@@ -1,0 +1,6 @@
+@FreshFarm.Identity.API_HostAddress = http://localhost:5101
+
+GET {{FreshFarm.Identity.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

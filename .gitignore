@@ -1,0 +1,45 @@
+# ===== .NET build output =====
+**/bin/
+**/obj/
+
+# ===== Visual Studio =====
+.vs/
+**/*.user
+**/*.suo
+**/*.csproj.user
+**/*.userosscache
+**/*.sln.docstates
+
+# ===== VS Code =====
+.vscode/
+
+# ===== Rider/JetBrains =====
+.idea/
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Logs =====
+*.log
+
+# ===== App settings / secrets =====
+# Commit appsettings.json, ignore environment overrides (Development/Staging/Production)
+**/appsettings.*.json
+!**/appsettings.json
+
+# User secrets / local files
+**/secrets.json
+
+# ===== Node (if any later) =====
+node_modules/
+
+# ===== Docker local volumes (if you add later) =====
+**/docker-data/
+
+DuAnCu/
+
+#docs
+docs/
+
