@@ -68,3 +68,57 @@ public sealed class OrderListItemResponse // DTO tra ve cho API list.
     public string Status { get; init; } = string.Empty; // Trang thai don.
     public string? PaymentStatus { get; init; } // Trang thai thanh toan.
 }
+
+public sealed class OrderDetailResponse // DTO tra ve cho API chi tiet don theo id.
+{
+    public int OrderId { get; init; } // Ma don.
+    public DateTime OrderDate { get; init; } // Ngay tao don.
+    public decimal ShippingFee { get; init; } // Phi giao hang.
+    public int? CouponId { get; init; } // Coupon da ap dung (neu co).
+    public decimal TotalAmount { get; init; } // Tong tien don.
+    public string? OrderNote { get; init; } // Ghi chu cua nguoi mua.
+    public string Status { get; init; } = string.Empty; // Trang thai don.
+    public string? PaymentStatus { get; init; } // Trang thai thanh toan tong quan.
+    public DateTime? PaidAt { get; init; } // Thoi diem da thanh toan (neu co).
+    public string? BuyerFullName { get; init; } // Snapshot ten nguoi mua/nhan.
+    public string? BuyerPhone { get; init; } // Snapshot so dien thoai.
+    public string? BuyerEmail { get; init; } // Snapshot email.
+    public int PointsEarned { get; init; } // Diem cong.
+    public int PointsRedeemed { get; init; } // Diem da dung.
+    public List<OrderDetailItemResponse> Items { get; init; } = new(); // Danh sach item trong don.
+    public List<OrderDetailShippingResponse> Shippings { get; init; } = new(); // Danh sach ban ghi giao nhan.
+    public List<OrderDetailPaymentResponse> Payments { get; init; } = new(); // Danh sach ban ghi thanh toan.
+}
+
+public sealed class OrderDetailItemResponse // Tung dong item trong chi tiet don.
+{
+    public int OrderDetailId { get; init; } // Ma dong chi tiet.
+    public int ProductId { get; init; } // Ma san pham.
+    public int Quantity { get; init; } // So luong.
+    public decimal UnitPrice { get; init; } // Don gia snapshot.
+    public string? UnitSymbol { get; init; } // Don vi tinh.
+}
+
+public sealed class OrderDetailShippingResponse // Tung ban ghi shipping cua don.
+{
+    public int ShippingId { get; init; } // Ma shipping.
+    public string? ShippingType { get; init; } // Loai giao hang.
+    public string? FullName { get; init; } // Ten nguoi nhan.
+    public string? Phone { get; init; } // So dien thoai nguoi nhan.
+    public string? Email { get; init; } // Email nguoi nhan.
+    public string? AddressDetail { get; init; } // Dia chi chi tiet.
+    public int? ProvinceId { get; init; } // Ma tinh/thanh.
+    public int? CommuneId { get; init; } // Ma phuong/xa.
+}
+
+public sealed class OrderDetailPaymentResponse // Tung ban ghi payment cua don.
+{
+    public int PaymentId { get; init; } // Ma payment.
+    public string? PaymentMethod { get; init; } // Phuong thuc thanh toan.
+    public string? BankName { get; init; } // Ten ngan hang.
+    public string? AccountName { get; init; } // Ten chu tai khoan.
+    public string? AccountNumber { get; init; } // So tai khoan.
+    public string? TransactionCode { get; init; } // Ma giao dich.
+    public string? PaymentStatus { get; init; } // Trang thai payment.
+    public DateTime? PaymentDate { get; init; } // Thoi diem thanh toan.
+}

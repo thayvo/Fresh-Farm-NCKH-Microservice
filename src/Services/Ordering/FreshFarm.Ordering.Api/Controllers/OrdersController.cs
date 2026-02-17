@@ -56,24 +56,82 @@ public sealed class OrdersController : ControllerBase // Dung ControllerBase cho
             return Unauthorized("Token khong co claim user id hop le."); // 401.
         }
 
-        var order = await _db.Orders // Query bang Orders.
+        var result = await _db.Orders // Query bang Orders.
             .AsNoTracking() // Chi doc, khong can track.
-            .Include(o => o.OrderDetails) // Nap chi tiet dong hang.
-            .Include(o => o.Shippings) // Nap thong tin giao hang.
-            .Include(o => o.Payments) // Nap thong tin thanh toan.
-            .FirstOrDefaultAsync(o => o.OrderId == id, cancellationToken); // Tim theo id don.
+            .Where(o => o.OrderId == id) // Loc theo id don.
+            .Select(o => new // Projection de tranh tra truc tiep entity EF.
+            {
+                o.UserId, // Dung de check quyen so huu don.
+                Data = new OrderDetailResponse // Map chi tiet sang response DTO.
+                {
+                    OrderId = o.OrderId,
+                    OrderDate = o.OrderDate,
+                    ShippingFee = o.ShippingFee,
+                    CouponId = o.CouponId,
+                    TotalAmount = o.TotalAmount,
+                    OrderNote = o.OrderNote,
+                    Status = o.Status ?? string.Empty,
+                    PaymentStatus = o.PaymentStatus,
+                    PaidAt = o.PaidAt,
+                    BuyerFullName = o.BuyerFullName,
+                    BuyerPhone = o.BuyerPhone,
+                    BuyerEmail = o.BuyerEmail,
+                    PointsEarned = o.PointsEarned,
+                    PointsRedeemed = o.PointsRedeemed,
+                    Items = o.OrderDetails // Danh sach item theo thu tu on dinh.
+                        .OrderBy(x => x.OrderDetailId)
+                        .Select(x => new OrderDetailItemResponse
+                        {
+                            OrderDetailId = x.OrderDetailId,
+                            ProductId = x.ProductId,
+                            Quantity = x.Quantity,
+                            UnitPrice = x.UnitPrice,
+                            UnitSymbol = x.UnitSymbol
+                        })
+                        .ToList(),
+                    Shippings = o.Shippings // Danh sach shipping theo thu tu on dinh.
+                        .OrderBy(x => x.ShippingId)
+                        .Select(x => new OrderDetailShippingResponse
+                        {
+                            ShippingId = x.ShippingId,
+                            ShippingType = x.ShippingType,
+                            FullName = x.FullName,
+                            Phone = x.Phone,
+                            Email = x.Email,
+                            AddressDetail = x.AddressDetail,
+                            ProvinceId = x.ProvinceId,
+                            CommuneId = x.CommuneId
+                        })
+                        .ToList(),
+                    Payments = o.Payments // Danh sach payment theo thu tu on dinh.
+                        .OrderBy(x => x.PaymentId)
+                        .Select(x => new OrderDetailPaymentResponse
+                        {
+                            PaymentId = x.PaymentId,
+                            PaymentMethod = x.PaymentMethod,
+                            BankName = x.BankName,
+                            AccountName = x.AccountName,
+                            AccountNumber = x.AccountNumber,
+                            TransactionCode = x.TransactionCode,
+                            PaymentStatus = x.PaymentStatus,
+                            PaymentDate = x.PaymentDate
+                        })
+                        .ToList()
+                }
+            })
+            .FirstOrDefaultAsync(cancellationToken); // Tim theo id don.
 
-        if (order is null) // Khong tim thay don.
+        if (result is null) // Khong tim thay don.
         {
             return NotFound($"Khong tim thay order id = {id}."); // 404 ro rang.
         }
 
-        if (order.UserId != userId.Value) // User hien tai khong so huu don.
+        if (result.UserId != userId.Value) // User hien tai khong so huu don.
         {
             return Forbid(); // 403 de dam bao boundary du lieu.
         }
 
-        return Ok(order); // MVP: tra truc tiep entity de debug nhanh; sau nay doi sang response DTO rieng.
+        return Ok(result.Data); // Tra response DTO de on dinh contract API va tranh cycle serialize.
     }
 
     [HttpPost] // Endpoint tao don moi.

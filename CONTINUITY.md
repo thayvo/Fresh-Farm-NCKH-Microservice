@@ -1,93 +1,51 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Hoan thien bo tai lieu va MVP microservices FreshFarm (`Identity`, `Catalog`, `Ordering`, `Web BFF`) dua tren `docs/final3.sql`.
-  - Success criteria: tai lieu khop code hien tai, DB per service ro rang, Ordering theo huong 3PL e-commerce only (khong pickup cua hang), co checklist thao tac tiep theo.
-  - Goal turn hien tai: tao 1 file `.md` mo ta chuoi tai lieu can dung sau `docs/ordering.md`.
+  - Hoan thien MVP microservices FreshFarm (`Identity`, `Catalog`, `Ordering`, `Web BFF`) va giu API Ordering on dinh theo huong e-commerce 3PL.
+  - Success criteria hien tai cua turn: `GET /api/orders/{id}` tra DTO on dinh, khong con loi `System.Text.Json.JsonException` do cycle serialize.
 - **Constraints/Assumptions**:
-  - User rule (hieu luc cho cac turn tiep theo): chi duoc tao/chinh file `.md`; khong sua `.cs/.json/.sql` neu chua duoc user cho phep ro rang.
-  - Repo dang ignore `docs/` va `appsettings.*.json` (tru `appsettings.json`), nen file docs/config local co the khong duoc git track.
-  - Trang thai config dev (check 2026-02-11): ca 4 service dang co file `appsettings.development.json` (lowercase), khong phai `appsettings.Development.json` theo convention.
-  - Noi dung config dev hien tai khong hop le de chay:
-    - Identity `appsettings.development.json` dang la C# class text, khong phai JSON.
-    - Catalog/Ordering/BFF `appsettings.development.json` dang de `{}`.
-  - Moi service validate JWT phai dung cung `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key`.
-  - Muc tieu hien tai uu tien Ordering + docs.
+  - User da cho phep ro rang sua code de implement plan (khong con rang buoc "chi sua .md" cho turn nay).
+  - Khong dung workaround global `ReferenceHandler.IgnoreCycles`; uu tien contract-first DTO.
+  - Du an `FreshFarm.Ordering.Api` su dung `net8.0`, `Nullable` enable.
+  - Moi service validate JWT can dung cung `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key`.
+  - Moi truong tool session thieu `dotnet` CLI (`dotnet: command not found`), nhung user da test thanh cong tren may dev cua user.
 - **Key decisions**:
-  - Nguon schema chuan la `docs/final3.sql`.
-  - Tach DB per service: `FreshFarmIdentityDB`, `FreshFarmCatalogDB`, `FreshFarmOrderingDB`.
-  - Ordering chot huong giao hang ben thu 3 (3PL), khong van hanh module delivery noi bo.
-  - Giu gateway BFF nhe (proxy), service ownership va auth chinh o tung API.
-  - Tai su dung giao dien tu `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram` theo huong "copy UI nhanh + refactor backend theo microservice", khong copy nguyen monolith controller/EF6 logic.
-  - Trong Ordering e-commerce only: bo truong pickup tai cua hang (`Shipping.IsStorePickup`, `Shipping.StoreAddress`) khoi code va huong dan DB.
+  - `GET /api/orders/{id}` khong tra truc tiep entity EF `Order`; doi sang `OrderDetailResponse`.
+  - Flow endpoint giu nguyen semantic status code: `401/404/403/200`.
+  - Mapping chi tiet su dung projection LINQ (`Select`) va sap xep on dinh:
+    - `Items` theo `OrderDetailId`
+    - `Shippings` theo `ShippingId`
+    - `Payments` theo `PaymentId`
+  - Khong them AutoMapper trong pham vi fix nay.
 - **State**:
   - *Done*:
-    - Da tao lai bo docs tu SQL + code hien tai:
-      - `docs/final3.md`
-      - `docs/FreshFarmOrderingDB.sql.md`
-      - `docs/FreshFarmOrderingDB.3pl.delta.sql.md`
-      - `docs/ordering.md`
-      - `docs/ke-hoach-tiep-theo.md`
-      - `docs/appsettings-development-templates.md` (cap nhat key `IdentityDB`)
-      - `docs/README.md`
-    - Da cap nhat `docs/ordering.md` thanh huong dan Ordering chi tiet theo DB that:
-      - Co DTO de xac thuc request.
-      - Co `OrdersController` mau dung EF Core + transaction.
-      - Co giai thich ly do gan nhu tung dong code.
-      - Co checklist test sau khi code.
-    - Da doc code du an cu tai `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn` (MVC5/EF6, user+admin UI, SignalR, delivery area) de lap ke hoach tai su dung cho du an moi.
-    - Da tao `docs/dungDuAnCu.md`:
-      - Mapping man hinh cu -> BFF/service moi.
-      - Ke hoach trien khai theo giai doan de co UI chay nhanh.
-      - Danh sach phan copy duoc ngay, phan can refactor, phan nen bo (delivery noi bo).
-      - De xuat nang cap sau MVP.
-    - Da tao `docs/auth-account.md`:
-      - Huong dan chi tiet buoc `Auth + Account` sau Ordering.
-      - Co code mau comment tung dong cho `Program.cs`, DTO, `AccountController`, va Views.
-      - Co checklist test va muc troubleshooting.
-    - Da doi chieu voi code:
-      - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-      - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-      - `src/Web/FreshFarm.Web.Bff/Program.cs`
-    - Da check blocker runtime ngay (2026-02-11):
-      - `appsettings.development.json` dang sai casing o ca 4 service.
-      - Identity `appsettings.development.json` dang la noi dung C# class, khong phai JSON.
-      - Catalog/Ordering/BFF `appsettings.development.json` dang de `{}`.
-      - `OrdersController` cua Ordering chua co business logic DB (dang mock `return Ok()`).
-    - Da cap nhat Ordering theo 3PL e-commerce only:
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs` da bo `IsStorePickup` va `StoreAddress`.
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/Shipping.cs` da bo `IsStorePickup` va `StoreAddress`.
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.cs` da bo mapping `StoreAddress`.
-      - `docs/FreshFarmOrderingDB.3pl.delta.sql.md` da them SQL drop 2 cot pickup trong `dbo.Shipping`.
-      - `docs/ordering.md` va `docs/FreshFarmOrderingDB.sql.md` da doi huong ve giao hang 3PL online-only.
-    - Da audit lai logic Ordering theo chuan e-commerce online (2026-02-12):
-      - `OrdersController` van dang mock (`GET/POST` deu `return Ok()`), chua co nghiep vu dat don that.
-      - `Program.cs` da co JWT + DbContext nhung chua thay `AddAuthorization()`.
-      - DTO shipping dang lech voi entity (`PhoneNumber` vs `Phone`, gioi han 11 vs DB 20).
-      - Chua co luong nghiep vu cot loi: inventory reserve, coupon validate, payment webhook, state machine, idempotency.
-    - Da tao `docs/chuoi-sau-ordering.md` de chi ro thu tu docs sau `docs/ordering.md`.
-    - Da cap nhat `docs/README.md` de them entry cho `docs/chuoi-sau-ordering.md`.
+    - Da implement fix cycle serialize cho `GET /api/orders/{id}`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`:
+        - Them `OrderDetailResponse`
+        - Them `OrderDetailItemResponse`
+        - Them `OrderDetailShippingResponse`
+        - Them `OrderDetailPaymentResponse`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`:
+        - Bo `Include(...)` + `return Ok(order)`
+        - Doi sang projection `Select(...)` tra DTO + ownership check bang `result.UserId`
+        - Giu nguyen behavior `NotFound`/`Forbid`.
+    - User xac nhan da test thanh cong sau khi sua endpoint (2026-02-17).
+    - Da ghi nhan ket qua verify tool:
+      - Trong session nay khong build duoc vi `dotnet` khong co san.
   - *Now*:
-    - Chot noi dung tra loi user va duong dan file vua tao.
+    - Chot roadmap ky thuat tiep theo sau khi fix da pass test tay.
   - *Next*:
-    - Neu user muon, bo sung ban "checklist thao tac theo ngay" dua tren chuoi docs moi.
+    - Bo sung test tu dong cho `OrdersController.GetById` (uu tien integration test 3 case `200/404/403`).
+    - Chuan hoa contract API Ordering theo DTO cho cac endpoint con lai (tranh tra entity truc tiep trong tuong lai).
+    - Chuan bi commit nho, mo ta ro thay doi contract `GET /api/orders/{id}` de frontend/BFF cap nhat neu can.
 - **Open questions** (UNCONFIRMED if needed):
   - Khong co.
 - **Working set** (files/ids/commands):
-  - `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram`
-  - `docs/final3.sql`
-  - `docs/final3.md`
-  - `docs/FreshFarmOrderingDB.sql.md`
-  - `docs/FreshFarmOrderingDB.3pl.delta.sql.md`
-  - `docs/ordering.md`
-  - `docs/auth-account.md`
-  - `docs/dungDuAnCu.md`
-  - `docs/ke-hoach-tiep-theo.md`
-  - `docs/appsettings-development-templates.md`
-  - `docs/chuoi-sau-ordering.md`
-  - `docs/README.md`
-  - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-  - `src/Web/FreshFarm.Web.Bff/Program.cs`
+  - `CONTINUITY.md`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/Order.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/OrderDetail.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/Shipping.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/Payment.cs`
+  - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj` (UNCONFIRMED runtime verify; tool missing)
