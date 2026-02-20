@@ -1,0 +1,170 @@
+@using System.Globalization
+@model dynamic
+@{
+    Layout = null;
+
+    decimal ToDecimal(object? value, decimal fallback = 0m)
+    {
+        if (value is null) return fallback;
+        if (decimal.TryParse(value.ToString(), out var parsed)) return parsed;
+        return fallback;
+    }
+
+    DateTime ToDateTime(object? value, DateTime fallback)
+    {
+        if (value is null) return fallback;
+        if (DateTime.TryParse(value.ToString(), out var parsed)) return parsed;
+        return fallback;
+    }
+
+    var orderCode = ViewBag.OrderCode as string;
+    var hasOrderData = !string.IsNullOrWhiteSpace(orderCode);
+
+    var orderDate = hasOrderData ? ToDateTime(ViewBag.OrderDate, DateTime.Now) : DateTime.MinValue;
+    var totalAmount = hasOrderData ? ToDecimal(ViewBag.TotalAmount, 0m) : 0m;
+    var paymentMethod = hasOrderData ? (ViewBag.PaymentMethod as string ?? "COD") : null;
+    var recipientName = hasOrderData ? (ViewBag.RecipientName as string ?? "Chưa cập nhật") : null;
+    var recipientPhone = hasOrderData ? (ViewBag.RecipientPhone as string ?? "Chưa cập nhật") : null;
+    var recipientAddress = hasOrderData ? (ViewBag.RecipientAddress as string ?? "Chưa cập nhật") : null;
+
+    string Vnd(decimal value) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", value);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đặt hàng thành công - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary-green: #008a4f;
+        }
+
+        body {
+            background: #f4f7f5;
+            min-height: 100vh;
+        }
+
+        .success-wrap {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 12px;
+        }
+
+        .card {
+            border: 0;
+            border-radius: 14px;
+        }
+
+        .check-icon {
+            color: var(--primary-green);
+            font-size: 4rem;
+        }
+
+        .btn-main {
+            background: var(--primary-green);
+            border-color: var(--primary-green);
+            color: #fff;
+        }
+
+        .btn-main:hover {
+            background: #006a3d;
+            border-color: #006a3d;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <main class="success-wrap">
+        <div class="card shadow-sm p-4 p-md-5">
+            @if (hasOrderData)
+            {
+                <div class="card-body text-center">
+                    <i class="bi bi-check-circle-fill check-icon mb-3"></i>
+                    <h2 class="fw-bold mb-2">Cảm ơn bạn đã đặt hàng!</h2>
+                    <p class="lead mb-3">
+                        Đơn hàng <strong class="text-primary">@orderCode</strong> đã được tạo thành công.
+                    </p>
+                    <p class="mb-4 text-muted">
+                        Chúng tôi đã ghi nhận đơn hàng của bạn và sẽ sớm liên hệ xác nhận.
+                    </p>
+
+                    <div class="row gx-4 gy-3 text-start border-top pt-4 mt-2 mb-3">
+                        <div class="col-md-6">
+                            <h5 class="fw-bold mb-3">Thông tin đơn hàng</h5>
+                            <p class="mb-1"><strong>Mã đơn hàng:</strong> <span class="text-primary">@orderCode</span></p>
+                            <p class="mb-1"><strong>Ngày đặt:</strong> @orderDate.ToString("dd/MM/yyyy HH:mm")</p>
+                            <p class="mb-1"><strong>Tổng tiền:</strong> <strong style="color: var(--primary-green)">@Vnd(totalAmount)</strong></p>
+                            <p class="mb-1"><strong>Thanh toán:</strong> @paymentMethod</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="fw-bold mb-3">Thông tin nhận hàng</h5>
+                            <p class="mb-1"><strong>Người nhận:</strong> @recipientName</p>
+                            <p class="mb-1"><strong>Số điện thoại:</strong> @recipientPhone</p>
+                            <p class="mb-1"><strong>Địa chỉ:</strong> @recipientAddress</p>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info border-0">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        Bạn có thể theo dõi đơn hàng trong mục <strong>Lịch sử đơn hàng</strong>.
+                    </div>
+
+                    <p class="mt-4 mb-2 text-muted small">
+                        Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.
+                    </p>
+
+                    <div class="d-grid gap-2 d-md-block mt-2">
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
+                            <i class="bi bi-house-door-fill me-2"></i>Về trang chủ
+                        </a>
+                        <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
+                        </a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card-body text-center">
+                    <i class="bi bi-exclamation-circle check-icon mb-3"></i>
+                    <h2 class="fw-bold mb-2">Không có dữ liệu đơn hàng</h2>
+                    <p class="mb-4 text-muted">
+                        Có thể bạn đã vào trực tiếp trang này hoặc phiên dữ liệu đã hết hạn.
+                    </p>
+                    <div class="d-grid gap-2 d-md-block">
+                        <a href="/checkout" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
+                            <i class="bi bi-arrow-repeat me-2"></i>Quay lại checkout
+                        </a>
+                        <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
+                            <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </main>
+
+    @if (hasOrderData)
+    {
+        <script>
+            (() => {
+                let seconds = 8;
+                const countdownEl = document.getElementById("countdown");
+                const timer = setInterval(() => {
+                    seconds--;
+                    if (countdownEl) {
+                        countdownEl.textContent = seconds.toString();
+                    }
+                    if (seconds <= 0) {
+                        clearInterval(timer);
+                        window.location.href = "/";
+                    }
+                }, 1000);
+            })();
+        </script>
+    }
+</body>
+</html>

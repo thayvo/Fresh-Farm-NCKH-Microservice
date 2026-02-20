@@ -1,70 +1,82 @@
-﻿using Microsoft.OpenApi.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddEndpointsApiExplorer();
-// Add services to the container.
-builder.Services.AddControllersWithViews();
+var builder = WebApplication.CreateBuilder(args); // Tao host builder cho app.
 
-builder.Services.AddHttpClient("Catalog", client =>
+builder.Services.AddControllersWithViews(); // Bat MVC + Razor views.
+builder.Services.AddEndpointsApiExplorer(); // Metadata endpoint cho swagger.
+
+builder.Services.AddDistributedMemoryCache(); // Session store trong memory (du cho MVP local).
+builder.Services.AddSession(options => // Cau hinh session middleware.
 {
-    var baseUrl = builder.Configuration["Services:Catalog:BaseUrl"];
-    client.BaseAddress = new Uri(baseUrl);
+    options.Cookie.Name = "FreshFarm.Bff.Session"; // Ten cookie session de de nhan biet.
+    options.Cookie.HttpOnly = true; // Chan javascript doc cookie session.
+    options.Cookie.IsEssential = true; // Session van chay du consent cookie.
+    options.IdleTimeout = TimeSpan.FromHours(2); // Het han session neu khong thao tac 2h.
 });
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "FreshFarm.Web.Bff", Version = "v1" });
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+
+builder.Services // Dang ky cookie authentication cho user web.
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Nhập: Bearer {token}"
+        options.LoginPath = "/account/signin"; // Chua login -> redirect signin.
+        options.AccessDeniedPath = "/account/signin"; // Tam thoi redirect signin cho MVP.
+        options.SlidingExpiration = true; // User hoat dong thi reset han cookie.
+        options.ExpireTimeSpan = TimeSpan.FromHours(2); // Han cookie auth.
     });
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-}
-);
-var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+builder.Services.AddAuthorization(); // Bat [Authorize] cho controller/action.
+
+builder.Services.AddHttpClient("Identity", client => // HttpClient typed by name cho Identity API.
 {
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-if(app.Environment.IsDevelopment())
+    var baseUrl = builder.Configuration["Services:Identity:BaseUrl"]; // Doc base url tu config.
+    client.BaseAddress = new Uri(baseUrl!); // Gan base address.
+});
+
+builder.Services.AddHttpClient("Catalog", client => // HttpClient cho Catalog API.
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    var baseUrl = builder.Configuration["Services:Catalog:BaseUrl"]; // Doc base url tu config.
+    client.BaseAddress = new Uri(baseUrl!); // Gan base address.
+});
+
+builder.Services.AddHttpClient("Ordering", client => // HttpClient cho Ordering API.
+{
+    var baseUrl = builder.Configuration["Services:Ordering:BaseUrl"]; // Doc base url tu config.
+    client.BaseAddress = new Uri(baseUrl!); // Gan base address.
+});
+
+builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "FreshFarm.Web.Bff", Version = "v1" }); // Metadata.
+});
+
+var app = builder.Build(); // Build app pipeline.
+
+if (!app.Environment.IsDevelopment()) // Pipeline production.
+{
+    app.UseExceptionHandler("/Home/Error"); // Trang loi chung.
+    app.UseHsts(); // Bat HSTS.
 }
-app.UseHttpsRedirection();
-app.UseStaticFiles();
 
-app.UseRouting();
+if (app.Environment.IsDevelopment()) // Dev moi mo swagger.
+{
+    app.UseSwagger(); // Tao swagger json.
+    app.UseSwaggerUI(); // UI swagger.
+}
 
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseHttpsRedirection(); // Ep HTTPS.
+app.UseStaticFiles(); // Phuc vu css/js/image.
+app.UseRouting(); // Route matching.
 
-app.MapControllers();
-app.MapControllerRoute(
+app.UseSession(); // IMPORTANT: session truoc auth neu action can doc session token.
+app.UseAuthentication(); // Doc cookie auth.
+app.UseAuthorization(); // Enforce [Authorize].
+
+app.MapControllers(); // Map API controllers.
+app.MapControllerRoute( // Map MVC default route.
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
-app.MapGet("/health", ()=>Results.Ok("ok"));
-app.Run();
+
+app.MapGet("/health", () => Results.Ok("ok")); // Health check endpoint.
+
+app.Run(); // Chay app.
