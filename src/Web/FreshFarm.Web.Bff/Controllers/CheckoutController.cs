@@ -27,6 +27,7 @@ public sealed class CheckoutController : Controller // MVC controller cho trang 
     [HttpGet("/checkout/success")]
     public IActionResult Success()
     {
+        ViewBag.OrderId = TempData["OrderId"];
         ViewBag.OrderCode = TempData["OrderCode"];
         ViewBag.OrderDate = TempData["OrderDate"];
         ViewBag.TotalAmount = TempData["TotalAmount"];
@@ -69,6 +70,7 @@ public sealed class CheckoutController : Controller // MVC controller cho trang 
 
         if (created is not null)
         {
+            TempData["OrderId"] = created.OrderId;
             TempData["OrderCode"] = $"FF{created.OrderId:D6}";
             TempData["TotalAmount"] = created.TotalAmount;
         }
