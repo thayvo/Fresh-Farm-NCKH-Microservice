@@ -16,79 +16,46 @@
         }
 
         body {
-            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
+            background: #f8f9fa;
+            min-height: 100vh;
         }
 
-        .checkout-wrap {
+        .checkout-container {
             max-width: 1140px;
-            margin: 28px auto 40px;
-            padding: 0 12px;
-        }
-
-        .top-nav {
-            background: #fff;
-            border: 1px solid #d7f1e4;
-            border-radius: 14px;
-        }
-
-        .brand-chip {
-            color: var(--primary-green);
-            font-weight: 800;
-            letter-spacing: .02em;
-            text-decoration: none;
-        }
-
-        .section-title {
-            color: #111827;
-            font-weight: 700;
-        }
-
-        .step-chip {
-            padding: .35rem .65rem;
-            border-radius: 999px;
-            font-size: .78rem;
-            font-weight: 600;
-            background: #eef5ef;
-            color: #35534a;
-        }
-
-        .step-chip.active {
-            background: rgba(0, 138, 79, .14);
-            color: #004f2d;
-            border: 1px solid rgba(0, 138, 79, .3);
         }
 
         .card {
             border: 0;
-            border-radius: 14px;
+            border-radius: 12px;
         }
 
         .form-control:focus,
         .form-select:focus {
             border-color: var(--primary-green);
-            box-shadow: 0 0 0 .25rem rgba(0, 138, 79, .15);
+            box-shadow: 0 0 0 .25rem rgba(0, 138, 79, .2);
         }
 
         .payment-option {
-            border: 1px solid #dee2e6;
+            border: 1px solid #e5e7eb;
             border-radius: 10px;
             padding: 12px 14px;
             cursor: pointer;
+            background: #fff;
         }
 
         .payment-option.active {
             border-color: var(--primary-green);
-            background: rgba(0, 138, 79, .05);
+            background: rgba(0, 138, 79, .06);
         }
 
-        .btn-main {
-            background: var(--primary-green);
+        .btn-success {
+            background-color: var(--primary-green);
             border-color: var(--primary-green);
             color: #fff;
         }
 
-        .btn-main:hover {
-            background: #006a3d;
+        .btn-success:hover {
+            background-color: #006a3d;
             border-color: #006a3d;
             color: #fff;
         }
@@ -98,7 +65,7 @@
         }
 
         .invalid-flow {
-            border: 1px dashed #dc3545;
+            border: 1px dashed #ef4444;
             border-radius: 10px;
             background: #fff5f5;
             color: #842029;
@@ -106,9 +73,9 @@
     </style>
 </head>
 <body>
-    <main class="checkout-wrap">
-        <header class="top-nav d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 mb-3">
-            <a href="/" class="brand-chip">FRESHFARM</a>
+    <div class="container my-5 checkout-container">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h2 class="mb-0">Thanh toán</h2>
             <div class="d-flex gap-2">
                 <a href="/" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-grid me-1"></i>Danh sách sản phẩm
@@ -117,16 +84,6 @@
                     <i class="bi bi-receipt me-1"></i>Đơn hàng của tôi
                 </a>
             </div>
-        </header>
-
-        <div class="mb-4">
-            <div class="d-flex flex-wrap gap-2 mb-2">
-                <span class="step-chip">1. Chọn sản phẩm</span>
-                <span class="step-chip active">2. Thanh toán</span>
-                <span class="step-chip">3. Hoàn tất</span>
-            </div>
-            <h2 class="section-title mb-1">Thanh toán</h2>
-            <p class="text-muted mb-0">Xác nhận thông tin giao hàng và hoàn tất đơn hàng.</p>
         </div>
 
         <div id="flowAlert" class="invalid-flow p-3 mb-3 d-none"></div>
@@ -249,21 +206,19 @@
                             <strong id="grandTotalValue" class="summary-price">0 ₫</strong>
                         </div>
 
-                        <button id="submitBtn" type="submit" form="checkoutForm" class="btn btn-main w-100 mt-3">
+                        <button id="submitBtn" type="submit" form="checkoutForm" class="btn btn-success w-100 mt-3">
                             <i class="bi bi-bag-check me-2"></i>Đặt hàng
                         </button>
                         <a href="/" class="btn btn-outline-secondary w-100 mt-2">
                             <i class="bi bi-arrow-left me-1"></i>Chọn sản phẩm khác
                         </a>
 
-                        <p class="small text-muted mt-3 mb-0">
-                            Luồng hiện tại nhận sản phẩm từ query string khi bấm “Mua ngay”.
-                        </p>
+                        <p class="small text-muted mt-3 mb-0">Mẹo: bấm “Mua ngay” từ trang sản phẩm để nạp dữ liệu nhanh.</p>
                     </div>
                 </div>
             </div>
         </div>
-    </main>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
