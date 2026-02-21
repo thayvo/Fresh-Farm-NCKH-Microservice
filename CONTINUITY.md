@@ -1,8 +1,11 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Kiểm tra dự án cũ có trang `OrderDetail` riêng hay không; nếu không có thì tạo mới cho BFF theo phong cách hiện tại.
-  - Success criteria của turn này: có trang `OrderDetail` mới chạy được với dữ liệu thật từ Ordering API và đã nối từ `OrderHistory`.
+  - Cập nhật tài liệu kế hoạch với code hoàn chỉnh toàn phần trong file `.md`.
+  - Success criteria của turn này:
+    - Có full code cho các file view ưu tiên ngay trong `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`.
+    - Có quy tắc/checkpoint nhắc đẩy GitHub sau từng cụm file.
+    - Chỉ sửa trong phạm vi `md/views` theo ràng buộc user.
 - **Constraints/Assumptions**:
   - User da cho phep sua file view trong turn nay.
   - Khong sua `.cs/.json/.sql` neu user chua cho phep ro rang.
@@ -13,7 +16,15 @@
     - Khi can tao/sua view, phai xem truoc nguon UI cu tai `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram`.
     - Neu co phan copy duoc thi de nghi user copy qua de assistant sua/refactor cho nhanh.
     - Từ giờ dùng tiếng Việt có dấu trong dự án (ưu tiên cho text hiển thị, tài liệu, comment).
+  - Ràng buộc mới nhất user nhắc lại:
+    - Turn này chỉ yêu cầu kiểm tra và ghi kế hoạch vào file `.md`.
+    - Không sửa file ngoài `md/views` cho đến khi user cho phép.
+  - Yêu cầu mới nhất từ user:
+    - Đưa code hoàn chỉnh vào file `.md`.
+    - Mỗi cụm file sau khi hoàn tất phải nhắc user đẩy GitHub.
 - **Key decisions**:
+  - Theo yêu cầu mới nhất: không bỏ qua GitHub nữa, chuyển sang cơ chế nhắc đẩy theo checkpoint sau mỗi cụm file.
+  - Full code chỉ cung cấp trong tài liệu `.md` trước, chưa tự ý sửa thêm file code ngoài phạm vi.
   - Tiep tuc huong Ordering e-commerce 3PL va contract-first DTO (khong tra truc tiep entity EF cho endpoint chi tiet).
   - BFF giu vai tro gateway nhe/proxy; auth-account flow se la buoc uu tien tiep theo sau khi Ordering on dinh.
   - Danh gia tien do phai dua tren ma nguon thuc te thay vi chi dua vao ke hoach cu trong docs.
@@ -39,6 +50,13 @@
     - Không ép đổi tên identifier/code symbol nếu việc đổi tên có nguy cơ ảnh hưởng logic.
 - **State**:
   - *Done*:
+    - Đã tạo mới `docs/git-tu-nhap-mon-den-phap-su.md`:
+      - Đủ 60 câu hỏi (Q1-Q60), có đủ 8 mục trả lời cho từng câu.
+      - Bao phủ toàn bộ nhóm 1-10 theo yêu cầu.
+      - Có ví dụ thực tế bám dự án FreshFarm trong từng nhóm.
+      - Có phụ lục `.gitignore` .NET, chiến lược nhánh, flow feature -> production.
+      - Có cheat sheet 20 lệnh Git dùng nhiều nhất.
+    - Đã cập nhật `docs/README.md` thêm entry cho tài liệu Git mới.
     - Đã sửa `Views/Checkout/Success.cshtml` để bỏ fallback dữ liệu giả:
       - Không còn default `FF000000` và `Khách hàng` khi thiếu dữ liệu.
       - Chỉ render block "Đặt hàng thành công" khi có `OrderCode` từ `TempData`.
@@ -197,12 +215,74 @@
       - Thêm phần "Hướng dẫn xử lý 5 mục còn lại (chi tiết để bạn tự sửa)" cho các mục controller.
     - Đã ghi nhận ràng buộc mới từ user:
       - Dùng tiếng Việt có dấu trong dự án từ thời điểm này.
+    - Đã rà soát nhanh trạng thái Git hiện tại:
+      - Nhánh hiện tại: `dev` (`git branch --show-current`).
+      - Working tree đang có 147 file thay đổi (`git status --porcelain | wc -l`), trải rộng Catalog/Identity/Ordering/BFF và cả `.gitignore`, `AGENTS.md`.
+      - Phân bố thay đổi tập trung ở:
+        - `src/Services/*`: 78 file.
+        - `src/Web/*`: 63 file.
+      - Chưa có file nào được stage (`git diff --name-only --cached` = 0).
+      - `docs/README.md` đã có link tới `docs/git-tu-nhap-mon-den-phap-su.md`.
+      - `docs/git-tu-nhap-mon-den-phap-su.md` có đủ `Q1` đến `Q60`.
+      - Hai file docs chính đang bị ignore bởi rule `docs/` trong `.gitignore`:
+        - `docs/README.md`
+        - `docs/git-tu-nhap-mon-den-phap-su.md`
+      - Local `dev` và `origin/dev` đang cùng commit (`0 0` theo `git rev-list --left-right --count dev...origin/dev`).
+    - Đã xác nhận trạng thái sau khi user báo "đã push":
+      - `dev`, `origin/dev`, `feature/bff-mvp`, `origin/feature/bff-mvp` cùng trỏ về commit `2c78e3f`.
+      - Push đã thành công cho commit hiện tại trên remote.
+      - Tuy nhiên local vẫn còn working tree bẩn (nhiều file modified chưa commit), nên nếu tiếp tục làm sẽ khó tách lịch sử.
+      - Kiểm tra tree của `origin/dev` chưa thấy:
+        - `docs/git-tu-nhap-mon-den-phap-su.md`
+        - `docs/README.md`
+      - Khả năng cao 2 file docs chưa lên remote do rule ignore `docs/` trong `.gitignore`.
+    - Đã hoàn tất 1 chức năng code mới:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
+        - Ghi thêm `OrderId` vào `TempData` sau khi tạo đơn thành công.
+        - Đọc `TempData["OrderId"]` ở action `Success`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`:
+        - Parse `OrderId` từ `ViewBag`.
+        - Bổ sung nút "Xem chi tiết đơn vừa đặt" trỏ tới `/account/orders/{id}` khi có dữ liệu.
+      - Giữ nguyên bố cục/màu sắc hiện có của trang success.
+    - Đã cập nhật mới toàn bộ file kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Nội dung mới gồm:
+        - Ảnh chụp hiện trạng theo code thực tế.
+        - Điểm nghẽn chính hiện tại.
+        - Roadmap cực chi tiết theo giai đoạn A/B/C/D.
+        - Nhánh làm ngay chỉ với `md/views`: Home product listing + Checkout động từ query.
+        - Definition of Done + checklist test tay + mẫu prompt để làm tiếp từng bước.
+    - Đã bổ sung vào cùng file kế hoạch phần code hoàn chỉnh toàn phần:
+      - Full file `Views/Home/Index.cshtml`.
+      - Full file `Views/Checkout/Index.cshtml`.
+      - Thêm mục quy tắc đẩy GitHub và checkpoint sau từng cụm file.
+    - Đã xác nhận:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md` đang bị ignore bởi `.gitignore` (rule `docs/`), cần `git add -f` hoặc bỏ rule ignore nếu muốn push file docs này.
+    - Đã triển khai theo yêu cầu mới nhất (chỉ sửa `views`):
+      - Sửa `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` từ template "Welcome" sang trang danh sách sản phẩm.
+      - Có ô tìm kiếm theo tên sản phẩm.
+      - JavaScript gọi `GET /bff/products` và `GET /bff/products?name=...`.
+      - Render grid card gồm tên, giá, danh mục, đơn vị.
+      - Nút `Mua ngay` chuyển tới `/checkout?productId=...&productName=...&unitPrice=...&unitSymbol=...`.
+      - Có tái sử dụng phong cách từ dự án cũ (layout card, màu xanh thương hiệu, khung ảnh sản phẩm).
+    - User đã commit và push thành công chức năng Home listing:
+      - Commit: `e823992`
+      - Branch: `feature/bff-mvp`
+      - Remote: `origin/feature/bff-mvp`
+    - User đặt câu hỏi quy trình: sau khi xong chức năng có nên gộp luôn vào `dev` hay không.
+    - Đã xử lý lỗi compile ở view success:
+      - File: `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
+      - Lỗi: `CS8197 Cannot infer the type of implicitly-typed out variable 'parsedOrderId'`.
+      - Nguyên nhân: `ViewBag.OrderId` là `dynamic`, kết hợp `out var` khiến compiler không suy luận được kiểu.
+      - Cách sửa đã áp dụng:
+        - `string? orderIdText = Convert.ToString(ViewBag.OrderId);`
+        - `int.TryParse(orderIdText, out int parsedOrderId)`
   - *Now*:
-    - Hướng dẫn user cách gom nhiều nhánh chưa merge về `dev` an toàn khi code đã nhiều.
+    - Báo user nguyên nhân lỗi ở `Success.cshtml` và xác nhận đã sửa.
   - *Next*:
-    - Thực hiện merge theo thứ tự, xử lý conflict từng nhánh, rồi đẩy `dev` lên remote.
+    - Nếu user đồng ý, tiếp tục sửa `Views/Checkout/Index.cshtml` theo query string động.
 - **Open questions** (UNCONFIRMED if needed):
-  - Không có.
+  - `UNCONFIRMED`: 147 file modified là thay đổi chủ đích hay nhiễu line-ending/format.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
   - `docs/chuoi-sau-ordering.md`
@@ -212,6 +292,7 @@
   - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
   - `docs/ke-hoach-tiep-theo.md`
   - `docs/README.md`
+  - `docs/git-tu-nhap-mon-den-phap-su.md`
   - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
   - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
   - `src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj`
