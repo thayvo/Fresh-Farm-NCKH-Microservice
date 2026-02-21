@@ -19,6 +19,9 @@
 
     var orderCode = ViewBag.OrderCode as string;
     var hasOrderData = !string.IsNullOrWhiteSpace(orderCode);
+    string? orderIdText = Convert.ToString(ViewBag.OrderId);
+    var orderId = int.TryParse(orderIdText, out int parsedOrderId) ? parsedOrderId : 0;
+    var hasOrderId = orderId > 0;
 
     var orderDate = hasOrderData ? ToDateTime(ViewBag.OrderDate, DateTime.Now) : DateTime.MinValue;
     var totalAmount = hasOrderData ? ToDecimal(ViewBag.TotalAmount, 0m) : 0m;
@@ -116,14 +119,20 @@
                         Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.
                     </p>
 
-                    <div class="d-grid gap-2 d-md-block mt-2">
-                        <a asp-controller="Home" asp-action="Index" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
-                            <i class="bi bi-house-door-fill me-2"></i>Về trang chủ
-                        </a>
-                        <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
-                            <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
-                        </a>
-                    </div>
+                        <div class="d-grid gap-2 d-md-block mt-2">
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
+                                <i class="bi bi-house-door-fill me-2"></i>Về trang chủ
+                            </a>
+                            @if (hasOrderId)
+                            {
+                                <a href="/account/orders/@orderId" class="btn btn-outline-primary btn-lg me-md-2 mb-2 mb-md-0">
+                                    <i class="bi bi-receipt me-2"></i>Xem chi tiết đơn vừa đặt
+                                </a>
+                            }
+                            <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
+                            </a>
+                        </div>
                 </div>
             }
             else
