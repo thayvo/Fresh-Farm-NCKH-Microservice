@@ -1,46 +1,47 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Sửa giao diện trang Home của BFF giống giao diện Home dự án cũ.
+  - Hoàn thiện UI BFF theo hướng view-first, bám phong cách dự án cũ.
   - Success criteria:
-    - Home có bố cục cũ: promo bar, header, navbar, carousel, danh mục cuộn, slider gợi ý, lưới nổi bật, footer, popup coupon.
-    - Vẫn chạy với luồng BFF mới: dữ liệu sản phẩm lấy từ `GET /bff/products` và mua qua `/checkout?...`.
-    - Chỉ sửa trong `views` và cập nhật ledger.
+    - Cụm Shared đã tái sử dụng được.
+    - Home giữ đúng luồng dữ liệu sản phẩm và bố cục cũ.
+    - Có lộ trình rõ ràng cho các cụm view kế tiếp (Account/Checkout/Cart).
 - **Constraints/Assumptions**:
   - User ưu tiên tiếng Việt có dấu.
-  - Chỉ sửa `Views/*` và file `.md` nếu chưa có cho phép khác.
-  - Môi trường hiện tại không có `dotnet` CLI nên chưa build/test tự động.
-  - Home cũ phụ thuộc nhiều model/partial/assets của ASP.NET MVC cũ; BFF không có các phần đó nên cần chuyển sang render bằng JavaScript.
+  - Tập trung sửa `views` và `.md`.
+  - Mục tiêu hiện tại là giống giao diện cũ trước, logic nâng sau.
+  - `docs/` đang bị ignore bởi `.gitignore`.
 - **Key decisions**:
-  - Thay toàn bộ `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` bằng phiên bản mô phỏng gần như đầy đủ Home cũ.
-  - Nhúng CSS/JS trực tiếp trong view để không cần sửa file ngoài `views`.
-  - Dùng dữ liệu động từ `/bff/products` để render danh mục, gợi ý, nổi bật.
-  - Các thao tác wishlist/cart cũ được mô phỏng phía client (localStorage + link checkout) để giữ trải nghiệm giao diện cũ.
+  - Tạo các partial legacy trong `Views/Shared` thay vì giữ block lớn trong `Home/Index`.
+  - Giữ `Home/Index` làm trang host dữ liệu, còn phần chrome UI (promo/header/nav/footer/toast) tách shared.
+  - Không đụng controller/service trong bước Shared.
 - **State**:
   - *Done*:
-    - Đã sửa `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` theo phong cách Home cũ:
-      - Promo bar + header + navbar.
-      - Carousel banner.
-      - Danh mục ngang có nút cuộn trái/phải.
-      - Khu "Gợi Ý Hôm Nay" bằng Swiper.
-      - Khu "Sản phẩm nổi bật" dạng card overlay.
-      - Popup coupon và footer phong cách cũ.
-    - Đã gắn dữ liệu runtime BFF:
-      - Gọi `GET /bff/products` (và `?name=...` khi tìm kiếm).
-      - Chuẩn hóa dữ liệu sản phẩm và render lại theo layout cũ.
-      - Nút thao tác sản phẩm trỏ sang `/checkout?productId=...&productName=...&unitPrice=...&unitSymbol=...`.
+    - Đã tạo mới các partial shared:
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ToastLegacy.cshtml`
+    - Đã cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`:
+      - Dùng `@await Html.PartialAsync(...)` cho promo/header/nav/footer/toast.
+      - Giữ nguyên JS IDs quan trọng (`headerSearchForm`, `headerSearchInput`) để script Home tiếp tục hoạt động.
+    - Đã cập nhật kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Đánh dấu trạng thái `[Đã làm]` cho Bước 1 Shared.
   - *Now*:
-    - Bàn giao để user xem lại mức độ "y chang" mong muốn.
+    - Chốt bàn giao bước Shared cho user.
   - *Next*:
-    - Nếu cần giống tuyệt đối cả hình/logo/icon cũ: user copy thêm assets (logo/slogan/images) sang BFF, rồi tinh chỉnh pixel-level.
+    - Làm Bước 2: so khớp pixel-level Home theo giao diện cũ.
+    - Sau đó sang Bước 3: chuẩn hóa cụm Account (SignIn/SignUp).
 - **Open questions** (UNCONFIRMED if needed):
-  - `UNCONFIRMED`: User có muốn copy toàn bộ ảnh/logo gốc từ dự án cũ sang `wwwroot` để đạt mức "y chang" tuyệt đối không?
+  - `UNCONFIRMED`: User muốn mình làm tiếp ngay Bước 2 (pixel-level Home) hay qua Bước 3 (SignIn/SignUp) luôn?
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/Index.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/HeaderPartial.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/NavBar.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/PromoBar.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/FooterPartial.cshtml`
-  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Content/Site.css`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ToastLegacy.cshtml`
+  - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`

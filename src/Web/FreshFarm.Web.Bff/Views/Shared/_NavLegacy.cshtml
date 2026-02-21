@@ -1,0 +1,19 @@
+@{
+    var current = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
+}
+<nav class="navbar navbar-expand-lg navbar-main">
+    <div class="container">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="mainNavigation">
+            <ul class="navbar-nav mx-auto fw-medium">
+                <li class="nav-item"><a class="nav-link @(current == "home" ? "active" : string.Empty)" href="/">Trang Chủ</a></li>
+                <li class="nav-item"><a class="nav-link" href="#section-categories">Danh mục</a></li>
+                <li class="nav-item"><a class="nav-link" href="#section-suggest">Gợi Ý Hôm Nay</a></li>
+                <li class="nav-item"><a class="nav-link" href="#section-featured">Sản phẩm nổi bật</a></li>
+                <li class="nav-item"><a class="nav-link" href="/account/orders">Lịch sử đơn</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>

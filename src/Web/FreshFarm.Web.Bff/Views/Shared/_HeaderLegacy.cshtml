@@ -1,0 +1,51 @@
+<header class="py-3 bg-white border-bottom">
+    <div class="container">
+        <div class="row align-items-center g-3">
+            <div class="col-lg-3 col-md-4 col-12 d-flex align-items-center gap-2">
+                <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
+                    <span class="brand-logo">FF</span>
+                    <span>
+                        <span class="d-block brand-text">FRESHFARM</span>
+                        <span class="brand-sub">Nông sản sạch mỗi ngày</span>
+                    </span>
+                </a>
+            </div>
+
+            <div class="col-lg-6 col-md-8 col-12">
+                <form id="headerSearchForm" class="d-flex" autocomplete="off">
+                    <input id="headerSearchInput"
+                           class="form-control me-2"
+                           type="search"
+                           placeholder="Nhập tên sản phẩm cần tìm" />
+                    <button class="btn btn-search" type="submit">Tìm</button>
+                </form>
+            </div>
+
+            <div class="col-lg-3 col-12 d-flex justify-content-lg-end align-items-center">
+                <div class="user-actions d-flex align-items-center gap-3">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <a href="/account/orders" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
+                            <i class="bi bi-receipt"></i><span class="d-none d-lg-inline">Đơn hàng</span>
+                        </a>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-link nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0 text-decoration-none">
+                                <i class="bi bi-box-arrow-right"></i><span class="d-none d-lg-inline">Đăng xuất</span>
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a href="/account/signin" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
+                            <i class="bi bi-person"></i><span class="d-none d-lg-inline">Đăng nhập</span>
+                        </a>
+                        <a href="/account/orders" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
+                            <i class="bi bi-receipt"></i><span class="d-none d-lg-inline">Đơn hàng</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
