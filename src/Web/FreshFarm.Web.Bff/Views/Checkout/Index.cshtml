@@ -1,14 +1,7 @@
 @using System.Globalization
-@model dynamic
+@model FreshFarm.Web.Bff.Dtos.CheckoutSubmitRequestDto
 @{
     Layout = null;
-
-    string Vnd(decimal value) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", value);
-    const decimal sampleUnitPrice = 28000m;
-    const int sampleQuantity = 1;
-    const decimal defaultShippingFee = 15000m;
-    var subTotal = sampleUnitPrice * sampleQuantity;
-    var grandTotal = subTotal + defaultShippingFee;
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -53,6 +46,7 @@
             border: 1px solid #dee2e6;
             border-radius: 10px;
             padding: 12px 14px;
+            cursor: pointer;
         }
 
         .payment-option.active {
@@ -75,6 +69,13 @@
         .summary-price {
             color: var(--primary-green);
         }
+
+        .invalid-flow {
+            border: 1px dashed #dc3545;
+            border-radius: 10px;
+            background: #fff5f5;
+            color: #842029;
+        }
     </style>
 </head>
 <body>
@@ -84,16 +85,18 @@
             <p class="text-muted mb-0">Xác nhận thông tin giao hàng và hoàn tất đơn hàng.</p>
         </div>
 
+        <div id="flowAlert" class="invalid-flow p-3 mb-3 d-none"></div>
+
         <div class="row g-4">
             <div class="col-lg-7">
                 <form id="checkoutForm" asp-controller="Checkout" asp-action="Index" method="post">
                     @Html.AntiForgeryToken()
+
                     <input type="hidden" name="Shipping.ShippingType" value="HomeDelivery" />
-                    <input type="hidden" name="Items[0].ProductId" value="117" />
-                    <input type="hidden" name="Items[0].Quantity" value="@sampleQuantity" />
-                    <input type="hidden" name="Items[0].UnitPrice" value="@sampleUnitPrice" />
-                    <input type="hidden" name="Items[0].UnitSymbol" value="kg" />
-                    <input type="hidden" name="Payment.PaymentMethod" id="paymentMethodHidden" value="COD" />
+                    <input type="hidden" id="productIdInput" name="Items[0].ProductId" value="0" />
+                    <input type="hidden" id="unitPriceInput" name="Items[0].UnitPrice" value="0" />
+                    <input type="hidden" id="unitSymbolInput" name="Items[0].UnitSymbol" value="" />
+                    <input type="hidden" id="paymentMethodHidden" name="Payment.PaymentMethod" value="COD" />
 
                     <div class="card shadow-sm">
                         <div class="card-body p-4">
@@ -148,19 +151,31 @@
                         <h5 class="fw-bold mb-3">Tóm tắt đơn hàng</h5>
 
                         <ul class="list-group list-group-flush mb-3">
-                            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                            <li class="list-group-item px-0 d-flex justify-content-between align-items-start">
                                 <div>
-                                    <div class="fw-semibold">Rau xà lách hữu cơ</div>
-                                    <small class="text-muted">x @sampleQuantity • 1 kg</small>
+                                    <div id="productNameText" class="fw-semibold">Chưa chọn sản phẩm</div>
+                                    <small id="productMetaText" class="text-muted">Hãy quay lại trang sản phẩm để chọn.</small>
                                 </div>
-                                <span>@Vnd(subTotal)</span>
+                                <span id="lineTotalText">0 ₫</span>
                             </li>
                         </ul>
 
+                        <div class="mb-2">
+                            <label class="form-label">Số lượng</label>
+                            <input id="quantityInput"
+                                   name="Items[0].Quantity"
+                                   type="number"
+                                   min="1"
+                                   step="1"
+                                   class="form-control"
+                                   value="1" />
+                        </div>
+
                         <div class="d-flex justify-content-between mb-2">
                             <span>Tạm tính</span>
-                            <strong id="subtotalValue">@Vnd(subTotal)</strong>
+                            <strong id="subtotalValue">0 ₫</strong>
                         </div>
+
                         <div class="d-flex justify-content-between mb-2 align-items-center">
                             <span>Phí vận chuyển</span>
                             <div style="max-width: 150px;">
@@ -171,9 +186,10 @@
                                        min="0"
                                        step="1000"
                                        class="form-control form-control-sm text-end"
-                                       value="@defaultShippingFee" />
+                                       value="15000" />
                             </div>
                         </div>
+
                         <div class="d-flex justify-content-between mb-2">
                             <span>Giảm giá</span>
                             <strong>0 ₫</strong>
@@ -181,20 +197,15 @@
                         <hr />
                         <div class="d-flex justify-content-between fs-5">
                             <span>Tổng cộng</span>
-                            <strong id="grandTotalValue" class="summary-price">@Vnd(grandTotal)</strong>
+                            <strong id="grandTotalValue" class="summary-price">0 ₫</strong>
                         </div>
 
-                        <div class="input-group mt-3">
-                            <input class="form-control" placeholder="Mã giảm giá (sẽ mở sau)" disabled />
-                            <button type="button" class="btn btn-outline-secondary" disabled>Áp dụng</button>
-                        </div>
-
-                        <button type="submit" form="checkoutForm" class="btn btn-main w-100 mt-3">
+                        <button id="submitBtn" type="submit" form="checkoutForm" class="btn btn-main w-100 mt-3">
                             <i class="bi bi-bag-check me-2"></i>Đặt hàng
                         </button>
 
                         <p class="small text-muted mt-3 mb-0">
-                            Giao diện đã giữ đúng phong cách cũ. Phần coupon/điểm thưởng sẽ nối logic ở bước sau.
+                            Luồng hiện tại nhận sản phẩm từ query string khi bấm “Mua ngay”.
                         </p>
                     </div>
                 </div>
@@ -205,23 +216,87 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         (() => {
-            const paymentOptions = document.querySelectorAll("#paymentOptions .payment-option");
-            const paymentHidden = document.getElementById("paymentMethodHidden");
-            const shippingFeeInput = document.getElementById("shippingFeeInput");
-            const grandTotalValue = document.getElementById("grandTotalValue");
-            const subTotal = @subTotal.ToString(CultureInfo.InvariantCulture);
+            const flowAlert = document.getElementById("flowAlert");
+            const submitBtn = document.getElementById("submitBtn");
 
-            const formatVnd = (value) => {
-                const safeValue = Number.isFinite(value) ? value : 0;
-                return safeValue.toLocaleString("vi-VN") + " ₫";
+            const productIdInput = document.getElementById("productIdInput");
+            const unitPriceInput = document.getElementById("unitPriceInput");
+            const unitSymbolInput = document.getElementById("unitSymbolInput");
+            const quantityInput = document.getElementById("quantityInput");
+            const shippingFeeInput = document.getElementById("shippingFeeInput");
+            const paymentMethodHidden = document.getElementById("paymentMethodHidden");
+
+            const productNameText = document.getElementById("productNameText");
+            const productMetaText = document.getElementById("productMetaText");
+            const lineTotalText = document.getElementById("lineTotalText");
+            const subtotalValue = document.getElementById("subtotalValue");
+            const grandTotalValue = document.getElementById("grandTotalValue");
+
+            const paymentOptions = document.querySelectorAll("#paymentOptions .payment-option");
+
+            const toNumber = (value, fallback = 0) => {
+                const num = Number(value);
+                return Number.isFinite(num) ? num : fallback;
             };
 
-            const recalcGrandTotal = () => {
-                const shipping = Number(shippingFeeInput?.value || 0);
-                const total = Math.max(0, Number(subTotal) + (Number.isFinite(shipping) ? shipping : 0));
-                if (grandTotalValue) {
-                    grandTotalValue.textContent = formatVnd(total);
+            const toVnd = (value) => {
+                const safe = toNumber(value, 0);
+                return safe.toLocaleString("vi-VN") + " ₫";
+            };
+
+            const params = new URLSearchParams(window.location.search);
+            const queryProductId = toNumber(params.get("productId"), 0);
+            const queryProductName = params.get("productName") || "";
+            const queryUnitPrice = toNumber(params.get("unitPrice"), 0);
+            const queryUnitSymbol = params.get("unitSymbol") || "";
+
+            const isValidFlow = queryProductId > 0 && queryUnitPrice >= 0;
+
+            const setFlowError = (message) => {
+                flowAlert.textContent = message;
+                flowAlert.classList.remove("d-none");
+                submitBtn.setAttribute("disabled", "disabled");
+            };
+
+            const clearFlowError = () => {
+                flowAlert.classList.add("d-none");
+                flowAlert.textContent = "";
+                submitBtn.removeAttribute("disabled");
+            };
+
+            const recalcTotal = () => {
+                const quantity = Math.max(1, toNumber(quantityInput.value, 1));
+                quantityInput.value = quantity;
+
+                const unitPrice = toNumber(unitPriceInput.value, 0);
+                const shippingFee = Math.max(0, toNumber(shippingFeeInput.value, 0));
+
+                const subTotal = unitPrice * quantity;
+                const grandTotal = subTotal + shippingFee;
+
+                lineTotalText.textContent = toVnd(subTotal);
+                subtotalValue.textContent = toVnd(subTotal);
+                grandTotalValue.textContent = toVnd(grandTotal);
+
+                const unitSymbol = unitSymbolInput.value || "đơn vị";
+                productMetaText.textContent = `x ${quantity} • ${unitSymbol}`;
+            };
+
+            const initProductFromQuery = () => {
+                if (!isValidFlow) {
+                    setFlowError("Không có dữ liệu sản phẩm hợp lệ. Hãy quay lại trang sản phẩm và bấm “Mua ngay”.");
+                    productNameText.textContent = "Chưa chọn sản phẩm";
+                    productMetaText.textContent = "Hãy quay lại trang sản phẩm để chọn.";
+                    return;
                 }
+
+                clearFlowError();
+                productIdInput.value = String(queryProductId);
+                unitPriceInput.value = String(queryUnitPrice);
+                unitSymbolInput.value = queryUnitSymbol || "đơn vị";
+
+                productNameText.textContent = queryProductName || `Sản phẩm #${queryProductId}`;
+                recalcTotal();
             };
 
             paymentOptions.forEach((option) => {
@@ -232,18 +307,15 @@
                     const radio = option.querySelector('input[type="radio"]');
                     if (radio) {
                         radio.checked = true;
-                        if (paymentHidden) {
-                            paymentHidden.value = radio.value;
-                        }
+                        paymentMethodHidden.value = radio.value;
                     }
                 });
             });
 
-            if (shippingFeeInput) {
-                shippingFeeInput.addEventListener("input", recalcGrandTotal);
-            }
+            quantityInput.addEventListener("input", recalcTotal);
+            shippingFeeInput.addEventListener("input", recalcTotal);
 
-            recalcGrandTotal();
+            initProductFromQuery();
         })();
     </script>
 </body>
