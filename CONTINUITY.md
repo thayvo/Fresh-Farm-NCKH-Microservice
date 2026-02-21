@@ -197,10 +197,18 @@
       - Thêm phần "Hướng dẫn xử lý 5 mục còn lại (chi tiết để bạn tự sửa)" cho các mục controller.
     - Đã ghi nhận ràng buộc mới từ user:
       - Dùng tiếng Việt có dấu trong dự án từ thời điểm này.
+    - Đã xử lý lỗi compile ở `Views/Checkout/Success.cshtml`:
+      - `CS8197` do `ViewBag.OrderId` là dynamic kết hợp `out var`.
+      - Đã đổi sang parse tường minh `out int`.
+    - Đã kiểm tra trạng thái merge hiện tại:
+      - Nhánh đang checkout: `dev`.
+      - `dev` local đang bẩn (nhiều file modified chưa commit).
+      - `feature/bff-mvp` đang ahead `dev` 4 commit.
+      - `feature/bff-mvp` đồng bộ với `origin/feature/bff-mvp`.
   - *Now*:
-    - Hướng dẫn user cách gom nhiều nhánh chưa merge về `dev` an toàn khi code đã nhiều.
+    - Giải thích cho user cách pull an toàn khi đang có code local để tránh mất code mới.
   - *Next*:
-    - Thực hiện merge theo thứ tự, xử lý conflict từng nhánh, rồi đẩy `dev` lên remote.
+    - Nếu user muốn, đưa checklist thao tác `stash/branch/merge` không mất code.
 - **Open questions** (UNCONFIRMED if needed):
   - Không có.
 - **Working set** (files/ids/commands):
