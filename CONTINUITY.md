@@ -29,16 +29,32 @@
     - Đã cập nhật kế hoạch:
       - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
       - Đánh dấu trạng thái `[Đã làm]` cho Bước 1 Shared.
+    - Đã hoàn thiện Bước 2 cho Home:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` để bám sát style/animation từ dự án cũ.
+      - Nâng popup coupon theo cấu trúc chi tiết hơn (welcome icon, coupon info, expiry warning).
+      - Giữ nguyên luồng API BFF (`/bff/products`) và CTA sang `/checkout`.
+    - Đã cập nhật kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Đánh dấu trạng thái `[Đã làm]` cho Bước 2 Home.
+    - Đã hoàn thiện Bước 3 cho cụm Account Auth:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml` theo phong cách auth của dự án cũ.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml` theo phong cách auth của dự án cũ.
+      - Giữ bind model BFF qua `asp-for`, không đổi controller.
+      - Bổ sung fallback logo khi chưa có assets cũ.
+    - Đã cập nhật kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Đánh dấu trạng thái `[Đã làm]` cho Bước 3 Account Auth.
   - *Now*:
-    - Chốt bàn giao bước Shared cho user.
+    - Bàn giao kết quả Bước 3 (SignIn/SignUp) cho user.
   - *Next*:
-    - Làm Bước 2: so khớp pixel-level Home theo giao diện cũ.
-    - Sau đó sang Bước 3: chuẩn hóa cụm Account (SignIn/SignUp).
+    - Sang Bước 4: rà và nâng cấp giao diện `OrderHistory/OrderDetail` theo phong cách cũ.
 - **Open questions** (UNCONFIRMED if needed):
-  - `UNCONFIRMED`: User muốn mình làm tiếp ngay Bước 2 (pixel-level Home) hay qua Bước 3 (SignIn/SignUp) luôn?
+  - Không có.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`

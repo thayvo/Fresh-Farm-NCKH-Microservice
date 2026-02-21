@@ -1,6 +1,7 @@
 @model FreshFarm.Web.Bff.Dtos.LoginRequestDto
 @{
     Layout = null;
+    var returnUrl = Context.Request.Query["returnUrl"].ToString();
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -25,30 +26,29 @@
         }
 
         .login-card {
-            width: 100%;
             max-width: 450px;
-            border: 0;
+            width: 100%;
             border-radius: 16px;
         }
 
-        .brand-mark {
-            width: 64px;
-            height: 64px;
+        .logo-fallback {
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
-            background: rgba(0, 138, 79, 0.12);
+            background: rgba(0, 138, 79, .12);
             color: var(--primary-green);
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.6rem;
+            font-size: 1.75rem;
         }
 
-        .btn-main {
+        .btn-success {
             background: var(--primary-green);
             border-color: var(--primary-green);
         }
 
-        .btn-main:hover {
+        .btn-success:hover {
             background: #006a3d;
             border-color: #006a3d;
         }
@@ -59,58 +59,79 @@
 
         .form-control:focus {
             border-color: var(--primary-green);
-            box-shadow: 0 0 0 .25rem rgba(0, 138, 79, .20);
+            box-shadow: 0 0 0 .25rem rgba(0, 138, 79, .25);
         }
 
         .divider-text {
             position: relative;
             text-align: center;
-            margin: 14px 0;
+            margin: 15px 0;
         }
 
         .divider-text span {
+            padding: 0 8px;
+            font-size: 12px;
             position: relative;
             z-index: 2;
             background: #fff;
             color: #6c757d;
-            padding: 0 10px;
-            font-size: .78rem;
             letter-spacing: .08em;
         }
 
         .divider-text::after {
             content: "";
             position: absolute;
-            left: 0;
-            right: 0;
-            top: 50%;
+            width: 100%;
             height: 1px;
-            background: #e5e7eb;
+            background: #ddd;
+            left: 0;
+            top: 50%;
             z-index: 1;
         }
     </style>
 </head>
 <body>
-    <div class="card shadow-sm p-4 login-card">
+    <div class="card border-0 shadow-sm p-4 login-card">
         <div class="card-body">
             <div class="text-center mb-4">
-                <div class="brand-mark mb-3"><i class="bi bi-basket2-fill"></i></div>
-                <h3 class="fw-bold mb-1">Chào mừng trở lại</h3>
-                <p class="text-muted mb-0">Đăng nhập để tiếp tục đặt hàng.</p>
+                <img id="signinLogo"
+                     src="~/images/legacy/logo.PNG"
+                     alt="Logo FreshFarm"
+                     style="max-height: 70px"
+                     onerror="this.classList.add('d-none');document.getElementById('signinLogoFallback').classList.remove('d-none');" />
+                <div id="signinLogoFallback" class="logo-fallback d-none">
+                    <i class="bi bi-basket2-fill"></i>
+                </div>
+                <h3 class="fw-bold mt-3">Chào mừng trở lại!</h3>
+                <p class="text-muted mb-0">Đăng nhập để tiếp tục.</p>
             </div>
 
             <form asp-action="SignIn" asp-controller="Account" method="post" class="needs-validation" novalidate>
                 @Html.AntiForgeryToken()
+                @if (!string.IsNullOrWhiteSpace(returnUrl))
+                {
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                }
+
                 <div asp-validation-summary="All" class="text-danger small mb-3"></div>
 
                 <div class="form-floating mb-3">
-                    <input asp-for="Identifier" class="form-control" placeholder="Email hoặc UserName" autocomplete="username" required />
-                    <label asp-for="Identifier">Email hoặc UserName</label>
+                    <input asp-for="Identifier"
+                           class="form-control"
+                           placeholder="Tên đăng nhập hoặc email"
+                           autocomplete="username"
+                           required />
+                    <label asp-for="Identifier">Tên đăng nhập hoặc email</label>
                     <span asp-validation-for="Identifier" class="text-danger small"></span>
                 </div>
 
                 <div class="form-floating mb-3">
-                    <input asp-for="Password" class="form-control" type="password" placeholder="Mật khẩu" autocomplete="current-password" required />
+                    <input asp-for="Password"
+                           class="form-control"
+                           type="password"
+                           placeholder="Mật khẩu"
+                           autocomplete="current-password"
+                           required />
                     <label asp-for="Password">Mật khẩu</label>
                     <span asp-validation-for="Password" class="text-danger small"></span>
                 </div>
@@ -118,30 +139,33 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="rememberMe" disabled />
-                        <label class="form-check-label text-muted" for="rememberMe">Ghi nhớ đăng nhập (giai đoạn sau)</label>
+                        <label class="form-check-label" for="rememberMe">Ghi nhớ đăng nhập</label>
                     </div>
-                    <span class="small text-muted">Quên mật khẩu (sắp mở)</span>
+                    <a href="javascript:void(0)" class="small text-decoration-none text-muted">Quên mật khẩu?</a>
                 </div>
 
                 <div class="d-grid">
-                    <button class="btn btn-main btn-lg text-white" type="submit">Đăng nhập</button>
+                    <button class="btn btn-success btn-lg" type="submit">Đăng nhập</button>
                 </div>
 
-                <p class="divider-text"><span>ĐĂNG NHẬP MẠNG XÃ HỘI (GIAI ĐOẠN SAU)</span></p>
+                <p class="divider-text"><span>HOẶC</span></p>
 
                 <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-outline-danger btn-lg" disabled>
-                        <i class="bi bi-google me-2"></i>Google
+                    <button type="button" class="btn btn-danger btn-lg" disabled>
+                        <i class="bi bi-google me-2"></i> Đăng nhập với Google
                     </button>
-                    <button type="button" class="btn btn-outline-primary btn-lg" disabled>
-                        <i class="bi bi-facebook me-2"></i>Facebook
+                    <button type="button" class="btn btn-primary btn-lg" disabled>
+                        <i class="bi bi-facebook me-2"></i> Đăng nhập với Facebook
                     </button>
                 </div>
             </form>
 
             <p class="text-center mt-4 mb-0 text-muted">
                 Chưa có tài khoản?
-                <a asp-action="SignUp" asp-controller="Account" class="fw-semibold text-decoration-none" style="color: var(--primary-green)">Đăng ký ngay</a>
+                <a asp-action="SignUp"
+                   asp-controller="Account"
+                   class="fw-bold text-decoration-none"
+                   style="color: var(--primary-green)">Đăng ký ngay</a>
             </p>
         </div>
     </div>

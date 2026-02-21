@@ -14,13 +14,13 @@
 
     <style>
         :root {
-            --primary-green: #008a4f;
-            --secondary-green: #006a3d;
+            --primary-green: #28a745;
+            --secondary-green: #1f8f3a;
             --text-color: #333;
             --border-color: #e0e0e0;
             --danger-color: #dc3545;
             --secondary-yellow: #ffb524;
-            --text-green: #198754;
+            --text-green: #28a745;
         }
 
         body {
@@ -50,14 +50,14 @@
             width: 54px;
             height: 54px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #12b76a 0%, #008a4f 100%);
+            background: linear-gradient(135deg, #12b76a 0%, #28a745 100%);
             color: #fff;
             font-weight: 800;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             letter-spacing: .02em;
-            box-shadow: 0 8px 20px rgba(0, 138, 79, .25);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, .25);
         }
 
         .brand-text {
@@ -166,7 +166,7 @@
 
         .category-item {
             flex: 0 0 auto;
-            width: 240px;
+            width: 220px;
             height: 120px;
             transition: box-shadow .3s ease;
         }
@@ -193,6 +193,8 @@
         .scroll-btn {
             width: 40px;
             height: 40px;
+            top: 50%;
+            transform: translateY(-50%);
             transition: all .2s ease-in-out;
             background-color: #fff;
             color: var(--primary-green);
@@ -205,15 +207,11 @@
         }
 
         .scroll-btn.btn-prev {
-            left: -10px;
-            top: 50%;
-            transform: translate(0, 25%);
+            left: 8px;
         }
 
         .scroll-btn.btn-next {
-            right: -10px;
-            top: 50%;
-            transform: translate(0, 25%);
+            right: 8px;
         }
 
         .product-card {
@@ -385,6 +383,42 @@
             text-align: center;
         }
 
+        .popup-header::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'><path fill='rgba(255,255,255,0.1)' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,122.7C672,117,768,139,864,138.7C960,139,1056,117,1152,101.3C1248,85,1344,75,1392,69.3L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'></path></svg>") no-repeat bottom;
+            background-size: cover;
+            opacity: .3;
+        }
+
+        .welcome-icon {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, .2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 35px;
+            position: relative;
+            animation: bounce 2s infinite;
+        }
+
+        @@keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
         .popup-title {
             font-size: 26px;
             font-weight: 700;
@@ -428,6 +462,15 @@
             overflow-y: auto;
         }
 
+        .popup-body::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .popup-body::-webkit-scrollbar-thumb {
+            background: var(--primary-green);
+            border-radius: 3px;
+        }
+
         .coupon-card {
             background: #fff;
             border: 2px dashed var(--primary-green);
@@ -437,6 +480,27 @@
             position: relative;
             overflow: hidden;
             transition: all .3s ease;
+            animation: slideIn .5s ease-out backwards;
+        }
+
+        .coupon-card:nth-child(1) {
+            animation-delay: .1s;
+        }
+
+        .coupon-card:nth-child(2) {
+            animation-delay: .2s;
+        }
+
+        @@keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         .coupon-card:hover {
@@ -482,6 +546,46 @@
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
+        }
+
+        .coupon-body {
+            padding-left: 10px;
+        }
+
+        .coupon-description {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .coupon-info {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #495057;
+        }
+
+        .info-item i {
+            color: var(--primary-green);
+            font-size: 14px;
+        }
+
+        .expiry-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #856404;
         }
 
         .popup-footer {
@@ -541,6 +645,10 @@
             .popup-container {
                 width: 95%;
                 margin: 10px;
+            }
+
+            .popup-header {
+                padding: 25px 20px 20px;
             }
 
             .popup-title {
@@ -609,8 +717,9 @@
         <div class="popup-container">
             <div class="popup-header">
                 <button class="btn-close-popup" onclick="closeWelcomePopup()"><i class="bi bi-x-lg"></i></button>
+                <div class="welcome-icon">🎉</div>
                 <h2 class="popup-title">Chào mừng bạn trở lại!</h2>
-                <p class="popup-subtitle">Bạn có ưu đãi đặc biệt đang chờ</p>
+                <p class="popup-subtitle">Bạn có 2 ưu đãi đặc biệt đang chờ</p>
             </div>
             <div class="popup-body">
                 <div class="coupon-card">
@@ -618,16 +727,49 @@
                         <div class="coupon-code"><i class="bi bi-ticket-perforated-fill"></i> FRESH10</div>
                         <span class="coupon-badge">Giảm %</span>
                     </div>
-                    <p class="mb-1">Giảm 10% cho đơn từ 300.000₫</p>
-                    <small class="text-muted">Hết hạn: 31/12/2026</small>
+                    <div class="coupon-body">
+                        <p class="coupon-description">Giảm 10% cho đơn từ 300.000₫.</p>
+                        <div class="coupon-info">
+                            <div class="info-item">
+                                <i class="bi bi-calendar-check"></i>
+                                <span>Hết hạn: 31/12/2026</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-cart-check"></i>
+                                <span>Đơn tối thiểu: 300.000₫</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-tag"></i>
+                                <span>Giảm: 10%</span>
+                            </div>
+                        </div>
+                        <div class="expiry-warning">
+                            <i class="bi bi-clock"></i> Còn 6 ngày để sử dụng
+                        </div>
+                    </div>
                 </div>
                 <div class="coupon-card">
                     <div class="coupon-header">
                         <div class="coupon-code"><i class="bi bi-ticket-perforated-fill"></i> SHIPFREE</div>
                         <span class="coupon-badge">Giảm ngay</span>
                     </div>
-                    <p class="mb-1">Miễn phí vận chuyển toàn quốc</p>
-                    <small class="text-muted">Hết hạn: 31/12/2026</small>
+                    <div class="coupon-body">
+                        <p class="coupon-description">Miễn phí vận chuyển toàn quốc, không giới hạn đơn tối thiểu.</p>
+                        <div class="coupon-info">
+                            <div class="info-item">
+                                <i class="bi bi-calendar-check"></i>
+                                <span>Hết hạn: 31/12/2026</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-infinity"></i>
+                                <span>Không giới hạn đơn tối thiểu</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="bi bi-tag"></i>
+                                <span>Giảm: 100% phí vận chuyển</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="popup-footer">
@@ -760,7 +902,7 @@
                                     <i class="bi bi-eye me-1"></i> Xem chi tiết
                                 </a>
                                 <a href="${buildCheckoutUrl(product)}" class="btn btn-success">
-                                    <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
+                                    <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
                                 </a>
                             </div>
 
@@ -855,7 +997,7 @@
                                             <i class="bi bi-eye me-1"></i> Xem chi tiết
                                         </a>
                                         <a href="${buildCheckoutUrl(p)}" class="btn btn-success">
-                                            <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
+                                            <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
                                         </a>
                                     </div>
 
@@ -989,10 +1131,16 @@
 
             try {
                 const params = new URLSearchParams(window.location.search);
-                const shouldShow = params.get("showCoupon") === "1";
+                const from = params.get("from");
+                const ref = document.referrer || "";
                 const isHidden = sessionStorage.getItem("hideWelcomePopup") === "1";
+                const shouldHide = from === "thankyou"
+                    || ref.includes("/checkout/success")
+                    || ref.includes("/Checkout/Success")
+                    || isHidden;
+                const shouldShow = params.get("showCoupon") === "1" && !shouldHide;
 
-                if (shouldShow && !isHidden) {
+                if (shouldShow) {
                     popup.classList.add("show");
                 } else {
                     popup.classList.remove("show");
