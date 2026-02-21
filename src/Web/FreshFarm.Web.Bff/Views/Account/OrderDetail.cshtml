@@ -43,16 +43,30 @@
     <style>
         :root {
             --primary-green: #008a4f;
+            --primary-green-dark: #006a3d;
         }
 
         body {
-            background: #f4f7f5;
+            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
         }
 
         .page-wrap {
             max-width: 1120px;
-            margin: 40px auto;
+            margin: 28px auto 40px;
             padding: 0 12px;
+        }
+
+        .top-nav {
+            background: #fff;
+            border: 1px solid #d7f1e4;
+            border-radius: 14px;
+        }
+
+        .brand-chip {
+            color: var(--primary-green);
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-decoration: none;
         }
 
         .btn-main {
@@ -62,8 +76,8 @@
         }
 
         .btn-main:hover {
-            background: #006a3d;
-            border-color: #006a3d;
+            background: var(--primary-green-dark);
+            border-color: var(--primary-green-dark);
             color: #fff;
         }
 
@@ -75,6 +89,18 @@
 </head>
 <body>
     <main class="page-wrap">
+        <header class="top-nav d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 mb-3">
+            <a href="/" class="brand-chip">FRESHFARM</a>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-grid me-1"></i>Danh sách sản phẩm
+                </a>
+                <a href="/account/orders" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
+                </a>
+            </div>
+        </header>
+
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
             <div>
                 <h2 class="fw-bold mb-1">Chi tiết đơn hàng</h2>
@@ -98,7 +124,11 @@
         {
             var orderBadge = OrderBadge(Model.Status);
             var paymentBadge = PaymentBadge(Model.PaymentStatus);
-            var primaryShipping = Model.Shippings.FirstOrDefault();
+            var primaryShipping = (Model.Shippings is not null && Model.Shippings.Count > 0)
+                ? Model.Shippings[0]
+                : null;
+            var hasItems = Model.Items is not null && Model.Items.Count > 0;
+            var hasPayments = Model.Payments is not null && Model.Payments.Count > 0;
 
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body p-4">
@@ -164,7 +194,7 @@
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-body p-4">
                     <h5 class="fw-bold mb-3">Sản phẩm trong đơn</h5>
-                    @if (Model.Items.Count == 0)
+                    @if (!hasItems)
                     {
                         <div class="text-muted">Không có dữ liệu sản phẩm.</div>
                     }
@@ -182,7 +212,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var item in Model.Items)
+                                    @foreach (var item in Model.Items!)
                                     {
                                         var lineTotal = item.UnitPrice * item.Quantity;
                                         <tr>
@@ -203,7 +233,7 @@
             <div class="card border-0 shadow-sm">
                 <div class="card-body p-4">
                     <h5 class="fw-bold mb-3">Lịch sử thanh toán</h5>
-                    @if (Model.Payments.Count == 0)
+                    @if (!hasPayments)
                     {
                         <div class="text-muted mb-3">Chưa có bản ghi thanh toán.</div>
                     }
@@ -220,7 +250,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var payment in Model.Payments)
+                                    @foreach (var payment in Model.Payments!)
                                     {
                                         var pBadge = PaymentBadge(payment.PaymentStatus);
                                         <tr>
@@ -244,8 +274,9 @@
                     }
 
                     <div class="d-flex gap-2 flex-wrap mt-3">
+                        <a href="/" class="btn btn-main">Tiếp tục mua sắm</a>
                         <a href="/account/orders" class="btn btn-outline-secondary">Quay lại lịch sử đơn</a>
-                        <a href="/bff/orders/@Model.OrderId" target="_blank" rel="noopener" class="btn btn-main">
+                        <a href="/bff/orders/@Model.OrderId" target="_blank" rel="noopener" class="btn btn-outline-secondary">
                             <i class="bi bi-code-slash me-1"></i>Xem JSON
                         </a>
                     </div>

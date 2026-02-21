@@ -1,327 +1,46 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Cập nhật tài liệu kế hoạch với code hoàn chỉnh toàn phần trong file `.md`.
-  - Success criteria của turn này:
-    - Có full code cho các file view ưu tiên ngay trong `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`.
-    - Có quy tắc/checkpoint nhắc đẩy GitHub sau từng cụm file.
-    - Chỉ sửa trong phạm vi `md/views` theo ràng buộc user.
+  - Sửa giao diện trang Home của BFF giống giao diện Home dự án cũ.
+  - Success criteria:
+    - Home có bố cục cũ: promo bar, header, navbar, carousel, danh mục cuộn, slider gợi ý, lưới nổi bật, footer, popup coupon.
+    - Vẫn chạy với luồng BFF mới: dữ liệu sản phẩm lấy từ `GET /bff/products` và mua qua `/checkout?...`.
+    - Chỉ sửa trong `views` và cập nhật ledger.
 - **Constraints/Assumptions**:
-  - User da cho phep sua file view trong turn nay.
-  - Khong sua `.cs/.json/.sql` neu user chua cho phep ro rang.
-  - Ràng buộc cập nhật từ user (ưu tiên cao): assistant chỉ được sửa `Views/*` và file tài liệu `.md`; không sửa `Controller` hay phần code khác.
-  - Moi service validate JWT can dong bo `Jwt:Issuer`, `Jwt:Audience`, `Jwt:Key`.
-  - Moi truong tool hien tai khong co `dotnet` CLI (`dotnet: command not found`), nen khong build/test tu dong duoc trong session nay.
-  - Rang buoc moi tu user:
-    - Khi can tao/sua view, phai xem truoc nguon UI cu tai `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram`.
-    - Neu co phan copy duoc thi de nghi user copy qua de assistant sua/refactor cho nhanh.
-    - Từ giờ dùng tiếng Việt có dấu trong dự án (ưu tiên cho text hiển thị, tài liệu, comment).
-  - Ràng buộc mới nhất user nhắc lại:
-    - Turn này chỉ yêu cầu kiểm tra và ghi kế hoạch vào file `.md`.
-    - Không sửa file ngoài `md/views` cho đến khi user cho phép.
-  - Yêu cầu mới nhất từ user:
-    - Đưa code hoàn chỉnh vào file `.md`.
-    - Mỗi cụm file sau khi hoàn tất phải nhắc user đẩy GitHub.
+  - User ưu tiên tiếng Việt có dấu.
+  - Chỉ sửa `Views/*` và file `.md` nếu chưa có cho phép khác.
+  - Môi trường hiện tại không có `dotnet` CLI nên chưa build/test tự động.
+  - Home cũ phụ thuộc nhiều model/partial/assets của ASP.NET MVC cũ; BFF không có các phần đó nên cần chuyển sang render bằng JavaScript.
 - **Key decisions**:
-  - Theo yêu cầu mới nhất: không bỏ qua GitHub nữa, chuyển sang cơ chế nhắc đẩy theo checkpoint sau mỗi cụm file.
-  - Full code chỉ cung cấp trong tài liệu `.md` trước, chưa tự ý sửa thêm file code ngoài phạm vi.
-  - Tiep tuc huong Ordering e-commerce 3PL va contract-first DTO (khong tra truc tiep entity EF cho endpoint chi tiet).
-  - BFF giu vai tro gateway nhe/proxy; auth-account flow se la buoc uu tien tiep theo sau khi Ordering on dinh.
-  - Danh gia tien do phai dua tren ma nguon thuc te thay vi chi dua vao ke hoach cu trong docs.
-  - Doi `docs/ke-hoach-tiep-theo.md` sang ke hoach 5 phase moi, tap trung vao flow end-user thay vi tiep tuc refactor lai phan da xong.
-  - Khong ket luan "thieu config" neu config co the da dat o User Secrets; can phan biet ro "trong repo" va "runtime may user".
-  - Uu tien "logic tich hop de chay end-to-end" truoc "lam dep giao dien":
-    - Lam BFF `Auth + Account` + BFF Ordering integration truoc.
-    - Giao dien chi can muc toi thieu de test flow.
-    - Polish UI de sau khi flow da on dinh.
-  - Dung tai lieu docs moi cho phan BFF implementation chi tiet: `docs/bff-luong-va-code-chi-tiet.md`.
-  - Co the dung `Dtos` folder cho BFF de dong bo naming voi cac API; `Models` van dung duoc, nhung `Dtos` ro y nghia hon.
-  - Chot dung `Dtos` cho BFF docs (khong dung `Models` cho file `AccountDtos.cs` trong huong dan).
-  - Quy tac lam view tu nay:
-    - Buoc 1: doi chieu view ben du an cu.
-    - Buoc 2: neu tai su dung duoc thi yeu cau user copy file/phan html vao workspace.
-    - Buoc 3: assistant chinh sua lai theo DTO/controller hien tai.
-  - Ke hoach tiep theo duoc chot theo thu tu:
-    - Ngay 1: OrderHistory + OrderDetail.
-    - Ngay 2: Checkout MVC -> goi Ordering tao don.
-    - Ngay 3: hardening BFF order proxy + checklist demo.
-  - Quy ước ngôn ngữ mới:
-    - Từ các chỉnh sửa tiếp theo, assistant dùng tiếng Việt có dấu cho nội dung trong dự án.
-    - Không ép đổi tên identifier/code symbol nếu việc đổi tên có nguy cơ ảnh hưởng logic.
+  - Thay toàn bộ `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` bằng phiên bản mô phỏng gần như đầy đủ Home cũ.
+  - Nhúng CSS/JS trực tiếp trong view để không cần sửa file ngoài `views`.
+  - Dùng dữ liệu động từ `/bff/products` để render danh mục, gợi ý, nổi bật.
+  - Các thao tác wishlist/cart cũ được mô phỏng phía client (localStorage + link checkout) để giữ trải nghiệm giao diện cũ.
 - **State**:
   - *Done*:
-    - Đã tạo mới `docs/git-tu-nhap-mon-den-phap-su.md`:
-      - Đủ 60 câu hỏi (Q1-Q60), có đủ 8 mục trả lời cho từng câu.
-      - Bao phủ toàn bộ nhóm 1-10 theo yêu cầu.
-      - Có ví dụ thực tế bám dự án FreshFarm trong từng nhóm.
-      - Có phụ lục `.gitignore` .NET, chiến lược nhánh, flow feature -> production.
-      - Có cheat sheet 20 lệnh Git dùng nhiều nhất.
-    - Đã cập nhật `docs/README.md` thêm entry cho tài liệu Git mới.
-    - Đã sửa `Views/Checkout/Success.cshtml` để bỏ fallback dữ liệu giả:
-      - Không còn default `FF000000` và `Khách hàng` khi thiếu dữ liệu.
-      - Chỉ render block "Đặt hàng thành công" khi có `OrderCode` từ `TempData`.
-      - Khi thiếu dữ liệu (truy cập trực tiếp/hết phiên), hiển thị block cảnh báo "Không có dữ liệu đơn hàng" + CTA quay lại checkout / xem đơn.
-      - Chỉ chạy countdown auto-redirect khi có dữ liệu đơn hàng hợp lệ.
-    - Đã kiểm tra lại sau lần user tự sửa mới nhất (2026-02-20):
-      - `BffCatalogController` đã sửa đúng scope (member nằm trong class).
-      - `BffCatalogController` đã dùng `AttachAccessToken(client)` cho cả `GetProducts` và `CreateProduct`.
-      - `BffCatalogController.GetProducts` và `CreateProduct` đều giữ `StatusCode` upstream bằng `ContentResult`.
-      - `CheckoutController` đã set `TempData` sau khi tạo đơn và action `Success` đọc dữ liệu để render.
-      - `Success.cshtml` vẫn có fallback mặc định, nhưng giờ đã nhận dữ liệu thật nếu đi đúng luồng checkout.
-    - Đã kiểm tra `OrdersController.Create` để xác nhận payload trả về sau khi tạo đơn:
-      - `CreatedAtAction(..., new { orderId = order.OrderId, totalAmount })`.
-      - Có thể dùng `orderId` và `totalAmount` để truyền dữ liệu sang trang `Checkout/Success`.
-    - Đã kiểm tra lại sau khi user tự cập nhật controller (2026-02-20) và xác nhận:
-      - `AccountController` đã thêm `[ValidateAntiForgeryToken]` cho POST `SignIn`, `SignUp`, `Logout`.
-      - `CheckoutController` đã có action `GET /checkout/success` và redirect success sau khi đặt đơn.
-      - `BffCatalogController.GetProducts` đã đổi sang `ContentResult` giữ `StatusCode` upstream.
-      - `OrderHistory` vẫn nối đúng nút giao diện sang `/account/orders/{id}`.
-      - `SignIn.cshtml` và `SignUp.cshtml` đã chuẩn hóa tiếng Việt có dấu.
-    - Phát hiện lỗi nghiêm trọng mới trong `BffCatalogController`:
-      - Khai báo `private const` và method `AttachAccessToken` đang đặt ở scope `namespace` thay vì trong class, có nguy cơ lỗi compile.
-      - Luồng attach token session chưa được áp dụng thật (hàm `AttachAccessToken` chưa được gọi trong `GetProducts/CreateProduct`).
-    - Đã kiểm tra lại theo danh sách lỗi user cung cấp (2026-02-20) và xác nhận trạng thái thực tế:
-      - `OrderDetail.cshtml` đã có và action `OrderDetail` đang render được view này.
-      - `OrderHistory.cshtml` đã nối nút "Xem chi tiết đơn" sang `/account/orders/{id}`; nút JSON tách riêng.
-      - `SignIn.cshtml` và `SignUp.cshtml` vẫn còn nhiều text không dấu (chưa chuẩn hóa theo quy ước tiếng Việt có dấu).
-      - `AccountController` POST `SignIn/SignUp/Logout` chưa có `[ValidateAntiForgeryToken]`.
-      - `CheckoutController` vẫn redirect về `OrderHistory`, chưa dùng luồng `Success`.
-      - `BffCatalogController.GetProducts` chưa pass-through status code upstream (đang `Content(..., "application/json")`).
-      - `BffCatalogController` chưa đồng bộ lấy token từ session như `BffOrdersController`.
-    - Da doi chieu lai code hien tai cua cac module chinh:
-      - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
-      - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
-      - `src/Web/FreshFarm.Web.Bff/Program.cs`
-      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
-    - Ket qua audit nhanh:
-      - Identity: co `login/register`, hash password, tao JWT.
-      - Catalog: co `GET /api/products`, `GET /api/products/{id}`, `POST /api/products` voi role `Seller`.
-      - Ordering: co nghiep vu that cho `POST /api/orders`, `GET /api/orders/my`, `GET /api/orders/{id}` va da tra DTO chi tiet.
-      - BFF: moi co proxy Catalog (`/bff/products` GET/POST), chua co `AccountController`/Ordering proxy.
-      - Config dev hien tai:
-        - `Identity/appsettings.Development.json`: chi co `Jwt`, chua thay `ConnectionStrings:IdentityDB`.
-        - `Ordering/appsettings.Development.json`: chi co `Jwt`, chua thay `ConnectionStrings:FreshFarmOrderingDB`.
-        - `Catalog/appsettings.Development.json`: da co `ConnectionStrings:FreshFarmCatalogDB` + `Jwt`.
-        - `Web.Bff/appsettings.Development.json`: dang `{}`.
-      - Da xac nhan tool khong build/test duoc trong session nay (`dotnet --info` fail).
-    - Da cap nhat lai `docs/ke-hoach-tiep-theo.md`:
-      - Xoa thong tin cu sai trang thai (`OrdersController` mock).
-      - Bo sung phase moi: `Phase 0 (config)` -> `Phase 1 (Auth+Account BFF)` -> `Phase 2 (BFF Ordering)` -> `Phase 3 (test/hardening)` -> `Phase 4 (demo)`.
-      - Dong bo voi `docs/chuoi-sau-ordering.md`.
-    - Da kiem tra lai code/config (2026-02-18):
-      - `Identity Program.cs` dang doc `ConnectionStrings:IdentityDB` va `Jwt:*`.
-      - `Catalog Program.cs` dang doc `ConnectionStrings:FreshFarmCatalogDB` va `Jwt:*`.
-      - `Ordering Program.cs` dang doc `ConnectionStrings:FreshFarmOrderingDB` va `Jwt:*`.
-      - `BFF Program.cs` dang doc `Services:Catalog:BaseUrl`.
-      - `Identity appsettings.Development.json` co `Jwt`, chua co `ConnectionStrings`.
-      - `Catalog appsettings.Development.json` co ca `ConnectionStrings` va `Jwt`.
-      - `Ordering appsettings.Development.json` co `Jwt`, chua co `ConnectionStrings`.
-      - `BFF appsettings.Development.json` dang rong.
-      - Ca 4 project `.csproj` deu co `UserSecretsId` (co kha nang user da set secrets tren may local).
-    - Da tao tai lieu moi:
-      - `docs/bff-luong-va-code-chi-tiet.md`
-      - Noi dung gom:
-        - Luong tong quan BFF (signin/signup/order history/order proxy).
-        - `appsettings.Development.json` mau cho BFF.
-        - `Program.cs` mau co comment tung dong va ly do.
-        - `AccountDtos.cs`, `AccountController.cs`, `BffOrdersController.cs` mau co comment tung dong.
-        - View toi thieu (`SignIn`, `SignUp`, `OrderHistory`) co comment.
-        - Checklist test va troubleshooting.
-    - Da cap nhat `docs/README.md` them entry cho `docs/bff-luong-va-code-chi-tiet.md`.
-    - Da xac nhan thu muc `src/Web/FreshFarm.Web.Bff/Models` hien co va co the tao moi `AccountDtos.cs` trong thu muc nay.
-    - Da cap nhat dong bo tai lieu sang `Dtos`:
-      - `docs/bff-luong-va-code-chi-tiet.md`: `Models/AccountDtos.cs` -> `Dtos/AccountDtos.cs`, namespace/use/model type doi sang `FreshFarm.Web.Bff.Dtos`.
-      - `docs/auth-account.md`: cap nhat tuong tu de khong lech voi tai lieu moi.
-    - Da sua view BFF theo model/action hien tai:
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
-      - Noi dung da bo cac phan legacy khong dung route/model hien tai va dong bo voi `FreshFarm.Web.Bff.Dtos.*`.
-    - Da tao file y tuong:
-      - `docs/SignIn-SignUp-Y-tuong.md`
-      - Ghi ro: van de cu, huong sua, khi nao dung, khi nao nang cap tiep.
-    - Da cap nhat `docs/README.md` them entry cho `docs/SignIn-SignUp-Y-tuong.md`.
-    - Da tao file ke hoach moi:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Noi dung gom:
-        - Ke hoach 3 ngay sau SignIn/SignUp.
-        - Code mau chi tiet tung dong cho:
-          - `AccountController` action `OrderDetail`
-          - `Views/Account/OrderHistory.cshtml`
-          - `Views/Account/OrderDetail.cshtml`
-          - `Dtos/CheckoutDtos.cs`
-          - `Controllers/CheckoutController.cs`
-          - `Views/Checkout/Index.cshtml`
-          - Helper hardening `BffOrdersController`
-        - Checklist test cuoi va huong dan copy UI tu du an cu.
-    - Da cap nhat `docs/README.md` them entry cho `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`.
-    - Da xac nhan lai trong repo (2026-02-20):
-      - Co file `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md` voi noi dung huong dan chi tiet.
-      - `docs/README.md` da co muc index tro toi file ke hoach moi.
-    - Da doi chieu truc tiep du an cu (2026-02-20):
-      - Co the truy cap `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram`.
-      - Tim thay view nguon:
-        - `Views/Account/SignIn.cshtml`
-        - `Views/Account/SignUp.cshtml`
-        - `Views/Account/OrderHistory.cshtml`
-    - Da cap nhat UI trong BFF theo huong "lay nhanh tu du an cu + sua theo contract moi":
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
-      - Diem giu lai: form-floating, bo cuc card, nhan dien mau.
-      - Diem sua lai: bind dung `LoginRequestDto`/`RegisterRequestDto`, route `Account/SignIn`/`Account/SignUp`.
-      - Diem dat cho phase sau: `ForgotPassword`, `Google/Facebook login`, `AcceptTerms`.
-    - Đã nâng cấp `OrderHistory` view theo BFF hiện tại:
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml`
-      - Bỏ model legacy `FreshFram.Models.OrderHistoryVM` và các partial cũ (`_AccountNav`, `_BreadCrumb`).
-      - Chuyển sang model `List<FreshFarm.Web.Bff.Dtos.OrderHistoryItemDto>`.
-      - Giữ giao diện dạng trang tài khoản + card + accordion; bổ sung badge trạng thái đơn/thanh toán.
-    - Đã chỉnh lại 2 view checkout theo BFF hiện tại và giữ phong cách cũ:
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
-      - Bỏ phụ thuộc model legacy `FreshFram.Models.CheckoutVM` và `FreshFram.Models.Order`.
-      - Giữ bố cục card, tông màu xanh thương hiệu và trải nghiệm checkout/success.
-    - Đã kiểm tra lại controller/view mới ở BFF và phát hiện điểm cần sửa:
-      - Có nguy cơ lỗi runtime ở `AccountController.OrderDetail` do thiếu file view `Views/Account/OrderDetail.cshtml`.
-      - `Checkout/Success` chưa có action nào redirect tới nên đang chưa được dùng.
-      - `BffCatalogController.GetProducts` chưa pass-through đúng status code từ Catalog API.
-      - Action POST `SignIn/SignUp/Logout` chưa bật validate anti-forgery token.
-    - Đã xác nhận từ dự án cũ:
-      - Không có view `OrderDetail` riêng trong `Views/Account`; chi tiết đơn nằm trong `OrderHistory` dạng accordion.
-    - Đã tạo mới trang chi tiết đơn cho BFF:
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Dtos/AccountDtos.cs`: bổ sung `OrderDetailDto` và DTO con.
-      - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`: parse response `GET /api/orders/{id}` sang `OrderDetailDto`.
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml`: nối nút `Xem chi tiết đơn` sang `/account/orders/{id}`.
-    - Da cap nhat ghi chu doi chieu vao:
-      - `docs/SignIn-SignUp-Y-tuong.md` (them muc "Doi chieu voi du an cu (2026-02-20)").
-    - Da cap nhat `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md` (2026-02-20):
-      - Them thong bao cach lam moi: "ban copy giao dien, assistant sua truc tiep".
-      - Them muc `0.1` danh sach file uu tien copy (`OrderHistory`, `CheckOut/Index`, `CheckOut/Success`).
-      - Them muc `0.2` mau tin nhan de user gui sau khi copy xong.
-      - Dieu chinh ke hoach Ngay 1/Ngay 2 theo huong copy truoc, refactor sau.
-    - Đã thêm mục trạng thái kiểm tra 7 lỗi vào:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Có đánh dấu rõ `[Đã xong]/[Chưa xong]` theo hiện trạng code.
-    - Đã sửa tiếng Việt có dấu cho 2 view auth:
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
-      - Đã chuẩn hóa thêm các câu còn lẫn tiếng Anh trong UI (ví dụ social login, ghi chú điều khoản).
-    - Đã cập nhật `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md` với:
-      - Mục 7 đổi sang `[Đã xong]` (text có dấu).
-      - Thêm phần "Hướng dẫn xử lý 5 mục còn lại (chi tiết để bạn tự sửa)" cho các mục controller.
-    - Đã ghi nhận ràng buộc mới từ user:
-      - Dùng tiếng Việt có dấu trong dự án từ thời điểm này.
-    - Đã rà soát nhanh trạng thái Git hiện tại:
-      - Nhánh hiện tại: `dev` (`git branch --show-current`).
-      - Working tree đang có 147 file thay đổi (`git status --porcelain | wc -l`), trải rộng Catalog/Identity/Ordering/BFF và cả `.gitignore`, `AGENTS.md`.
-      - Phân bố thay đổi tập trung ở:
-        - `src/Services/*`: 78 file.
-        - `src/Web/*`: 63 file.
-      - Chưa có file nào được stage (`git diff --name-only --cached` = 0).
-      - `docs/README.md` đã có link tới `docs/git-tu-nhap-mon-den-phap-su.md`.
-      - `docs/git-tu-nhap-mon-den-phap-su.md` có đủ `Q1` đến `Q60`.
-      - Hai file docs chính đang bị ignore bởi rule `docs/` trong `.gitignore`:
-        - `docs/README.md`
-        - `docs/git-tu-nhap-mon-den-phap-su.md`
-      - Local `dev` và `origin/dev` đang cùng commit (`0 0` theo `git rev-list --left-right --count dev...origin/dev`).
-    - Đã xác nhận trạng thái sau khi user báo "đã push":
-      - `dev`, `origin/dev`, `feature/bff-mvp`, `origin/feature/bff-mvp` cùng trỏ về commit `2c78e3f`.
-      - Push đã thành công cho commit hiện tại trên remote.
-      - Tuy nhiên local vẫn còn working tree bẩn (nhiều file modified chưa commit), nên nếu tiếp tục làm sẽ khó tách lịch sử.
-      - Kiểm tra tree của `origin/dev` chưa thấy:
-        - `docs/git-tu-nhap-mon-den-phap-su.md`
-        - `docs/README.md`
-      - Khả năng cao 2 file docs chưa lên remote do rule ignore `docs/` trong `.gitignore`.
-    - Đã hoàn tất 1 chức năng code mới:
-      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
-        - Ghi thêm `OrderId` vào `TempData` sau khi tạo đơn thành công.
-        - Đọc `TempData["OrderId"]` ở action `Success`.
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`:
-        - Parse `OrderId` từ `ViewBag`.
-        - Bổ sung nút "Xem chi tiết đơn vừa đặt" trỏ tới `/account/orders/{id}` khi có dữ liệu.
-      - Giữ nguyên bố cục/màu sắc hiện có của trang success.
-    - Đã cập nhật mới toàn bộ file kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Nội dung mới gồm:
-        - Ảnh chụp hiện trạng theo code thực tế.
-        - Điểm nghẽn chính hiện tại.
-        - Roadmap cực chi tiết theo giai đoạn A/B/C/D.
-        - Nhánh làm ngay chỉ với `md/views`: Home product listing + Checkout động từ query.
-        - Definition of Done + checklist test tay + mẫu prompt để làm tiếp từng bước.
-    - Đã bổ sung vào cùng file kế hoạch phần code hoàn chỉnh toàn phần:
-      - Full file `Views/Home/Index.cshtml`.
-      - Full file `Views/Checkout/Index.cshtml`.
-      - Thêm mục quy tắc đẩy GitHub và checkpoint sau từng cụm file.
-    - Đã xác nhận:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md` đang bị ignore bởi `.gitignore` (rule `docs/`), cần `git add -f` hoặc bỏ rule ignore nếu muốn push file docs này.
-    - Đã triển khai theo yêu cầu mới nhất (chỉ sửa `views`):
-      - Sửa `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` từ template "Welcome" sang trang danh sách sản phẩm.
-      - Có ô tìm kiếm theo tên sản phẩm.
-      - JavaScript gọi `GET /bff/products` và `GET /bff/products?name=...`.
-      - Render grid card gồm tên, giá, danh mục, đơn vị.
-      - Nút `Mua ngay` chuyển tới `/checkout?productId=...&productName=...&unitPrice=...&unitSymbol=...`.
-      - Có tái sử dụng phong cách từ dự án cũ (layout card, màu xanh thương hiệu, khung ảnh sản phẩm).
-    - User đã commit và push thành công chức năng Home listing:
-      - Commit: `e823992`
-      - Branch: `feature/bff-mvp`
-      - Remote: `origin/feature/bff-mvp`
-    - User đặt câu hỏi quy trình: sau khi xong chức năng có nên gộp luôn vào `dev` hay không.
-    - Đã xử lý lỗi compile ở view success:
-      - File: `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
-      - Lỗi: `CS8197 Cannot infer the type of implicitly-typed out variable 'parsedOrderId'`.
-      - Nguyên nhân: `ViewBag.OrderId` là `dynamic`, kết hợp `out var` khiến compiler không suy luận được kiểu.
-      - Cách sửa đã áp dụng:
-        - `string? orderIdText = Convert.ToString(ViewBag.OrderId);`
-        - `int.TryParse(orderIdText, out int parsedOrderId)`
+    - Đã sửa `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` theo phong cách Home cũ:
+      - Promo bar + header + navbar.
+      - Carousel banner.
+      - Danh mục ngang có nút cuộn trái/phải.
+      - Khu "Gợi Ý Hôm Nay" bằng Swiper.
+      - Khu "Sản phẩm nổi bật" dạng card overlay.
+      - Popup coupon và footer phong cách cũ.
+    - Đã gắn dữ liệu runtime BFF:
+      - Gọi `GET /bff/products` (và `?name=...` khi tìm kiếm).
+      - Chuẩn hóa dữ liệu sản phẩm và render lại theo layout cũ.
+      - Nút thao tác sản phẩm trỏ sang `/checkout?productId=...&productName=...&unitPrice=...&unitSymbol=...`.
   - *Now*:
-    - Báo user nguyên nhân lỗi ở `Success.cshtml` và xác nhận đã sửa.
+    - Bàn giao để user xem lại mức độ "y chang" mong muốn.
   - *Next*:
-    - Nếu user đồng ý, tiếp tục sửa `Views/Checkout/Index.cshtml` theo query string động.
+    - Nếu cần giống tuyệt đối cả hình/logo/icon cũ: user copy thêm assets (logo/slogan/images) sang BFF, rồi tinh chỉnh pixel-level.
 - **Open questions** (UNCONFIRMED if needed):
-  - `UNCONFIRMED`: 147 file modified là thay đổi chủ đích hay nhiễu line-ending/format.
+  - `UNCONFIRMED`: User có muốn copy toàn bộ ảnh/logo gốc từ dự án cũ sang `wwwroot` để đạt mức "y chang" tuyệt đối không?
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
-  - `docs/chuoi-sau-ordering.md`
-  - `docs/auth-account.md`
-  - `docs/bff-luong-va-code-chi-tiet.md`
-  - `docs/SignIn-SignUp-Y-tuong.md`
-  - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-  - `docs/ke-hoach-tiep-theo.md`
-  - `docs/README.md`
-  - `docs/git-tu-nhap-mon-den-phap-su.md`
-  - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj`
-  - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.Development.json`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.Development.json`
-  - `src/Web/FreshFarm.Web.Bff/Program.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/BffOrdersController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Dtos/AccountDtos.cs`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
-  - `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram\Views\Account\SignIn.cshtml`
-  - `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram\Views\Account\SignUp.cshtml`
-  - `D:\NCKH\DOAN\DuAnCu\DoAnWeb-testCodeDoAn\FreshFram\Views\Account\OrderHistory.cshtml`
-  - `rg --files /mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Account`
-  - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
-  - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
-  - `dotnet --info`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/Index.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/HeaderPartial.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/NavBar.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/PromoBar.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Views/Home/FooterPartial.cshtml`
+  - `/mnt/d/NCKH/DOAN/DuAnCu/DoAnWeb-testCodeDoAn/FreshFram/Content/Site.css`

@@ -44,16 +44,30 @@
     <style>
         :root {
             --primary-green: #008a4f;
+            --primary-green-dark: #006a3d;
         }
 
         body {
-            background: #f4f7f5;
+            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
         }
 
         .page-wrap {
             max-width: 1120px;
-            margin: 40px auto;
+            margin: 28px auto 40px;
             padding: 0 12px;
+        }
+
+        .top-nav {
+            background: #fff;
+            border: 1px solid #d7f1e4;
+            border-radius: 14px;
+        }
+
+        .brand-chip {
+            color: var(--primary-green);
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-decoration: none;
         }
 
         .account-nav .list-group-item.active {
@@ -83,14 +97,32 @@
         }
 
         .btn-main:hover {
-            background: #006a3d;
-            border-color: #006a3d;
+            background: var(--primary-green-dark);
+            border-color: var(--primary-green-dark);
             color: #fff;
+        }
+
+        .empty-box {
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            background: #fff;
         }
     </style>
 </head>
 <body>
     <main class="page-wrap">
+        <header class="top-nav d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 mb-3">
+            <a href="/" class="brand-chip">FRESHFARM</a>
+            <div class="d-flex gap-2">
+                <a href="/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-grid me-1"></i>Danh sách sản phẩm
+                </a>
+                <a href="/account/orders" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
+                </a>
+            </div>
+        </header>
+
         <div class="mb-4">
             <h1 class="fw-bold mb-1">Tài khoản của tôi</h1>
             <p class="text-muted mb-0">Theo dõi đơn hàng bạn đã đặt.</p>
@@ -135,7 +167,12 @@
 
                         @if (Model is null || !Model.Any())
                         {
-                            <div class="alert alert-info mb-0">Bạn chưa có đơn hàng nào.</div>
+                            <div class="empty-box p-4 text-center">
+                                <div class="mb-2 text-muted">Bạn chưa có đơn hàng nào.</div>
+                                <a href="/" class="btn btn-main btn-sm">
+                                    <i class="bi bi-cart-plus me-1"></i>Bắt đầu mua sắm
+                                </a>
+                            </div>
                         }
                         else
                         {
@@ -189,6 +226,9 @@
                                                 <div class="d-flex gap-2 flex-wrap">
                                                     <a href="/account/orders/@order.OrderId" class="btn btn-main btn-sm">
                                                         <i class="bi bi-eye me-1"></i>Xem chi tiết đơn
+                                                    </a>
+                                                    <a href="/" class="btn btn-outline-success btn-sm">
+                                                        <i class="bi bi-cart-plus me-1"></i>Mua thêm
                                                     </a>
                                                     <a href="/bff/orders/@order.OrderId" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
                                                         <i class="bi bi-code-slash me-1"></i>Xem JSON
