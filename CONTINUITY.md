@@ -44,10 +44,21 @@
     - Đã cập nhật kế hoạch:
       - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
       - Đánh dấu trạng thái `[Đã làm]` cho Bước 3 Account Auth.
+    - Đã hoàn thiện phần Checkout của Bước 5:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml` theo bố cục checkout bản cũ.
+      - Giữ nguyên luồng dữ liệu query string (`productId`, `productName`, `unitPrice`, `unitSymbol`) và submit hiện tại.
+      - Không đổi controller/service.
+    - Đã hoàn thiện phần Success của Bước 5:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml` về layout success bản cũ.
+      - Giữ nhánh fallback khi thiếu dữ liệu đơn hàng.
+      - Giữ nút xem chi tiết đơn vừa đặt và redirect về `/?from=thankyou`.
+    - Đã cập nhật kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Ghi trạng thái `[Đã làm]` cho Checkout `Index` và `Success`.
   - *Now*:
-    - Bàn giao kết quả Bước 3 (SignIn/SignUp) cho user.
+    - Bàn giao kết quả cụm Checkout/Success cho user.
   - *Next*:
-    - Sang Bước 4: rà và nâng cấp giao diện `OrderHistory/OrderDetail` theo phong cách cũ.
+    - Nếu user yêu cầu, chuyển sang Bước 4 (`OrderHistory/OrderDetail`) hoặc Bước 6 (`Cart UI`).
 - **Open questions** (UNCONFIRMED if needed):
   - Không có.
 - **Working set** (files/ids/commands):
@@ -55,6 +66,8 @@
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`

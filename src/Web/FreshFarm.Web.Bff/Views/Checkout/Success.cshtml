@@ -47,42 +47,12 @@
         }
 
         body {
-            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
+            background: #f8f9fa;
             min-height: 100vh;
         }
 
-        .success-wrap {
-            max-width: 900px;
-            margin: 28px auto 40px;
-            padding: 0 12px;
-        }
-
-        .top-nav {
-            background: #fff;
-            border: 1px solid #d7f1e4;
-            border-radius: 14px;
-        }
-
-        .brand-chip {
-            color: var(--primary-green);
-            font-weight: 800;
-            letter-spacing: .02em;
-            text-decoration: none;
-        }
-
-        .step-chip {
-            padding: .35rem .65rem;
-            border-radius: 999px;
-            font-size: .78rem;
-            font-weight: 600;
-            background: #eef5ef;
-            color: #35534a;
-        }
-
-        .step-chip.active {
-            background: rgba(0, 138, 79, .14);
-            color: #004f2d;
-            border: 1px solid rgba(0, 138, 79, .3);
+        .success-container {
+            max-width: 960px;
         }
 
         .card {
@@ -114,65 +84,49 @@
     </style>
 </head>
 <body>
-    <main class="success-wrap">
-        <header class="top-nav d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 mb-3">
-            <a href="/" class="brand-chip">FRESHFARM</a>
-            <div class="d-flex gap-2">
-                <a href="/" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-grid me-1"></i>Danh sách sản phẩm
-                </a>
-                <a href="/account/orders" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-receipt me-1"></i>Đơn hàng của tôi
-                </a>
-            </div>
-        </header>
+    <div class="container my-4 success-container">
+        <div class="mx-auto" style="max-width: 860px;">
+            <div class="card shadow-sm p-4 p-md-5">
+                @if (hasOrderData)
+                {
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle-fill check-icon mb-3"></i>
 
-        <div class="d-flex flex-wrap gap-2 mb-3">
-            <span class="step-chip">1. Chọn sản phẩm</span>
-            <span class="step-chip">2. Thanh toán</span>
-            <span class="step-chip active">3. Hoàn tất</span>
-        </div>
+                        <h2 class="fw-bold mb-2">Cảm ơn bạn đã đặt hàng!</h2>
+                        <p class="lead mb-3">
+                            Đơn hàng của bạn <strong class="text-primary">@orderCode</strong> đã được tạo thành công.
+                        </p>
+                        <p class="mb-4">
+                            Chúng tôi đã ghi nhận đơn hàng và sẽ sớm liên hệ xác nhận đơn của bạn.
+                        </p>
 
-        <div class="card shadow-sm p-4 p-md-5">
-            @if (hasOrderData)
-            {
-                <div class="card-body text-center">
-                    <i class="bi bi-check-circle-fill check-icon mb-3"></i>
-                    <h2 class="fw-bold mb-2">Cảm ơn bạn đã đặt hàng!</h2>
-                    <p class="lead mb-3">
-                        Đơn hàng <strong class="text-primary">@orderCode</strong> đã được tạo thành công.
-                    </p>
-                    <p class="mb-4 text-muted">
-                        Chúng tôi đã ghi nhận đơn hàng của bạn và sẽ sớm liên hệ xác nhận.
-                    </p>
-
-                    <div class="row gx-4 gy-3 text-start border-top pt-4 mt-2 mb-3">
-                        <div class="col-md-6">
-                            <h5 class="fw-bold mb-3">Thông tin đơn hàng</h5>
-                            <p class="mb-1"><strong>Mã đơn hàng:</strong> <span class="text-primary">@orderCode</span></p>
-                            <p class="mb-1"><strong>Ngày đặt:</strong> @orderDate.ToString("dd/MM/yyyy HH:mm")</p>
-                            <p class="mb-1"><strong>Tổng tiền:</strong> <strong style="color: var(--primary-green)">@Vnd(totalAmount)</strong></p>
-                            <p class="mb-1"><strong>Thanh toán:</strong> @paymentMethod</p>
+                        <div class="row gx-4 gy-3 text-start border-top pt-4 mt-2 mb-3">
+                            <div class="col-md-6">
+                                <h5 class="fw-bold mb-3">Thông tin đơn hàng</h5>
+                                <p class="mb-1"><strong>Mã đơn hàng:</strong> <span class="text-primary">@orderCode</span></p>
+                                <p class="mb-1"><strong>Ngày đặt:</strong> @orderDate.ToString("dd/MM/yyyy HH:mm")</p>
+                                <p class="mb-1"><strong>Tổng tiền:</strong> <strong style="color: var(--primary-green)">@Vnd(totalAmount)</strong></p>
+                                <p class="mb-1"><strong>Phương thức thanh toán:</strong> @paymentMethod</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="fw-bold mb-3">Địa chỉ giao hàng</h5>
+                                <p class="mb-1"><strong>Người nhận:</strong> @recipientName</p>
+                                <p class="mb-1"><strong>Số điện thoại:</strong> @recipientPhone</p>
+                                <p class="mb-1"><strong>Địa chỉ:</strong> @recipientAddress</p>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <h5 class="fw-bold mb-3">Thông tin nhận hàng</h5>
-                            <p class="mb-1"><strong>Người nhận:</strong> @recipientName</p>
-                            <p class="mb-1"><strong>Số điện thoại:</strong> @recipientPhone</p>
-                            <p class="mb-1"><strong>Địa chỉ:</strong> @recipientAddress</p>
+
+                        <div class="alert alert-info border-0" role="alert">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            Bạn có thể theo dõi đơn hàng trong mục <strong>Lịch sử đơn hàng</strong>.
                         </div>
-                    </div>
 
-                    <div class="alert alert-info border-0">
-                        <i class="bi bi-info-circle-fill me-2"></i>
-                        Bạn có thể theo dõi đơn hàng trong mục <strong>Lịch sử đơn hàng</strong>.
-                    </div>
-
-                    <p class="mt-4 mb-2 text-muted small">
-                        Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.
-                    </p>
+                        <p class="mt-4 mb-2 text-muted small">
+                            Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.
+                        </p>
 
                         <div class="d-grid gap-2 d-md-block mt-2">
-                            <a asp-controller="Home" asp-action="Index" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
+                            <a href="/?from=thankyou" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
                                 <i class="bi bi-house-door-fill me-2"></i>Về trang chủ
                             </a>
                             @if (hasOrderId)
@@ -185,31 +139,32 @@
                                 <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
                             </a>
                         </div>
-                </div>
-            }
-            else
-            {
-                <div class="card-body text-center">
-                    <i class="bi bi-exclamation-triangle-fill warning-icon mb-3"></i>
-                    <h2 class="fw-bold mb-2">Không có dữ liệu đơn hàng</h2>
-                    <p class="mb-4 text-muted">
-                        Có thể bạn đã vào trực tiếp trang này hoặc phiên dữ liệu đã hết hạn.
-                    </p>
-                    <div class="d-grid gap-2 d-md-block">
-                        <a href="/checkout" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
-                            <i class="bi bi-arrow-repeat me-2"></i>Quay lại checkout
-                        </a>
-                        <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
-                            <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
-                        </a>
-                        <a href="/" class="btn btn-outline-secondary btn-lg">
-                            <i class="bi bi-grid me-2"></i>Về danh sách sản phẩm
-                        </a>
                     </div>
-                </div>
-            }
+                }
+                else
+                {
+                    <div class="card-body text-center">
+                        <i class="bi bi-exclamation-triangle-fill warning-icon mb-3"></i>
+                        <h2 class="fw-bold mb-2">Không có dữ liệu đơn hàng</h2>
+                        <p class="mb-4 text-muted">
+                            Có thể bạn đã vào trực tiếp trang này hoặc phiên dữ liệu đã hết hạn.
+                        </p>
+                        <div class="d-grid gap-2 d-md-block">
+                            <a href="/checkout" class="btn btn-main btn-lg me-md-2 mb-2 mb-md-0">
+                                <i class="bi bi-arrow-repeat me-2"></i>Quay lại checkout
+                            </a>
+                            <a href="/account/orders" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-file-text me-2"></i>Xem đơn hàng của tôi
+                            </a>
+                            <a href="/" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-grid me-2"></i>Về danh sách sản phẩm
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
         </div>
-    </main>
+    </div>
 
     @if (hasOrderData)
     {
@@ -224,7 +179,7 @@
                     }
                     if (seconds <= 0) {
                         clearInterval(timer);
-                        window.location.href = "/";
+                        window.location.href = "/?from=thankyou";
                     }
                 }, 1000);
             })();
