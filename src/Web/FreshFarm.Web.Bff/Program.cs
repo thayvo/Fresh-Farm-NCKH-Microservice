@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+﻿using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
+using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 
 var builder = WebApplication.CreateBuilder(args); // Tao host builder cho app.
@@ -49,6 +50,9 @@ builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "FreshFarm.Web.Bff", Version = "v1" }); // Metadata.
 });
+
+builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionService cần HttpContext.
+builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
 
 var app = builder.Build(); // Build app pipeline.
 

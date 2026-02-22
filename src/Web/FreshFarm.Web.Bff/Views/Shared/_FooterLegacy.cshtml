@@ -1,3 +1,9 @@
+@{
+    var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
+    var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
+    var currentUrl = $"{currentPath}{currentQuery}";
+}
+
 <footer class="bg-dark text-white pt-5 pb-4">
     <div class="container text-center text-md-start">
         <div class="row gy-4">
@@ -28,7 +34,12 @@
             <div class="col-6 col-md-2">
                 <h6 class="text-uppercase fw-bold mb-3" style="color:var(--primary-green)">Tài khoản</h6>
                 <ul class="list-unstyled mb-0">
-                    <li><a href="/account/signin" class="footer-link">Đăng nhập</a></li>
+                    <li>
+                        <a asp-controller="Account"
+                           asp-action="SignIn"
+                           asp-route-returnUrl="@currentUrl"
+                           class="footer-link">Đăng nhập</a>
+                    </li>
                     <li><a href="/account/orders" class="footer-link">Lịch sử đơn hàng</a></li>
                     <li><a href="#section-featured" class="footer-link">Sản phẩm</a></li>
                 </ul>

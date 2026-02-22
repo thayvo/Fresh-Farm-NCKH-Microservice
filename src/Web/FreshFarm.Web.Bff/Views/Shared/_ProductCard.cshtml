@@ -1,0 +1,91 @@
+@using System.Globalization
+@model dynamic
+@{
+    object? source = Model;
+
+    string GetText(params string[] propertyNames)
+    {
+        if (source is null)
+        {
+            return string.Empty;
+        }
+
+        var type = source.GetType();
+        foreach (var propertyName in propertyNames)
+        {
+            var property = type.GetProperty(propertyName);
+            if (property is null)
+            {
+                continue;
+            }
+
+            var value = property.GetValue(source)?.ToString();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    decimal GetDecimal(params string[] propertyNames)
+    {
+        var raw = GetText(propertyNames);
+        return decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed)
+            || decimal.TryParse(raw, NumberStyles.Any, CultureInfo.GetCultureInfo("vi-VN"), out parsed)
+            ? parsed
+            : 0m;
+    }
+
+    int GetInt(params string[] propertyNames)
+    {
+        var raw = GetText(propertyNames);
+        return int.TryParse(raw, out var parsed) ? parsed : 0;
+    }
+
+    var productId = GetInt("ProductId", "Id");
+    var productName = GetText("ProductName", "Name");
+    var unitSymbol = GetText("UnitSymbol", "Unit");
+    var imageName = GetText("ImageFileName", "ImageUrl", "Image");
+    var unitPrice = GetDecimal("UnitPrice", "Price");
+    var fallbackName = productId > 0 ? $"Sản phẩm #{productId}" : "Sản phẩm";
+    var safeProductName = string.IsNullOrWhiteSpace(productName) ? fallbackName : productName;
+    var safeUnitSymbol = string.IsNullOrWhiteSpace(unitSymbol) ? "đơn vị" : unitSymbol;
+    var imageUrl = string.IsNullOrWhiteSpace(imageName)
+        ? "/images/legacy/no-image.png"
+        : (imageName.StartsWith("/") || imageName.StartsWith("http", System.StringComparison.OrdinalIgnoreCase)
+            ? imageName
+            : $"/images/legacy/{imageName}");
+    var checkoutUrl = $"/checkout?productId={productId}" +
+                      $"&productName={System.Uri.EscapeDataString(safeProductName)}" +
+                      $"&unitPrice={unitPrice.ToString(CultureInfo.InvariantCulture)}" +
+                      $"&unitSymbol={System.Uri.EscapeDataString(safeUnitSymbol)}";
+}
+
+<div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
+    <div class="product-image-wrapper">
+        <img src="@imageUrl"
+             class="product-image"
+             alt="@safeProductName"
+             onerror="this.onerror=null;this.src='/images/legacy/no-image.png';" />
+    </div>
+
+    <div class="product-overlay">
+        <h5 class="h6 mb-2">@safeProductName</h5>
+        <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+            <span class="fw-bold fs-5">@unitPrice.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) ₫</span>
+        </div>
+        <a href="@checkoutUrl" class="btn btn-success btn-sm fw-semibold px-3 py-2">
+            <i class="bi bi-lightning-charge me-1"></i>Mua ngay
+        </a>
+    </div>
+
+    <div class="card-body text-center">
+        <h6 class="mb-1 text-truncate" title="@safeProductName">@safeProductName</h6>
+        <div class="text-muted small mb-1">@safeUnitSymbol</div>
+        <span class="fw-bold" style="color: var(--primary-green)">
+            @unitPrice.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) ₫
+        </span>
+    </div>
+</div>

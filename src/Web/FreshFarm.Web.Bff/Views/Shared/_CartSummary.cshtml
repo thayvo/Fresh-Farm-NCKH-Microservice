@@ -1,0 +1,14 @@
+@model int
+@{ Layout = null; }
+
+<div class="d-flex align-items-center">
+    <a href="/cart"
+       class="nav-link position-relative d-flex align-items-center gap-2 text-dark fw-medium">
+        <i class="bi bi-cart"></i>
+        <span id="cart-item-count"
+              class="badge bg-danger rounded-circle position-absolute @(Model > 0 ? string.Empty : "d-none")">
+            @Model
+        </span>
+        <span class="d-none d-lg-inline">Giỏ hàng</span>
+    </a>
+</div>

@@ -2,6 +2,8 @@
 @model FreshFarm.Web.Bff.Dtos.OrderDetailDto?
 @{
     Layout = null;
+    ViewBag.Title = "Chi tiết đơn hàng";
+    ViewBag.BreadcrumbItems = Tuple.Create("Tài khoản", "/account/orders");
 
     string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", amount);
 
@@ -10,10 +12,9 @@
         var normalized = (status ?? string.Empty).Trim().ToLowerInvariant();
         return normalized switch
         {
-            "completed" or "delivered" => ("bg-success", "Đã giao"),
-            "pending" => ("bg-warning text-dark", "Chờ xử lý"),
-            "processing" => ("bg-info text-dark", "Đang xử lý"),
-            "shipping" or "shipped" => ("bg-primary", "Đang giao"),
+            "completed" or "delivered" => ("bg-success", "Đã giao hàng"),
+            "pending" or "processing" => ("bg-warning text-dark", "Đang xử lý"),
+            "shipping" or "shipped" => ("bg-info text-dark", "Đang giao"),
             "canceled" or "cancelled" => ("bg-danger", "Đã hủy"),
             _ => ("bg-secondary", string.IsNullOrWhiteSpace(status) ? "Không rõ" : status!)
         };
@@ -32,6 +33,7 @@
         };
     }
 }
+
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -41,248 +43,221 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <style>
-        :root {
-            --primary-green: #008a4f;
-            --primary-green-dark: #006a3d;
-        }
-
         body {
             background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
         }
 
-        .page-wrap {
-            max-width: 1120px;
-            margin: 28px auto 40px;
-            padding: 0 12px;
-        }
-
-        .top-nav {
-            background: #fff;
-            border: 1px solid #d7f1e4;
-            border-radius: 14px;
-        }
-
-        .brand-chip {
-            color: var(--primary-green);
-            font-weight: 800;
-            letter-spacing: .02em;
-            text-decoration: none;
-        }
-
-        .btn-main {
-            background: var(--primary-green);
-            border-color: var(--primary-green);
-            color: #fff;
-        }
-
-        .btn-main:hover {
-            background: var(--primary-green-dark);
-            border-color: var(--primary-green-dark);
-            color: #fff;
+        .account-nav .list-group-item.active {
+            background: var(--primary-green, #008a4f);
+            border-color: var(--primary-green, #008a4f);
         }
 
         .meta-label {
             color: #6b7280;
             font-size: .9rem;
         }
+
+        .order-number {
+            color: var(--primary-green, #008a4f);
+        }
     </style>
 </head>
 <body>
-    <main class="page-wrap">
-        <header class="top-nav d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 mb-3">
-            <a href="/" class="brand-chip">FRESHFARM</a>
-            <div class="d-flex gap-2">
-                <a href="/" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-grid me-1"></i>Danh sách sản phẩm
-                </a>
-                <a href="/account/orders" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-clock-history me-1"></i>Lịch sử đơn
-                </a>
-            </div>
-        </header>
-
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-            <div>
-                <h2 class="fw-bold mb-1">Chi tiết đơn hàng</h2>
-                <p class="text-muted mb-0">Theo dõi đầy đủ thông tin đơn hàng của bạn.</p>
-            </div>
-            <a href="/account/orders" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Quay lại lịch sử đơn
-            </a>
+    <main class="container my-5">
+        <div class="mb-4">
+            <h1 class="fw-bold">Tài khoản của tôi</h1>
+            @await Html.PartialAsync("_BreadCrumb")
         </div>
 
-        @if (ViewBag.Error is not null)
-        {
-            <div class="alert alert-danger">@ViewBag.Error</div>
-        }
+        <div class="row g-4">
+            @await Html.PartialAsync("_AccountNav")
 
-        @if (Model is null)
-        {
-            <div class="alert alert-warning">Không có dữ liệu chi tiết đơn hàng để hiển thị.</div>
-        }
-        else
-        {
-            var orderBadge = OrderBadge(Model.Status);
-            var paymentBadge = PaymentBadge(Model.PaymentStatus);
-            var primaryShipping = (Model.Shippings is not null && Model.Shippings.Count > 0)
-                ? Model.Shippings[0]
-                : null;
-            var hasItems = Model.Items is not null && Model.Items.Count > 0;
-            var hasPayments = Model.Payments is not null && Model.Payments.Count > 0;
+            <section class="col-lg-9">
+                @if (ViewBag.Error is not null)
+                {
+                    <div class="alert alert-danger">@ViewBag.Error</div>
+                }
 
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body p-4">
-                    <div class="row g-3 align-items-center">
-                        <div class="col-md-3">
-                            <div class="meta-label">Mã đơn</div>
-                            <div class="fw-semibold fs-5">#@Model.OrderId</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="meta-label">Ngày đặt</div>
-                            <div class="fw-semibold">@Model.OrderDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="meta-label">Trạng thái đơn</div>
-                            <span class="badge @orderBadge.CssClass">@orderBadge.Label</span>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="meta-label">Thanh toán</div>
-                            <span class="badge @paymentBadge.CssClass">@paymentBadge.Label</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-4 mb-4">
-                <div class="col-lg-7">
-                    <div class="card border-0 shadow-sm h-100">
+                @if (Model is null)
+                {
+                    <div class="card border-0 shadow-sm">
                         <div class="card-body p-4">
-                            <h5 class="fw-bold mb-3">Thông tin người nhận</h5>
-                            <p class="mb-1"><strong>Họ tên:</strong> @(primaryShipping?.FullName ?? Model.BuyerFullName ?? "Chưa cập nhật")</p>
-                            <p class="mb-1"><strong>Số điện thoại:</strong> @(primaryShipping?.Phone ?? Model.BuyerPhone ?? "Chưa cập nhật")</p>
-                            <p class="mb-1"><strong>Email:</strong> @(primaryShipping?.Email ?? Model.BuyerEmail ?? "Chưa cập nhật")</p>
-                            <p class="mb-0"><strong>Địa chỉ:</strong> @(primaryShipping?.AddressDetail ?? "Chưa cập nhật")</p>
+                            <h4 class="fw-bold mb-3">Chi tiết đơn hàng</h4>
+                            <div class="alert alert-warning mb-3">Không có dữ liệu chi tiết đơn hàng để hiển thị.</div>
+                            <a href="/account/orders" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>Quay lại lịch sử đơn
+                            </a>
                         </div>
                     </div>
-                </div>
+                }
+                else
+                {
+                    var orderBadge = OrderBadge(Model.Status);
+                    var paymentBadge = PaymentBadge(Model.PaymentStatus);
+                    var primaryShipping = (Model.Shippings is not null && Model.Shippings.Count > 0)
+                        ? Model.Shippings[0]
+                        : null;
+                    var hasItems = Model.Items is not null && Model.Items.Count > 0;
+                    var hasPayments = Model.Payments is not null && Model.Payments.Count > 0;
 
-                <div class="col-lg-5">
-                    <div class="card border-0 shadow-sm h-100">
+                    <div class="card border-0 shadow-sm mb-4">
                         <div class="card-body p-4">
-                            <h5 class="fw-bold mb-3">Tổng quan thanh toán</h5>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Tổng tiền hàng + phí ship</span>
-                                <strong>@Vnd(Model.TotalAmount)</strong>
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                <div>
+                                    <h4 class="fw-bold mb-1">Chi tiết đơn hàng</h4>
+                                    <div class="text-muted">Mã đơn: <strong class="order-number">#@Model.OrderId</strong></div>
+                                </div>
+                                <a href="/account/orders" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-arrow-left me-1"></i>Quay lại lịch sử đơn
+                                </a>
                             </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Phí vận chuyển</span>
-                                <strong>@Vnd(Model.ShippingFee)</strong>
-                            </div>
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Điểm đã dùng</span>
-                                <strong>@Model.PointsRedeemed</strong>
-                            </div>
-                            <div class="d-flex justify-content-between">
-                                <span>Điểm đã tích lũy</span>
-                                <strong>@Model.PointsEarned</strong>
+
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-4">
+                                    <div class="meta-label">Ngày đặt</div>
+                                    <div class="fw-semibold">@Model.OrderDate.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="meta-label">Trạng thái đơn</div>
+                                    <span class="badge @orderBadge.CssClass">@orderBadge.Label</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="meta-label">Thanh toán</div>
+                                    <span class="badge @paymentBadge.CssClass">@paymentBadge.Label</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3">Sản phẩm trong đơn</h5>
-                    @if (!hasItems)
-                    {
-                        <div class="text-muted">Không có dữ liệu sản phẩm.</div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive">
-                            <table class="table align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Mã SP</th>
-                                        <th>Số lượng</th>
-                                        <th>Đơn vị</th>
-                                        <th>Đơn giá</th>
-                                        <th>Thành tiền</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var item in Model.Items!)
-                                    {
-                                        var lineTotal = item.UnitPrice * item.Quantity;
-                                        <tr>
-                                            <td>@item.ProductId</td>
-                                            <td>@item.Quantity</td>
-                                            <td>@(item.UnitSymbol ?? "-")</td>
-                                            <td>@Vnd(item.UnitPrice)</td>
-                                            <td class="fw-semibold">@Vnd(lineTotal)</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-7">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h5 class="fw-bold mb-3">Thông tin người nhận</h5>
+                                    <p class="mb-1"><strong>Họ tên:</strong> @(primaryShipping?.FullName ?? Model.BuyerFullName ?? "Chưa cập nhật")</p>
+                                    <p class="mb-1"><strong>Số điện thoại:</strong> @(primaryShipping?.Phone ?? Model.BuyerPhone ?? "Chưa cập nhật")</p>
+                                    <p class="mb-1"><strong>Email:</strong> @(primaryShipping?.Email ?? Model.BuyerEmail ?? "Chưa cập nhật")</p>
+                                    <p class="mb-0"><strong>Địa chỉ:</strong> @(primaryShipping?.AddressDetail ?? "Chưa cập nhật")</p>
+                                </div>
+                            </div>
                         </div>
-                    }
-                </div>
-            </div>
 
-            <div class="card border-0 shadow-sm">
-                <div class="card-body p-4">
-                    <h5 class="fw-bold mb-3">Lịch sử thanh toán</h5>
-                    @if (!hasPayments)
-                    {
-                        <div class="text-muted mb-3">Chưa có bản ghi thanh toán.</div>
-                    }
-                    else
-                    {
-                        <div class="table-responsive mb-3">
-                            <table class="table align-middle">
-                                <thead>
-                                    <tr>
-                                        <th>Phương thức</th>
-                                        <th>Mã giao dịch</th>
-                                        <th>Trạng thái</th>
-                                        <th>Thời gian</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var payment in Model.Payments!)
-                                    {
-                                        var pBadge = PaymentBadge(payment.PaymentStatus);
-                                        <tr>
-                                            <td>@(payment.PaymentMethod ?? "-")</td>
-                                            <td>@(payment.TransactionCode ?? "-")</td>
-                                            <td><span class="badge @pBadge.CssClass">@pBadge.Label</span></td>
-                                            <td>@(payment.PaymentDate?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
+                        <div class="col-lg-5">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h5 class="fw-bold mb-3">Tổng quan thanh toán</h5>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Tổng tiền hàng + phí ship</span>
+                                        <strong>@Vnd(Model.TotalAmount)</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Phí vận chuyển</span>
+                                        <strong>@Vnd(Model.ShippingFee)</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Điểm đã dùng</span>
+                                        <strong>@Model.PointsRedeemed</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Điểm tích lũy</span>
+                                        <strong>@Model.PointsEarned</strong>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    }
-
-                    @if (!string.IsNullOrWhiteSpace(Model.OrderNote))
-                    {
-                        <div class="border rounded p-3 bg-light">
-                            <div class="meta-label mb-1">Ghi chú đơn hàng</div>
-                            <div>@Model.OrderNote</div>
-                        </div>
-                    }
-
-                    <div class="d-flex gap-2 flex-wrap mt-3">
-                        <a href="/" class="btn btn-main">Tiếp tục mua sắm</a>
-                        <a href="/account/orders" class="btn btn-outline-secondary">Quay lại lịch sử đơn</a>
-                        <a href="/bff/orders/@Model.OrderId" target="_blank" rel="noopener" class="btn btn-outline-secondary">
-                            <i class="bi bi-code-slash me-1"></i>Xem JSON
-                        </a>
                     </div>
-                </div>
-            </div>
-        }
+
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-3">Sản phẩm trong đơn</h5>
+                            @if (!hasItems)
+                            {
+                                <div class="text-muted">Không có dữ liệu sản phẩm.</div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Mã SP</th>
+                                                <th>Số lượng</th>
+                                                <th>Đơn vị</th>
+                                                <th>Đơn giá</th>
+                                                <th>Thành tiền</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in Model.Items!)
+                                            {
+                                                var lineTotal = item.UnitPrice * item.Quantity;
+                                                <tr>
+                                                    <td>@item.ProductId</td>
+                                                    <td>@item.Quantity</td>
+                                                    <td>@(item.UnitSymbol ?? "-")</td>
+                                                    <td>@Vnd(item.UnitPrice)</td>
+                                                    <td class="fw-semibold">@Vnd(lineTotal)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-4">
+                            <h5 class="fw-bold mb-3">Lịch sử thanh toán</h5>
+                            @if (!hasPayments)
+                            {
+                                <div class="text-muted mb-3">Chưa có bản ghi thanh toán.</div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive mb-3">
+                                    <table class="table align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Phương thức</th>
+                                                <th>Mã giao dịch</th>
+                                                <th>Trạng thái</th>
+                                                <th>Thời gian</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var payment in Model.Payments!)
+                                            {
+                                                var paymentLineBadge = PaymentBadge(payment.PaymentStatus);
+                                                <tr>
+                                                    <td>@(payment.PaymentMethod ?? "-")</td>
+                                                    <td>@(payment.TransactionCode ?? "-")</td>
+                                                    <td><span class="badge @paymentLineBadge.CssClass">@paymentLineBadge.Label</span></td>
+                                                    <td>@(payment.PaymentDate?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(Model.OrderNote))
+                            {
+                                <div class="border rounded p-3 bg-light mb-3">
+                                    <div class="meta-label mb-1">Ghi chú đơn hàng</div>
+                                    <div>@Model.OrderNote</div>
+                                </div>
+                            }
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a href="/" class="btn btn-success">Tiếp tục mua sắm</a>
+                                <a href="/account/orders" class="btn btn-outline-secondary">Quay lại lịch sử đơn</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </section>
+        </div>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

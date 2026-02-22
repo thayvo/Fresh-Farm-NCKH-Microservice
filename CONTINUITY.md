@@ -2,6 +2,13 @@
 
 - **Goal** (incl. success criteria):
   - Hoàn thiện UI BFF theo hướng view-first, bám phong cách dự án cũ.
+  - Bổ sung UX auth:
+    - Đăng nhập từ trang nào thì quay lại đúng trang đó.
+    - Sau đăng nhập hiển thị lời chào có tên người dùng.
+  - Có tài liệu học tập tổng hợp toàn bộ tiến trình:
+    - làm gì trước/sau,
+    - tạo file trước/sau,
+    - tổ chức thư mục dự án và lý do.
   - Success criteria:
     - Cụm Shared đã tái sử dụng được.
     - Home giữ đúng luồng dữ liệu sản phẩm và bố cục cũ.
@@ -15,6 +22,18 @@
   - Tạo các partial legacy trong `Views/Shared` thay vì giữ block lớn trong `Home/Index`.
   - Giữ `Home/Index` làm trang host dữ liệu, còn phần chrome UI (promo/header/nav/footer/toast) tách shared.
   - Không đụng controller/service trong bước Shared.
+  - Bước 4 và Bước 6 tiếp tục theo nguyên tắc chỉ sửa `views` và `.md`, ưu tiên style giống dự án cũ.
+  - Kết quả lệnh của assistant chạy trong sandbox riêng, không phản ánh trực tiếp toolchain trên máy local của user.
+  - Dùng `returnUrl` theo hướng an toàn:
+    - Nhận `returnUrl` ở `AccountController.SignIn` (GET/POST).
+    - Chỉ redirect khi `Url.IsLocalUrl(returnUrl)` để tránh open redirect.
+    - Fallback về `OrderHistory` nếu không có `returnUrl` hợp lệ.
+  - Ưu tiên roadmap hiện tại:
+    - Hoàn thiện BFF luồng khách mua (Customer flow) trước.
+    - Seller chỉ bắt đầu khi customer flow đã ổn định end-to-end.
+  - Quy ước đặt tên DTO:
+    - Có thể đặt file gom nhóm (vd: `AccountDtos.cs`, `ProfileDtos.cs`) chứa nhiều class DTO.
+    - Nếu file chỉ chứa 1 class, ưu tiên trùng tên file với class để dễ tìm (vd: `ProfileUpdateRequestDto.cs`).
 - **State**:
   - *Done*:
     - Đã tạo mới các partial shared:
@@ -55,12 +74,102 @@
     - Đã cập nhật kế hoạch:
       - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
       - Ghi trạng thái `[Đã làm]` cho Checkout `Index` và `Success`.
+    - Đã hoàn thiện Bước 4 cho cụm Order:
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_BreadCrumb.cshtml`.
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml`.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml` theo layout account kiểu cũ.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml` đồng bộ style account + dữ liệu BFF.
+    - Đã hoàn thiện Bước 6 cho cụm Cart UI shell:
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`.
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_CartSummary.cshtml`.
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`.
+    - Đã cập nhật kế hoạch:
+      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+      - Ghi trạng thái `[Đã làm]` cho Bước 4 và Bước 6.
+    - Đã tạo thêm tài liệu kế hoạch mới theo yêu cầu user:
+      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
+      - Chốt thứ tự ưu tiên P0/P1/P2/P3 cho vòng tiếp theo.
+      - Nêu rõ rủi ro hiện tại: model mismatch giữa `CartController.Index()` (`CartSummaryDto`) và `Views/Cart/Index.cshtml` (đang dùng list item).
+    - Đã thực thi các mục liên quan `views` trong kế hoạch mới:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`:
+        - Đổi model sang `CartSummaryDto`.
+        - Dùng `Model.Items/Model.SubTotal/Model.ShippingFee/Model.GrandTotal`.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`:
+        - Thêm anti-forgery form ẩn.
+        - Thêm nút `Thêm vào giỏ` trên card sản phẩm.
+        - Thêm JS submit `POST /cart/add` qua form ẩn.
+      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md`:
+        - Đánh dấu `[Đã làm]` cho P0 và phần view của P1.
+    - Đã triển khai hướng B (checkout nhiều item từ cart):
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`:
+        - Bỏ thao tác mô phỏng client-side.
+        - Nối form thật tới `POST /cart/update`, `POST /cart/remove`, `POST /cart/clear`.
+        - Nút đặt hàng điều hướng `/checkout` (không gắn query string 1 item).
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
+        - Render nhiều item theo `Items[i]`.
+        - Bỏ phụ thuộc query string `productId/unitPrice/unitSymbol`.
+        - Tính lại tạm tính/tổng theo danh sách item + shipping fee.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
+        - GET `/checkout` lấy đầy đủ item từ cart session.
+        - POST `/checkout` normalize request trước khi gọi Ordering API.
+        - Giữ clear cart sau khi đặt đơn thành công.
+      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md`:
+        - Đánh dấu trạng thái `[Đã làm]` cho P1/P2 theo hướng B.
+    - Đã hoàn thiện UX auth theo yêu cầu mới:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`:
+        - GET/POST `SignIn` nhận `returnUrl`.
+        - Redirect an toàn qua helper `NormalizeReturnUrl` + `RedirectToLocal`.
+        - Trả lại đúng trang trước đăng nhập khi `returnUrl` hợp lệ.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`:
+        - Ưu tiên đọc `ViewData["ReturnUrl"]`, fallback `returnUrl`/`ReturnUrl` từ query.
+        - Giữ hidden input `returnUrl` khi submit.
+      - Cập nhật link đăng nhập mang `returnUrl` theo trang hiện tại:
+        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
+        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
+      - Cập nhật header hiển thị lời chào khi đã đăng nhập:
+        - `Chào, {User.Identity.Name}` (fallback `bạn` nếu thiếu tên).
+    - Đã tạo tài liệu học tập tổng hợp theo yêu cầu:
+      - `docs/hoctap.md`
+      - Nội dung gồm:
+        - timeline theo mốc commit/tài liệu,
+        - thứ tự triển khai theo pha (A -> G),
+        - thứ tự tạo/sửa file trọng tâm trong BFF,
+        - tổ chức thư mục và lý do kỹ thuật.
+    - Đã xác nhận trạng thái UI thông tin tài khoản:
+      - Chưa có trang profile/account-info riêng theo dự án cũ.
+      - Hiện mới có các màn account: `SignIn`, `SignUp`, `OrderHistory`, `OrderDetail` và lời chào tên ở header.
+    - Đã triển khai phần view cho “Thông tin tài khoản” theo yêu cầu mới:
+      - Tạo `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml` thêm menu `Thông tin tài khoản` -> `/account/profile`.
+      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md` với hướng dẫn tự sửa `.cs`:
+        - action `GET /account/profile`,
+        - skeleton `POST /account/profile` để bật lưu dữ liệu thật.
+      - Đã thêm guard avatar khi tên user rỗng để tránh lỗi `Substring`.
+    - Đã rà soát và vá thêm các thiếu sót Account ở mức `views`:
+      - `SignIn`/`SignUp` giữ `returnUrl` khi chuyển qua lại giữa 2 trang.
+      - `SignUp` form nhận kèm query `returnUrl` để không mất ngữ cảnh ở luồng UI.
+      - Header khi đã đăng nhập có link nhanh `Tài khoản` -> `/account/profile`.
+      - Header khi chưa đăng nhập, bấm `Đơn hàng` sẽ chuyển tới `SignIn` với `returnUrl=/account/orders`.
+      - `Profile` thêm khối hiển thị `TempData["SuccessMessage"]` / `TempData["ErrorMessage"]` / `ViewBag.Error`.
+      - `Profile` bổ sung CTA về trang chủ.
+      - `Profile` breadcrumb trỏ đúng `/account/profile`.
+      - `Profile` form đã chuẩn bị sẵn bind field (`FullName`, `Email`, `Phone`, `Address`) + anti-forgery + `ReturnUrl`.
+      - `_AccountNav` mở rộng active state cho action `ProfileUpdate`.
+    - Đã bổ sung checklist phần thiếu `.cs` trong:
+      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
+      - gồm: route profile GET/POST, giữ `returnUrl` sau signup, map claim email/phone.
+    - Kết quả tool quan trọng:
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -nologo` thất bại do môi trường thiếu `dotnet` (`command not found`).
   - *Now*:
-    - Bàn giao kết quả cụm Checkout/Success cho user.
+    - User gặp lỗi compile `CS0246` ở `ProfileUpdate`: dùng kiểu `ProfileDtos` nhưng chưa có class/DTO tương ứng trong project.
   - *Next*:
-    - Nếu user yêu cầu, chuyển sang Bước 4 (`OrderHistory/OrderDetail`) hoặc Bước 6 (`Cart UI`).
+    - User tạo DTO profile (`ProfileDto`) trong `Dtos` hoặc đổi kiểu tham số cho trùng class đã có, rồi build/test lại.
+    - Theo quyết định ưu tiên:
+      - Hoàn thiện BFF customer flow còn thiếu (cart/checkout/order polish + test tay).
+      - Sau đó mới tách nhánh làm Seller flow.
 - **Open questions** (UNCONFIRMED if needed):
-  - Không có.
+  - UNCONFIRMED: JWT của môi trường hiện tại luôn có claim `username`; nếu đổi claim type cần map lại chỗ tạo `ClaimTypes.Name`.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
@@ -68,9 +177,24 @@
   - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ToastLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_BreadCrumb.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_CartSummary.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
   - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
+  - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
+  - `docs/hoctap.md`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
+  - Local evidence from user screenshot:
+    - `dotnet --list-sdks`: `9.0.304`
+    - Installed runtimes include `Microsoft.AspNetCore.App 8.0.19` and `Microsoft.NETCore.App 8.0.19`

@@ -1,0 +1,156 @@
+@using System.Security.Claims
+@{
+    Layout = null;
+    ViewBag.Title = "Thông tin tài khoản";
+    ViewBag.BreadcrumbItems = Tuple.Create("Tài khoản", "/account/profile");
+
+    var displayName = User.Identity?.Name ?? "Khách hàng";
+    var username = User.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? displayName;
+    var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier || c.Type == "sub")?.Value ?? "-";
+    var email = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email || c.Type == "email")?.Value ?? string.Empty;
+    var phone = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.MobilePhone || c.Type == ClaimTypes.HomePhone || c.Type == "phone_number" || c.Type == "phone")?.Value ?? string.Empty;
+    var avatarLetter = string.IsNullOrWhiteSpace(displayName)
+        ? "K"
+        : displayName.Trim().Substring(0, 1).ToUpperInvariant();
+    var returnUrl = Context.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = "/account/profile";
+    }
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thông tin tài khoản - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        body {
+            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
+        }
+
+        .account-nav .list-group-item.active {
+            background: var(--primary-green, #008a4f);
+            border-color: var(--primary-green, #008a4f);
+        }
+
+        .avatar-circle {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #12b76a 0%, #008a4f 100%);
+            color: #fff;
+            font-size: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .field-note {
+            color: #6b7280;
+            font-size: .875rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container my-5">
+        <div class="mb-4">
+            <h1 class="fw-bold">Tài khoản của tôi</h1>
+            @await Html.PartialAsync("_BreadCrumb")
+        </div>
+
+        <div class="row g-4">
+            @await Html.PartialAsync("_AccountNav")
+
+            <section class="col-lg-9">
+                @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="alert alert-success">@successMessage</div>
+                }
+
+                @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                @if (ViewBag.Error is not null)
+                {
+                    <div class="alert alert-danger">@ViewBag.Error</div>
+                }
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="d-flex align-items-center gap-3 flex-wrap mb-4">
+                            <div class="avatar-circle">
+                                @avatarLetter
+                            </div>
+                            <div>
+                                <h4 class="fw-bold mb-1">@displayName</h4>
+                                <div class="text-muted">Mã tài khoản: @userId</div>
+                            </div>
+                        </div>
+
+                        <form asp-controller="Account"
+                              asp-action="ProfileUpdate"
+                              method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ReturnUrl" value="@returnUrl" />
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Tên đăng nhập</label>
+                                    <input class="form-control" name="UserName" value="@username" readonly />
+                                    <div class="field-note mt-1">Tên đăng nhập không thể đổi ở bước hiện tại.</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Họ và tên</label>
+                                    <input class="form-control" name="FullName" value="@displayName" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Email</label>
+                                    <input class="form-control" name="Email" type="email" value="@email" placeholder="Nhập email của bạn" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Số điện thoại</label>
+                                    <input class="form-control" name="Phone" value="@phone" placeholder="Nhập số điện thoại" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Địa chỉ</label>
+                                    <textarea class="form-control"
+                                              name="Address"
+                                              rows="3"
+                                              placeholder="Nhập địa chỉ nhận hàng mặc định"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 field-note">
+                                Trang này đã xong phần giao diện. Cần bổ sung action GET/POST trong `AccountController` để lưu dữ liệu thật.
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap mt-4">
+                                <button type="button"
+                                        class="btn btn-success"
+                                        disabled
+                                        title="Chưa bật do thiếu action POST /account/profile">
+                                    <i class="bi bi-save me-2"></i>Lưu thay đổi
+                                </button>
+                                <a href="/account/orders" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left me-2"></i>Quay lại lịch sử đơn
+                                </a>
+                                <a href="/" class="btn btn-outline-success">
+                                    <i class="bi bi-house-door me-2"></i>Về trang chủ
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

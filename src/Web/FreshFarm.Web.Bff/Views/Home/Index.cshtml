@@ -780,6 +780,9 @@
 
     @await Html.PartialAsync("_FooterLegacy")
     @await Html.PartialAsync("_ToastLegacy")
+    <form id="homeAntiForgeryForm" class="d-none" method="post">
+        @Html.AntiForgeryToken()
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
@@ -794,6 +797,7 @@
             const searchInput = document.getElementById("headerSearchInput");
             const btnPrev = document.getElementById("btnPrev");
             const btnNext = document.getElementById("btnNext");
+            const antiForgeryToken = document.querySelector("#homeAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
 
             let swiperInstance = null;
 
@@ -842,6 +846,35 @@
                     quantity: String(qty)
                 });
                 return "/checkout?" + query.toString();
+            };
+
+            const submitAddToCart = (product, qty = 1) => {
+                if (!antiForgeryToken || toNumber(product.productId, 0) <= 0) {
+                    return;
+                }
+
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/cart/add";
+                form.style.display = "none";
+
+                const addField = (name, value) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = String(value ?? "");
+                    form.appendChild(input);
+                };
+
+                addField("__RequestVerificationToken", antiForgeryToken);
+                addField("ProductId", product.productId);
+                addField("ProductName", product.productName);
+                addField("UnitPrice", product.price);
+                addField("UnitSymbol", product.unitName);
+                addField("Quantity", Math.max(1, toNumber(qty, 1)));
+
+                document.body.appendChild(form);
+                form.submit();
             };
 
             const getLikedIds = () => {
@@ -901,9 +934,20 @@
                                 <a href="${buildCheckoutUrl(product)}" class="view-details mb-3">
                                     <i class="bi bi-eye me-1"></i> Xem chi tiết
                                 </a>
-                                <a href="${buildCheckoutUrl(product)}" class="btn btn-success">
-                                    <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
-                                </a>
+                                <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                    <button type="button"
+                                            class="btn btn-outline-light btn-sm"
+                                            data-action="add-cart"
+                                            data-product-id="${product.productId}"
+                                            data-product-name="${escapeHtml(product.productName)}"
+                                            data-unit-price="${toNumber(product.price, 0)}"
+                                            data-unit-symbol="${escapeHtml(product.unitName)}">
+                                        <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
+                                    </button>
+                                    <a href="${buildCheckoutUrl(product)}" class="btn btn-success btn-sm">
+                                        <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
+                                    </a>
+                                </div>
                             </div>
 
                             <div class="card-body text-center">
@@ -996,9 +1040,20 @@
                                         <a href="${buildCheckoutUrl(p)}" class="view-details mb-3">
                                             <i class="bi bi-eye me-1"></i> Xem chi tiết
                                         </a>
-                                        <a href="${buildCheckoutUrl(p)}" class="btn btn-success">
-                                            <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
-                                        </a>
+                                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                            <button type="button"
+                                                    class="btn btn-outline-light btn-sm"
+                                                    data-action="add-cart"
+                                                    data-product-id="${p.productId}"
+                                                    data-product-name="${escapeHtml(p.productName)}"
+                                                    data-unit-price="${toNumber(p.price, 0)}"
+                                                    data-unit-symbol="${escapeHtml(p.unitName)}">
+                                                <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
+                                            </button>
+                                            <a href="${buildCheckoutUrl(p)}" class="btn btn-success btn-sm">
+                                                <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
+                                            </a>
+                                        </div>
                                     </div>
 
                                     <div class="card-body text-center">
@@ -1064,6 +1119,29 @@
                     });
                 });
             };
+
+            document.addEventListener("click", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const addCartButton = target.closest("button[data-action='add-cart']");
+                if (!(addCartButton instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const product = {
+                    productId: toNumber(addCartButton.getAttribute("data-product-id"), 0),
+                    productName: addCartButton.getAttribute("data-product-name") ?? "",
+                    price: toNumber(addCartButton.getAttribute("data-unit-price"), 0),
+                    unitName: addCartButton.getAttribute("data-unit-symbol") ?? "đơn vị"
+                };
+
+                submitAddToCart(product, 1);
+            });
 
             const loadHomeProducts = async (keyword = "") => {
                 try {

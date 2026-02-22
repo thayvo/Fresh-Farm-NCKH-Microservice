@@ -1,3 +1,9 @@
+@{
+    var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
+    var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
+    var currentUrl = $"{currentPath}{currentQuery}";
+}
+
 <div class="promo-bar py-2 d-none d-lg-block">
     <div class="container-fluid d-flex justify-content-between">
         <div class="d-flex align-items-center gap-2">
@@ -8,7 +14,9 @@
         <div class="desktop-links d-flex align-items-center gap-2">
             <a href="/account/orders"><i class="bi bi-receipt"></i> Lịch sử đơn hàng</a>
             <span>|</span>
-            <a href="/account/signin"><i class="bi bi-person-fill"></i> Tài khoản</a>
+            <a asp-controller="Account" asp-action="SignIn" asp-route-returnUrl="@currentUrl">
+                <i class="bi bi-person-fill"></i> Tài khoản
+            </a>
         </div>
     </div>
 </div>

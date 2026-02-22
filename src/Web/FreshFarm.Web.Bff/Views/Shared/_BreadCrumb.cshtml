@@ -1,0 +1,15 @@
+@{
+    var breadcrumbItems = ViewBag.BreadcrumbItems;
+}
+<nav style="--bs-breadcrumb-divider: '>'" aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb @(ViewBag.BreadcrumbClass ?? string.Empty)">
+        <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+        @if (breadcrumbItems is not null)
+        {
+            <li class="breadcrumb-item">
+                <a href="@breadcrumbItems.Item2">@breadcrumbItems.Item1</a>
+            </li>
+        }
+        <li class="breadcrumb-item active" aria-current="page">@ViewBag.Title</li>
+    </ol>
+</nav>

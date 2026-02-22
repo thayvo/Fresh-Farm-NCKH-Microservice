@@ -1,0 +1,237 @@
+@using System.Globalization
+@using System.Linq
+@using FreshFarm.Web.Bff.Dtos
+@model CartSummaryDto?
+@{
+    Layout = null;
+    ViewBag.Title = "Giỏ hàng";
+    ViewBag.BreadcrumbItems = Tuple.Create("Mua sắm", "/");
+
+    var summary = Model ?? new CartSummaryDto
+    {
+        Items = new List<CartItemDto>(),
+        SubTotal = 0m,
+        ShippingFee = 15000m,
+        GrandTotal = 15000m
+    };
+
+    var items = (summary.Items ?? new List<CartItemDto>()).ToList();
+    var totalQty = items.Sum(x => x.Quantity);
+    var checkoutError = TempData["CheckoutError"] as string;
+
+    const decimal freeShipThreshold = 500000m;
+    var remainToFreeShip = Math.Max(0m, freeShipThreshold - summary.SubTotal);
+    var freeShipProgress = freeShipThreshold <= 0m
+        ? 0m
+        : Math.Min(100m, Math.Round((summary.SubTotal / freeShipThreshold) * 100m, 0));
+    var isFreeShip = summary.SubTotal >= freeShipThreshold;
+
+    string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", amount);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Giỏ hàng - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        body {
+            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
+        }
+
+        .cart-item-img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+        }
+
+        .freeship-track {
+            width: 100%;
+            height: 10px;
+            background: #eef2f7;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .freeship-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transition: width .3s ease;
+        }
+
+        .checkout-total {
+            color: var(--primary-green, #008a4f);
+        }
+
+        .qty-actions {
+            min-width: 180px;
+        }
+    </style>
+</head>
+<body>
+    <main class="container my-5">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+            <div>
+                <h1 class="display-6 fw-bold mb-2">Giỏ hàng của bạn</h1>
+                @await Html.PartialAsync("_BreadCrumb")
+            </div>
+            @await Html.PartialAsync("_CartSummary", totalQty)
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(checkoutError))
+        {
+            <div class="alert alert-warning">@checkoutError</div>
+        }
+
+        @if (!items.Any())
+        {
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-cart-x" style="font-size: 4rem; color: var(--primary-green, #008a4f);"></i>
+                    <h2 class="mt-4 h4">Giỏ hàng của bạn đang trống</h2>
+                    <p class="text-muted">Có vẻ như bạn chưa thêm sản phẩm nào vào giỏ hàng.</p>
+                    <a href="/" class="btn btn-success btn-lg mt-2">
+                        <i class="bi bi-arrow-left me-2"></i>Quay lại mua sắm
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-4" id="cart-view">
+                <section class="col-lg-8">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body" id="cart-items-container">
+                            @foreach (var item in items)
+                            {
+                                var safeName = string.IsNullOrWhiteSpace(item.ProductName) ? $"Sản phẩm #{item.ProductId}" : item.ProductName;
+                                var safeUnit = string.IsNullOrWhiteSpace(item.UnitSymbol) ? "đơn vị" : item.UnitSymbol;
+                                var safeQuantity = Math.Max(1, item.Quantity);
+                                var lineTotal = item.UnitPrice * safeQuantity;
+
+                                <div class="row g-3 align-items-center py-2">
+                                    <div class="col-md-5 d-flex align-items-center">
+                                        <img src="/images/legacy/no-image.png"
+                                             class="cart-item-img rounded"
+                                             alt="@safeName"
+                                             onerror="this.onerror=null;this.src='/images/legacy/no-image.png';" />
+                                        <div class="ms-3">
+                                            <h6 class="mb-1">@safeName</h6>
+                                            <small class="text-muted">Đơn vị: @safeUnit</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-2 text-md-center">
+                                        <p class="mb-0 fw-semibold">@Vnd(item.UnitPrice)</p>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <form asp-controller="Cart" asp-action="Update" method="post" class="qty-actions">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="ProductId" value="@item.ProductId" />
+                                            <div class="input-group input-group-sm">
+                                                <button type="submit"
+                                                        class="btn btn-outline-secondary"
+                                                        name="Quantity"
+                                                        value="@(Math.Max(1, safeQuantity - 1))">
+                                                    -
+                                                </button>
+                                                <input type="number"
+                                                       min="1"
+                                                       name="Quantity"
+                                                       value="@safeQuantity"
+                                                       class="form-control text-center" />
+                                                <button type="submit"
+                                                        class="btn btn-outline-secondary"
+                                                        name="Quantity"
+                                                        value="@(safeQuantity + 1)">
+                                                    +
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+
+                                    <div class="col-md-2 text-md-end">
+                                        <p class="mb-1 fw-bold" style="color: var(--primary-green, #008a4f)">@Vnd(lineTotal)</p>
+                                        <form asp-controller="Cart" asp-action="Remove" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="ProductId" value="@item.ProductId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <hr class="cart-item-divider" />
+                            }
+                        </div>
+
+                        <div class="card-footer bg-white border-0 py-3 d-flex justify-content-between gap-2 flex-wrap">
+                            <a href="/" class="btn btn-outline-success">
+                                <i class="bi bi-arrow-left me-2"></i>Tiếp tục mua sắm
+                            </a>
+                            <form asp-controller="Cart" asp-action="Clear" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-danger">Xóa giỏ hàng</button>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <aside class="col-lg-4">
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold mb-3">Phí vận chuyển</h5>
+                            <p class="small mb-3 text-center" id="freeship-message">
+                                @if (isFreeShip)
+                                {
+                                    <strong>Chúc mừng! Bạn đã được miễn phí vận chuyển.</strong>
+                                }
+                                else
+                                {
+                                    @:Thêm <strong>@Vnd(remainToFreeShip)</strong> nữa để được miễn phí vận chuyển!
+                                }
+                            </p>
+                            <div class="mb-2">
+                                <div class="freeship-track">
+                                    <div class="freeship-bar" style="width: @freeShipProgress%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold mb-4">Tổng quan đơn hàng</h5>
+
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Tạm tính</span>
+                                <span class="fw-semibold">@Vnd(summary.SubTotal)</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Phí giao hàng</span>
+                                <span class="fw-semibold">@Vnd(summary.ShippingFee)</span>
+                            </div>
+
+                            <hr />
+
+                            <div class="d-flex justify-content-between fw-bold fs-5 mb-3">
+                                <span>Tổng cộng</span>
+                                <span class="checkout-total">@Vnd(summary.GrandTotal)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <a href="/checkout" class="btn btn-success btn-lg">ĐẶT HÀNG</a>
+                    </div>
+                </aside>
+            </div>
+        }
+    </main>
+</body>
+</html>

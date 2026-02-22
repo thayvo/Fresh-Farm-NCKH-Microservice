@@ -20,16 +20,26 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpGet("/account/signin")] // Route GET signin.
     [AllowAnonymous] // Chua login van vao duoc.
-    public IActionResult SignIn() // Render view signin.
+    public IActionResult SignIn(string? returnUrl = null) // Render view signin.
     {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chuan hoa returnUrl cho redirect an toan.
+        if (User.Identity?.IsAuthenticated == true) // Neu da dang nhap thi khong can vao form.
+        {
+            return RedirectToLocal(normalizedReturnUrl); // Quay ve trang truoc hoac fallback.
+        }
+
+        ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
         return View(); // Views/Account/SignIn.cshtml.
     }
 
     [HttpPost("/account/signin")] // Route POST signin.
     [ValidateAntiForgeryToken] // Bắt buộc token hợp lệ từ form.
     [AllowAnonymous] // Anonymous submit login.
-    public async Task<IActionResult> SignIn(LoginRequestDto request) // Nhan model form.
+    public async Task<IActionResult> SignIn(LoginRequestDto request, string? returnUrl = null) // Nhan model form.
     {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chi chap nhan local url de tranh open redirect.
+        ViewData["ReturnUrl"] = normalizedReturnUrl; // Giu lai de form render lai khi co loi.
+
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password)) // Validate input.
         {
             ModelState.AddModelError(string.Empty, "Vui long nhap day du thong tin."); // Them loi cho view.
@@ -73,7 +83,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal); // Set cookie auth.
 
-        return RedirectToAction(nameof(OrderHistory)); // Login xong den order history.
+        return RedirectToLocal(normalizedReturnUrl); // Login xong quay ve trang dang dung neu hop le.
     }
 
     [HttpGet("/account/signup")] // Route GET signup.
@@ -86,7 +96,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/signup")] // Route POST signup.
     [ValidateAntiForgeryToken] // Chặn submit giả mạo từ site khác.
     [AllowAnonymous] // Anonymous dang ky.
-    public async Task<IActionResult> SignUp(RegisterRequestDto request) // Nhan model form.
+    public async Task<IActionResult> SignUp(RegisterRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         if (!ModelState.IsValid) // Validate MVC model.
         {
@@ -102,8 +112,8 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             ModelState.AddModelError(string.Empty, $"Dang ky that bai: {errorText}"); // Show loi.
             return View(request); // O lai form.
         }
-
-        return RedirectToAction(nameof(SignIn)); // Dang ky thanh cong -> dang nhap.
+        return RedirectToAction(nameof(SignIn), new { returnUrl });
+        
     }
 
     [HttpPost("/account/logout")] // Route POST logout.
@@ -179,4 +189,118 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         return View(detail); // Render Views/Account/OrderDetail.cshtml.
     }
+
+    private string? NormalizeReturnUrl(string? returnUrl) // Chuan hoa returnUrl tu query/form.
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl)) // Null/rong thi bo qua.
+        {
+            return null;
+        }
+
+        return Url.IsLocalUrl(returnUrl) ? returnUrl : null; // Chi cho phep local url.
+    }
+
+    private IActionResult RedirectToLocal(string? returnUrl) // Redirect an toan sau login.
+    {
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)) // URL noi bo hop le.
+        {
+            return Redirect(returnUrl); // Quay lai trang user dang dung.
+        }
+
+        return RedirectToAction(nameof(OrderHistory)); // Fallback mac dinh.
+    }
+
+    [HttpGet("/account/profile")]
+    [Authorize]
+    public IActionResult Profile(string? returnUrl = null)
+    {
+        // View profile hiện tại tự đọc claim để hiển thị dữ liệu
+        // returnUrl để dành cho luồng quay về nếu bạn cần dùng thêm
+        ViewData["ReturnUrl"] = returnUrl;
+        return View();
+    }
+
+
+    [HttpPost("/account/profile")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProfileUpdate(ProfileUpdateRequestDto request, string? returnUrl = null)
+    {
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl)
+            ?? NormalizeReturnUrl(request.ReturnUrl)
+            ?? "/account/profile";
+
+        request.FullName = request.FullName?.Trim() ?? string.Empty;
+        request.Email = request.Email?.Trim() ?? string.Empty;
+        request.Phone = request.Phone?.Trim() ?? string.Empty;
+        request.Address = request.Address?.Trim() ?? string.Empty;
+        request.UserName = request.UserName?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            TempData["ErrorMessage"] = "Họ và tên không được để trống.";
+            return Redirect(safeReturnUrl);
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl });
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        identityClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        // Nếu Identity API của bạn dùng payload khác, sửa object này cho đúng contract.
+        var payload = new
+        {
+            fullName = request.FullName,
+            email = request.Email,
+            phone = request.Phone,
+            address = request.Address
+        };
+
+        var response = await identityClient.PutAsJsonAsync("/auth/profile", payload);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody)
+                ? $"Cập nhật thất bại ({(int)response.StatusCode})."
+                : $"Cập nhật thất bại: {errorBody}";
+            return Redirect(safeReturnUrl);
+        }
+
+        // Cập nhật lại claim trong cookie để header/profile đổi ngay, không cần đăng nhập lại.
+        var claims = User.Claims.ToList();
+        UpsertClaim(claims, ClaimTypes.Name, request.FullName);
+        UpsertClaim(claims, ClaimTypes.Email, request.Email);
+        UpsertClaim(claims, "email", request.Email);
+        UpsertClaim(claims, ClaimTypes.MobilePhone, request.Phone);
+        UpsertClaim(claims, "phone", request.Phone);
+        if (!string.IsNullOrWhiteSpace(request.UserName))
+        {
+            UpsertClaim(claims, "username", request.UserName);
+        }
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+        TempData["SuccessMessage"] = "Cập nhật thông tin tài khoản thành công.";
+        return Redirect(safeReturnUrl);
+    }
+
+    private static void UpsertClaim(List<Claim> claims, string type, string? value)
+    {
+        claims.RemoveAll(c => c.Type == type);
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            claims.Add(new Claim(type, value));
+        }
+    }
+
+
 }

@@ -1,6 +1,11 @@
 @model FreshFarm.Web.Bff.Dtos.RegisterRequestDto
 @{
     Layout = null;
+    var returnUrl = Context.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = Context.Request.Query["ReturnUrl"].ToString();
+    }
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -83,9 +88,18 @@
                 <p class="text-muted mb-0">Bắt đầu hành trình nông sản sạch cùng chúng tôi!</p>
             </div>
 
-            <form asp-action="SignUp" asp-controller="Account" method="post" class="needs-validation" novalidate>
+            <form asp-action="SignUp"
+                  asp-controller="Account"
+                  asp-route-returnUrl="@returnUrl"
+                  method="post"
+                  class="needs-validation"
+                  novalidate>
                 @Html.AntiForgeryToken()
                 <input asp-for="RoleName" type="hidden" value="Customer" />
+                @if (!string.IsNullOrWhiteSpace(returnUrl))
+                {
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                }
 
                 <div asp-validation-summary="All" class="text-danger small mb-3"></div>
 
@@ -169,6 +183,7 @@
                 Đã có tài khoản?
                 <a asp-action="SignIn"
                    asp-controller="Account"
+                   asp-route-returnUrl="@returnUrl"
                    class="fw-bold text-decoration-none"
                    style="color: var(--primary-green)">Đăng nhập</a>
             </p>
