@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using FreshFarm.Identity.Api.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -29,6 +29,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
         ClockSkew = TimeSpan.FromMinutes(1)
     };
 });
+builder.Services.AddAuthorization(); // Bật service authorization để [Authorize] hoạt động đúng.
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

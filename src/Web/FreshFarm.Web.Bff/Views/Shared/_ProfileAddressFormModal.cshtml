@@ -1,0 +1,105 @@
+@model FreshFarm.Web.Bff.Dtos.ProfilePageViewModel
+@{
+    var returnUrl = Model?.ReturnUrl;
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = "/account/profile";
+    }
+}
+
+<div class="modal fade" id="createAddressModal" tabindex="-1" aria-labelledby="createAddressModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold" id="createAddressModalLabel">
+                    <i class="bi bi-geo-alt me-2 text-success"></i>Thêm địa chỉ mới
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+
+            <form asp-controller="Account"
+                  asp-action="CreateAddress"
+                  method="post"
+                  class="needs-validation"
+                  novalidate>
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="ReturnUrl" value="@returnUrl" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Người nhận</label>
+                            <input class="form-control"
+                                   name="RecipientName"
+                                   placeholder="Nhập họ và tên người nhận"
+                                   maxlength="100"
+                                   required />
+                            <div class="invalid-feedback">Vui lòng nhập tên người nhận.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Số điện thoại</label>
+                            <input class="form-control"
+                                   name="Phone"
+                                   placeholder="0xxxxxxxxx"
+                                   required
+                                   pattern="^0\d{9}$"
+                                   maxlength="10"
+                                   minlength="10" />
+                            <div class="invalid-feedback">Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Địa chỉ chi tiết</label>
+                            <input class="form-control"
+                                   name="AddressDetail"
+                                   placeholder="Số nhà, tên đường, khu vực..."
+                                   maxlength="255"
+                                   required />
+                            <div class="invalid-feedback">Vui lòng nhập địa chỉ chi tiết.</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tỉnh/Thành</label>
+                            <input class="form-control"
+                                   name="Province"
+                                   placeholder="Ví dụ: Bình Dương"
+                                   maxlength="100" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Quận/Huyện</label>
+                            <input class="form-control"
+                                   name="District"
+                                   placeholder="Ví dụ: Thủ Dầu Một"
+                                   maxlength="100" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Phường/Xã</label>
+                            <input class="form-control"
+                                   name="Ward"
+                                   placeholder="Ví dụ: Phú Hòa"
+                                   maxlength="100" />
+                        </div>
+                    </div>
+
+                    <div class="form-check mt-3">
+                        <input type="hidden" name="IsDefault" value="false" />
+                        <input class="form-check-input" type="checkbox" value="true" id="isDefaultAddress" name="IsDefault" />
+                        <label class="form-check-label" for="isDefaultAddress">
+                            Đặt làm địa chỉ mặc định
+                        </label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-save me-2"></i>Lưu địa chỉ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

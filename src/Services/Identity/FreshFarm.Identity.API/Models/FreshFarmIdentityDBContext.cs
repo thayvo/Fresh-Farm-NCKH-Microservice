@@ -12,7 +12,7 @@ public partial class FreshFarmIdentityDBContext : DbContext
         : base(options)
     {
     }
-
+    public virtual DbSet<AddressBook> AddressBooks { get; set; } // DbSet thao tác bảng AddressBook.
     public virtual DbSet<Permission> Permissions { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
@@ -29,6 +29,51 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AddressBook>(entity => // Mapping cho entity AddressBook.
+        {
+            entity.ToTable("AddressBook"); // Ánh xạ đúng tên bảng DB.
+
+            entity.HasKey(e => e.AddressId); // Khai báo PK.
+
+            entity.Property(e => e.RecipientName) // Mapping cột RecipientName.
+                .IsRequired() // Bắt buộc.
+                .HasMaxLength(100); // Tối đa 100 ký tự.
+
+            entity.Property(e => e.Phone) // Mapping cột Phone.
+                .IsRequired() // Bắt buộc.
+                .HasMaxLength(10); // Tối đa 10 ký tự.
+
+            entity.Property(e => e.AddressDetail) // Mapping cột AddressDetail.
+                .IsRequired() // Bắt buộc.
+                .HasMaxLength(255); // Tối đa 255 ký tự.
+
+            entity.Property(e => e.Province) // Mapping cột Province.
+                .HasMaxLength(100); // Tối đa 100 ký tự.
+
+            entity.Property(e => e.District) // Mapping cột District.
+                .HasMaxLength(100); // Tối đa 100 ký tự.
+
+            entity.Property(e => e.Ward) // Mapping cột Ward.
+                .HasMaxLength(100); // Tối đa 100 ký tự.
+
+            entity.Property(e => e.IsDefault) // Mapping cột IsDefault.
+                .HasDefaultValue(false); // Mặc định false.
+
+            entity.Property(e => e.IsActive) // Mapping cột IsActive.
+                .HasDefaultValue(true); // Mặc định true.
+
+            entity.Property(e => e.CreatedAt) // Mapping cột CreatedAt.
+                .HasPrecision(0) // Dùng precision(0) đồng bộ các bảng hiện có.
+                .HasDefaultValueSql("(sysutcdatetime())"); // Mặc định UTC now.
+
+            entity.Property(e => e.UpdatedAt) // Mapping cột UpdatedAt.
+                .HasPrecision(0); // Precision(0).
+
+            entity.HasOne(d => d.User) // Khai báo quan hệ many-to-one.
+                .WithMany(p => p.AddressBooks) // 1 user có nhiều address.
+                .HasForeignKey(d => d.UserId) // FK là UserId.
+                .HasConstraintName("FK_AddressBook_Users"); // Tên FK.
+        });
         modelBuilder.Entity<Permission>(entity =>
         {
             entity.HasIndex(e => e.PermissionCode, "UQ_Permissions_Code").IsUnique();

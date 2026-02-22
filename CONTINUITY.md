@@ -156,20 +156,84 @@
       - `Profile` breadcrumb trỏ đúng `/account/profile`.
       - `Profile` form đã chuẩn bị sẵn bind field (`FullName`, `Email`, `Phone`, `Address`) + anti-forgery + `ReturnUrl`.
       - `_AccountNav` mở rộng active state cho action `ProfileUpdate`.
+      - `Profile` đã bỏ trạng thái demo:
+        - Bật nút `Lưu thay đổi` dạng `submit`,
+        - bỏ thông báo placeholder “chưa có action”,
+        - thêm client-side validation (`needs-validation`).
     - Đã bổ sung checklist phần thiếu `.cs` trong:
       - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
       - gồm: route profile GET/POST, giữ `returnUrl` sau signup, map claim email/phone.
     - Kết quả tool quan trọng:
       - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -nologo` thất bại do môi trường thiếu `dotnet` (`command not found`).
+    - Đã rà soát thực trạng profile/email/phone/address theo code hiện tại:
+      - `Profile.cshtml` đang lấy `Email/Phone` từ claim cookie, không đọc trực tiếp từ DB/API.
+      - `SignIn` mới map `NameIdentifier`, `Name`, `Role`; chưa map `email/phone` từ JWT sang cookie claims.
+      - `ProfileUpdate` gọi `PUT /auth/profile` nhưng `Identity AuthController` chưa có endpoint này.
+      - Chưa có luồng/screen “sổ địa chỉ nhiều địa chỉ” trong BFF hiện tại.
+      - `docs/final3.sql` cũ có `AddressBook`, `vw_UserAddresses`, unique default address index, SP save/default.
+      - `Identity` hiện tại chỉ có bảng users/auth/roles/sessions (không có model/table address book trong service).
+      - Ràng buộc chuẩn email/phone 10 số chưa có ở tầng API hiện tại (mới có required/max-length/unique).
+    - Đã cập nhật kế hoạch cực chi tiết theo yêu cầu user:
+      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
+      - Bổ sung section mới gồm:
+        - script SQL chuẩn hóa `Users.Phone` + tạo `AddressBook`,
+        - DTO Identity/BFF có DataAnnotation validate email/phone 10 số,
+        - code đầy đủ cho endpoint Identity (`/auth/profile`, `/auth/addresses`, create/update/set-default/delete),
+        - code đầy đủ cho BFF `AccountController` để gọi API thật,
+        - checklist test chi tiết + checkpoint git sau từng mốc.
+    - Đã thực hiện đúng phạm vi user cho phép: chỉ sửa 3 file view profile/address.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`:
+        - Bind `ProfilePageViewModel` thay vì đọc claim trực tiếp.
+        - Form `ProfileUpdate` dùng field đúng DTO (`FullName`, `Email`, `Phone`, `ReturnUrl`).
+        - Thêm khu vực `Sổ địa chỉ` và nút mở modal thêm địa chỉ.
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`:
+        - Render danh sách địa chỉ từ `Model.Addresses`.
+        - Form `POST SetDefaultAddress` cho từng item + anti-forgery.
+      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressFormModal.cshtml`:
+        - Form `POST CreateAddress` + anti-forgery.
+        - Field map đúng `UpsertProfileAddressRequestDto`.
+        - Validate client-side cho phone 10 số bắt đầu 0.
+    - Đã kiểm tra nhanh phần `.cs` sau khi sửa view:
+      - Identity đã có endpoint profile/address (`GET/PUT profile`, `GET/POST addresses`, `set-default`, `delete`).
+      - Identity `Program.cs` đã có `AddAuthorization()`.
+      - Identity models/dbcontext đã có `AddressBook`.
+      - BFF `AccountController` đã có action tương ứng cho profile + create/set-default address.
+    - Đã nối views với action CRUD địa chỉ mới trong BFF:
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`
+        - Thêm form `UpdateAddress` (qua modal sửa từng địa chỉ).
+        - Thêm form `DeleteAddress` (POST + anti-forgery + confirm).
+        - Giữ form `SetDefaultAddress`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressFormModal.cshtml`
+        - Bổ sung hidden `IsDefault=false` để bind bool ổn định khi checkbox không tick.
+    - Kết quả tool:
+      - `dotnet --version` thất bại trong môi trường assistant (`command not found`), không thể build/compile tại đây.
+    - Đã cập nhật chi tiết tài liệu học tập theo tiến độ mới nhất:
+      - `docs/hoctap.md`
+      - Bổ sung các phần mới:
+        - trạng thái cập nhật gần nhất của customer flow,
+        - tiến độ theo cụm kỹ thuật Identity/BFF/Views,
+        - danh sách file tạo/sửa mới nhất,
+        - checklist test tay profile/address/cart/checkout/order,
+        - danh sách điểm còn mở và thứ tự ưu tiên bước tiếp theo.
+    - Đã tạo tài liệu chuyên đề kết nối service theo yêu cầu mới:
+      - `docs/hoc-ket-noi-service.md`
+      - Nội dung chính:
+        - bản đồ đầy đủ các điểm BFF gọi Identity/Catalog/Ordering theo file và line,
+        - giải thích kiến trúc `IHttpClientFactory` + named clients + token/session/cookie,
+        - quy trình chuẩn thêm call service mới (config, DTO, auth header, error handling),
+        - phần lý thuyết nền tảng cần học sâu (HTTP semantics, auth, resilience),
+        - lộ trình học hiệu quả theo giai đoạn + checklist dùng lại nhanh.
   - *Now*:
-    - User gặp lỗi compile `CS0246` ở `ProfileUpdate`: dùng kiểu `ProfileDtos` nhưng chưa có class/DTO tương ứng trong project.
+    - User yêu cầu tài liệu rất chi tiết về các điểm BFF gọi service và cách học/áp dụng lại.
   - *Next*:
-    - User tạo DTO profile (`ProfileDto`) trong `Dtos` hoặc đổi kiểu tham số cho trùng class đã có, rồi build/test lại.
-    - Theo quyết định ưu tiên:
-      - Hoàn thiện BFF customer flow còn thiếu (cart/checkout/order polish + test tay).
-      - Sau đó mới tách nhánh làm Seller flow.
+    - User đọc `docs/hoc-ket-noi-service.md` và chọn phần muốn đào sâu tiếp (ví dụ: retry/timeout/logging chuẩn production).
+    - Theo ưu tiên kỹ thuật hiện tại:
+      - test local đầy đủ các thao tác address CRUD trên `/account/profile`,
+      - nếu ổn định thì nối địa chỉ mặc định sang checkout,
+      - sau đó polish customer flow trước khi tách Seller flow.
 - **Open questions** (UNCONFIRMED if needed):
   - UNCONFIRMED: JWT của môi trường hiện tại luôn có claim `username`; nếu đổi claim type cần map lại chỗ tạo `ClaimTypes.Name`.
+  - UNCONFIRMED: User muốn đồng bộ “sổ địa chỉ” về Identity service hay tạo service Address riêng để dùng chung cho checkout/profile.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`

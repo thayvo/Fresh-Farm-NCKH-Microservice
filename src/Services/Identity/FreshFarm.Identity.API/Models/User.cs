@@ -28,4 +28,5 @@ public partial class User
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public virtual ICollection<UserSession> UserSessions { get; set; } = new List<UserSession>();
+    public virtual ICollection<AddressBook> AddressBooks { get; set; } = new List<AddressBook>(); // Danh sách địa chỉ của user.
 }

@@ -66,13 +66,26 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         HttpContext.Session.SetString(AccessTokenSessionKey, auth.AccessToken); // Luu JWT vao session server-side.
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.AccessToken); // Parse token de lay claims.
-
+        
         var claims = new List<Claim> // Tao claim list cho cookie principal.
         {
             new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty), // sub -> user id.
             new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? request.Identifier) // Ten hien thi.
         };
+        // ===== 1) Trong action SignIn POST, ngay sau khi parse jwt =====
+        var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value; // Đọc email từ JWT.
+        if (!string.IsNullOrWhiteSpace(emailValue)) // Nếu token có email.
+        {
+            claims.Add(new Claim(ClaimTypes.Email, emailValue)); // Map email chuẩn cho View/Profile.
+            claims.Add(new Claim("email", emailValue)); // Map thêm claim custom để tương thích code hiện tại.
+        }
 
+        var phoneValue = jwt.Claims.FirstOrDefault(c => c.Type == "phone" || c.Type == "phone_number" || c.Type == ClaimTypes.MobilePhone)?.Value; // Đọc phone nếu token có.
+        if (!string.IsNullOrWhiteSpace(phoneValue)) // Nếu token có phone.
+        {
+            claims.Add(new Claim(ClaimTypes.MobilePhone, phoneValue)); // Map phone chuẩn.
+            claims.Add(new Claim("phone", phoneValue)); // Map phone custom.
+        }
         foreach (var roleClaim in jwt.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role")) // Lay role trong JWT.
         {
             claims.Add(new Claim(ClaimTypes.Role, roleClaim.Value)); // Add role vao principal.
@@ -210,35 +223,154 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         return RedirectToAction(nameof(OrderHistory)); // Fallback mac dinh.
     }
 
-    [HttpGet("/account/profile")]
-    [Authorize]
-    public IActionResult Profile(string? returnUrl = null)
+    // ===== 3) Thay action GET /account/profile bằng bản dùng API thật =====
+    [HttpGet("/account/profile")] // Route profile.
+    [Authorize] // Chỉ user login mới xem được.
+    public async Task<IActionResult> Profile(string? returnUrl = null) // Render profile async để gọi API.
     {
-        // View profile hiện tại tự đọc claim để hiển thị dữ liệu
-        // returnUrl để dành cho luồng quay về nếu bạn cần dùng thêm
-        ViewData["ReturnUrl"] = returnUrl;
-        return View();
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy token từ session.
+        if (string.IsNullOrWhiteSpace(token)) // Nếu mất token.
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); // Logout cookie cho đồng bộ.
+            return RedirectToAction(nameof(SignIn), new { returnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/profile" }); // Về đăng nhập.
+        }
+
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/profile"; // Chuẩn hóa returnUrl.
+        var (vm, error) = await GetProfilePageViewModelAsync(token, safeReturnUrl); // Gọi helper lấy model.
+        if (vm is null) // Nếu lấy model lỗi.
+        {
+            ViewBag.Error = error ?? "Không tải được thông tin tài khoản."; // Set lỗi cho view.
+            vm = new ProfilePageViewModel { ReturnUrl = safeReturnUrl }; // Tạo model fallback để view không vỡ.
+        }
+
+        return View(vm); // Render view với model.
     }
 
+    // ===== 4) Thay action POST /account/profile bằng bản validate chặt =====
+    [HttpPost("/account/profile")] // Route submit cập nhật profile.
+    [Authorize] // Chỉ user login mới submit.
+    [ValidateAntiForgeryToken] // Bật chống CSRF.
+    public async Task<IActionResult> ProfileUpdate(ProfileUpdateRequestDto request, string? returnUrl = null) // Nhận payload cập nhật.
+    {
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) // Ưu tiên query returnUrl.
+            ?? NormalizeReturnUrl(request.ReturnUrl) // Nếu query không có thì lấy từ form.
+            ?? "/account/profile"; // Fallback cứng về profile.
 
-    [HttpPost("/account/profile")]
-    [Authorize]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ProfileUpdate(ProfileUpdateRequestDto request, string? returnUrl = null)
+        if (!ModelState.IsValid) // Nếu DataAnnotation fail.
+        {
+            TempData["ErrorMessage"] = "Dữ liệu cập nhật không hợp lệ. Vui lòng kiểm tra lại."; // Báo lỗi chung.
+            return Redirect(safeReturnUrl); // Redirect lại trang profile.
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy token session.
+        if (string.IsNullOrWhiteSpace(token)) // Nếu mất token.
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); // Logout cookie.
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl }); // Về signin.
+        }
+
+        request.FullName = request.FullName.Trim(); // Trim fullname.
+        request.Email = request.Email.Trim(); // Trim email.
+        request.Phone = request.Phone.Trim(); // Trim phone.
+
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Tạo Identity client.
+        identityClient.DefaultRequestHeaders.Authorization = // Gắn Authorization header.
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Bearer token.
+
+        var response = await identityClient.PutAsJsonAsync("/auth/profile", new // Gọi API update profile.
+        {
+            fullName = request.FullName, // Payload fullName.
+            email = request.Email, // Payload email.
+            phone = request.Phone // Payload phone.
+        });
+
+        if (!response.IsSuccessStatusCode) // Nếu update fail.
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(); // Đọc error body.
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody) // Chuẩn hóa message.
+                ? $"Cập nhật thất bại ({(int)response.StatusCode})." // Message fallback.
+                : $"Cập nhật thất bại: {errorBody}"; // Message chi tiết.
+            return Redirect(safeReturnUrl); // Quay lại profile.
+        }
+
+        var claims = User.Claims.ToList(); // Lấy claim hiện tại.
+        UpsertClaim(claims, ClaimTypes.Name, request.FullName); // Cập nhật tên hiển thị.
+        UpsertClaim(claims, ClaimTypes.Email, request.Email); // Cập nhật email chuẩn.
+        UpsertClaim(claims, "email", request.Email); // Cập nhật email custom.
+        UpsertClaim(claims, ClaimTypes.MobilePhone, request.Phone); // Cập nhật phone chuẩn.
+        UpsertClaim(claims, "phone", request.Phone); // Cập nhật phone custom.
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme); // Tạo identity mới.
+        var principal = new ClaimsPrincipal(identity); // Tạo principal mới.
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal); // Ghi lại cookie mới.
+
+        TempData["SuccessMessage"] = "Cập nhật thông tin tài khoản thành công."; // Message thành công.
+        return Redirect(safeReturnUrl); // Quay lại profile.
+    }
+
+    // ===== 5) Thêm action tạo địa chỉ =====
+    [HttpPost("/account/profile/address/create")] // Route tạo địa chỉ mới.
+    [Authorize] // Bắt buộc login.
+    [ValidateAntiForgeryToken] // Chống CSRF.
+    public async Task<IActionResult> CreateAddress(UpsertProfileAddressRequestDto request, string? returnUrl = null) // Nhận payload tạo địa chỉ.
+    {
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) // Chuẩn hóa query returnUrl.
+            ?? NormalizeReturnUrl(request.ReturnUrl) // Hoặc lấy từ form.
+            ?? "/account/profile"; // Fallback profile.
+
+        if (!ModelState.IsValid) // Validate payload.
+        {
+            TempData["ErrorMessage"] = "Thông tin địa chỉ không hợp lệ."; // Báo lỗi validate.
+            return Redirect(safeReturnUrl); // Quay lại profile.
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy token session.
+        if (string.IsNullOrWhiteSpace(token)) // Nếu mất token.
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); // Logout cookie.
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl }); // Về signin.
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Identity client.
+        identityClient.DefaultRequestHeaders.Authorization = // Gắn bearer.
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Authorization header.
+
+        var response = await identityClient.PostAsJsonAsync("/auth/addresses", new // Gọi API create address.
+        {
+            recipientName = request.RecipientName?.Trim(), // Payload recipientName.
+            phone = request.Phone?.Trim(), // Payload phone.
+            addressDetail = request.AddressDetail?.Trim(), // Payload addressDetail.
+            province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(), // Payload province.
+            district = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(), // Payload district.
+            ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(), // Payload ward.
+            isDefault = request.IsDefault // Payload isDefault.
+        });
+
+        if (!response.IsSuccessStatusCode) // Nếu API fail.
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(); // Đọc lỗi.
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody) // Chuẩn hóa message.
+                ? $"Thêm địa chỉ thất bại ({(int)response.StatusCode})." // Fallback message.
+                : $"Thêm địa chỉ thất bại: {errorBody}"; // Message chi tiết.
+            return Redirect(safeReturnUrl); // Quay lại profile.
+        }
+
+        TempData["SuccessMessage"] = "Đã thêm địa chỉ mới."; // Message thành công.
+        return Redirect(safeReturnUrl); // Quay lại profile.
+    }
+
+    [HttpPost("/account/profile/address/{addressId:int}/update")] // Form submit sửa địa chỉ.
+    [Authorize] // Chỉ user đã đăng nhập.
+    [ValidateAntiForgeryToken] // Chống CSRF.
+    public async Task<IActionResult> UpdateAddress(int addressId, UpsertProfileAddressRequestDto request, string? returnUrl = null)
     {
         var safeReturnUrl = NormalizeReturnUrl(returnUrl)
             ?? NormalizeReturnUrl(request.ReturnUrl)
             ?? "/account/profile";
 
-        request.FullName = request.FullName?.Trim() ?? string.Empty;
-        request.Email = request.Email?.Trim() ?? string.Empty;
-        request.Phone = request.Phone?.Trim() ?? string.Empty;
-        request.Address = request.Address?.Trim() ?? string.Empty;
-        request.UserName = request.UserName?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(request.FullName))
+        if (!ModelState.IsValid)
         {
-            TempData["ErrorMessage"] = "Họ và tên không được để trống.";
+            TempData["ErrorMessage"] = "Thông tin địa chỉ không hợp lệ.";
             return Redirect(safeReturnUrl);
         }
 
@@ -253,44 +385,94 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         identityClient.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        // Nếu Identity API của bạn dùng payload khác, sửa object này cho đúng contract.
-        var payload = new
+        var response = await identityClient.PutAsJsonAsync($"/auth/addresses/{addressId}", new
         {
-            fullName = request.FullName,
-            email = request.Email,
-            phone = request.Phone,
-            address = request.Address
-        };
-
-        var response = await identityClient.PutAsJsonAsync("/auth/profile", payload);
+            recipientName = request.RecipientName?.Trim(),
+            phone = request.Phone?.Trim(),
+            addressDetail = request.AddressDetail?.Trim(),
+            province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(),
+            district = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(),
+            ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(),
+            isDefault = request.IsDefault
+        });
 
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync();
             TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody)
-                ? $"Cập nhật thất bại ({(int)response.StatusCode})."
-                : $"Cập nhật thất bại: {errorBody}";
+                ? $"Cập nhật địa chỉ thất bại ({(int)response.StatusCode})."
+                : $"Cập nhật địa chỉ thất bại: {errorBody}";
             return Redirect(safeReturnUrl);
         }
 
-        // Cập nhật lại claim trong cookie để header/profile đổi ngay, không cần đăng nhập lại.
-        var claims = User.Claims.ToList();
-        UpsertClaim(claims, ClaimTypes.Name, request.FullName);
-        UpsertClaim(claims, ClaimTypes.Email, request.Email);
-        UpsertClaim(claims, "email", request.Email);
-        UpsertClaim(claims, ClaimTypes.MobilePhone, request.Phone);
-        UpsertClaim(claims, "phone", request.Phone);
-        if (!string.IsNullOrWhiteSpace(request.UserName))
+        TempData["SuccessMessage"] = "Cập nhật địa chỉ thành công.";
+        return Redirect(safeReturnUrl);
+    }
+
+    [HttpPost("/account/profile/address/{addressId:int}/delete")] // Form submit xóa địa chỉ.
+    [Authorize] // Chỉ user đã đăng nhập.
+    [ValidateAntiForgeryToken] // Chống CSRF.
+    public async Task<IActionResult> DeleteAddress(int addressId, string? returnUrl = null)
+    {
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/profile";
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
         {
-            UpsertClaim(claims, "username", request.UserName);
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl });
         }
 
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        identityClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-        TempData["SuccessMessage"] = "Cập nhật thông tin tài khoản thành công.";
+        var response = await identityClient.DeleteAsync($"/auth/addresses/{addressId}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody)
+                ? $"Xóa địa chỉ thất bại ({(int)response.StatusCode})."
+                : $"Xóa địa chỉ thất bại: {errorBody}";
+            return Redirect(safeReturnUrl);
+        }
+
+        TempData["SuccessMessage"] = "Đã xóa địa chỉ.";
         return Redirect(safeReturnUrl);
+    }
+
+
+    // ===== 6) Thêm action đặt địa chỉ mặc định =====
+    [HttpPost("/account/profile/address/{addressId:int}/default")] // Route set default address.
+    [Authorize] // Bắt buộc login.
+    [ValidateAntiForgeryToken] // Chống CSRF.
+    public async Task<IActionResult> SetDefaultAddress(int addressId, string? returnUrl = null) // Nhận id cần set default.
+    {
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/profile"; // Chuẩn hóa returnUrl.
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy token session.
+        if (string.IsNullOrWhiteSpace(token)) // Nếu mất token.
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); // Logout.
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl }); // Về signin.
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Identity client.
+        identityClient.DefaultRequestHeaders.Authorization = // Gắn bearer.
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Authorization header.
+
+        var response = await identityClient.PostAsync($"/auth/addresses/{addressId}/set-default", content: null); // Gọi API set default.
+        if (!response.IsSuccessStatusCode) // Nếu fail.
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(); // Đọc lỗi.
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorBody) // Chuẩn hóa lỗi.
+                ? $"Đặt địa chỉ mặc định thất bại ({(int)response.StatusCode})." // Fallback.
+                : $"Đặt địa chỉ mặc định thất bại: {errorBody}"; // Chi tiết.
+            return Redirect(safeReturnUrl); // Quay lại profile.
+        }
+
+        TempData["SuccessMessage"] = "Đã đặt địa chỉ mặc định."; // Thành công.
+        return Redirect(safeReturnUrl); // Quay lại profile.
     }
 
     private static void UpsertClaim(List<Claim> claims, string type, string? value)
@@ -302,5 +484,56 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
     }
 
+    // ===== 2) Thêm helper private trong AccountController =====
+    private async Task<(ProfilePageViewModel? Model, string? Error)> GetProfilePageViewModelAsync(string token, string? returnUrl) // Hàm gom logic gọi profile + addresses.
+    {
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Tạo HttpClient tới Identity API.
+        identityClient.DefaultRequestHeaders.Authorization = // Gắn bearer token cho API cần auth.
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Header Authorization.
+
+        var profileResponse = await identityClient.GetAsync("/auth/profile"); // Gọi API lấy profile.
+        if (!profileResponse.IsSuccessStatusCode) // Nếu API profile fail.
+        {
+            var profileError = await profileResponse.Content.ReadAsStringAsync(); // Đọc error text.
+            return (null, string.IsNullOrWhiteSpace(profileError) ? "Không lấy được thông tin tài khoản." : profileError); // Trả lỗi.
+        }
+
+        var profilePayload = await profileResponse.Content.ReadFromJsonAsync<ProfileResponseBridgeDto>(); // Parse payload profile.
+        if (profilePayload is null) // Nếu parse null.
+        {
+            return (null, "Không đọc được dữ liệu profile từ Identity API."); // Báo lỗi parse.
+        }
+
+        var addressesResponse = await identityClient.GetAsync("/auth/addresses"); // Gọi API lấy danh sách địa chỉ.
+        if (!addressesResponse.IsSuccessStatusCode) // Nếu API address fail.
+        {
+            var addressesError = await addressesResponse.Content.ReadAsStringAsync(); // Đọc lỗi API address.
+            return (null, string.IsNullOrWhiteSpace(addressesError) ? "Không lấy được sổ địa chỉ." : addressesError); // Trả lỗi rõ.
+        }
+
+        var addressesPayload = await addressesResponse.Content.ReadFromJsonAsync<List<ProfileAddressItemDto>>() // Parse list address.
+                             ?? new List<ProfileAddressItemDto>(); // Fallback list rỗng.
+
+        var vm = new ProfilePageViewModel // Tạo view model tổng cho trang profile.
+        {
+            UserName = profilePayload.UserName ?? string.Empty, // Gán username.
+            FullName = profilePayload.FullName ?? string.Empty, // Gán fullname.
+            Email = profilePayload.Email ?? string.Empty, // Gán email.
+            Phone = profilePayload.Phone ?? string.Empty, // Gán phone.
+            Addresses = addressesPayload, // Gán danh sách địa chỉ.
+            ReturnUrl = returnUrl // Gán returnUrl.
+        };
+
+        return (vm, null); // Trả model thành công.
+    }
+
+    private sealed class ProfileResponseBridgeDto // DTO bridge nội bộ để parse JSON từ Identity API.
+    {
+        public int UserId { get; set; } // UserId từ API.
+        public string? UserName { get; set; } // UserName từ API.
+        public string? FullName { get; set; } // FullName từ API.
+        public string? Email { get; set; } // Email từ API.
+        public string? Phone { get; set; } // Phone từ API.
+    }
 
 }
