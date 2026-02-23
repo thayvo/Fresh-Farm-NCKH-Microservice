@@ -223,10 +223,95 @@
         - quy trình chuẩn thêm call service mới (config, DTO, auth header, error handling),
         - phần lý thuyết nền tảng cần học sâu (HTTP semantics, auth, resilience),
         - lộ trình học hiệu quả theo giai đoạn + checklist dùng lại nhanh.
+    - Đã rà soát hiện trạng checkout/profile theo yêu cầu mới:
+      - Ràng buộc mạnh cho email/phone hiện có ở profile/address (BFF + Identity DTO).
+      - Checkout hiện mới kiểm tra required cơ bản; chưa có regex phone/email ở BFF/Ordering cho luồng tạo đơn.
+      - User đã có “sổ địa chỉ” ở trang profile, nhưng checkout chưa tích hợp chọn địa chỉ đã lưu/mặc định.
+    - Đã triển khai ngay bước 1-2 cho checkout theo yêu cầu user:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
+        - GET `/checkout` gọi Identity `/auth/addresses` để lấy địa chỉ đã lưu.
+        - Prefill shipping từ địa chỉ mặc định (nếu có).
+        - POST `/checkout` hỗ trợ mode `saved/new`, nhận `selectedAddressId` và map địa chỉ đã chọn vào payload đặt đơn.
+        - Giữ state chọn địa chỉ khi validation fail hoặc Ordering API fail.
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
+        - Thêm UI chọn `Dùng địa chỉ đã lưu` hoặc `Nhập địa chỉ mới`.
+        - Thêm dropdown chọn địa chỉ đã lưu (kèm dữ liệu người nhận/điện thoại/địa chỉ).
+        - Thêm JS tự fill shipping fields khi chọn địa chỉ đã lưu.
+        - Giữ khả năng nhập địa chỉ mới thủ công.
+        - Bổ sung pattern phone 10 số bắt đầu bằng 0 ở form checkout.
+    - Đã làm tiếp bước 3 theo phạm vi “chỉ views”:
+      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
+        - Bật cơ chế `needs-validation` + `novalidate` cho form checkout.
+        - Thêm `invalid-feedback` rõ ràng cho các field shipping và chọn địa chỉ đã lưu.
+        - Bổ sung ràng buộc HTML cho shipping:
+          - `FullName`: `maxlength=100`,
+          - `Phone`: `pattern ^0\\d{9}$`, `inputmode=numeric`, `minlength/maxlength=10`,
+          - `Email`: `type=email`, `maxlength=100`,
+          - `AddressDetail`: `maxlength=255`.
+        - JS cập nhật rule `required` theo mode `saved/new`.
+        - JS chặn submit khi form invalid và thêm class `was-validated`.
+        - JS lọc ký tự số cho field phone khi nhập tay.
+    - Đã sửa lỗi Razor `RZ1031` ở checkout view:
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+      - Nguyên nhân: đặt biểu thức C# trực tiếp trong vùng khai báo thuộc tính của thẻ `<option>`.
+      - Cách sửa: tách thành `if/else` để render 2 nhánh `<option>` có/không có `selected`.
+    - Đã sửa lỗi runtime `RuntimeBinderException` ở checkout view:
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+      - Nguyên nhân: gọi `int.TryParse(...)` với biểu thức xuất phát từ `ViewBag` (`dynamic`) gây mơ hồ overload ở runtime.
+      - Cách sửa: ép `ViewBag.SelectedAddressId` về `object?`, tách ra chuỗi trung gian rồi mới `int.TryParse(...)`.
+    - Đã sửa lỗi redirect loop `ERR_TOO_MANY_REDIRECTS` khi vào `/checkout`:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+      - Nguyên nhân: cookie auth còn hiệu lực nhưng `ACCESS_TOKEN` trong session bị mất; `Checkout` redirect sang `SignIn`, còn `SignIn` thấy đã đăng nhập lại redirect ngược về `Checkout` -> lặp 302.
+      - Cách sửa: ở GET/POST `/checkout`, khi thiếu token thì `SignOutAsync` cookie + remove session key trước khi redirect sang signin.
+    - Đã sửa lỗi lấy `userId` từ JWT trong Identity API:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+      - Triệu chứng: BFF checkout hiển thị `Không tải được sổ địa chỉ: Token không chứa user id hợp lệ.`
+      - Nguyên nhân: Identity đọc claim `sub` trực tiếp; trong một số cấu hình JwtBearer, `sub` được map sang `ClaimTypes.NameIdentifier`.
+      - Cách sửa: thêm helper `TryGetCurrentUserId(...)` để đọc fallback từ cả `JwtRegisteredClaimNames.Sub` và `ClaimTypes.NameIdentifier`, rồi dùng lại ở toàn bộ action profile/address.
+    - Đã xác nhận lý do UI “địa chỉ đã lưu / địa chỉ mới” không hiện ở checkout:
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+      - Block radio + select chỉ render khi `savedAddresses.Any()` là `true`.
+      - Khi gọi `/auth/addresses` lỗi thì `savedAddresses` rỗng, view rơi vào nhánh `else` và chỉ render hidden `addressMode=new`.
+    - Đã chỉnh UI checkout phần chọn địa chỉ theo hướng giống luồng cũ:
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+      - Luôn render khối “Nguồn địa chỉ giao hàng” với 2 mode:
+        - `Dùng địa chỉ đã lưu`
+        - `Nhập địa chỉ mới`
+      - Khi chưa có địa chỉ lưu:
+        - disable mode `saved`,
+        - hiển thị hướng dẫn sang `/account/profile` để thêm địa chỉ,
+        - vẫn giữ mode `new` hoạt động bình thường.
+      - Cập nhật JS đồng bộ:
+        - mode `saved` chỉ bật khi select có option thật,
+        - tự fallback về `new` nếu không có dữ liệu địa chỉ,
+        - giữ validation đúng cho từng mode.
+    - Đã sửa lỗi crash sau khi đặt hàng do `TempData` không serialize được `decimal`:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+      - Triệu chứng: `DefaultTempDataSerializer cannot serialize an object of type 'System.Decimal'`.
+      - Cách sửa:
+        - `TempData["TotalAmount"]` đổi từ `decimal` sang chuỗi invariant.
+        - `TempData["OrderDate"]` lưu chuỗi ISO (`"O"`) để an toàn serialize.
+    - Đã chỉnh Home theo yêu cầu bám dự án cũ và bỏ “Yêu thích”:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
+        - Xóa nút trái tim trên card sản phẩm (featured + suggest).
+        - Xóa logic JS/localStorage của wishlist.
+        - Xóa CSS `btn-wishlist` liên quan.
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+        - Thêm shortcut `Giỏ hàng` ở header cho cả user đã đăng nhập và chưa đăng nhập.
+    - Đã xác định nguyên nhân phải đăng nhập lại thường xuyên:
+      - BFF lưu `ACCESS_TOKEN` trong `Session` (`AccountController`), không nằm trong cookie auth.
+      - `Session` đang dùng `AddDistributedMemoryCache` (`Program.cs`) nên mất khi app restart và hết hạn theo `IdleTimeout`.
+      - Các controller (`Checkout`, `Account`, `BffOrders`) chủ động `SignOutAsync` khi cookie còn nhưng thiếu `ACCESS_TOKEN` để tránh redirect loop.
+      - Cookie auth hiện tại không cấp `IsPersistent=true` khi login, nên đóng browser cũng có thể mất phiên đăng nhập.
   - *Now*:
-    - User yêu cầu tài liệu rất chi tiết về các điểm BFF gọi service và cách học/áp dụng lại.
+    - User hỏi lý do vì sao luôn bị yêu cầu đăng nhập lại.
   - *Next*:
-    - User đọc `docs/hoc-ket-noi-service.md` và chọn phần muốn đào sâu tiếp (ví dụ: retry/timeout/logging chuẩn production).
+    - Chốt hướng sửa phiên đăng nhập:
+      - (A) giữ token trong session nhưng chuyển sang session store bền vững (Redis/SQL),
+      - (B) hoặc bổ sung cơ chế rehydrate token khi session mất,
+      - (C) bật đăng nhập persistent cookie nếu muốn giữ phiên sau khi đóng browser.
+    - Nếu muốn giống cũ hơn nữa (layout card địa chỉ thay cho dropdown), thực hiện bước refactor UI lần 2.
+    - Nếu còn lỗi backend validation thì tiếp tục theo checklist sửa `.cs` đã hướng dẫn.
     - Theo ưu tiên kỹ thuật hiện tại:
       - test local đầy đủ các thao tác address CRUD trên `/account/profile`,
       - nếu ổn định thì nối địa chỉ mặc định sang checkout,

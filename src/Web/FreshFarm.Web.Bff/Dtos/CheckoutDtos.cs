@@ -1,4 +1,5 @@
 ﻿namespace FreshFarm.Web.Bff.Dtos; // Namespace DTO cho checkout flow.
+using System.ComponentModel.DataAnnotations;
 
 public sealed class CheckoutItemInputDto // 1 dong item user dat.
 {
@@ -17,16 +18,32 @@ public sealed class CheckoutSubmitRequestDto // Payload gui qua BFF -> Ordering 
     public CheckoutPaymentInputDto? Payment { get; set; } // Phuong thuc thanh toan.
 }
 
-public sealed class CheckoutShippingInputDto // Shipping object.
+public sealed class CheckoutShippingInputDto
 {
-    public string ShippingType { get; set; } = "HomeDelivery"; // Loai giao hang.
-    public string FullName { get; set; } = string.Empty; // Nguoi nhan.
-    public string Phone { get; set; } = string.Empty; // SDT.
-    public string? Email { get; set; } // Email.
-    public string? AddressDetail { get; set; } // Dia chi.
-    public int? ProvinceId { get; set; } // Ma tinh.
-    public int? CommuneId { get; set; } // Ma xa.
+    [Required(ErrorMessage = "Loại giao hàng là bắt buộc.")]
+    [StringLength(50, ErrorMessage = "Loại giao hàng tối đa 50 ký tự.")]
+    public string ShippingType { get; set; } = "HomeDelivery";
+
+    [Required(ErrorMessage = "Họ và tên người nhận là bắt buộc.")]
+    [StringLength(100, ErrorMessage = "Họ và tên tối đa 100 ký tự.")]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Số điện thoại là bắt buộc.")]
+    [RegularExpression(@"^0\d{9}$", ErrorMessage = "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.")]
+    public string Phone { get; set; } = string.Empty;
+
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+    [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+    public string? Email { get; set; }
+
+    [Required(ErrorMessage = "Địa chỉ chi tiết là bắt buộc.")]
+    [StringLength(255, ErrorMessage = "Địa chỉ chi tiết tối đa 255 ký tự.")]
+    public string? AddressDetail { get; set; }
+
+    public int? ProvinceId { get; set; }
+    public int? CommuneId { get; set; }
 }
+
 
 public sealed class CheckoutPaymentInputDto // Payment object.
 {

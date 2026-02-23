@@ -33,26 +33,30 @@ public sealed class CreateOrderItemRequest // Tung dong san pham trong don.
     public string? UnitSymbol { get; init; } // Vi du: kg, bo, hop.
 }
 
-public sealed class CreateShippingRequest // Thong tin giao nhan.
+public sealed class CreateShippingRequest
 {
-    [Required, MaxLength(50)] // Giu dung schema + bat buoc de xu ly nghiep vu.
-    public string ShippingType { get; init; } = "HomeDelivery"; // Vi du: HomeDelivery, Express.
+    [Required, MaxLength(50)]
+    public string ShippingType { get; init; } = "HomeDelivery";
 
-    [Required, MaxLength(100)] // Giu dung schema `Shipping.FullName`.
-    public string FullName { get; init; } = string.Empty; // Nguoi nhan.
+    [Required, MaxLength(100)]
+    public string FullName { get; init; } = string.Empty;
 
-    [Required, MaxLength(20)] // Giu dung schema `Shipping.Phone`.
-    public string Phone { get; init; } = string.Empty; // SDT nguoi nhan.
+    [Required]
+    [MaxLength(10)]
+    [RegularExpression(@"^0\d{9}$", ErrorMessage = "Phone phải gồm 10 chữ số và bắt đầu bằng 0.")]
+    public string Phone { get; init; } = string.Empty;
 
-    [MaxLength(100)] // Giu dung schema `Shipping.Email`.
-    public string? Email { get; init; } // Email co the khong co.
+    [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+    [MaxLength(100)]
+    public string? Email { get; init; }
 
-    [MaxLength(255)] // Giu dung schema `Shipping.AddressDetail`.
-    public string? AddressDetail { get; init; } // Dia chi chi tiet.
+    [Required, MaxLength(255)]
+    public string? AddressDetail { get; init; }
 
-    public int? ProvinceId { get; init; } // Optional vi co the cap nhat sau.
-    public int? CommuneId { get; init; } // Optional vi co the cap nhat sau.
+    public int? ProvinceId { get; init; }
+    public int? CommuneId { get; init; }
 }
+
 
 public sealed class CreatePaymentRequest // Thong tin thanh toan ban dau.
 {

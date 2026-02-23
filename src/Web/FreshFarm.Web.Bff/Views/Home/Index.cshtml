@@ -280,28 +280,6 @@
             opacity: .8;
         }
 
-        .btn-wishlist {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(255, 255, 255, .8);
-            border-radius: 50%;
-            width: 35px;
-            height: 35px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #333;
-            transition: all .2s ease;
-            z-index: 5;
-        }
-
-        .btn-wishlist:hover,
-        .btn-wishlist.active {
-            background-color: var(--danger-color);
-            color: #fff;
-        }
-
         .mySwiper-suggest .swiper-button-prev,
         .mySwiper-suggest .swiper-button-next {
             background-color: rgba(255, 255, 255, .9);
@@ -877,51 +855,10 @@
                 form.submit();
             };
 
-            const getLikedIds = () => {
-                try {
-                    const raw = localStorage.getItem("ff-liked-products");
-                    const parsed = raw ? JSON.parse(raw) : [];
-                    return Array.isArray(parsed) ? parsed : [];
-                } catch {
-                    return [];
-                }
-            };
-
-            const setLikedIds = (ids) => {
-                localStorage.setItem("ff-liked-products", JSON.stringify(ids));
-            };
-
-            const toggleWishlist = (productId, button) => {
-                const icon = button.querySelector("i");
-                const likedIds = getLikedIds();
-                const index = likedIds.indexOf(productId);
-
-                if (index >= 0) {
-                    likedIds.splice(index, 1);
-                    button.classList.remove("active");
-                    icon.classList.remove("bi-heart-fill");
-                    icon.classList.add("bi-heart");
-                } else {
-                    likedIds.push(productId);
-                    button.classList.add("active");
-                    icon.classList.remove("bi-heart");
-                    icon.classList.add("bi-heart-fill");
-                }
-
-                setLikedIds(likedIds);
-            };
-
             const buildCard = (product, sizeClass = "col-6 col-md-4 col-lg-3") => {
-                const liked = getLikedIds().includes(product.productId);
                 return `
                     <div class="${sizeClass}">
                         <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
-                            <button type="button"
-                                    class="btn-wishlist border-0 bg-transparent position-absolute top-0 end-0 m-2 ${liked ? "active" : ""}"
-                                    data-product-id="${product.productId}">
-                                <i class="bi ${liked ? "bi-heart-fill" : "bi-heart"} fs-5 text-danger"></i>
-                            </button>
-
                             <div class="product-image-wrapper">
                                 <img src="${defaultImage}" class="product-image" alt="${escapeHtml(product.productName)}" />
                             </div>
@@ -1018,16 +955,9 @@
                 suggestionEmpty.classList.add("d-none");
                 suggestionWrapper.innerHTML = suggestions
                     .map((p) => {
-                        const liked = getLikedIds().includes(p.productId);
                         return `
                             <div class="swiper-slide">
                                 <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
-                                    <button type="button"
-                                            class="btn-wishlist border-0 bg-transparent position-absolute top-0 end-0 m-2 ${liked ? "active" : ""}"
-                                            data-product-id="${p.productId}">
-                                        <i class="bi ${liked ? "bi-heart-fill" : "bi-heart"} fs-5 text-danger"></i>
-                                    </button>
-
                                     <div class="product-image-wrapper">
                                         <img src="${defaultImage}" class="product-image" alt="${escapeHtml(p.productName)}" />
                                     </div>
@@ -1109,17 +1039,6 @@
                 featuredGrid.innerHTML = featured.map((p) => buildCard(p)).join("");
             };
 
-            const wireWishlistButtons = () => {
-                document.querySelectorAll("button.btn-wishlist[data-product-id]").forEach((button) => {
-                    button.addEventListener("click", () => {
-                        const id = Number(button.getAttribute("data-product-id") || "0");
-                        if (id > 0) {
-                            toggleWishlist(id, button);
-                        }
-                    });
-                });
-            };
-
             document.addEventListener("click", (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) {
@@ -1166,7 +1085,6 @@
                     renderCategories(products);
                     renderSuggestions(products);
                     renderFeatured(products);
-                    wireWishlistButtons();
                 } catch (error) {
                     categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";
                     suggestionWrapper.innerHTML = "";

@@ -1,4 +1,5 @@
 @using System.Globalization
+@using System.Linq
 @using FreshFarm.Web.Bff.Dtos
 @model CheckoutSubmitRequestDto
 @{
@@ -19,6 +20,62 @@
     }
 
     var grandTotal = subTotal + shippingFee;
+
+    var savedAddresses = ViewBag.SavedAddresses as List<ProfileAddressItemDto> ?? new List<ProfileAddressItemDto>();
+    var addressMode = (ViewBag.AddressMode as string)?.ToLowerInvariant() == "saved" ? "saved" : "new";
+    if (savedAddresses.Count == 0)
+    {
+        addressMode = "new";
+    }
+
+    object? selectedAddressIdRaw = ViewBag.SelectedAddressId;
+    var selectedAddressId = 0;
+    if (selectedAddressIdRaw is int selectedIdFromViewBag)
+    {
+        selectedAddressId = selectedIdFromViewBag;
+    }
+    else
+    {
+        var selectedAddressIdText = selectedAddressIdRaw?.ToString();
+        if (!string.IsNullOrWhiteSpace(selectedAddressIdText))
+        {
+            _ = int.TryParse(selectedAddressIdText, out selectedAddressId);
+        }
+    }
+
+    var selectedAddress = savedAddresses.FirstOrDefault(x => x.AddressId == selectedAddressId)
+        ?? savedAddresses.FirstOrDefault(x => x.IsDefault)
+        ?? savedAddresses.FirstOrDefault();
+    if (selectedAddressId == 0 && selectedAddress is not null)
+    {
+        selectedAddressId = selectedAddress.AddressId;
+    }
+
+    var addressLoadError = ViewBag.AddressLoadError as string;
+
+    if (addressMode == "saved" && selectedAddress is not null)
+    {
+        if (string.IsNullOrWhiteSpace(shipping.FullName))
+        {
+            shipping.FullName = selectedAddress.RecipientName;
+        }
+
+        if (string.IsNullOrWhiteSpace(shipping.Phone))
+        {
+            shipping.Phone = selectedAddress.Phone;
+        }
+
+        if (string.IsNullOrWhiteSpace(shipping.AddressDetail))
+        {
+            shipping.AddressDetail = string.Join(", ", new[]
+            {
+                selectedAddress.AddressDetail,
+                selectedAddress.Ward,
+                selectedAddress.District,
+                selectedAddress.Province
+            }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        }
+    }
 
     string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", amount);
 }
@@ -97,6 +154,13 @@
             padding: 12px;
             background: #fff;
         }
+
+        .address-mode-wrap {
+            background: #f8faf9;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px;
+        }
     </style>
 </head>
 <body>
@@ -125,7 +189,12 @@
 
         <div class="row g-4">
             <div class="col-lg-7">
-                <form id="checkoutForm" asp-controller="Checkout" asp-action="Index" method="post">
+                <form id="checkoutForm"
+                      asp-controller="Checkout"
+                      asp-action="Index"
+                      method="post"
+                      class="needs-validation"
+                      novalidate>
                     @Html.AntiForgeryToken()
 
                     <input type="hidden"
@@ -200,38 +269,150 @@
 
                             <div asp-validation-summary="All" class="text-danger small mb-3"></div>
 
+                            @if (!string.IsNullOrWhiteSpace(addressLoadError))
+                            {
+                                <div class="alert alert-warning py-2 px-3 small">
+                                    @addressLoadError
+                                </div>
+                            }
+
+                            <div class="address-mode-wrap mb-3">
+                                <label class="form-label fw-semibold mb-2">Nguồn địa chỉ giao hàng</label>
+                                <div class="d-flex flex-wrap gap-3 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="radio"
+                                               name="addressMode"
+                                               id="addressModeSaved"
+                                               value="saved"
+                                               @(addressMode == "saved" && savedAddresses.Any() ? "checked" : null)
+                                               @(!savedAddresses.Any() ? "disabled" : null) />
+                                        <label class="form-check-label" for="addressModeSaved">Dùng địa chỉ đã lưu</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                               type="radio"
+                                               name="addressMode"
+                                               id="addressModeNew"
+                                               value="new"
+                                               @(addressMode == "new" || !savedAddresses.Any() ? "checked" : null) />
+                                        <label class="form-check-label" for="addressModeNew">Nhập địa chỉ mới</label>
+                                    </div>
+                                </div>
+
+                                @if (!savedAddresses.Any())
+                                {
+                                    <div class="small text-muted mb-2">
+                                        Bạn chưa có địa chỉ đã lưu. Hãy thêm trong
+                                        <a href="/account/profile" class="text-decoration-none">Thông tin tài khoản</a>
+                                        để chọn nhanh ở bước thanh toán.
+                                    </div>
+                                }
+
+                                <div id="savedAddressWrap">
+                                    <label class="form-label mb-1">Chọn địa chỉ đã lưu</label>
+                                    <select id="savedAddressSelect"
+                                            name="selectedAddressId"
+                                            class="form-select"
+                                            @(!savedAddresses.Any() ? "disabled" : null)>
+                                        @if (savedAddresses.Any())
+                                        {
+                                            @foreach (var address in savedAddresses)
+                                            {
+                                                var optionText = string.Join(" | ", new[]
+                                                {
+                                                    address.RecipientName,
+                                                    address.Phone,
+                                                    address.AddressDetail,
+                                                    address.Ward,
+                                                    address.District,
+                                                    address.Province
+                                                }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                                                if (selectedAddressId == address.AddressId)
+                                                {
+                                                    <option value="@address.AddressId"
+                                                            data-recipient-name="@address.RecipientName"
+                                                            data-phone="@address.Phone"
+                                                            data-address-detail="@address.AddressDetail"
+                                                            data-ward="@address.Ward"
+                                                            data-district="@address.District"
+                                                            data-province="@address.Province"
+                                                            selected>
+                                                        @optionText @(address.IsDefault ? "(Mặc định)" : string.Empty)
+                                                    </option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@address.AddressId"
+                                                            data-recipient-name="@address.RecipientName"
+                                                            data-phone="@address.Phone"
+                                                            data-address-detail="@address.AddressDetail"
+                                                            data-ward="@address.Ward"
+                                                            data-district="@address.District"
+                                                            data-province="@address.Province">
+                                                        @optionText @(address.IsDefault ? "(Mặc định)" : string.Empty)
+                                                    </option>
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <option value="">Chưa có địa chỉ đã lưu để chọn.</option>
+                                        }
+                                    </select>
+                                    <div class="invalid-feedback">Vui lòng chọn một địa chỉ đã lưu.</div>
+                                    <div class="form-text">Bạn có thể đổi sang “Nhập địa chỉ mới” nếu muốn giao tới nơi khác.</div>
+                                </div>
+                            </div>
+
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label">Họ và tên</label>
                                     <input name="Shipping.FullName"
+                                           id="shippingFullName"
                                            class="form-control"
                                            placeholder="Nguyễn Văn A"
                                            required
+                                           maxlength="100"
                                            value="@shipping.FullName" />
+                                    <div class="invalid-feedback">Vui lòng nhập họ và tên người nhận.</div>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Số điện thoại</label>
                                     <input name="Shipping.Phone"
+                                           id="shippingPhone"
                                            class="form-control"
                                            placeholder="09xxxxxxxx"
                                            required
+                                           pattern="^0\d{9}$"
+                                           maxlength="10"
+                                           minlength="10"
+                                           inputmode="numeric"
+                                           title="Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0."
                                            value="@shipping.Phone" />
+                                    <div class="invalid-feedback">Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Email</label>
                                     <input name="Shipping.Email"
+                                           id="shippingEmail"
                                            class="form-control"
                                            type="email"
                                            placeholder="you@example.com"
+                                           maxlength="100"
                                            value="@shipping.Email" />
+                                    <div class="invalid-feedback">Email không đúng định dạng.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Địa chỉ chi tiết</label>
                                     <input name="Shipping.AddressDetail"
+                                           id="shippingAddressDetail"
                                            class="form-control"
                                            placeholder="Số nhà, đường, phường/xã, quận/huyện..."
                                            required
+                                           maxlength="255"
                                            value="@shipping.AddressDetail" />
+                                    <div class="invalid-feedback">Vui lòng nhập địa chỉ giao hàng chi tiết.</div>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label">Ghi chú đơn hàng</label>
@@ -318,6 +499,21 @@
             const grandTotalValue = document.getElementById("grandTotalValue");
             const paymentMethodHidden = document.getElementById("paymentMethodHidden");
             const paymentOptions = document.querySelectorAll("#paymentOptions .payment-option");
+            const addressModeInputs = document.querySelectorAll('input[name="addressMode"]');
+            const savedAddressWrap = document.getElementById("savedAddressWrap");
+            const savedAddressSelect = document.getElementById("savedAddressSelect");
+            const hasSavedAddressOptions = !!(savedAddressSelect && savedAddressSelect.options.length > 0 && !savedAddressSelect.disabled);
+            const shippingFullNameInput = document.getElementById("shippingFullName");
+            const shippingPhoneInput = document.getElementById("shippingPhone");
+            const shippingAddressDetailInput = document.getElementById("shippingAddressDetail");
+
+            const manualSnapshot = {
+                fullName: shippingFullNameInput ? shippingFullNameInput.value : "",
+                phone: shippingPhoneInput ? shippingPhoneInput.value : "",
+                addressDetail: shippingAddressDetailInput ? shippingAddressDetailInput.value : ""
+            };
+            let wasSavedMode = false;
+            const checkoutForm = document.getElementById("checkoutForm");
 
             const toNumber = (value, fallback = 0) => {
                 const num = Number(value);
@@ -325,6 +521,102 @@
             };
 
             const toVnd = (value) => toNumber(value, 0).toLocaleString("vi-VN") + " ₫";
+
+            const setShippingReadonly = (isReadonly) => {
+                if (shippingFullNameInput) {
+                    shippingFullNameInput.readOnly = isReadonly;
+                }
+                if (shippingPhoneInput) {
+                    shippingPhoneInput.readOnly = isReadonly;
+                }
+                if (shippingAddressDetailInput) {
+                    shippingAddressDetailInput.readOnly = isReadonly;
+                }
+            };
+
+            const applySavedAddressToShipping = () => {
+                if (!savedAddressSelect || !shippingFullNameInput || !shippingPhoneInput || !shippingAddressDetailInput) {
+                    return;
+                }
+
+                const selectedOption = savedAddressSelect.options[savedAddressSelect.selectedIndex];
+                if (!selectedOption) {
+                    return;
+                }
+
+                const parts = [
+                    selectedOption.dataset.addressDetail || "",
+                    selectedOption.dataset.ward || "",
+                    selectedOption.dataset.district || "",
+                    selectedOption.dataset.province || ""
+                ].map((x) => x.trim()).filter((x) => x.length > 0);
+
+                shippingFullNameInput.value = selectedOption.dataset.recipientName || "";
+                shippingPhoneInput.value = selectedOption.dataset.phone || "";
+                shippingAddressDetailInput.value = parts.join(", ");
+            };
+
+            const syncAddressModeUi = () => {
+                const selectedModeInput = document.querySelector('input[name="addressMode"]:checked');
+                const mode = selectedModeInput ? selectedModeInput.value : "new";
+                const useSavedMode = mode === "saved" && hasSavedAddressOptions;
+
+                if (mode === "saved" && !hasSavedAddressOptions) {
+                    const newModeInput = document.getElementById("addressModeNew");
+                    if (newModeInput instanceof HTMLInputElement) {
+                        newModeInput.checked = true;
+                    }
+                }
+
+                if (savedAddressWrap) {
+                    savedAddressWrap.style.display = useSavedMode ? "" : "none";
+                }
+
+                if (useSavedMode && !wasSavedMode) {
+                    if (shippingFullNameInput) {
+                        manualSnapshot.fullName = shippingFullNameInput.value;
+                    }
+                    if (shippingPhoneInput) {
+                        manualSnapshot.phone = shippingPhoneInput.value;
+                    }
+                    if (shippingAddressDetailInput) {
+                        manualSnapshot.addressDetail = shippingAddressDetailInput.value;
+                    }
+                }
+
+                if (useSavedMode) {
+                    applySavedAddressToShipping();
+                    setShippingReadonly(true);
+                } else {
+                    setShippingReadonly(false);
+                    if (wasSavedMode) {
+                        if (shippingFullNameInput) {
+                            shippingFullNameInput.value = manualSnapshot.fullName;
+                        }
+                        if (shippingPhoneInput) {
+                            shippingPhoneInput.value = manualSnapshot.phone;
+                        }
+                        if (shippingAddressDetailInput) {
+                            shippingAddressDetailInput.value = manualSnapshot.addressDetail;
+                        }
+                    }
+                }
+
+                if (savedAddressSelect) {
+                    savedAddressSelect.required = !!useSavedMode;
+                }
+                if (shippingFullNameInput) {
+                    shippingFullNameInput.required = !useSavedMode;
+                }
+                if (shippingPhoneInput) {
+                    shippingPhoneInput.required = !useSavedMode;
+                }
+                if (shippingAddressDetailInput) {
+                    shippingAddressDetailInput.required = !useSavedMode;
+                }
+
+                wasSavedMode = !!useSavedMode;
+            };
 
             const recalcTotal = () => {
                 let subTotal = 0;
@@ -412,8 +704,46 @@
                 if (target.classList.contains("qty-input") || target.id === "shippingFeeInput") {
                     recalcTotal();
                 }
+
+                if (target.id === "shippingPhone" && !target.readOnly) {
+                    target.value = target.value.replace(/\D/g, "").slice(0, 10);
+                }
             });
 
+            addressModeInputs.forEach((input) => {
+                input.addEventListener("change", syncAddressModeUi);
+            });
+
+            if (savedAddressSelect) {
+                savedAddressSelect.addEventListener("change", () => {
+                    const selectedModeInput = document.querySelector('input[name="addressMode"]:checked');
+                    if (selectedModeInput && selectedModeInput.value === "saved") {
+                        applySavedAddressToShipping();
+                    }
+                });
+            }
+
+            if (checkoutForm instanceof HTMLFormElement) {
+                checkoutForm.addEventListener("submit", (event) => {
+                    const selectedModeInput = document.querySelector('input[name="addressMode"]:checked');
+                    const useSavedMode = !!(selectedModeInput && selectedModeInput.value === "saved" && hasSavedAddressOptions);
+
+                    if (useSavedMode && savedAddressSelect && !savedAddressSelect.value) {
+                        savedAddressSelect.setCustomValidity("Vui lòng chọn địa chỉ đã lưu.");
+                    } else if (savedAddressSelect) {
+                        savedAddressSelect.setCustomValidity("");
+                    }
+
+                    if (!checkoutForm.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+
+                    checkoutForm.classList.add("was-validated");
+                });
+            }
+
+            syncAddressModeUi();
             recalcTotal();
         })();
     </script>

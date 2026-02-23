@@ -36,6 +36,9 @@
                         <a href="/account/profile" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
                             <i class="bi bi-person-circle"></i><span class="d-none d-lg-inline">Tài khoản</span>
                         </a>
+                        <a href="/cart" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
+                            <i class="bi bi-cart3"></i><span class="d-none d-lg-inline">Giỏ hàng</span>
+                        </a>
                         <a href="/account/orders" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
                             <i class="bi bi-receipt"></i><span class="d-none d-lg-inline">Đơn hàng</span>
                         </a>
@@ -53,6 +56,12 @@
                            asp-route-returnUrl="@currentUrl"
                            class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
                             <i class="bi bi-person"></i><span class="d-none d-lg-inline">Đăng nhập</span>
+                        </a>
+                        <a asp-controller="Account"
+                           asp-action="SignIn"
+                           asp-route-returnUrl="/cart"
+                           class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
+                            <i class="bi bi-cart3"></i><span class="d-none d-lg-inline">Giỏ hàng</span>
                         </a>
                         <a asp-controller="Account"
                            asp-action="SignIn"

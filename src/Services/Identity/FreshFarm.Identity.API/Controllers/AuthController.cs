@@ -169,8 +169,7 @@ namespace FreshFarm.Identity.Api.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Chỉ cho token JWT hợp lệ.
         public async Task<IActionResult> GetProfile() // Action lấy profile hiện tại.
         {
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Đọc claim sub từ JWT.
-            if (!int.TryParse(sub, out var userId)) // Parse userId an toàn.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // Token lỗi thì trả 401.
             }
@@ -202,8 +201,7 @@ namespace FreshFarm.Identity.Api.Controllers
                 return ValidationProblem(ModelState); // Trả lỗi validate chuẩn ASP.NET Core.
             }
 
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Đọc user id từ token.
-            if (!int.TryParse(sub, out var userId)) // Parse user id an toàn.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // Token sai.
             }
@@ -251,8 +249,7 @@ namespace FreshFarm.Identity.Api.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
         public async Task<IActionResult> GetAddresses() // Action list addresses.
         {
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Lấy claim sub.
-            if (!int.TryParse(sub, out var userId)) // Parse int an toàn.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // 401 nếu token sai.
             }
@@ -287,8 +284,7 @@ namespace FreshFarm.Identity.Api.Controllers
                 return ValidationProblem(ModelState); // Trả lỗi validate.
             }
 
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Lấy claim sub.
-            if (!int.TryParse(sub, out var userId)) // Parse user id.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // 401 nếu sai.
             }
@@ -348,8 +344,7 @@ namespace FreshFarm.Identity.Api.Controllers
                 return ValidationProblem(ModelState); // Trả lỗi validation.
             }
 
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Đọc claim sub.
-            if (!int.TryParse(sub, out var userId)) // Parse user id.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // 401.
             }
@@ -404,8 +399,7 @@ namespace FreshFarm.Identity.Api.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
         public async Task<IActionResult> SetDefaultAddress(int addressId) // Nhận addressId cần set mặc định.
         {
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Đọc claim sub.
-            if (!int.TryParse(sub, out var userId)) // Parse userId.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // 401.
             }
@@ -440,8 +434,7 @@ namespace FreshFarm.Identity.Api.Controllers
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
         public async Task<IActionResult> DeleteAddress(int addressId) // Nhận id địa chỉ cần xóa.
         {
-            var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub); // Đọc claim sub.
-            if (!int.TryParse(sub, out var userId)) // Parse user id.
+            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
             {
                 return Unauthorized("Token không chứa user id hợp lệ."); // 401.
             }
@@ -459,6 +452,17 @@ namespace FreshFarm.Identity.Api.Controllers
 
             await _db.SaveChangesAsync(); // Lưu DB.
             return NoContent(); // Trả 204 khi xóa thành công.
+        }
+
+        private bool TryGetCurrentUserId(out int userId) // Lấy user id từ claim đã map hoặc claim gốc.
+        {
+            userId = 0; // Giá trị mặc định nếu parse thất bại.
+
+            var rawUserId = User.FindFirstValue(JwtRegisteredClaimNames.Sub) // Claim gốc "sub" (khi không map).
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier) // Claim đã map mặc định của JwtBearer.
+                ?? User.FindFirstValue("sub"); // Fallback cứng.
+
+            return int.TryParse(rawUserId, out userId); // Parse an toàn sang int.
         }
     }
     
