@@ -1,0 +1,471 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.UnitViewModel
+@{
+    ViewBag.Title = "Thêm Đơn Vị Tính";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<style>
+    .page-header {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2.5rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    .form-section {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #667eea;
+    }
+
+        .form-section h5 {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control, .form-select {
+        border-radius: 10px;
+        border: 2px solid #e9ecef;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+    .btn-custom {
+        border-radius: 25px;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+    .info-box {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #667eea;
+    }
+
+        .info-box i {
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+    .unit-type-card {
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+    }
+
+        .unit-type-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .unit-type-card input[type="radio"]:checked ~ .card-content {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            border-radius: 8px;
+            padding: 0.5rem;
+        }
+
+    .unit-type-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .switch-wrapper {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .form-switch .form-check-input {
+        width: 3rem;
+        height: 1.5rem;
+        cursor: pointer;
+    }
+
+        .form-switch .form-check-input:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+
+    .required-star {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .char-counter {
+        font-size: 0.875rem;
+        color: #6c757d;
+        float: right;
+    }
+
+    .example-box {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin-top: 0.5rem;
+    }
+
+        .example-box i {
+            color: #ffc107;
+        }
+</style>
+<div class="container mt-4">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-plus-circle text-primary me-2"></i>
+                    Thêm Đơn Vị Tính Mới
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="@Url.Action("Dashboard", "Home")" class="text-decoration-none">Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="@Url.Action("Index", "Unit")" class="text-decoration-none">Đơn vị tính</a>
+                        </li>
+                        <li class="breadcrumb-item active">Thêm mới</li>
+                    </ol>
+                </nav>
+            </div>
+            <a href="@Url.Action("Index", "Unit")" class="btn btn-outline-secondary btn-custom">
+                <i class="bi bi-arrow-left me-2"></i>Quay lại
+            </a>
+        </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-info-circle me-3"></i>
+            <div>
+                <strong>Hướng dẫn:</strong> Điền đầy đủ thông tin đơn vị tính.
+                Các trường có dấu <span class="required-star">*</span> là bắt buộc.
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="form-card">
+        @using (Html.BeginForm("Create", "Unit", FormMethod.Post, new { @class = "needs-validation", novalidate = "novalidate" }))
+        {
+            @Html.AntiForgeryToken()
+            @Html.ValidationSummary(true, "", new { @class = "alert alert-danger" })
+
+            <!-- Thông tin cơ bản -->
+            <div class="form-section">
+                <h5>
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Thông Tin Cơ Bản
+                </h5>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="UnitName" class="form-label">
+                            Tên đơn vị <span class="required-star">*</span>
+                        </label>
+                        @Html.TextBoxFor(m => m.UnitName, new
+                        {
+                            @class = "form-control",
+                            placeholder = "VD: Kilogram, Lít, Cái...",
+                            maxlength = "100",
+                            id = "UnitName",
+                            required = "required",
+                            oninput = "updateCharCount('UnitName', 100)"
+                        })
+                        <span class="char-counter" id="UnitName-counter">0/100</span>
+                        @Html.ValidationMessageFor(m => m.UnitName, "", new { @class = "text-danger small" })
+
+                        <div class="example-box">
+                            <i class="bi bi-lightbulb me-2"></i>
+                            <small><strong>Ví dụ:</strong> Kilogram, Gram, Lít, Mét, Cái, Gói, Hộp...</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="Symbol" class="form-label">
+                            Ký hiệu <span class="required-star">*</span>
+                        </label>
+                        @Html.TextBoxFor(m => m.Symbol, new
+                        {
+                            @class = "form-control",
+                            placeholder = "VD: kg, L, cái...",
+                            maxlength = "20",
+                            id = "Symbol",
+                            required = "required",
+                            oninput = "updateCharCount('Symbol', 20)"
+                        })
+                        <span class="char-counter" id="Symbol-counter">0/20</span>
+                        @Html.ValidationMessageFor(m => m.Symbol, "", new { @class = "text-danger small" })
+
+                        <div class="example-box">
+                            <i class="bi bi-lightbulb me-2"></i>
+                            <small><strong>Ví dụ:</strong> kg, g, L, ml, m, cm, cái, gói...</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="Description" class="form-label">
+                        Mô tả
+                    </label>
+                    @Html.TextAreaFor(m => m.Description, new
+                    {
+                        @class = "form-control",
+                        rows = "4",
+                        placeholder = "Nhập mô tả chi tiết về đơn vị tính này...",
+                        maxlength = "500",
+                        id = "Description",
+                        oninput = "updateCharCount('Description', 500)"
+                    })
+                    <span class="char-counter" id="Description-counter">0/500</span>
+                    @Html.ValidationMessageFor(m => m.Description, "", new { @class = "text-danger small" })
+                </div>
+            </div>
+
+            <!-- Loại đơn vị -->
+            <div class="form-section">
+                <h5>
+                    <i class="bi bi-list-ul me-2"></i>
+                    Phân Loại Đơn Vị (Tùy chọn - chỉ để tham khảo)
+                </h5>
+
+                <div class="row">
+                    <div class="col-md-3 col-sm-6">
+                        <label class="unit-type-card">
+                            <input type="radio" name="unitType" value="weight" class="d-none">
+                            <div class="card-content d-flex align-items-center">
+                                <div class="unit-type-icon me-3">
+                                    <i class="bi bi-box"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">Khối lượng</div>
+                                    <small class="text-muted">kg, g, tấn</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="col-md-3 col-sm-6">
+                        <label class="unit-type-card">
+                            <input type="radio" name="unitType" value="volume" class="d-none">
+                            <div class="card-content d-flex align-items-center">
+                                <div class="unit-type-icon me-3">
+                                    <i class="bi bi-droplet"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">Thể tích</div>
+                                    <small class="text-muted">L, ml</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="col-md-3 col-sm-6">
+                        <label class="unit-type-card">
+                            <input type="radio" name="unitType" value="length" class="d-none">
+                            <div class="card-content d-flex align-items-center">
+                                <div class="unit-type-icon me-3">
+                                    <i class="bi bi-rulers"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">Chiều dài</div>
+                                    <small class="text-muted">m, cm, mm</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="col-md-3 col-sm-6">
+                        <label class="unit-type-card">
+                            <input type="radio" name="unitType" value="count" class="d-none" checked>
+                            <div class="card-content d-flex align-items-center">
+                                <div class="unit-type-icon me-3">
+                                    <i class="bi bi-123"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold">Đơn vị đếm</div>
+                                    <small class="text-muted">cái, gói, hộp</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-3 mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <small>
+                        <strong>Lưu ý:</strong> Phân loại này chỉ để hiển thị giao diện,
+                        hệ thống sẽ tự động phân loại dựa trên tên và ký hiệu đơn vị.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Trạng thái -->
+            <div class="form-section">
+                <h5>
+                    <i class="bi bi-toggle-on me-2"></i>
+                    Trạng Thái
+                </h5>
+
+                <div class="switch-wrapper">
+                    <div>
+                        <div class="fw-bold mb-1">Kích hoạt đơn vị</div>
+                        <small class="text-muted">
+                            Đơn vị sẽ được hiển thị và sử dụng trong hệ thống
+                        </small>
+                    </div>
+                    <div class="form-check form-switch">
+                        @Html.CheckBoxFor(m => m.IsActive, new
+                        {
+                            @class = "form-check-input",
+                            id = "IsActive",
+                            @checked = "checked"
+                        })
+                        <label class="form-check-label" for="IsActive"></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 mt-4">
+                <a href="@Url.Action("Index", "Unit")" class="btn btn-secondary btn-custom">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Hủy bỏ
+                </a>
+                <button type="reset" class="btn btn-outline-secondary btn-custom">
+                    <i class="bi bi-arrow-counterclockwise me-2"></i>
+                    Làm mới
+                </button>
+                <button type="submit" class="btn btn-primary btn-custom">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Lưu đơn vị
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@section scripts{
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@3.2.12/dist/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        // Đếm ký tự
+        function updateCharCount(fieldId, maxLength) {
+            const field = document.getElementById(fieldId);
+            const counter = document.getElementById(fieldId + '-counter');
+            const currentLength = field.value.length;
+            counter.textContent = currentLength + '/' + maxLength;
+
+            if (currentLength >= maxLength) {
+                counter.style.color = '#dc3545';
+            } else if (currentLength >= maxLength * 0.8) {
+                counter.style.color = '#ffc107';
+            } else {
+                counter.style.color = '#6c757d';
+            }
+        }
+
+        // Initialize counters
+        $(document).ready(function () {
+            updateCharCount('UnitName', 100);
+            updateCharCount('Symbol', 20);
+            updateCharCount('Description', 500);
+
+            // Update on input
+            $('#UnitName, #Symbol, #Description').on('input', function () {
+                const id = $(this).attr('id');
+                const max = $(this).attr('maxlength');
+                updateCharCount(id, max);
+            });
+
+            // Card selection effect
+            $('.unit-type-card').on('click', function () {
+                $('.unit-type-card').removeClass('border-primary');
+                $(this).addClass('border-primary');
+                $(this).find('input[type="radio"]').prop('checked', true);
+            });
+
+            // Form validation
+            $('form').on('submit', function (e) {
+                if (!this.checkValidity()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                $(this).addClass('was-validated');
+            });
+
+            // Reset form
+            $('button[type="reset"]').on('click', function () {
+                $('form').removeClass('was-validated');
+                updateCharCount('UnitName', 100);
+                updateCharCount('Symbol', 20);
+                updateCharCount('Description', 500);
+            });
+
+            // Confirm before leaving if form has changes
+            let formChanged = false;
+            $('form input, form textarea, form select').on('change', function () {
+                formChanged = true;
+            });
+
+            $(window).on('beforeunload', function () {
+                if (formChanged) {
+                    return 'Bạn có thay đổi chưa được lưu. Bạn có chắc muốn rời khỏi trang?';
+                }
+            });
+
+            $('form').on('submit', function () {
+                formChanged = false;
+            });
+        });
+    </script>
+}

@@ -1,68 +1,77 @@
-﻿using FreshFarm.Ordering.Api.Dtos; // Doc cac request/response DTO vua tao.
-using FreshFarm.Ordering.Api.Models; // Dung entity va DbContext scaffold tu DB.
-using Microsoft.AspNetCore.Authorization; // Dung [Authorize] de bat buoc dang nhap.
-using Microsoft.AspNetCore.Mvc; // Kieu ControllerBase va IActionResult.
-using Microsoft.EntityFrameworkCore; // Dung async query + transaction cua EF Core.
-using System.IdentityModel.Tokens.Jwt; // Doc claim `sub` tu JWT.
-using System.Security.Claims; // Ho tro thao tac claim.
+using FreshFarm.Ordering.Api.Dtos;
+using FreshFarm.Ordering.Api.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
-namespace FreshFarm.Ordering.Api.Controllers; // Namespace cua controller Ordering.
+namespace FreshFarm.Ordering.Api.Controllers;
 
-[ApiController] // Bat model validation tu dong va binding API chuan.
-[Route("api/orders")] // Dat route ro rang, de endpoint on dinh.
-[Authorize] // Moi endpoint trong controller nay deu can token hop le.
-public sealed class OrdersController : ControllerBase // Dung ControllerBase cho API, khong dung Controller MVC.
+[ApiController]
+[Route("api/orders")]
+[Authorize]
+public sealed class OrdersController : ControllerBase
 {
-    private readonly FreshFarmOrderingDBContext _db; // DbContext de truy cap CSDL Ordering.
-
-    
-    public OrdersController(FreshFarmOrderingDBContext db) // Inject DbContext qua DI.
+    private static readonly Dictionary<string, string> CanonicalStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
-        _db = db; // Gan context vao field de dung trong action.
+        ["Pending"] = "Pending",
+        ["Processing"] = "Processing",
+        ["Ready"] = "Ready",
+        ["Shipped"] = "Shipped",
+        ["Delivered"] = "Delivered",
+        ["Canceled"] = "Canceled"
+    };
+
+    private readonly FreshFarmOrderingDBContext _db;
+
+    public OrdersController(FreshFarmOrderingDBContext db)
+    {
+        _db = db;
     }
 
-    [HttpGet("my")] // Endpoint lay danh sach don cua chinh user dang dang nhap.
-    public async Task<IActionResult> GetMyOrders(CancellationToken cancellationToken) // Async + cancellation cho API production-safe.
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyOrders(CancellationToken cancellationToken)
     {
-        var userId = TryGetUserIdFromToken(); // Rut UserId tu JWT.
-        if (userId is null) // Neu khong rut duoc user id thi token dang khong dung format app.
+        var userId = TryGetUserIdFromToken();
+        if (userId is null)
         {
-            return Unauthorized("Token khong co claim user id hop le."); // Tra 401 de client xu ly login lai.
+            return Unauthorized("Token khong co claim user id hop le.");
         }
 
-        var data = await _db.Orders // Query tu bang Orders.
-            .AsNoTracking() // Read-only nen tat tracking de giam memory/CPU.
-            .Where(order => order.UserId == userId.Value) // Chi lay don cua user hien tai. //order là alias cho Order trong db.Orders, có thể đặtt tên khác, và oorrder là một row trong bảng Orders và có trường UserId
-            .OrderByDescending(order => order.OrderDate) // Don moi nhat hien truoc.
-            .Select(order => new OrderListItemResponse // Map sang response DTO gon nhe.
+        var data = await _db.Orders
+            .AsNoTracking()
+            .Where(order => order.UserId == userId.Value)
+            .OrderByDescending(order => order.OrderDate)
+            .Select(order => new OrderListItemResponse
             {
-                OrderId = order.OrderId, // Ma don.
-                OrderDate = order.OrderDate, // Ngay tao.
-                TotalAmount = order.TotalAmount, // Tong tien.
-                Status = order.Status, // Trang thai don.
-                PaymentStatus = order.PaymentStatus // Trang thai thanh toan.
+                OrderId = order.OrderId,
+                OrderDate = order.OrderDate,
+                TotalAmount = order.TotalAmount,
+                Status = order.Status,
+                PaymentStatus = order.PaymentStatus
             })
-            .ToListAsync(cancellationToken); // Chay query async.
+            .ToListAsync(cancellationToken);
 
-        return Ok(data); // Tra danh sach don cua user.
+        return Ok(data);
     }
 
-    [HttpGet("{id:int}")] // Endpoint lay chi tiet 1 don theo id.
-    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken) // Nhan id tu route.
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
-        var userId = TryGetUserIdFromToken(); // Lay user id tu token.
-        if (userId is null) // Token khong hop le cho app.
+        var userId = TryGetUserIdFromToken();
+        if (userId is null)
         {
-            return Unauthorized("Token khong co claim user id hop le."); // 401.
+            return Unauthorized("Token khong co claim user id hop le.");
         }
 
-        var result = await _db.Orders // Query bang Orders.
-            .AsNoTracking() // Chi doc, khong can track.
-            .Where(o => o.OrderId == id) // Loc theo id don.
-            .Select(o => new // Projection de tranh tra truc tiep entity EF.
+        var result = await _db.Orders
+            .AsNoTracking()
+            .Where(o => o.OrderId == id)
+            .Select(o => new
             {
-                o.UserId, // Dung de check quyen so huu don.
-                Data = new OrderDetailResponse // Map chi tiet sang response DTO.
+                o.UserId,
+                Data = new OrderDetailResponse
                 {
                     OrderId = o.OrderId,
                     OrderDate = o.OrderDate,
@@ -78,7 +87,7 @@ public sealed class OrdersController : ControllerBase // Dung ControllerBase cho
                     BuyerEmail = o.BuyerEmail,
                     PointsEarned = o.PointsEarned,
                     PointsRedeemed = o.PointsRedeemed,
-                    Items = o.OrderDetails // Danh sach item theo thu tu on dinh.
+                    Items = o.OrderDetails
                         .OrderBy(x => x.OrderDetailId)
                         .Select(x => new OrderDetailItemResponse
                         {
@@ -89,7 +98,7 @@ public sealed class OrdersController : ControllerBase // Dung ControllerBase cho
                             UnitSymbol = x.UnitSymbol
                         })
                         .ToList(),
-                    Shippings = o.Shippings // Danh sach shipping theo thu tu on dinh.
+                    Shippings = o.Shippings
                         .OrderBy(x => x.ShippingId)
                         .Select(x => new OrderDetailShippingResponse
                         {
@@ -103,7 +112,7 @@ public sealed class OrdersController : ControllerBase // Dung ControllerBase cho
                             CommuneId = x.CommuneId
                         })
                         .ToList(),
-                    Payments = o.Payments // Danh sach payment theo thu tu on dinh.
+                    Payments = o.Payments
                         .OrderBy(x => x.PaymentId)
                         .Select(x => new OrderDetailPaymentResponse
                         {
@@ -119,134 +128,621 @@ public sealed class OrdersController : ControllerBase // Dung ControllerBase cho
                         .ToList()
                 }
             })
-            .FirstOrDefaultAsync(cancellationToken); // Tim theo id don.
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (result is null) // Khong tim thay don.
+        if (result is null)
         {
-            return NotFound($"Khong tim thay order id = {id}."); // 404 ro rang.
+            return NotFound($"Khong tim thay order id = {id}.");
         }
 
-        if (result.UserId != userId.Value) // User hien tai khong so huu don.
+        if (result.UserId != userId.Value)
         {
-            return Forbid(); // 403 de dam bao boundary du lieu.
+            return Forbid();
         }
 
-        return Ok(result.Data); // Tra response DTO de on dinh contract API va tranh cycle serialize.
+        return Ok(result.Data);
     }
 
-    [HttpPost] // Endpoint tao don moi.
-    public async Task<IActionResult> Create([FromBody] CreateOrderRequest request, CancellationToken cancellationToken) // Nhan request + cancellation token.
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateOrderRequest request, CancellationToken cancellationToken)
     {
-        var userId = TryGetUserIdFromToken(); // Lay user id token.
-        if (userId is null) // Token khong co claim sub hop le.
+        var userId = TryGetUserIdFromToken();
+        if (userId is null)
         {
-            return Unauthorized("Token khong co claim user id hop le."); // 401.
+            return Unauthorized("Token khong co claim user id hop le.");
         }
 
-        if (request.Items.Count == 0) // Chan don rong, du da co MinLength.
+        if (request.Items.Count == 0)
         {
-            return BadRequest("Order phai co it nhat 1 item."); // 400.
+            return BadRequest("Order phai co it nhat 1 item.");
         }
 
-        var invalidItem = request.Items.Any(item => item.Quantity <= 0 || item.UnitPrice < 0 || item.ProductId <= 0); // Validate nghiep vu co ban.
-        if (invalidItem) // Co item khong hop le.
+        var invalidItem = request.Items.Any(item => item.Quantity <= 0 || item.UnitPrice < 0 || item.ProductId <= 0);
+        if (invalidItem)
         {
-            return BadRequest("Co item khong hop le (ProductId/Quantity/UnitPrice)."); // 400 ro rang.
+            return BadRequest("Co item khong hop le (ProductId/Quantity/UnitPrice).");
         }
 
-        var itemsAmount = request.Items.Sum(item => item.UnitPrice * item.Quantity); // Tinh tong tien hang.
-        var shippingFee = request.ShippingFee ?? 0m; // Neu client khong gui thi mac dinh 0.
-        var totalAmount = itemsAmount + shippingFee; // Tong tien don = hang + ship.
+        var itemsAmount = request.Items.Sum(item => item.UnitPrice * item.Quantity);
+        var shippingFee = request.ShippingFee ?? 0m;
+        var totalAmount = itemsAmount + shippingFee;
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken); // Mo transaction de giu du lieu nhat quan.
-        try // Bat dau khoi tao don.
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            var order = new Order // Tao entity Orders.
+            var order = new Order
             {
-                UserId = userId.Value, // UserId den tu JWT, khong lay tu body de tranh fake user.
-                OrderDate = DateTime.UtcNow, // Dong bo timezone theo server.
-                ShippingFee = shippingFee, // Phi ship request.
-                CouponId = null, // MVP chua xu ly coupon.
-                TotalAmount = totalAmount, // Tong tien da tinh.
-                OrderNote = request.OrderNote, // Ghi chu nguoi mua.
-                Status = "Pending", // Trang thai khoi tao.
-                PaymentStatus = "Pending", // Trang thai thanh toan khoi tao.
-                PaidAt = null, // Chua thanh toan.
-                StatusId = null, // MVP chua map status dictionary.
-                BuyerFullName = request.Shipping.FullName, // Snapshot nguoi nhan vao bang Orders.
-                BuyerPhone = request.Shipping.Phone, // Snapshot SDT.
-                BuyerEmail = request.Shipping.Email, // Snapshot email.
-                PointsEarned = 0, // MVP chua xu ly loyalty.
-                PointsRedeemed = 0 // MVP chua xu ly redeem point.
+                UserId = userId.Value,
+                OrderDate = DateTime.UtcNow,
+                ShippingFee = shippingFee,
+                CouponId = null,
+                TotalAmount = totalAmount,
+                OrderNote = request.OrderNote,
+                Status = "Pending",
+                PaymentStatus = "Pending",
+                PaidAt = null,
+                StatusId = null,
+                BuyerFullName = request.Shipping.FullName,
+                BuyerPhone = request.Shipping.Phone,
+                BuyerEmail = request.Shipping.Email,
+                PointsEarned = 0,
+                PointsRedeemed = 0
             };
 
-            _db.Orders.Add(order); // Add order vao context.
-            await _db.SaveChangesAsync(cancellationToken); // Save lan 1 de lay `OrderId`.
+            _db.Orders.Add(order);
+            await _db.SaveChangesAsync(cancellationToken);
 
-            var details = request.Items.Select(item => new OrderDetail // Map item request sang OrderDetail entity.
+            var details = request.Items.Select(item => new OrderDetail
             {
-                OrderId = order.OrderId, // Gan FK den order vua tao.
-                ProductId = item.ProductId, // Product id tu request.
-                Quantity = item.Quantity, // So luong.
-                UnitPrice = item.UnitPrice, // Gia snapshot tai luc dat.
-                UnitSymbol = item.UnitSymbol // Don vi.
-            }).ToList(); // Materialize list de AddRange.
+                OrderId = order.OrderId,
+                ProductId = item.ProductId,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                UnitSymbol = item.UnitSymbol
+            }).ToList();
 
-            _db.OrderDetails.AddRange(details); // Add toan bo dong hang.
+            _db.OrderDetails.AddRange(details);
 
-            var shipping = new Shipping // Tao ban ghi Shipping.
+            var shipping = new Shipping
             {
-                OrderId = order.OrderId, // FK den order.
-                ShippingType = request.Shipping.ShippingType, // Kieu giao hang.
-                FullName = request.Shipping.FullName, // Nguoi nhan.
-                Phone = request.Shipping.Phone, // So dien thoai.
-                Email = request.Shipping.Email, // Email.
-                AddressDetail = request.Shipping.AddressDetail, // Dia chi.
-                ProvinceId = request.Shipping.ProvinceId, // Optional province.
-                CommuneId = request.Shipping.CommuneId // Optional commune.
+                OrderId = order.OrderId,
+                ShippingType = request.Shipping.ShippingType,
+                FullName = request.Shipping.FullName,
+                Phone = request.Shipping.Phone,
+                Email = request.Shipping.Email,
+                AddressDetail = request.Shipping.AddressDetail,
+                ProvinceId = request.Shipping.ProvinceId,
+                CommuneId = request.Shipping.CommuneId
             };
 
-            _db.Shippings.Add(shipping); // Add thong tin giao nhan.
+            _db.Shippings.Add(shipping);
 
-            if (request.Payment is not null) // Chi tao Payment neu client gui.
+            if (request.Payment is not null)
             {
-                var payment = new Payment // Tao payment khoi tao.
+                var payment = new Payment
                 {
-                    OrderId = order.OrderId, // FK den order.
-                    PaymentMethod = request.Payment.PaymentMethod, // Phuong thuc thanh toan.
-                    PaymentStatus = "Pending", // Trang thai ban dau.
-                    PaymentDate = null, // Chua thanh toan.
-                    UserId = userId.Value // Luu user de doi chieu.
+                    OrderId = order.OrderId,
+                    PaymentMethod = request.Payment.PaymentMethod,
+                    PaymentStatus = "Pending",
+                    PaymentDate = null,
+                    UserId = userId.Value
                 };
 
-                _db.Payments.Add(payment); // Add payment vao context.
+                _db.Payments.Add(payment);
             }
 
-            await _db.SaveChangesAsync(cancellationToken); // Save lan 2 cho detail/shipping/payment.
-            await transaction.CommitAsync(cancellationToken); // Commit transaction khi tat ca thanh cong.
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
-            return CreatedAtAction( // Tra 201 theo REST convention.
-                nameof(GetById), // Link den endpoint GetById.
-                new { id = order.OrderId }, // Route value cho URL moi tao.
-                new { orderId = order.OrderId, totalAmount }); // Payload gon cho client.
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = order.OrderId },
+                new { orderId = order.OrderId, totalAmount });
         }
-        catch (Exception ex) // Bat loi de rollback transaction.
+        catch (Exception ex)
         {
-            await transaction.RollbackAsync(cancellationToken); // Rollback de tranh du lieu nua chung.
-            return StatusCode(500, new { message = "Tao order that bai.", detail = ex.Message }); // Tra 500 + detail de debug local.
+            await transaction.RollbackAsync(cancellationToken);
+            return StatusCode(500, new { message = "Tao order that bai.", detail = ex.Message });
         }
     }
 
-    private int? TryGetUserIdFromToken() // Helper lay UserId tu JWT.
+    [Authorize(Policy = "SellerOnly")]
+    [HttpGet("admin/paged")]
+    public async Task<IActionResult> GetAdminOrdersPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] string? statusFilter = null,
+        [FromQuery] string? dateFilter = null,
+        CancellationToken cancellationToken = default)
     {
-        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub) // Uu tien claim `sub` vi Identity dang phat claim nay.
-                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier); // Fallback cho truong hop token map sang NameIdentifier.
-
-        if (!int.TryParse(sub, out var userId)) // Neu parse that bai thi token khong hop le cho schema user int.
+        if (page < 1)
         {
-            return null; // Tra null de action xu ly 401.
+            page = 1;
         }
 
-        return userId; // Tra user id hop le.
+        if (pageSize <= 0)
+        {
+            pageSize = 10;
+        }
+
+        var query = _db.Orders.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.Trim().ToLower();
+            query = query.Where(o =>
+                o.OrderId.ToString().Contains(term) ||
+                (o.BuyerFullName ?? string.Empty).ToLower().Contains(term) ||
+                (o.BuyerEmail ?? string.Empty).ToLower().Contains(term) ||
+                (o.BuyerPhone ?? string.Empty).Contains(term));
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusFilter) &&
+            !string.Equals(statusFilter, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(o => o.Status == statusFilter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(dateFilter) && DateTime.TryParse(dateFilter, out var filterDate))
+        {
+            var date = filterDate.Date;
+            query = query.Where(o => o.OrderDate.Date == date);
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(o => o.OrderDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(o => new
+            {
+                OrderID = o.OrderId,
+                OrderCode = $"#{o.OrderId:D6}",
+                CustomerName = string.IsNullOrWhiteSpace(o.BuyerFullName) ? $"U{o.UserId}" : o.BuyerFullName,
+                OrderDate = o.OrderDate,
+                TotalAmount = o.TotalAmount,
+                Status = o.Status,
+                StatusBadgeClass = GetStatusBadgeClass(o.Status),
+                StatusText = GetStatusText(o.Status)
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            data = items,
+            page,
+            pageSize,
+            total
+        });
+    }
+
+    [Authorize(Policy = "SellerOnly")]
+    [HttpGet("admin/{orderId:int}/detail")]
+    public async Task<IActionResult> GetAdminOrderDetail([FromRoute] int orderId, CancellationToken cancellationToken)
+    {
+        var order = await _db.Orders
+            .AsNoTracking()
+            .Include(o => o.OrderDetails)
+            .Include(o => o.Payments)
+            .Include(o => o.Shippings)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        }
+
+        var payment = order.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
+        var shipping = order.Shippings.OrderByDescending(s => s.ShippingId).FirstOrDefault();
+
+        var items = order.OrderDetails
+            .OrderBy(od => od.OrderDetailId)
+            .Select(od => new
+            {
+                productId = od.ProductId,
+                productName = $"#P{od.ProductId}",
+                quantity = od.Quantity,
+                unitPrice = od.UnitPrice,
+                unitSymbol = od.UnitSymbol ?? string.Empty,
+                totalPrice = od.Quantity * od.UnitPrice
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            success = true,
+            orderId = order.OrderId,
+            orderCode = $"#{order.OrderId:D6}",
+            userId = order.UserId,
+            customerName = string.IsNullOrWhiteSpace(order.BuyerFullName) ? $"U{order.UserId}" : order.BuyerFullName,
+            customerEmail = order.BuyerEmail,
+            buyerFullName = order.BuyerFullName,
+            buyerPhone = order.BuyerPhone,
+            buyerEmail = order.BuyerEmail,
+            phone = shipping?.Phone ?? order.BuyerPhone,
+            address = shipping?.AddressDetail,
+            orderDate = order.OrderDate,
+            status = GetStatusText(order.Status),
+            statusCode = order.Status,
+            paymentMethod = payment?.PaymentMethod ?? "COD",
+            paymentStatus = payment?.PaymentStatus ?? order.PaymentStatus,
+            bankName = payment?.BankName,
+            transactionCode = payment?.TransactionCode,
+            subtotal = order.TotalAmount - order.ShippingFee,
+            shippingFee = order.ShippingFee,
+            total = order.TotalAmount,
+            orderNote = order.OrderNote,
+            items,
+            canCancel = order.Status == "Pending" || order.Status == "Processing",
+            canEdit = order.Status != "Delivered" && order.Status != "Canceled"
+        });
+    }
+
+    [Authorize(Policy = "SellerOnly")]
+    [HttpPost("admin/{orderId:int}/status")]
+    public async Task<IActionResult> UpdateAdminOrderStatus([FromRoute] int orderId, [FromBody] UpdateAdminOrderStatusRequest request)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.NewStatus))
+        {
+            return BadRequest(new { message = "Thiếu trạng thái cần cập nhật." });
+        }
+
+        if (!TryNormalizeStatus(request.NewStatus, out var newStatus))
+        {
+            return BadRequest(new { message = "Trạng thái không hợp lệ." });
+        }
+
+        var order = await _db.Orders.FirstOrDefaultAsync(o => o.OrderId == orderId);
+        if (order is null)
+        {
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        }
+
+        if (!CanChangeStatus(order.Status, newStatus))
+        {
+            return BadRequest(new
+            {
+                message = $"Không thể chuyển từ '{GetStatusText(order.Status)}' sang '{GetStatusText(newStatus)}'."
+            });
+        }
+
+        var oldStatus = order.Status;
+        order.Status = newStatus;
+
+        try
+        {
+            var stRow = await _db.Statuses.FirstOrDefaultAsync(s => s.StatusName == newStatus);
+            if (stRow is not null)
+            {
+                order.StatusId = stRow.StatusId;
+            }
+        }
+        catch
+        {
+            // No-op for status lookup compatibility.
+        }
+
+        if (newStatus == "Delivered")
+        {
+            var payment = await _db.Payments.FirstOrDefaultAsync(p => p.OrderId == orderId);
+            if (payment is not null)
+            {
+                var isCod = string.Equals(payment.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase);
+                if (!isCod)
+                {
+                    payment.PaymentStatus = "Paid";
+                    payment.PaymentDate = DateTime.UtcNow;
+                    order.PaymentStatus = "Paid";
+                    order.PaidAt = DateTime.UtcNow;
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = $"Cập nhật trạng thái thành công: {GetStatusText(newStatus)}",
+            status = newStatus,
+            statusText = GetStatusText(newStatus),
+            statusClass = GetStatusBadgeClass(newStatus),
+            oldStatus
+        });
+    }
+
+    [Authorize(Policy = "SellerOnly")]
+    [HttpDelete("admin/{orderId:int}")]
+    public async Task<IActionResult> DeleteAdminOrder([FromRoute] int orderId)
+    {
+        var order = await _db.Orders
+            .Include(o => o.OrderDetails)
+            .Include(o => o.Payments)
+            .Include(o => o.Shippings)
+            .Include(o => o.CouponUsageHistories)
+            .Include(o => o.InventoryReservations)
+            .Include(o => o.PaymentTransactions)
+            .Include(o => o.ReconciliationLogs)
+            .Include(o => o.SellerOrders)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order is null)
+        {
+            return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        }
+
+        if (string.Equals(order.Status, "Delivered", StringComparison.OrdinalIgnoreCase))
+        {
+            return Conflict(new { message = "Không thể xóa đơn hàng đã giao. Vui lòng hủy đơn trước." });
+        }
+
+        await using var tran = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var sellerOrderIds = order.SellerOrders.Select(so => so.SellerOrderId).ToList();
+            if (sellerOrderIds.Count > 0)
+            {
+                var sellerOrderItems = await _db.SellerOrderItems
+                    .Where(i => sellerOrderIds.Contains(i.SellerOrderId))
+                    .ToListAsync();
+
+                var sellerOrderItemIds = sellerOrderItems.Select(i => i.SellerOrderItemId).ToList();
+                if (sellerOrderItemIds.Count > 0)
+                {
+                    var returns = await _db.ReturnRequests
+                        .Where(r => sellerOrderItemIds.Contains(r.SellerOrderItemId))
+                        .ToListAsync();
+                    if (returns.Count > 0)
+                    {
+                        _db.ReturnRequests.RemoveRange(returns);
+                    }
+
+                    var inventoryReservations = await _db.InventoryReservations
+                        .Where(r => r.SellerOrderItemId.HasValue && sellerOrderItemIds.Contains(r.SellerOrderItemId.Value))
+                        .ToListAsync();
+                    if (inventoryReservations.Count > 0)
+                    {
+                        _db.InventoryReservations.RemoveRange(inventoryReservations);
+                    }
+                }
+
+                var payouts = await _db.PayoutItems
+                    .Where(pi => sellerOrderIds.Contains(pi.SellerOrderId))
+                    .ToListAsync();
+                if (payouts.Count > 0)
+                {
+                    _db.PayoutItems.RemoveRange(payouts);
+                }
+
+                var shipments = await _db.Shipments
+                    .Where(s => sellerOrderIds.Contains(s.SellerOrderId))
+                    .ToListAsync();
+                if (shipments.Count > 0)
+                {
+                    var shipmentIds = shipments.Select(s => s.ShipmentId).ToList();
+                    var shipmentEvents = await _db.ShipmentEvents
+                        .Where(e => shipmentIds.Contains(e.ShipmentId))
+                        .ToListAsync();
+                    if (shipmentEvents.Count > 0)
+                    {
+                        _db.ShipmentEvents.RemoveRange(shipmentEvents);
+                    }
+
+                    _db.Shipments.RemoveRange(shipments);
+                }
+
+                if (sellerOrderItems.Count > 0)
+                {
+                    _db.SellerOrderItems.RemoveRange(sellerOrderItems);
+                }
+
+                _db.SellerOrders.RemoveRange(order.SellerOrders);
+            }
+
+            if (order.OrderDetails.Count > 0)
+            {
+                _db.OrderDetails.RemoveRange(order.OrderDetails);
+            }
+
+            if (order.Payments.Count > 0)
+            {
+                _db.Payments.RemoveRange(order.Payments);
+            }
+
+            if (order.Shippings.Count > 0)
+            {
+                _db.Shippings.RemoveRange(order.Shippings);
+            }
+
+            if (order.CouponUsageHistories.Count > 0)
+            {
+                _db.CouponUsageHistories.RemoveRange(order.CouponUsageHistories);
+            }
+
+            if (order.InventoryReservations.Count > 0)
+            {
+                _db.InventoryReservations.RemoveRange(order.InventoryReservations);
+            }
+
+            if (order.PaymentTransactions.Count > 0)
+            {
+                var paymentTxnIds = order.PaymentTransactions.Select(t => t.PaymentTxnId).ToList();
+                if (paymentTxnIds.Count > 0)
+                {
+                    var refunds = await _db.RefundTransactions.Where(r => paymentTxnIds.Contains(r.PaymentTxnId)).ToListAsync();
+                    if (refunds.Count > 0)
+                    {
+                        _db.RefundTransactions.RemoveRange(refunds);
+                    }
+
+                    var payouts = await _db.Payouts.Where(p => p.PaymentTxnId.HasValue && paymentTxnIds.Contains(p.PaymentTxnId.Value)).ToListAsync();
+                    if (payouts.Count > 0)
+                    {
+                        var payoutIds = payouts.Select(p => p.PayoutId).ToList();
+                        var payoutItems = await _db.PayoutItems.Where(pi => payoutIds.Contains(pi.PayoutId)).ToListAsync();
+                        if (payoutItems.Count > 0)
+                        {
+                            _db.PayoutItems.RemoveRange(payoutItems);
+                        }
+
+                        _db.Payouts.RemoveRange(payouts);
+                    }
+                }
+
+                _db.PaymentTransactions.RemoveRange(order.PaymentTransactions);
+            }
+
+            if (order.ReconciliationLogs.Count > 0)
+            {
+                _db.ReconciliationLogs.RemoveRange(order.ReconciliationLogs);
+            }
+
+            _db.Orders.Remove(order);
+
+            await _db.SaveChangesAsync();
+            await tran.CommitAsync();
+
+            return Ok(new { success = true, message = "Xóa đơn hàng thành công." });
+        }
+        catch (Exception ex)
+        {
+            await tran.RollbackAsync();
+            return BadRequest(new { success = false, message = "Lỗi khi xóa đơn hàng.", detail = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = "SellerOnly")]
+    [HttpGet("admin/statistics")]
+    public async Task<IActionResult> GetAdminStatistics(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var today = now.Date;
+        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+        var diff = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+        var startOfWeek = today.AddDays(-diff);
+
+        var query = _db.Orders.AsNoTracking();
+
+        var totalOrders = await query.CountAsync(cancellationToken);
+        var pendingOrders = await query.CountAsync(o => o.Status == "Pending", cancellationToken);
+        var processingOrders = await query.CountAsync(o => o.Status == "Processing", cancellationToken);
+        var shippedOrders = await query.CountAsync(o => o.Status == "Shipped", cancellationToken);
+        var deliveredOrders = await query.CountAsync(o => o.Status == "Delivered", cancellationToken);
+        var canceledOrders = await query.CountAsync(o => o.Status == "Canceled", cancellationToken);
+
+        var totalRevenue = await query.Where(o => o.Status == "Delivered").SumAsync(o => (decimal?)o.TotalAmount, cancellationToken) ?? 0;
+        var todayRevenue = await query.Where(o => o.Status == "Delivered" && o.OrderDate.Date == today).SumAsync(o => (decimal?)o.TotalAmount, cancellationToken) ?? 0;
+        var monthRevenue = await query.Where(o => o.Status == "Delivered" && o.OrderDate >= firstDayOfMonth).SumAsync(o => (decimal?)o.TotalAmount, cancellationToken) ?? 0;
+
+        var todayOrders = await query.CountAsync(o => o.OrderDate.Date == today, cancellationToken);
+        var thisWeekOrders = await query.CountAsync(o => o.OrderDate >= startOfWeek, cancellationToken);
+        var thisMonthOrders = await query.CountAsync(o => o.OrderDate >= firstDayOfMonth, cancellationToken);
+
+        var avgOrderValue = deliveredOrders > 0 ? totalRevenue / deliveredOrders : 0m;
+        var deliveryRate = totalOrders > 0 ? (decimal)deliveredOrders / totalOrders * 100m : 0m;
+        var cancelRate = totalOrders > 0 ? (decimal)canceledOrders / totalOrders * 100m : 0m;
+
+        return Ok(new
+        {
+            success = true,
+            data = new
+            {
+                totalOrders,
+                pendingOrders,
+                processingOrders,
+                shippedOrders,
+                deliveredOrders,
+                canceledOrders,
+                totalRevenue,
+                todayRevenue,
+                monthRevenue,
+                todayOrders,
+                thisWeekOrders,
+                thisMonthOrders,
+                averageOrderValue = avgOrderValue,
+                deliveryRate,
+                cancelRate
+            }
+        });
+    }
+
+    private static bool TryNormalizeStatus(string? status, out string normalized)
+    {
+        normalized = string.Empty;
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return false;
+        }
+
+        return CanonicalStatuses.TryGetValue(status.Trim(), out normalized);
+    }
+
+    private static bool CanChangeStatus(string currentStatus, string newStatus)
+    {
+        if (string.Equals(currentStatus, "Delivered", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var validTransitions = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Pending", new List<string> { "Processing", "Canceled" } },
+            { "Processing", new List<string> { "Ready", "Shipped", "Canceled" } },
+            { "Ready", new List<string> { "Shipped", "Canceled" } },
+            { "Shipped", new List<string> { "Delivered", "Canceled" } }
+        };
+
+        return validTransitions.TryGetValue(currentStatus, out var next)
+            && next.Contains(newStatus, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string GetStatusText(string? status)
+    {
+        return status switch
+        {
+            "Pending" => "Chờ xử lý",
+            "Processing" => "Đang xử lý",
+            "Ready" => "Đã xử lý / Sẵn sàng giao",
+            "Shipped" => "Đang giao hàng",
+            "Delivered" => "Đã giao hàng",
+            "Canceled" => "Đã hủy",
+            _ => status ?? string.Empty
+        };
+    }
+
+    private static string GetStatusBadgeClass(string? status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-secondary",
+            "Processing" => "bg-info",
+            "Ready" => "badge-ready",
+            "Shipped" => "bg-warning",
+            "Delivered" => "bg-success",
+            "Canceled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private int? TryGetUserIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(sub, out var userId))
+        {
+            return null;
+        }
+
+        return userId;
+    }
+
+    public sealed class UpdateAdminOrderStatusRequest
+    {
+        public string NewStatus { get; set; } = string.Empty;
     }
 }

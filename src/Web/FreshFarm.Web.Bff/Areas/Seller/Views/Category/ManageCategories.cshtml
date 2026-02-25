@@ -1,0 +1,348 @@
+﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.Category>
+@{
+    ViewBag.Title = "Quản Lý Danh Mục";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    int totalPages = ViewBag.TotalPages ?? 1;
+    int totalRecords = ViewBag.TotalRecords ?? 0;
+    int pageSize = ViewBag.PageSize ?? 10;
+
+    Func<string, string> catImg = f =>
+    {
+        var name = string.IsNullOrWhiteSpace(f) ? "no-image.png" : f;
+        // Ảnh danh mục nằm trong ~/Images/Categories, fallback no-image.png ở ~/Images
+        return Url.Content(name == "no-image.png" ? "~/Images/no-image.png"
+                                                  : "~/Images/" + name);
+    };
+}
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold">Quản lý danh mục</h2>
+        <a href="@Url.Action("Create", "Category")" class="btn btn-success">
+            <i class="bi bi-plus-circle me-2"></i> Thêm danh mục mới
+        </a>
+    </div>
+
+    @* Thông báo thành công *@
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* Thông báo lỗi *@
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* Thanh tìm kiếm *@
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+            <form method="get" action="@Url.Action("ManageCategories")" class="row g-3">
+                <div class="col-md-10">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text"
+                               name="search"
+                               class="form-control"
+                               placeholder="Tìm kiếm theo tên danh mục, mô tả, slug..."
+                               value="@ViewBag.CurrentSearch">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search me-1"></i> Tìm kiếm
+                    </button>
+                </div>
+            </form>
+
+            @if (!string.IsNullOrEmpty(ViewBag.CurrentSearch))
+            {
+                <div class="mt-2">
+                    <span class="badge bg-info">
+                        Đang tìm: "@ViewBag.CurrentSearch"
+                    </span>
+                    <a href="@Url.Action("ManageCategories")" class="btn btn-sm btn-outline-secondary ms-2">
+                        <i class="bi bi-x"></i> Xóa bộ lọc
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            @* Thông tin phân trang *@
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <small class="text-muted">
+                        @if (Model != null && Model.Any())
+                        {
+                            <text>Hiển thị <strong>@Model.Count()</strong> trong tổng số <strong>@totalRecords</strong> danh mục
+                            (Trang <strong>@currentPage</strong>/<strong>@totalPages</strong>)</text>
+                        }
+                        else
+                        {
+                            <text>Không có danh mục nào</text>
+                        }
+                    </small>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 80px;">ID</th>
+                            <th style="width: 80px;">Ảnh</th> <!-- NEW -->
+                            <th>Tên danh mục</th>
+                            <th>Slug</th>
+                            <th>Mô tả</th>
+                            <th class="text-center" style="width: 120px;">Trạng thái</th>
+                            <th class="text-center" style="width: 150px;">Ngày tạo</th>
+                            <th class="text-end" style="width: 150px;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td>@item.CategoryID</td>
+                                    <td>
+                                        <img src="@catImg(item.ImageCategoriesName)"
+                                             alt="@item.CategoryName"
+                                             class="rounded"
+                                             style="width:56px;height:56px;object-fit:cover;" />
+                                    </td>
+                                    <td class="fw-bold">@item.CategoryName</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.Slug))
+                                        {<code class="small">@item.Slug</code> }
+                                    else
+                                    { <span class="text-muted small">Chưa có</span>}
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.Description))
+                                        {
+                                            if (item.Description.Length > 50)
+                                            {<span title="@item.Description">@item.Description.Substring(0, 50)...</span> }
+                                        else
+                                        { @item.Description }
+                                }
+                                else
+                                { <span class="text-muted">Chưa có mô tả</span>}
+                                    </td>
+                                    <td class="text-center">
+                                        @if (item.IsActive)
+                                        {<span class="badge bg-success">Kích hoạt</span> }
+                                        else
+                                        { <span class="badge bg-secondary">Ẩn</span>}
+                                    </td>
+                                    <td class="text-center small text-muted">
+                                        @item.CreatedDate.ToString("dd/MM/yyyy")
+                                        @if (item.UpdatedDate.HasValue)
+                                        {
+                                            <br />
+                                            <span class="badge bg-info" title="Cập nhật lần cuối">
+                                                <i class="bi bi-arrow-clockwise"></i> @item.UpdatedDate.Value.ToString("dd/MM/yyyy")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="@Url.Action("Edit", "Category", new { slug = item.Slug })"
+                                           class="btn btn-sm btn-primary" title="Chỉnh sửa">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-danger btn-delete"
+                                                data-id="@item.CategoryID"
+                                                data-name="@item.CategoryName"
+                                                title="Xóa">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                    <p class="mb-0 mt-2">
+                                        @(string.IsNullOrEmpty(ViewBag.CurrentSearch) ? "Không có danh mục nào." : "Không tìm thấy danh mục phù hợp.")
+                                    </p>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @* Phân trang thủ công *@
+            @if (totalPages > 1)
+            {
+                <div class="d-flex justify-content-center mt-4">
+                    <nav>
+                        <ul class="pagination">
+                            @* First Page *@
+                            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("ManageCategories", new { page = 1, search = ViewBag.CurrentSearch })">««</a>
+                            </li>
+
+                            @* Previous Page *@
+                            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("ManageCategories", new { page = currentPage - 1, search = ViewBag.CurrentSearch })">‹</a>
+                            </li>
+
+                            @* Page Numbers *@
+                            @{
+                                int startPage = Math.Max(1, currentPage - 2);
+                                int endPage = Math.Min(totalPages, currentPage + 2);
+                            }
+
+                            @if (startPage > 1)
+                            {
+                                <li class="page-item">
+                                    <a class="page-link" href="@Url.Action("ManageCategories", new { page = 1, search = ViewBag.CurrentSearch })">1</a>
+                                </li>
+                                if (startPage > 2)
+                                {
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                }
+                            }
+
+                            @for (int i = startPage; i <= endPage; i++)
+                            {
+                                <li class="page-item @(i == currentPage ? "active" : "")">
+                                    <a class="page-link" href="@Url.Action("ManageCategories", new { page = i, search = ViewBag.CurrentSearch })">@i</a>
+                                </li>
+                            }
+
+                            @if (endPage < totalPages)
+                            {
+                                if (endPage < totalPages - 1)
+                                {
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                }
+                                <li class="page-item">
+                                    <a class="page-link" href="@Url.Action("ManageCategories", new { page = totalPages, search = ViewBag.CurrentSearch })">@totalPages</a>
+                                </li>
+                            }
+
+                            @* Next Page *@
+                            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("ManageCategories", new { page = currentPage + 1, search = ViewBag.CurrentSearch })">›</a>
+                            </li>
+
+                            @* Last Page *@
+                            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("ManageCategories", new { page = totalPages, search = ViewBag.CurrentSearch })">»»</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Modal xác nhận xóa -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Xác nhận xóa
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="bi bi-trash text-danger" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">Bạn có chắc muốn xóa danh mục</h5>
+                    <p class="fw-bold fs-5 text-primary" id="categoryNameDelete"></p>
+                    <p class="text-muted mb-0">Hành động này không thể hoàn tác!</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </button>
+                    <button type="button" class="btn btn-danger" id="confirmDelete">
+                        <i class="bi bi-trash me-1"></i> Xác nhận xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form ẩn để submit -->
+    <form id="deleteForm" method="post" style="display:none;">
+        @Html.AntiForgeryToken()
+    </form>
+</main>
+
+@section Scripts {
+    <script>
+    $(document).ready(function() {
+        var deleteId = 0;
+
+        // Tự động ẩn thông báo sau 5 giây
+        setTimeout(function() {
+            $('.alert').fadeOut('slow');
+        }, 5000);
+
+        // Khi click nút xóa
+        $('.btn-delete').click(function() {
+            deleteId = $(this).data('id');
+            var categoryName = $(this).data('name');
+
+            $('#categoryNameDelete').text(categoryName);
+            $('#deleteModal').modal('show');
+        });
+
+        // Khi xác nhận xóa
+        $('#confirmDelete').click(function() {
+            var form = $('#deleteForm');
+            form.attr('action', '@Url.Action("Delete", "Category")?id=' + deleteId);
+            form.submit();
+        });
+    });
+    </script>
+}
+
+<style>
+    .pagination {
+        margin-bottom: 0;
+    }
+
+    .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .page-link {
+        color: #0d6efd;
+    }
+
+        .page-link:hover {
+            color: #0a58ca;
+        }
+
+    .page-item.disabled .page-link {
+        cursor: not-allowed;
+    }
+</style>

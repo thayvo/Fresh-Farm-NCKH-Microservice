@@ -1,0 +1,455 @@
+﻿@model IEnumerable<FreshFram.Models.StatusType>
+@{
+    ViewBag.Title = "Quản Lý Loại Trạng Thái";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Quản Lý Loại Trạng Thái</h2>
+        <button class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#modalAddLoai"
+                id="btnAddNewType">
+            <i class="bi bi-plus-circle"></i> Thêm loại trạng thái
+        </button>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Bộ lọc tìm kiếm -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <input type="hidden" name="page" value="1" />
+                <div class="col-md-6">
+                    <input type="text"
+                           name="searchTerm"
+                           value="@ViewBag.SearchTerm"
+                           class="form-control"
+                           placeholder="Tìm theo tên hoặc mô tả..." />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Tìm kiếm
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-success">
+                        <tr>
+                            <th>#</th>
+                            <th>Tên loại trạng thái</th>
+                            <th>Mô tả</th>
+                            <th>Ngày tạo</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            int index = (ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1;
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td>@index</td>
+                                    <td><strong>@item.StatusTypeName</strong></td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.Description))
+                                        {
+                                            @item.Description
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            @item.CreatedDate.ToString("dd/MM/yyyy HH:mm")
+                                        </small>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary me-1 btn-edit-type"
+                                                data-id="@item.StatusTypeID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalEditLoai">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger btn-delete-type"
+                                                data-id="@item.StatusTypeID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalDeleteLoai">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                index++;
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    Chưa có loại trạng thái nào
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Phân trang -->
+            @if (ViewBag.TotalPages > 1)
+            {
+                <nav aria-label="Phân trang" class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">
+                            Hiển thị <strong>@((ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1)</strong>
+                            đến <strong>@Math.Min(ViewBag.CurrentPage * ViewBag.PageSize, ViewBag.TotalItems)</strong>
+                            trong tổng số <strong>@ViewBag.TotalItems</strong> mục
+                        </div>
+
+                        <ul class="pagination mb-0">
+                            <li class="page-item @(ViewBag.CurrentPage == 1 ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("StatusType", new { page = ViewBag.CurrentPage - 1, searchTerm = ViewBag.SearchTerm })">
+                                    <span>&laquo;</span>
+                                </a>
+                            </li>
+
+                            @{
+                                int currentPage = ViewBag.CurrentPage;
+                                int totalPages = ViewBag.TotalPages;
+                                int startPage = Math.Max(1, currentPage - 2);
+                                int endPage = Math.Min(totalPages, currentPage + 2);
+
+                                if (startPage > 1)
+                                {
+                                    <li class="page-item">
+                                        <a class="page-link" href="@Url.Action("StatusType", new { page = 1, searchTerm = ViewBag.SearchTerm })">1</a>
+                                    </li>
+                                    if (startPage > 2)
+                                    {
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    }
+                                }
+
+                                for (int i = startPage; i <= endPage; i++)
+                                {
+                                    <li class="page-item @(i == currentPage ? "active" : "")">
+                                        <a class="page-link" href="@Url.Action("StatusType", new { page = i, searchTerm = ViewBag.SearchTerm })">@i</a>
+                                    </li>
+                                }
+
+                                if (endPage < totalPages)
+                                {
+                                    if (endPage < totalPages - 1)
+                                    {
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    }
+                                    <li class="page-item">
+                                        <a class="page-link" href="@Url.Action("StatusType", new { page = totalPages, searchTerm = ViewBag.SearchTerm })">@totalPages</a>
+                                    </li>
+                                }
+                            }
+
+                            <li class="page-item @(ViewBag.CurrentPage == ViewBag.TotalPages ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("StatusType", new { page = ViewBag.CurrentPage + 1, searchTerm = ViewBag.SearchTerm })">
+                                    <span>&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            }
+        </div>
+    </div>
+</main>
+
+@section modal {
+    <!-- Modal thêm loại trạng thái -->
+    <div class="modal fade" id="modalAddLoai" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Thêm loại trạng thái mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAddType">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Tên loại trạng thái <span class="text-danger">*</span></label>
+                            <input type="text"
+                                   name="StatusTypeName"
+                                   class="form-control"
+                                   placeholder="Nhập tên loại trạng thái..."
+                                   required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả</label>
+                            <textarea name="Description"
+                                      class="form-control"
+                                      rows="3"
+                                      placeholder="Nhập mô tả..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-success" id="btnSaveAddType">Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal sửa loại trạng thái -->
+    <div class="modal fade" id="modalEditLoai" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Chỉnh sửa loại trạng thái</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEditType">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="StatusTypeID" id="EditStatusTypeID" />
+                        <div class="mb-3">
+                            <label class="form-label">Tên loại trạng thái <span class="text-danger">*</span></label>
+                            <input type="text"
+                                   name="StatusTypeName"
+                                   id="EditStatusTypeName"
+                                   class="form-control"
+                                   required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả</label>
+                            <textarea name="Description"
+                                      id="EditDescription"
+                                      class="form-control"
+                                      rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-primary" id="btnSaveEditType">Cập nhật</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal xóa -->
+    <div class="modal fade" id="modalDeleteLoai" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa loại trạng thái này không?</p>
+                    <p class="text-danger"><small><i class="bi bi-exclamation-triangle"></i> Lưu ý: Không thể xóa nếu loại này đang được sử dụng.</small></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-danger" id="btnConfirmDeleteType">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+        let currentDeleteId = 0;
+
+        function showNotification(message, type = 'info') {
+            const oldAlert = document.querySelector('.dynamic-alert');
+            if (oldAlert) oldAlert.remove();
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;';
+
+            const iconMap = {
+                'success': 'bi-check-circle-fill',
+                'danger': 'bi-x-circle-fill',
+                'warning': 'bi-exclamation-triangle-fill',
+                'info': 'bi-info-circle-fill'
+            };
+
+            alertDiv.innerHTML = `<i class="bi ${iconMap[type]} me-2"></i><span>${message}</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => { alertDiv.classList.remove('show'); setTimeout(() => alertDiv.remove(), 150); }, 5000);
+        }
+
+        // Reset form khi mở modal thêm mới
+        document.getElementById('btnAddNewType').addEventListener('click', function() {
+            document.getElementById('formAddType').reset();
+        });
+
+        // Xử lý thêm mới loại trạng thái
+        document.getElementById('btnSaveAddType').addEventListener('click', function() {
+            const form = document.getElementById('formAddType');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+
+            fetch('@Url.Action("CreateStatusType", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalAddLoai')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            });
+        });
+
+        // Xử lý sửa - Load dữ liệu loại trạng thái
+        document.querySelectorAll('.btn-edit-type').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+
+                fetch('@Url.Action("GetStatusTypeDetail", "Status")?id=' + id)
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.success) {
+                            const data = result.data;
+                            document.getElementById('EditStatusTypeID').value = data.StatusTypeID;
+                            document.getElementById('EditStatusTypeName').value = data.StatusTypeName;
+                            document.getElementById('EditDescription').value = data.Description || '';
+                        } else {
+                            showNotification(result.message, 'danger');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showNotification('Không thể tải thông tin loại trạng thái', 'danger');
+                    });
+            });
+        });
+
+        // Xử lý cập nhật loại trạng thái
+        document.getElementById('btnSaveEditType').addEventListener('click', function() {
+            const form = document.getElementById('formEditType');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...';
+
+            fetch('@Url.Action("EditStatusType", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalEditLoai')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            });
+        });
+
+        // Xử lý xóa loại trạng thái
+        document.querySelectorAll('.btn-delete-type').forEach(btn => {
+            btn.addEventListener('click', function() {
+                currentDeleteId = this.dataset.id;
+            });
+        });
+
+        document.getElementById('btnConfirmDeleteType').addEventListener('click', function() {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const deleteBtn = this;
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
+
+            fetch('@Url.Action("DeleteStatusType", "Status")?id=' + currentDeleteId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: '__RequestVerificationToken=' + encodeURIComponent(token)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalDeleteLoai')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            });
+        });
+    </script>
+}

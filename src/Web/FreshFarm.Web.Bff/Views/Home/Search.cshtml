@@ -1,0 +1,1592 @@
+@{
+    Layout = null;
+    var keyword = (ViewData["SearchKeyword"] as string ?? string.Empty).Trim();
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tìm kiếm sản phẩm - FreshFarm</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+
+    <style>
+        :root {
+            --brand-primary: #16a34a;
+            --brand-primary-dark: #15803d;
+            --accent-orange: #f97316;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-soft: #e5e7eb;
+            --bg-soft: #f5f6f8;
+            --card-shadow: 0 4px 18px rgba(15, 23, 42, .08);
+        }
+
+        body {
+            font-family: "Inter", sans-serif;
+            background: var(--bg-soft);
+            color: var(--text-main);
+        }
+
+        .promo-bar {
+            background: linear-gradient(90deg, #18a85f 0%, #0b8f4d 100%);
+            color: #fff;
+            font-size: .875rem;
+        }
+
+        .promo-inner {
+            min-height: 28px;
+        }
+
+        .promo-links {
+            white-space: nowrap;
+        }
+
+        .promo-links a {
+            color: #fff;
+            text-decoration: none;
+            opacity: .95;
+        }
+
+        .promo-links a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .promo-links i {
+            margin-right: .2rem;
+        }
+
+        .promo-account-dropdown {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .promo-account-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #fff;
+            text-decoration: none;
+            opacity: .95;
+            padding: 2px 0;
+        }
+
+        .promo-account-trigger:hover {
+            color: #fff;
+            opacity: 1;
+            text-decoration: none;
+        }
+
+        .promo-account-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 210px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+            border: 1px solid var(--border-soft);
+            padding: 6px 0;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(8px);
+            transition: all .2s ease;
+            z-index: 30;
+        }
+
+        .promo-account-menu::before {
+            content: "";
+            position: absolute;
+            top: -7px;
+            right: 18px;
+            width: 12px;
+            height: 12px;
+            background: #fff;
+            border-top: 1px solid var(--border-soft);
+            border-left: 1px solid var(--border-soft);
+            transform: rotate(45deg);
+        }
+
+        .promo-account-dropdown:hover .promo-account-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .promo-account-item {
+            display: flex;
+            width: 100%;
+            border: 0;
+            background: transparent;
+            color: #111827 !important;
+            text-decoration: none !important;
+            padding: 10px 14px;
+            font-size: .98rem;
+            line-height: 1.25;
+            text-align: left;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .promo-account-item:hover {
+            background: #f3f4f6;
+            color: #0f172a !important;
+        }
+
+        .promo-account-btn {
+            font: inherit;
+        }
+
+        .header-main-shell {
+            background: #fff;
+            padding: 14px 0 12px;
+            border-bottom: 1px solid #e8eaee;
+        }
+
+        .header-main-wrap {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .header-brand-wrap {
+            flex: 0 0 auto;
+            min-width: 230px;
+        }
+
+        .brand-logo {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #12b76a 0%, #28a745 100%);
+            color: #fff;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: .02em;
+            box-shadow: 0 8px 20px rgba(40, 167, 69, .25);
+        }
+
+        .brand-text {
+            color: #111827;
+            font-weight: 800;
+            letter-spacing: .03em;
+            line-height: 1.1;
+        }
+
+        .brand-sub {
+            color: #6b7280;
+            font-size: .78rem;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+
+        .header-search-wrap {
+            flex: 1 1 540px;
+            min-width: 320px;
+        }
+
+        .header-search-form {
+            display: flex;
+            align-items: stretch;
+            border: 2px solid var(--brand-primary);
+            border-radius: 8px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .header-search-input {
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: .7rem .9rem;
+            font-size: 1.03rem;
+        }
+
+        .header-search-btn {
+            border-radius: 0;
+            min-width: 60px;
+            border: 0;
+            background: var(--brand-primary);
+            color: #fff;
+            font-size: 1.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-search-btn:hover {
+            background: var(--brand-primary-dark);
+            color: #fff;
+        }
+
+        .header-search-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin-top: 8px;
+            padding-left: 2px;
+        }
+
+        .header-search-keywords a {
+            color: #6b7280;
+            text-decoration: none;
+            font-size: .88rem;
+            transition: color .2s ease;
+        }
+
+        .header-search-keywords a:hover {
+            color: var(--brand-primary);
+        }
+
+        .header-actions-wrap {
+            flex: 0 0 auto;
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+        }
+
+        .header-cart-link {
+            color: #334155;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 2px 0;
+            position: relative;
+        }
+
+        .header-cart-link i {
+            font-size: 1.7rem;
+        }
+
+        .header-cart-link:hover {
+            color: var(--brand-primary);
+        }
+
+        .header-cart-badge {
+            position: absolute;
+            top: -10px;
+            right: -14px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 999px;
+            background: #fff;
+            color: #ee4d2d;
+            border: 2px solid #ee4d2d;
+            font-size: .78rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .header-cart-dropdown {
+            position: relative;
+        }
+
+        .header-cart-panel {
+            position: absolute;
+            top: calc(100% + 14px);
+            right: 0;
+            width: 380px;
+            background: #fff;
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, .2);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(8px);
+            transition: all .2s ease;
+            z-index: 30;
+            overflow: hidden;
+        }
+
+        .header-cart-panel::before {
+            content: "";
+            position: absolute;
+            top: -8px;
+            right: 26px;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-top: 1px solid var(--border-soft);
+            border-left: 1px solid var(--border-soft);
+            transform: rotate(45deg);
+        }
+
+        .header-cart-dropdown:hover .header-cart-panel,
+        .header-cart-dropdown:focus-within .header-cart-panel {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .header-cart-title {
+            padding: 12px 14px;
+            font-size: .98rem;
+            color: #9ca3af;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .header-cart-empty {
+            padding: 16px 14px 18px;
+            color: #64748b;
+            font-size: .95rem;
+        }
+
+        .header-cart-list {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .header-cart-item {
+            display: grid;
+            grid-template-columns: 54px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            text-decoration: none;
+            color: #111827;
+            border-bottom: 1px solid #f8fafc;
+        }
+
+        .header-cart-item:hover {
+            background: #f8fafc;
+            color: #111827;
+        }
+
+        .header-cart-thumb {
+            width: 54px;
+            height: 54px;
+            object-fit: cover;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        .header-cart-name-wrap {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .header-cart-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 1.02rem;
+        }
+
+        .header-cart-qty {
+            color: #64748b;
+            font-size: .82rem;
+        }
+
+        .header-cart-price {
+            color: #ee4d2d;
+            font-weight: 600;
+            font-size: .98rem;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+
+        .header-cart-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 14px;
+            background: #fff;
+        }
+
+        .header-cart-meta {
+            color: #374151;
+            font-size: .95rem;
+        }
+
+        .header-cart-view-btn {
+            border: 0;
+            border-radius: 6px;
+            background: #ee4d2d;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 14px;
+            white-space: nowrap;
+        }
+
+        .header-cart-view-btn:hover {
+            background: #d94425;
+            color: #fff;
+        }
+
+        .navbar-main {
+            background: #fff;
+            border-top: 1px solid #ebedf0;
+            border-bottom: 1px solid #ebedf0;
+        }
+
+        .navbar-main .nav-link {
+            position: relative;
+            color: #333;
+            transition: color .3s ease, text-shadow .3s ease;
+            font-weight: 500;
+        }
+
+        .navbar-main .nav-link::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 0%;
+            height: 2px;
+            background-color: var(--brand-primary);
+            transition: width .3s ease;
+        }
+
+        .navbar-main .nav-link:hover {
+            color: #000;
+            text-shadow: 0 0 1px rgba(0, 0, 0, .35);
+        }
+
+        .navbar-main .nav-link:hover::after,
+        .navbar-main .nav-link.active::after {
+            width: 100%;
+        }
+
+        .navbar-main .nav-link.active {
+            color: var(--brand-primary);
+        }
+
+        .search-page-shell {
+            margin-top: 8px;
+            margin-bottom: 36px;
+        }
+
+        .search-filter-card,
+        .search-result-card {
+            background: #fff;
+            border: 1px solid var(--border-soft);
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .search-filter-card {
+            position: sticky;
+            top: 12px;
+            overflow: hidden;
+        }
+
+        .filter-head {
+            padding: 14px 16px;
+            border-bottom: 1px solid #eef2f7;
+            font-size: 1.08rem;
+            font-weight: 700;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-body {
+            padding: 14px 16px 16px;
+        }
+
+        .filter-group {
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            border-bottom: 1px dashed #e5e7eb;
+        }
+
+        .filter-group:last-child {
+            margin-bottom: 0;
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .filter-group-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 10px;
+        }
+
+        .filter-check-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .price-range-row {
+            display: grid;
+            grid-template-columns: 1fr 20px 1fr;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .price-sep {
+            color: #9ca3af;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        .btn-apply-filter {
+            width: 100%;
+            background: var(--accent-orange);
+            border: 0;
+            color: #fff;
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 14px;
+        }
+
+        .btn-apply-filter:hover {
+            background: #ea580c;
+            color: #fff;
+        }
+
+        .rating-filter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rating-stars {
+            color: #f59e0b;
+            letter-spacing: 1px;
+            font-size: .95rem;
+        }
+
+        .btn-clear-filter {
+            width: 100%;
+            border: 1px solid #ef4444;
+            color: #ef4444;
+            background: #fff;
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 10px 14px;
+        }
+
+        .btn-clear-filter:hover {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .shop-related-card {
+            padding: 14px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .08) 0%, rgba(249, 115, 22, .08) 100%);
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            margin-bottom: 14px;
+        }
+
+        .shop-related-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .shop-related-title h5 {
+            margin: 0;
+            font-size: 1.02rem;
+            font-weight: 700;
+        }
+
+        .shop-related-list {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .shop-related-item {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            text-decoration: none;
+            color: #111827;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .shop-related-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, .12);
+            color: #111827;
+        }
+
+        .shop-related-thumb {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .shop-related-meta {
+            padding: 8px;
+        }
+
+        .shop-related-name {
+            font-size: .9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .shop-related-price {
+            color: var(--accent-orange);
+            font-weight: 700;
+            font-size: .92rem;
+        }
+
+        .search-header-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .search-header-title {
+            margin: 0;
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #111827;
+        }
+
+        .search-header-sub {
+            margin: 0;
+            color: #6b7280;
+        }
+
+        .keyword-mark {
+            color: var(--accent-orange);
+            font-weight: 700;
+        }
+
+        .sort-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #fff;
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 14px;
+        }
+
+        .sort-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .sort-label {
+            color: #6b7280;
+            font-weight: 500;
+            margin-right: 4px;
+        }
+
+        .btn-sort {
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            color: #374151;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-weight: 600;
+            font-size: .92rem;
+        }
+
+        .btn-sort.active {
+            background: var(--accent-orange);
+            color: #fff;
+            border-color: var(--accent-orange);
+        }
+
+        .sort-right {
+            color: #6b7280;
+            font-size: .92rem;
+            white-space: nowrap;
+        }
+
+        .result-grid {
+            margin: 0 -4px;
+        }
+
+        .result-grid > [class*="col-"] {
+            padding: 0 4px;
+            margin-bottom: 8px;
+        }
+
+        .search-product-card {
+            height: 100%;
+            background: #fff;
+            border: 1px solid #e6e8ec;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        .search-product-card:hover {
+            transform: translateY(-2px);
+            border-color: #fdba74;
+            box-shadow: 0 10px 20px rgba(249, 115, 22, .18);
+        }
+
+        .search-product-thumb {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .search-product-body {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .search-product-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .search-badge {
+            font-size: .72rem;
+            font-weight: 600;
+            color: #0f172a;
+            background: #f1f5f9;
+            border-radius: 999px;
+            padding: 3px 8px;
+            white-space: nowrap;
+        }
+
+        .search-unit {
+            font-size: .72rem;
+            color: #64748b;
+        }
+
+        .search-product-name {
+            min-height: 42px;
+            font-size: .95rem;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .search-product-price {
+            color: #ef4444;
+            font-size: 1.22rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .search-product-stats {
+            font-size: .85rem;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .search-product-location {
+            font-size: .82rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .search-product-actions {
+            margin-top: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-add-cart {
+            border: 1px solid #fed7aa;
+            background: #fff7ed;
+            color: #c2410c;
+            border-radius: 8px;
+            padding: 7px 8px;
+            font-weight: 600;
+            font-size: .85rem;
+        }
+
+        .btn-add-cart:hover {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .btn-buy-now {
+            border: 0;
+            background: var(--accent-orange);
+            color: #fff;
+            border-radius: 8px;
+            padding: 7px 8px;
+            font-weight: 600;
+            font-size: .85rem;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .btn-buy-now:hover {
+            background: #ea580c;
+            color: #fff;
+        }
+
+        .result-empty {
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            color: #6b7280;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .footer-link {
+            color: #ccc;
+            text-decoration: none;
+            display: block;
+            margin-bottom: .4rem;
+            transition: color .2s;
+        }
+
+        .footer-link:hover {
+            color: var(--brand-primary);
+        }
+
+        .social-icon {
+            color: #ccc;
+            font-size: 1.3rem;
+            transition: color .3s, transform .3s;
+        }
+
+        .social-icon:hover {
+            color: var(--brand-primary);
+            transform: translateY(-2px);
+        }
+
+        @@media (max-width: 1199.98px) {
+            .shop-related-list {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @@media (max-width: 991.98px) {
+            .header-main-wrap {
+                align-items: flex-start;
+            }
+
+            .header-brand-wrap {
+                flex: 0 0 100%;
+                min-width: 0;
+            }
+
+            .header-search-wrap {
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+
+            .header-actions-wrap {
+                margin-left: 0;
+                justify-content: flex-end;
+            }
+
+            .search-filter-card {
+                position: static;
+            }
+        }
+
+        @@media (max-width: 767.98px) {
+            .header-cart-link span {
+                display: none !important;
+            }
+
+            .header-cart-link i {
+                font-size: 1.4rem;
+            }
+
+            .header-cart-panel {
+                width: min(92vw, 360px);
+                right: -8px;
+            }
+
+            .header-cart-name {
+                font-size: .95rem;
+            }
+
+            .header-cart-price {
+                font-size: .92rem;
+            }
+
+            .sort-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .sort-right {
+                text-align: right;
+            }
+        }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_PromoBarLegacy")
+    @await Html.PartialAsync("_HeaderLegacy")
+    @await Html.PartialAsync("_NavLegacy")
+
+    <main class="container search-page-shell">
+        <div class="search-header-line">
+            <div>
+                <h1 class="search-header-title">Kết quả tìm kiếm nông sản</h1>
+                <p class="search-header-sub">Từ khoá: <span class="keyword-mark" id="searchKeywordLabel">@keyword</span></p>
+            </div>
+            <div id="searchResultCount" class="text-muted small">Đang tải dữ liệu...</div>
+        </div>
+
+        <div class="row g-3">
+            <aside class="col-lg-3">
+                <div class="search-filter-card">
+                    <div class="filter-head">
+                        <i class="bi bi-funnel"></i> Bộ lọc tìm kiếm
+                    </div>
+                    <div class="filter-body">
+                        <div class="filter-group">
+                            <div class="filter-group-title">Theo danh mục</div>
+                            <div id="categoryFilterWrap" class="filter-check-list"></div>
+                        </div>
+
+                        <div class="filter-group">
+                            <div class="filter-group-title">Nơi bán</div>
+                            <div id="locationFilterWrap" class="filter-check-list"></div>
+                        </div>
+
+                        <div class="filter-group">
+                            <div class="filter-group-title">Khoảng giá</div>
+                            <div class="price-range-row mb-2">
+                                <input id="minPriceInput" type="number" min="0" step="1000" class="form-control form-control-sm" placeholder="đ TỪ" />
+                                <span class="price-sep">-</span>
+                                <input id="maxPriceInput" type="number" min="0" step="1000" class="form-control form-control-sm" placeholder="đ ĐẾN" />
+                            </div>
+                            <button id="applyPriceBtn" type="button" class="btn btn-apply-filter">Áp dụng</button>
+                        </div>
+
+                        <div class="filter-group">
+                            <div class="filter-group-title">Đánh giá</div>
+                            <div class="filter-check-list">
+                                <label class="rating-filter-row"><input class="form-check-input me-2" type="radio" name="ratingFilter" value="0" checked /> Tất cả</label>
+                                <label class="rating-filter-row"><input class="form-check-input me-2" type="radio" name="ratingFilter" value="4.5" /> <span class="rating-stars">★★★★★</span> từ 4.5</label>
+                                <label class="rating-filter-row"><input class="form-check-input me-2" type="radio" name="ratingFilter" value="4.0" /> <span class="rating-stars">★★★★☆</span> từ 4.0</label>
+                                <label class="rating-filter-row"><input class="form-check-input me-2" type="radio" name="ratingFilter" value="3.5" /> <span class="rating-stars">★★★☆☆</span> từ 3.5</label>
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <div class="filter-group-title">Đơn vị</div>
+                            <div id="unitFilterWrap" class="filter-check-list"></div>
+                        </div>
+
+                        <div class="filter-group">
+                            <div class="filter-group-title">Chuẩn nông sản</div>
+                            <div id="certFilterWrap" class="filter-check-list">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" data-filter-type="cert" value="VietGAP" />
+                                    <span class="form-check-label">VietGAP</span>
+                                </label>
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" data-filter-type="cert" value="Hữu cơ" />
+                                    <span class="form-check-label">Hữu cơ</span>
+                                </label>
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" data-filter-type="cert" value="OCOP" />
+                                    <span class="form-check-label">OCOP</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <button id="clearFilterBtn" type="button" class="btn btn-clear-filter">Xoá tất cả</button>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="col-lg-9">
+                <div class="shop-related-card">
+                    <div class="shop-related-title">
+                        <h5>Sản phẩm liên quan đến "<span class="keyword-mark" id="relatedKeywordLabel">@keyword</span>"</h5>
+                        <a href="#resultGrid" class="text-decoration-none small text-success fw-semibold">Xem thêm <i class="bi bi-chevron-right"></i></a>
+                    </div>
+                    <div id="shopRelatedWrap" class="shop-related-list"></div>
+                </div>
+
+                <div class="sort-toolbar">
+                    <div class="sort-left">
+                        <span class="sort-label">Sắp xếp theo</span>
+                        <button type="button" class="btn-sort active" data-sort="related">Liên quan</button>
+                        <button type="button" class="btn-sort" data-sort="newest">Mới nhất</button>
+                        <button type="button" class="btn-sort" data-sort="bestseller">Bán chạy</button>
+                        <button type="button" class="btn-sort" data-sort="price-asc">Giá tăng dần</button>
+                        <button type="button" class="btn-sort" data-sort="price-desc">Giá giảm dần</button>
+                    </div>
+                    <div id="sortSummary" class="sort-right">Hiển thị 0 sản phẩm</div>
+                </div>
+
+                <div id="resultGrid" class="row result-grid"></div>
+                <div id="resultEmpty" class="result-empty d-none">Không tìm thấy sản phẩm phù hợp. Hãy thử từ khoá hoặc bộ lọc khác.</div>
+            </section>
+        </div>
+    </main>
+
+    @await Html.PartialAsync("_FooterLegacy")
+    @await Html.PartialAsync("_ToastLegacy")
+
+    <form id="searchAntiForgeryForm" class="d-none" method="post">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (() => {
+            const initialKeyword = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(keyword));
+            const endpointBase = "/bff/products";
+            const defaultImagePool = [
+                "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
+                "https://images.pexels.com/photos/1656666/pexels-photo-1656666.jpeg",
+                "https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg",
+                "https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg",
+                "https://images.pexels.com/photos/2090902/pexels-photo-2090902.jpeg",
+                "https://images.pexels.com/photos/4198019/pexels-photo-4198019.jpeg"
+            ];
+            const farmLocations = ["Đà Lạt", "Cần Thơ", "Hậu Giang", "Long An", "Bình Thuận", "Lâm Đồng", "TP. Hồ Chí Minh"];
+
+            const state = {
+                keyword: (initialKeyword || "").trim(),
+                allProducts: [],
+                minPrice: null,
+                maxPrice: null,
+                minRating: 0,
+                selectedCategories: new Set(),
+                selectedLocations: new Set(),
+                selectedUnits: new Set(),
+                selectedCertifications: new Set(),
+                sortBy: "related"
+            };
+
+            const grid = document.getElementById("resultGrid");
+            const emptyNode = document.getElementById("resultEmpty");
+            const categoryWrap = document.getElementById("categoryFilterWrap");
+            const locationWrap = document.getElementById("locationFilterWrap");
+            const unitWrap = document.getElementById("unitFilterWrap");
+            const minPriceInput = document.getElementById("minPriceInput");
+            const maxPriceInput = document.getElementById("maxPriceInput");
+            const applyPriceBtn = document.getElementById("applyPriceBtn");
+            const clearFilterBtn = document.getElementById("clearFilterBtn");
+            const resultCountNode = document.getElementById("searchResultCount");
+            const sortSummaryNode = document.getElementById("sortSummary");
+            const relatedWrap = document.getElementById("shopRelatedWrap");
+            const keywordLabel = document.getElementById("searchKeywordLabel");
+            const relatedKeywordLabel = document.getElementById("relatedKeywordLabel");
+            const antiForgeryToken = document.querySelector("#searchAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
+
+            const searchForm = document.getElementById("headerSearchForm");
+            const searchInput = document.getElementById("headerSearchInput");
+
+            if (!state.keyword) {
+                const keywordFromUrl = new URLSearchParams(window.location.search).get("q");
+                state.keyword = (keywordFromUrl || "").trim();
+            }
+
+            const toNumber = (value, fallback = 0) => {
+                const n = Number(value);
+                return Number.isFinite(n) ? n : fallback;
+            };
+
+            const vnd = (value) => toNumber(value, 0).toLocaleString("vi-VN") + " ₫";
+
+            const escapeHtml = (value) => {
+                const text = value ?? "";
+                return text
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#39;");
+            };
+
+            const normalizeProduct = (raw) => {
+                const productId = toNumber(raw.productID ?? raw.productId ?? raw.ProductID ?? raw.ProductId, 0);
+                const productName = (raw.productName ?? raw.ProductName ?? "Nông sản chưa đặt tên").toString();
+                const categoryName = (raw.categoryName ?? raw.CategoryName ?? "Chưa phân loại").toString();
+                const unitName = (raw.unitName ?? raw.UnitName ?? "đơn vị").toString();
+                const price = toNumber(raw.price ?? raw.Price, 0);
+                const rating = 4 + ((productId * 7) % 11) / 10;
+                const sold = 20 + (productId * 29) % 1200;
+                const location = farmLocations[Math.abs(productId) % farmLocations.length];
+                const image = defaultImagePool[Math.abs(productId) % defaultImagePool.length];
+                const certifications = [];
+
+                if (productId % 2 === 0) certifications.push("VietGAP");
+                if (productId % 3 === 0) certifications.push("Hữu cơ");
+                if (productId % 5 === 0) certifications.push("OCOP");
+                if (certifications.length === 0) certifications.push("Nông trại liên kết");
+
+                return {
+                    productId,
+                    productName,
+                    categoryName,
+                    unitName,
+                    price,
+                    rating,
+                    sold,
+                    location,
+                    image,
+                    certifications
+                };
+            };
+
+            const buildCheckoutUrl = (product, qty = 1) => {
+                const query = new URLSearchParams({
+                    productId: String(product.productId),
+                    productName: product.productName,
+                    unitPrice: String(product.price),
+                    unitSymbol: product.unitName,
+                    quantity: String(Math.max(1, qty))
+                });
+                return "/checkout?" + query.toString();
+            };
+
+            const submitAddToCart = (product, qty = 1) => {
+                if (!antiForgeryToken || toNumber(product.productId, 0) <= 0) {
+                    return;
+                }
+
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/cart/add";
+                form.style.display = "none";
+
+                const addField = (name, value) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = String(value ?? "");
+                    form.appendChild(input);
+                };
+
+                addField("__RequestVerificationToken", antiForgeryToken);
+                addField("ProductId", product.productId);
+                addField("ProductName", product.productName);
+                addField("UnitPrice", product.price);
+                addField("UnitSymbol", product.unitName);
+                addField("Quantity", Math.max(1, toNumber(qty, 1)));
+
+                document.body.appendChild(form);
+                form.submit();
+            };
+
+            const relevanceScore = (product, keyword) => {
+                if (!keyword) return 0;
+                const q = keyword.toLowerCase();
+                const name = product.productName.toLowerCase();
+                const category = product.categoryName.toLowerCase();
+                let score = 0;
+                if (name.startsWith(q)) score += 120;
+                if (name.includes(q)) score += 60;
+                if (category.includes(q)) score += 28;
+                score += product.rating * 3;
+                score += product.sold / 1000;
+                return score;
+            };
+
+            const renderCategoryFilters = (products) => {
+                const categories = Array.from(new Set(products.map((p) => p.categoryName))).sort((a, b) => a.localeCompare(b));
+                if (categories.length === 0) {
+                    categoryWrap.innerHTML = "<div class='text-muted small'>Chưa có danh mục khả dụng.</div>";
+                    return;
+                }
+
+                categoryWrap.innerHTML = categories
+                    .map((name) => `
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" data-filter-type="category" value="${escapeHtml(name)}">
+                            <span class="form-check-label">${escapeHtml(name)}</span>
+                        </label>
+                    `)
+                    .join("");
+            };
+
+            const renderLocationFilters = (products) => {
+                const locations = Array.from(new Set(products.map((p) => p.location))).sort((a, b) => a.localeCompare(b));
+                if (locations.length === 0) {
+                    locationWrap.innerHTML = "<div class='text-muted small'>Chưa có dữ liệu khu vực bán.</div>";
+                    return;
+                }
+
+                locationWrap.innerHTML = locations
+                    .map((name) => `
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" data-filter-type="location" value="${escapeHtml(name)}">
+                            <span class="form-check-label">${escapeHtml(name)}</span>
+                        </label>
+                    `)
+                    .join("");
+            };
+
+            const renderUnitFilters = (products) => {
+                const units = Array.from(new Set(products.map((p) => p.unitName))).sort((a, b) => a.localeCompare(b));
+                if (units.length === 0) {
+                    unitWrap.innerHTML = "<div class='text-muted small'>Chưa có dữ liệu đơn vị.</div>";
+                    return;
+                }
+
+                unitWrap.innerHTML = units
+                    .map((name) => `
+                        <label class="form-check">
+                            <input class="form-check-input" type="checkbox" data-filter-type="unit" value="${escapeHtml(name)}">
+                            <span class="form-check-label">${escapeHtml(name)}</span>
+                        </label>
+                    `)
+                    .join("");
+            };
+
+            const renderRelatedSection = (products) => {
+                const relatedItems = products.slice(0, 4);
+                if (relatedItems.length === 0) {
+                    relatedWrap.innerHTML = "<div class='text-muted small'>Chưa có sản phẩm liên quan.</div>";
+                    return;
+                }
+
+                relatedWrap.innerHTML = relatedItems
+                    .map((product) => `
+                        <a href="${buildCheckoutUrl(product)}" class="shop-related-item">
+                            <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" />
+                            <div class="shop-related-meta">
+                                <div class="shop-related-name">${escapeHtml(product.productName)}</div>
+                                <div class="shop-related-price">${vnd(product.price)}</div>
+                            </div>
+                        </a>
+                    `)
+                    .join("");
+            };
+
+            const applySort = (items) => {
+                const sorted = [...items];
+                switch (state.sortBy) {
+                    case "newest":
+                        sorted.sort((a, b) => b.productId - a.productId);
+                        break;
+                    case "bestseller":
+                        sorted.sort((a, b) => b.sold - a.sold);
+                        break;
+                    case "price-asc":
+                        sorted.sort((a, b) => a.price - b.price);
+                        break;
+                    case "price-desc":
+                        sorted.sort((a, b) => b.price - a.price);
+                        break;
+                    default:
+                        sorted.sort((a, b) => relevanceScore(b, state.keyword) - relevanceScore(a, state.keyword));
+                        break;
+                }
+                return sorted;
+            };
+
+            const applyFilters = () => {
+                let result = [...state.allProducts];
+
+                if (state.selectedCategories.size > 0) {
+                    result = result.filter((p) => state.selectedCategories.has(p.categoryName));
+                }
+
+                if (state.selectedLocations.size > 0) {
+                    result = result.filter((p) => state.selectedLocations.has(p.location));
+                }
+
+                if (state.selectedUnits.size > 0) {
+                    result = result.filter((p) => state.selectedUnits.has(p.unitName));
+                }
+
+                if (state.selectedCertifications.size > 0) {
+                    result = result.filter((p) => p.certifications.some((x) => state.selectedCertifications.has(x)));
+                }
+
+                if (typeof state.minPrice === "number") {
+                    result = result.filter((p) => p.price >= state.minPrice);
+                }
+
+                if (typeof state.maxPrice === "number") {
+                    result = result.filter((p) => p.price <= state.maxPrice);
+                }
+
+                if (state.minRating > 0) {
+                    result = result.filter((p) => p.rating >= state.minRating);
+                }
+
+                return applySort(result);
+            };
+
+            const renderResultGrid = (products) => {
+                if (products.length === 0) {
+                    grid.innerHTML = "";
+                    emptyNode.classList.remove("d-none");
+                    return;
+                }
+
+                emptyNode.classList.add("d-none");
+                grid.innerHTML = products
+                    .map((product) => `
+                        <div class="col-6 col-md-4 col-xl-3">
+                            <article class="search-product-card">
+                                <img src="${product.image}" class="search-product-thumb" alt="${escapeHtml(product.productName)}" />
+                                <div class="search-product-body">
+                                    <div class="search-product-top">
+                                        <span class="search-badge">${escapeHtml(product.categoryName)}</span>
+                                        <span class="search-unit">${escapeHtml(product.unitName)}</span>
+                                    </div>
+                                    <div class="search-product-name">${escapeHtml(product.productName)}</div>
+                                    <div class="small text-success fw-semibold">${escapeHtml((product.certifications && product.certifications[0]) || "Nông trại liên kết")}</div>
+                                    <div class="search-product-price">${vnd(product.price)}</div>
+                                    <div class="search-product-stats">
+                                        <span><i class="bi bi-star-fill text-warning"></i> ${product.rating.toFixed(1)}</span>
+                                        <span>Đã bán ${product.sold.toLocaleString("vi-VN")}</span>
+                                    </div>
+                                    <div class="search-product-location">
+                                        <i class="bi bi-geo-alt"></i>
+                                        <span>${escapeHtml(product.location)}</span>
+                                    </div>
+                                    <div class="search-product-actions">
+                                        <button type="button"
+                                                class="btn-add-cart"
+                                                data-action="add-cart"
+                                                data-product-id="${product.productId}"
+                                                data-product-name="${escapeHtml(product.productName)}"
+                                                data-unit-price="${product.price}"
+                                                data-unit-symbol="${escapeHtml(product.unitName)}">
+                                            Thêm giỏ
+                                        </button>
+                                        <a href="${buildCheckoutUrl(product)}" class="btn-buy-now">Mua ngay</a>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    `)
+                    .join("");
+            };
+
+            const updateSummary = (total) => {
+                resultCountNode.textContent = `Tìm thấy ${total.toLocaleString("vi-VN")} sản phẩm`;
+                sortSummaryNode.textContent = `Hiển thị ${total.toLocaleString("vi-VN")} sản phẩm`;
+                keywordLabel.textContent = state.keyword || "Tất cả";
+                relatedKeywordLabel.textContent = state.keyword || "Tất cả";
+                if (searchInput instanceof HTMLInputElement) {
+                    searchInput.value = state.keyword;
+                }
+            };
+
+            const syncUrl = () => {
+                const next = state.keyword ? `/search?q=${encodeURIComponent(state.keyword)}` : "/search";
+                history.replaceState(null, "", next);
+            };
+
+            const reloadProducts = async () => {
+                try {
+                    const url = state.keyword
+                        ? `${endpointBase}?name=${encodeURIComponent(state.keyword)}`
+                        : endpointBase;
+
+                    const response = await fetch(url, {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Không tải được dữ liệu sản phẩm (${response.status}).`);
+                    }
+
+                    const payload = await response.json();
+                    state.allProducts = Array.isArray(payload) ? payload.map(normalizeProduct) : [];
+
+                    renderCategoryFilters(state.allProducts);
+                    renderLocationFilters(state.allProducts);
+                    renderUnitFilters(state.allProducts);
+                    renderRelatedSection(state.allProducts);
+
+                    const filtered = applyFilters();
+                    renderResultGrid(filtered);
+                    updateSummary(filtered.length);
+                } catch (error) {
+                    console.error(error);
+                    state.allProducts = [];
+                    renderCategoryFilters([]);
+                    renderLocationFilters([]);
+                    renderUnitFilters([]);
+                    renderRelatedSection([]);
+                    renderResultGrid([]);
+                    updateSummary(0);
+                }
+            };
+
+            const runFilterAndRender = () => {
+                const filtered = applyFilters();
+                renderResultGrid(filtered);
+                updateSummary(filtered.length);
+            };
+
+            document.addEventListener("change", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLInputElement)) return;
+
+                const type = target.getAttribute("data-filter-type");
+                if (type === "category") {
+                    if (target.checked) state.selectedCategories.add(target.value);
+                    else state.selectedCategories.delete(target.value);
+                    runFilterAndRender();
+                    return;
+                }
+
+                if (type === "location") {
+                    if (target.checked) state.selectedLocations.add(target.value);
+                    else state.selectedLocations.delete(target.value);
+                    runFilterAndRender();
+                    return;
+                }
+
+                if (type === "unit") {
+                    if (target.checked) state.selectedUnits.add(target.value);
+                    else state.selectedUnits.delete(target.value);
+                    runFilterAndRender();
+                    return;
+                }
+
+                if (type === "cert") {
+                    if (target.checked) state.selectedCertifications.add(target.value);
+                    else state.selectedCertifications.delete(target.value);
+                    runFilterAndRender();
+                    return;
+                }
+
+                if (target.name === "ratingFilter") {
+                    state.minRating = toNumber(target.value, 0);
+                    runFilterAndRender();
+                }
+            });
+
+            document.addEventListener("click", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+
+                const sortButton = target.closest(".btn-sort");
+                if (sortButton instanceof HTMLButtonElement) {
+                    document.querySelectorAll(".btn-sort").forEach((btn) => btn.classList.remove("active"));
+                    sortButton.classList.add("active");
+                    state.sortBy = sortButton.getAttribute("data-sort") || "related";
+                    runFilterAndRender();
+                    return;
+                }
+
+                const addCartBtn = target.closest("button[data-action='add-cart']");
+                if (addCartBtn instanceof HTMLButtonElement) {
+                    event.preventDefault();
+                    const product = {
+                        productId: toNumber(addCartBtn.getAttribute("data-product-id"), 0),
+                        productName: addCartBtn.getAttribute("data-product-name") ?? "",
+                        price: toNumber(addCartBtn.getAttribute("data-unit-price"), 0),
+                        unitName: addCartBtn.getAttribute("data-unit-symbol") ?? "đơn vị"
+                    };
+                    submitAddToCart(product, 1);
+                }
+            });
+
+            applyPriceBtn?.addEventListener("click", () => {
+                const min = minPriceInput instanceof HTMLInputElement ? minPriceInput.value.trim() : "";
+                const max = maxPriceInput instanceof HTMLInputElement ? maxPriceInput.value.trim() : "";
+                state.minPrice = min === "" ? null : Math.max(0, toNumber(min, 0));
+                state.maxPrice = max === "" ? null : Math.max(0, toNumber(max, 0));
+
+                if (typeof state.minPrice === "number" && typeof state.maxPrice === "number" && state.minPrice > state.maxPrice) {
+                    const tmp = state.minPrice;
+                    state.minPrice = state.maxPrice;
+                    state.maxPrice = tmp;
+                    if (minPriceInput instanceof HTMLInputElement) minPriceInput.value = String(state.minPrice);
+                    if (maxPriceInput instanceof HTMLInputElement) maxPriceInput.value = String(state.maxPrice);
+                }
+
+                runFilterAndRender();
+            });
+
+            clearFilterBtn?.addEventListener("click", () => {
+                state.minPrice = null;
+                state.maxPrice = null;
+                state.minRating = 0;
+                state.selectedCategories.clear();
+                state.selectedLocations.clear();
+                state.selectedUnits.clear();
+                state.selectedCertifications.clear();
+                state.sortBy = "related";
+
+                if (minPriceInput instanceof HTMLInputElement) minPriceInput.value = "";
+                if (maxPriceInput instanceof HTMLInputElement) maxPriceInput.value = "";
+
+                document.querySelectorAll("input[data-filter-type]").forEach((input) => {
+                    if (input instanceof HTMLInputElement) input.checked = false;
+                });
+                const ratingAll = document.querySelector('input[name="ratingFilter"][value="0"]');
+                if (ratingAll instanceof HTMLInputElement) ratingAll.checked = true;
+
+                document.querySelectorAll(".btn-sort").forEach((btn) => {
+                    const sort = btn.getAttribute("data-sort");
+                    btn.classList.toggle("active", sort === "related");
+                });
+
+                runFilterAndRender();
+            });
+
+            searchForm?.addEventListener("submit", (event) => {
+                event.preventDefault();
+                const value = searchInput instanceof HTMLInputElement ? searchInput.value.trim() : "";
+                state.keyword = value;
+                syncUrl();
+                reloadProducts();
+            });
+
+            document.querySelectorAll("[data-header-keyword]").forEach((link) => {
+                link.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    const value = (link.getAttribute("data-header-keyword") || "").trim();
+                    state.keyword = value;
+                    if (searchInput instanceof HTMLInputElement) searchInput.value = value;
+                    syncUrl();
+                    reloadProducts();
+                });
+            });
+
+            syncUrl();
+            reloadProducts();
+        })();
+    </script>
+</body>
+</html>

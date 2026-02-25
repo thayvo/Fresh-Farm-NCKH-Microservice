@@ -1,0 +1,591 @@
+﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.UnitViewModel>
+@{
+    ViewBag.Title = "Quản Lý Đơn Vị Tính";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var stats = ViewBag.Stats as FreshFarm.Web.Bff.Areas.Seller.Models.UnitStatsViewModel;
+}
+
+@functions {
+    string GetIconByType(string type)
+    {
+        switch (type)
+        {
+            case "Khối lượng": return "box";
+            case "Thể tích": return "droplet";
+            case "Chiều dài": return "rulers";
+            case "Đơn vị đếm": return "123";
+            default: return "tag";
+        }
+    }
+}
+
+<style>
+    .page-header {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    .stats-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+
+    .stats-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+    }
+
+        .stats-icon.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stats-icon.success {
+            background: linear-gradient(135deg, #28a745 0%, #5cb85c 100%);
+            color: white;
+        }
+
+        .stats-icon.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+        }
+
+    .main-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    }
+
+    .unit-card {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 2px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+        .unit-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+            transform: translateX(5px);
+        }
+
+        .unit-card.active {
+            border-color: #28a745;
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(92, 184, 92, 0.1) 100%);
+        }
+
+    .unit-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .badge-custom {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .btn-custom {
+        border-radius: 25px;
+        padding: 0.6rem 1.5rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+    .action-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+        .action-btn:hover {
+            transform: scale(1.1);
+        }
+
+    .modal-content {
+        border-radius: 15px;
+        border: none;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px 15px 0 0;
+    }
+
+    .form-control, .form-select {
+        border-radius: 10px;
+        border: 2px solid #e9ecef;
+        padding: 0.7rem 1rem;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+    .search-box {
+        border-radius: 25px;
+        border: 2px solid #e9ecef;
+        padding: 0.7rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+        .search-box:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+</style>
+<div class="container mt-4">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-bold mb-2">
+                    <i class="bi bi-rulers text-primary me-2"></i>
+                    Quản Lý Đơn Vị Tính
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "Home")" class="text-decoration-none">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="#" class="text-decoration-none">Cài đặt</a></li>
+                        <li class="breadcrumb-item active">Đơn vị tính</li>
+                    </ol>
+                </nav>
+            </div>
+            <div>
+                <a href="@Url.Action("Create", "Unit")" class="btn btn-success btn-custom me-2">
+                    <i class="bi bi-file-earmark-plus me-2"></i>Thêm trang riêng
+                </a>
+                <button class="btn btn-primary btn-custom" data-bs-toggle="modal" data-bs-target="#addUnitModal">
+                    <i class="bi bi-plus-circle me-2"></i>Thêm nhanh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted mb-1">Tổng đơn vị</p>
+                        <h3 class="fw-bold mb-0">@(stats?.TotalUnits ?? 0)</h3>
+                        <small class="text-success"><i class="bi bi-arrow-up"></i> +@(stats?.NewUnitsThisMonth ?? 0) mới</small>
+                    </div>
+                    <div class="stats-icon primary">
+                        <i class="bi bi-rulers"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted mb-1">Đang sử dụng</p>
+                        <h3 class="fw-bold mb-0">@(stats?.ActiveUnits ?? 0)</h3>
+                        <small class="text-success"><i class="bi bi-check-circle"></i> Hoạt động</small>
+                    </div>
+                    <div class="stats-icon success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted mb-1">Không sử dụng</p>
+                        <h3 class="fw-bold mb-0">@(stats?.InactiveUnits ?? 0)</h3>
+                        <small class="text-muted"><i class="bi bi-pause-circle"></i> Tạm dừng</small>
+                    </div>
+                    <div class="stats-icon warning">
+                        <i class="bi bi-pause-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-card">
+        <!-- Search and Filter -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control search-box border-start-0" placeholder="Tìm kiếm đơn vị tính..." id="searchInput">
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <select class="form-select d-inline-block w-auto" style="border-radius: 25px;" id="filterStatus">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="active">Đang sử dụng</option>
+                    <option value="inactive">Không sử dụng</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Units List -->
+        <div class="row" id="unitsList">
+            @if (Model != null && Model.Any())
+            {
+                foreach (var unit in Model)
+                {
+                    <div class="col-md-6">
+                        <div class="unit-card @(unit.IsActive ? "active" : "")" data-status="@(unit.IsActive ? "active" : "inactive")" data-unit-id="@unit.UnitID">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center flex-grow-1">
+                                    <div class="unit-icon me-3" style="@(unit.IsActive ? "" : "opacity: 0.5;")">
+                                        <i class="bi bi-@GetIconByType(unit.UnitType)"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="mb-1 fw-bold @(unit.IsActive ? "" : "text-muted")">@unit.UnitName</h5>
+                                        <p class="text-muted mb-1 small">
+                                            <i class="bi bi-tag me-1"></i>Ký hiệu: <strong>@unit.Symbol</strong>
+                                        </p>
+                                        <p class="text-muted mb-0 small">
+                                            <i class="bi bi-list-ul me-1"></i>Loại: @unit.UnitType
+                                        </p>
+                                        @if (!string.IsNullOrEmpty(unit.Description))
+                                        {
+                                            <p class="text-muted mb-0 small mt-1">
+                                                <i class="bi bi-info-circle me-1"></i>@unit.Description
+                                            </p>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge @(unit.IsActive ? "bg-success" : "bg-secondary") badge-custom mb-2">
+                                        <i class="bi bi-@(unit.IsActive ? "check-circle" : "pause-circle") me-1"></i>@(unit.IsActive ? "Đang dùng" : "Không dùng")
+                                    </span>
+                                    <div>
+                                        <a href="@Url.Action("Edit", "Unit", new { id = unit.UnitID })"
+                                           class="action-btn btn btn-sm btn-outline-primary me-1"
+                                           title="Chỉnh sửa đơn vị">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+
+                                        <button class="action-btn btn btn-sm btn-outline-danger" title="Xóa" onclick="deleteUnit(@unit.UnitID, '@unit.UnitName')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        <h5>Chưa có đơn vị tính nào</h5>
+                        <p>Nhấn nút "Thêm đơn vị" để thêm đơn vị tính mới</p>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Empty State for Search -->
+        <div class="empty-state d-none" id="emptyState">
+            <i class="bi bi-inbox"></i>
+            <h5>Không tìm thấy đơn vị tính nào</h5>
+            <p>Thử tìm kiếm với từ khóa khác hoặc thêm đơn vị mới</p>
+        </div>
+    </div>
+</div>
+
+@section modal{
+
+    <!-- Modal Thêm Đơn Vị -->
+    <div class="modal fade" id="addUnitModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-circle me-2"></i>Thêm Đơn Vị Tính Mới
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addUnitForm">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tên đơn vị <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="UnitName" placeholder="VD: Kilogram" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Ký hiệu <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="Symbol" placeholder="VD: kg" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Mô tả</label>
+                            <textarea class="form-control" name="Description" rows="3" placeholder="Mô tả về đơn vị tính..."></textarea>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="IsActive" id="activeSwitch" checked>
+                            <label class="form-check-label fw-bold" for="activeSwitch">
+                                Đang sử dụng
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button type="button" class="btn btn-primary btn-custom" onclick="submitAddForm()">
+                        <i class="bi bi-check-circle me-1"></i>Lưu đơn vị
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Sửa Đơn Vị -->
+    <div class="modal fade" id="editUnitModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-pencil me-2"></i>Chỉnh Sửa Đơn Vị Tính
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editUnitForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="UnitID" id="editUnitID">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Tên đơn vị <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="UnitName" id="editUnitName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Ký hiệu <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="Symbol" id="editUnitSymbol" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Mô tả</label>
+                            <textarea class="form-control" name="Description" rows="3" id="editUnitDesc"></textarea>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="IsActive" id="editActiveSwitch">
+                            <label class="form-check-label fw-bold" for="editActiveSwitch">
+                                Đang sử dụng
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-custom" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button type="button" class="btn btn-primary btn-custom" onclick="submitEditForm()">
+                        <i class="bi bi-check-circle me-1"></i>Cập nhật
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@section scripts{
+    <script>
+      // Tìm kiếm và lọc
+      let allUnits = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+
+      $('#searchInput').on('keyup', function() {
+          filterUnits();
+      });
+
+      $('#filterStatus').on('change', function() {
+          filterUnits();
+      });
+
+      function filterUnits() {
+          const searchText = $('#searchInput').val().toLowerCase();
+          const statusFilter = $('#filterStatus').val();
+
+          let visibleCount = 0;
+          $('.unit-card').parent().each(function() {
+              const card = $(this).find('.unit-card');
+              const unitName = card.find('h5').text().toLowerCase();
+              const unitSymbol = card.find('strong').first().text().toLowerCase();
+              const unitStatus = card.data('status');
+
+              let matchSearch = unitName.includes(searchText) || unitSymbol.includes(searchText);
+              let matchStatus = statusFilter === 'all' || unitStatus === statusFilter;
+
+              if (matchSearch && matchStatus) {
+                  $(this).show();
+                  visibleCount++;
+              } else {
+                  $(this).hide();
+              }
+          });
+
+          if (visibleCount === 0) {
+              $('#emptyState').removeClass('d-none');
+          } else {
+              $('#emptyState').addClass('d-none');
+          }
+      }
+
+      // Thêm đơn vị
+      function submitAddForm() {
+          const formData = $('#addUnitForm').serialize();
+
+          $.ajax({
+              url: '@Url.Action("CreateAjax", "Unit")',
+              type: 'POST',
+              data: formData,
+              success: function(response) {
+                  if (response.success) {
+                      alert(response.message);
+                      location.reload();
+                  } else {
+                      alert(response.message);
+                  }
+              },
+              error: function() {
+                  alert('Có lỗi xảy ra, vui lòng thử lại!');
+              }
+          });
+      }
+
+      // Sửa đơn vị
+      function editUnit(id) {
+          $.ajax({
+              url: '@Url.Action("GetById", "Unit")',
+              type: 'GET',
+              data: { id: id },
+              success: function(response) {
+                  if (response.success) {
+                      $('#editUnitID').val(response.data.UnitID);
+                      $('#editUnitName').val(response.data.UnitName);
+                      $('#editUnitSymbol').val(response.data.Symbol);
+                      $('#editUnitDesc').val(response.data.Description);
+                      $('#editActiveSwitch').prop('checked', response.data.IsActive);
+                      $('#editUnitModal').modal('show');
+                  } else {
+                      alert(response.message);
+                  }
+              },
+              error: function() {
+                  alert('Có lỗi xảy ra khi tải dữ liệu!');
+              }
+          });
+      }
+
+      function submitEditForm() {
+          const formData = $('#editUnitForm').serialize();
+
+          $.ajax({
+              url: '@Url.Action("Edit", "Unit")',
+              type: 'POST',
+              data: formData,
+              success: function(response) {
+                  if (response.success) {
+                      alert(response.message);
+                      location.reload();
+                  } else {
+                      alert(response.message);
+                  }
+              },
+              error: function() {
+                  alert('Có lỗi xảy ra, vui lòng thử lại!');
+              }
+          });
+      }
+
+      // Xóa đơn vị
+      function deleteUnit(id, name) {
+          if (confirm('Bạn có chắc chắn muốn xóa đơn vị "' + name + '" không?')) {
+              $.ajax({
+                  url: '@Url.Action("Delete", "Unit")',
+                  type: 'POST',
+                  data: {
+                      id: id,
+                      __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                  },
+                  success: function(response) {
+                      if (response.success) {
+                          alert(response.message);
+                          location.reload();
+                      } else {
+                          alert(response.message);
+                      }
+                  },
+                  error: function() {
+                      alert('Có lỗi xảy ra, vui lòng thử lại!');
+                  }
+              });
+          }
+      }
+
+      // Reset form khi đóng modal
+      $('#addUnitModal').on('hidden.bs.modal', function () {
+          $('#addUnitForm')[0].reset();
+      });
+
+      $('#editUnitModal').on('hidden.bs.modal', function () {
+          $('#editUnitForm')[0].reset();
+      });
+    </script>
+}

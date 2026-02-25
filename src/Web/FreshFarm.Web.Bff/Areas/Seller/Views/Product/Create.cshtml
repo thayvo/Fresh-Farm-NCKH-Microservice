@@ -1,0 +1,485 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.Product
+@{
+    ViewBag.Title = "Thêm Sản Phẩm";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    ViewBag.BreadcrumbParentTitle = "Quản lý sản phẩm";
+    ViewBag.BreadcrumbParentUrl = Url.Action("ManageProducts", "Product");
+    ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
+}
+
+@* ========== THÔNG BÁO LỖI CHI TIẾT ========== *@
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0" role="alert">
+        <div class="d-flex align-items-start">
+            <i class="bi bi-exclamation-triangle-fill fs-3 me-3 text-danger"></i>
+            <div class="flex-grow-1">
+                @Html.Raw(TempData["ErrorMessage"])
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ========== THÔNG BÁO THÀNH CÔNG ========== *@
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm border-0" role="alert">
+        <div class="d-flex align-items-start">
+            <i class="bi bi-check-circle-fill fs-3 me-3 text-success"></i>
+            <div class="flex-grow-1">
+                @Html.Raw(TempData["SuccessMessage"])
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* ========== VALIDATION SUMMARY ========== *@
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <h5 class="alert-heading">
+            <i class="bi bi-exclamation-circle me-2"></i>Vui lòng kiểm tra lại các thông tin sau:
+        </h5>
+        <hr />
+        <ul class="mb-0">
+            @foreach (var key in ViewData.ModelState.Keys)
+            {
+                var state = ViewData.ModelState[key];
+                if (state.Errors.Count > 0)
+                {
+                    foreach (var error in state.Errors)
+                    {
+                        <li><strong>@key:</strong> @error.ErrorMessage</li>
+                    }
+                }
+            }
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<main class="container-fluid p-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Thêm sản phẩm mới</h2>
+        @Html.Partial("_Breadcrumb")
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            @using (Html.BeginForm("Create", "Product", FormMethod.Post, new { enctype = "multipart/form-data", @class = "row g-3" }))
+            {
+                @Html.AntiForgeryToken()
+                @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+
+                <!-- Tên sản phẩm -->
+                <div class="col-12">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-tag me-1"></i>Tên sản phẩm *
+                    </label>
+                    @Html.TextBoxFor(m => m.ProductName, new { @class = "form-control", placeholder = "Nhập tên sản phẩm", required = "required" })
+                    @Html.ValidationMessageFor(m => m.ProductName, "", new { @class = "text-danger" })
+                </div>
+
+                <!-- Mô tả ngắn -->
+                <div class="col-12">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-pencil-square me-1"></i>Mô tả ngắn
+                    </label>
+                    @Html.TextAreaFor(m => m.ShortDescription, new { @class = "form-control", rows = "3", placeholder = "Mô tả ngắn gọn về sản phẩm (hiển thị trên danh sách)" })
+                    @Html.ValidationMessageFor(m => m.ShortDescription, "", new { @class = "text-danger" })
+                </div>
+
+                <!-- Mô tả chi tiết -->
+                <div class="col-12">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-file-text me-1"></i>Mô tả chi tiết
+                    </label>
+                    @Html.TextAreaFor(m => m.LongDescription, new { @class = "form-control", rows = "6", placeholder = "Mô tả chi tiết đầy đủ về sản phẩm, công dụng, cách sử dụng..." })
+                    @Html.ValidationMessageFor(m => m.LongDescription, "", new { @class = "text-danger" })
+                    <small class="text-muted">Mô tả chi tiết sẽ hiển thị trên trang chi tiết sản phẩm</small>
+                </div>
+
+                <!-- Danh mục -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-folder me-1"></i>Danh mục *
+                    </label>
+                    @Html.DropDownListFor(m => m.CategoryId,
+                        (SelectList)ViewBag.Categories,
+                        "-- Chọn danh mục --",
+                        new { @class = "form-select", required = "required" })
+                    @Html.ValidationMessageFor(m => m.CategoryId, "", new { @class = "text-danger" })
+                </div>
+
+                <!-- Mã SKU -->
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-upc me-1"></i>Mã sản phẩm (SKU)
+                    </label>
+                    @Html.TextBoxFor(m => m.Sku, new { @class = "form-control", placeholder = "VD: VEG-001 (để trống để tự động tạo)" })
+                    @Html.ValidationMessageFor(m => m.Sku, "", new { @class = "text-danger" })
+                    <small class="text-muted">Để trống để hệ thống tự động tạo mã</small>
+                </div>
+
+                <!-- Giá -->
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-currency-dollar me-1"></i>Giá (VNĐ) *
+                    </label>
+                    @Html.TextBoxFor(m => m.Price, new { @class = "form-control", type = "number", step = "1000", min = "0", placeholder = "0", required = "required" })
+                    @Html.ValidationMessageFor(m => m.Price, "", new { @class = "text-danger" })
+                </div>
+
+                <!-- Số lượng tồn kho -->
+                <!--<div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-box-seam me-1"></i>Số lượng tồn kho *
+                    </label>-->
+                    @*@Html.TextBoxFor(m => m.StockQuantity, new { @class = "form-control", type = "number", min = "0", placeholder = "Đồng bộ từ Kho", @readonly = "readonly", disabled = "disabled", value = "0" })*@
+                    <!--<small class="text-muted">Tồn kho được quản lý ở Kho. Không chỉnh trực tiếp tại đây.</small>
+                    @Html.ValidationMessageFor(m => m.StockQuantity, "", new { @class = "text-danger" })
+                </div>-->
+
+                <!-- Đơn vị tính -->
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-rulers me-1"></i>Đơn vị tính *
+                    </label>
+                    @Html.DropDownListFor(m => m.UnitID,
+                        (SelectList)ViewBag.Units,
+                        "-- Chọn đơn vị --",
+                        new { @class = "form-select", required = "required" })
+                    @Html.ValidationMessageFor(m => m.UnitID, "", new { @class = "text-danger" })
+                </div>
+
+                <!-- ✅ THÊM: Hạn sử dụng -->
+                @*<div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-calendar-event me-1"></i>Hạn sử dụng
+                    </label>*@
+                    @*@Html.TextBoxFor(m => m.ExpiryDate, "{0:yyyy-MM-dd}", new
+                    {
+                        @class = "form-control",
+                        type = "date",
+                        id = "expiryDateInput"
+                    })
+                    @Html.ValidationMessageFor(m => m.ExpiryDate, "", new { @class = "text-danger" })*@
+                    <!--<small class="text-muted" id="expiryDateHelp">
+                        <i class="bi bi-info-circle me-1"></i>Để trống nếu sản phẩm không có hạn sử dụng
+                    </small>
+                    <div id="expiryWarning" class="alert alert-warning mt-2 d-none" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <span id="expiryWarningText"></span>
+                    </div>
+                </div>-->
+
+                <!-- Trạng thái -->
+                <!--<div class="col-md-6">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-eye me-1"></i>Trạng thái
+                    </label>
+                    <div>
+                        <div class="form-check form-check-inline">
+                            @Html.RadioButtonFor(m => m.Status, true, new { @class = "form-check-input", id = "statusActive", @checked = "checked" })
+                            <label class="form-check-label" for="statusActive">
+                                <i class="bi bi-check-circle text-success me-1"></i>Đang bán
+                            </label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            @Html.RadioButtonFor(m => m.Status, false, new { @class = "form-check-input", id = "statusInactive" })
+                            <label class="form-check-label" for="statusInactive">
+                                <i class="bi bi-x-circle text-danger me-1"></i>Ẩn
+                            </label>
+                        </div>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        <i class="bi bi-lightbulb me-1"></i>Lưu ý: Sản phẩm hết hạn sẽ tự động bị ẩn
+                    </small>
+                </div>-->
+
+                <!-- Ảnh sản phẩm -->
+                <div class="col-12">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-image me-1"></i>Ảnh sản phẩm
+                    </label>
+                    <div class="text-center mb-3">
+                        <img alt="Chưa có ảnh"
+                             style="width: 200px; height: 200px; object-fit: cover; border: 2px dashed #ccc; background: #f8f9fa; display: block; margin: 0 auto;"
+                             class="rounded"
+                             id="imagePreview"
+                             src="~/Images/no-image.png" />
+                    </div>
+                    <input type="file" name="ImageFile" class="form-control" id="imageInput" accept="image/*" />
+                    <small class="text-muted d-block mt-1">Chỉ chấp nhận file: JPG, PNG, GIF, WEBP (tối đa 5MB)</small>
+                    <span class="text-danger d-block mt-1" id="imageError"></span>
+                </div>
+
+                <!-- Buttons -->
+                <div class="col-12 mt-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="@Url.Action("ManageProducts", "Product")" class="btn btn-outline-secondary px-4">
+                            <i class="bi bi-arrow-left me-2"></i>Quay lại
+                        </a>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-danger px-4" id="resetBtn">
+                                <i class="bi bi-arrow-counterclockwise me-2"></i>Đặt lại
+                            </button>
+                            <button type="submit" class="btn btn-primary px-5 py-2 fw-bold shadow-sm" id="saveBtn" style="min-width: 200px;">
+                                <i class="bi bi-check-circle me-2"></i>
+                                <span class="btn-text">Lưu sản phẩm</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <style>
+        #saveBtn {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+            #saveBtn:hover:not(:disabled) {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4) !important;
+            }
+
+            #saveBtn:active:not(:disabled) {
+                transform: translateY(0);
+            }
+
+            #saveBtn:disabled {
+                cursor: not-allowed;
+                opacity: 0.7;
+            }
+
+        .btn-outline-danger:hover {
+            transform: translateY(-2px);
+            transition: all 0.3s ease;
+        }
+
+        .btn-outline-secondary:hover {
+            transform: translateX(-3px);
+            transition: all 0.3s ease;
+        }
+
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+            border-width: 0.15em;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+            textarea.form-control:focus {
+                border-color: #0d6efd;
+                box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+            }
+
+        .alert {
+            border-left: 4px solid;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .alert-danger {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+
+        .alert-success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+
+        .alert-warning {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+    </style>
+
+    <script>
+        let isSubmitting = false;
+
+        // ✅ Kiểm tra hạn sử dụng
+        function checkExpiryDate() {
+            const expiryInput = document.getElementById('expiryDateInput');
+            const expiryWarning = document.getElementById('expiryWarning');
+            const expiryWarningText = document.getElementById('expiryWarningText');
+            const statusInactive = document.getElementById('statusInactive');
+
+            if (!expiryInput.value) {
+                expiryWarning.classList.add('d-none');
+                return;
+            }
+
+            const expiryDate = new Date(expiryInput.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const diffTime = expiryDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 0) {
+                expiryWarning.classList.remove('d-none');
+                expiryWarning.classList.remove('alert-warning');
+                expiryWarning.classList.add('alert-danger');
+                expiryWarningText.textContent = 'Sản phẩm đã hết hạn! Sẽ tự động bị ẩn.';
+                statusInactive.checked = true;
+            } else if (diffDays <= 7) {
+                expiryWarning.classList.remove('d-none');
+                expiryWarning.classList.remove('alert-danger');
+                expiryWarning.classList.add('alert-warning');
+                expiryWarningText.textContent = `Sản phẩm sắp hết hạn (còn ${diffDays} ngày)!`;
+            } else {
+                expiryWarning.classList.add('d-none');
+            }
+        }
+
+        // Theo dõi thay đổi ngày hết hạn
+        document.getElementById('expiryDateInput').addEventListener('change', checkExpiryDate);
+
+        // Image preview với validation
+        const imageInput = document.getElementById("imageInput");
+        const imagePreview = document.getElementById("imagePreview");
+        const imageError = document.getElementById("imageError");
+
+        imageInput.addEventListener("change", function () {
+            imageError.textContent = '';
+            const file = this.files[0];
+
+            if (file) {
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    imageError.textContent = 'Chỉ chấp nhận file ảnh JPG, PNG, GIF, WEBP!';
+                    this.value = '';
+                    imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                    imagePreview.style.border = '2px dashed #ccc';
+                    return;
+                }
+
+                if (file.size > 5 * 1024 * 1024) {
+                    imageError.textContent = 'Kích thước file không được vượt quá 5MB!';
+                    this.value = '';
+                    imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                    imagePreview.style.border = '2px dashed #ccc';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    imagePreview.style.border = '2px solid #28a745';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Xử lý submit form
+        $('form').on('submit', function (e) {
+            if (isSubmitting) {
+                return true;
+            }
+
+            e.preventDefault();
+
+            imageError.textContent = '';
+
+            var productName = $.trim($('#ProductName').val());
+            if (productName === '') {
+                alert('Vui lòng nhập tên sản phẩm!');
+                $('#ProductName').focus();
+                return false;
+            }
+
+            var categoryId = $('#CategoryId').val();
+            if (categoryId === '' || categoryId === null) {
+                alert('Vui lòng chọn danh mục!');
+                $('#CategoryId').focus();
+                return false;
+            }
+
+            var price = parseFloat($('#Price').val());
+            if (isNaN(price) || price < 0) {
+                alert('Giá sản phẩm không hợp lệ!');
+                $('#Price').focus();
+                return false;
+            }
+
+            isSubmitting = true;
+
+            const saveBtn = $('#saveBtn');
+            const btnText = saveBtn.find('.btn-text');
+            const btnIcon = saveBtn.find('i');
+
+            saveBtn.prop('disabled', true);
+            $('#resetBtn').prop('disabled', true);
+
+            btnIcon.removeClass('bi-check-circle').addClass('spinner-border spinner-border-sm');
+            btnText.text('Đang lưu...');
+            saveBtn.removeClass('btn-primary').addClass('btn-secondary');
+
+            this.submit();
+        });
+
+        // Nút Reset
+        $('#resetBtn').on('click', function() {
+            if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu đã nhập?')) {
+                $('form')[0].reset();
+                imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                imagePreview.style.border = '2px dashed #ccc';
+                imageError.textContent = '';
+
+                $('#CategoryId').val('');
+                $('#UnitID').val('1');
+                $('#statusActive').prop('checked', true);
+                $('#expiryWarning').addClass('d-none');
+
+                $('#ProductName').focus();
+            }
+        });
+
+        // Trim whitespace khi blur
+        $('#ProductName, #Sku, #ShortDescription, #LongDescription').on('blur', function() {
+            $(this).val($.trim($(this).val()));
+        });
+
+        // Format giá khi nhập
+        $('#Price').on('blur', function() {
+            var val = parseFloat($(this).val());
+            if (!isNaN(val)) {
+                val = Math.round(val / 1000) * 1000;
+                $(this).val(val);
+            }
+        });
+
+        $(document).ready(function () {
+            setTimeout(function () {
+                $('.alert').fadeOut('slow', function () {
+                    $(this).remove();
+                });
+            }, 10000);
+
+            if ($('.alert-danger').length > 0) {
+                $('html, body').animate({
+                    scrollTop: $('.alert-danger').offset().top - 100
+                }, 500);
+            }
+
+            // Kiểm tra ngày hết hạn khi load trang
+            checkExpiryDate();
+        });
+    </script>
+}

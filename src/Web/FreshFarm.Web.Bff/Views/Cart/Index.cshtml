@@ -69,6 +69,46 @@
         .qty-actions {
             min-width: 180px;
         }
+
+        .cart-select-row {
+            border-bottom: 1px solid #eef2f7;
+            padding-bottom: .75rem;
+            margin-bottom: .5rem;
+        }
+
+        .cart-select-note {
+            font-size: .86rem;
+            color: #6b7280;
+        }
+
+        .cart-item-row {
+            transition: background-color .2s ease;
+        }
+
+        .cart-item-row:hover {
+            background-color: #fafdfb;
+        }
+
+        .cart-item-row.is-unchecked {
+            opacity: .55;
+        }
+
+        .cart-check-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .cart-check-wrap .form-check-input {
+            width: 1.1rem;
+            height: 1.1rem;
+            margin-top: 0;
+        }
+
+        #checkout-btn.disabled {
+            pointer-events: none;
+            opacity: .6;
+        }
     </style>
 </head>
 <body>
@@ -105,6 +145,14 @@
                 <section class="col-lg-8">
                     <div class="card border-0 shadow-sm">
                         <div class="card-body" id="cart-items-container">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 cart-select-row">
+                                <label for="cart-select-all" class="form-check d-flex align-items-center gap-2 mb-0">
+                                    <input class="form-check-input" type="checkbox" id="cart-select-all" checked />
+                                    <span class="fw-semibold">Chọn tất cả (@items.Count sản phẩm)</span>
+                                </label>
+                                <span id="cart-selected-inline" class="cart-select-note">Đã chọn @items.Count/@items.Count sản phẩm</span>
+                            </div>
+
                             @foreach (var item in items)
                             {
                                 var safeName = string.IsNullOrWhiteSpace(item.ProductName) ? $"Sản phẩm #{item.ProductId}" : item.ProductName;
@@ -112,8 +160,18 @@
                                 var safeQuantity = Math.Max(1, item.Quantity);
                                 var lineTotal = item.UnitPrice * safeQuantity;
 
-                                <div class="row g-3 align-items-center py-2">
-                                    <div class="col-md-5 d-flex align-items-center">
+                                <div class="row g-3 align-items-center py-2 cart-item-row"
+                                     data-line-total="@lineTotal.ToString(CultureInfo.InvariantCulture)"
+                                     data-quantity="@safeQuantity">
+                                    <div class="col-2 col-md-1 cart-check-wrap">
+                                        <input class="form-check-input cart-item-check"
+                                               type="checkbox"
+                                               checked
+                                               aria-label="Chọn @safeName"
+                                               data-product-id="@item.ProductId" />
+                                    </div>
+
+                                    <div class="col-10 col-md-4 d-flex align-items-center">
                                         <img src="/images/legacy/no-image.png"
                                              class="cart-item-img rounded"
                                              alt="@safeName"
@@ -182,6 +240,11 @@
                 </section>
 
                 <aside class="col-lg-4">
+                    <div id="cart-summary-data"
+                         data-free-ship-threshold="@freeShipThreshold.ToString(CultureInfo.InvariantCulture)"
+                         data-shipping-fee="@summary.ShippingFee.ToString(CultureInfo.InvariantCulture)"
+                         data-total-items="@items.Count"></div>
+
                     <div class="card border-0 shadow-sm mb-4">
                         <div class="card-body">
                             <h5 class="card-title fw-bold mb-3">Phí vận chuyển</h5>
@@ -197,7 +260,7 @@
                             </p>
                             <div class="mb-2">
                                 <div class="freeship-track">
-                                    <div class="freeship-bar" style="width: @freeShipProgress%"></div>
+                                    <div id="freeship-bar" class="freeship-bar" style="width: @freeShipProgress%"></div>
                                 </div>
                             </div>
                         </div>
@@ -208,30 +271,190 @@
                             <h5 class="card-title fw-bold mb-4">Tổng quan đơn hàng</h5>
 
                             <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Đã chọn</span>
+                                <span class="fw-semibold" id="selected-item-count">@items.Count sản phẩm</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Tạm tính</span>
-                                <span class="fw-semibold">@Vnd(summary.SubTotal)</span>
+                                <span class="fw-semibold" id="selected-sub-total">@Vnd(summary.SubTotal)</span>
                             </div>
 
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="text-muted">Phí giao hàng</span>
-                                <span class="fw-semibold">@Vnd(summary.ShippingFee)</span>
+                                <span class="fw-semibold" id="selected-shipping-fee">@Vnd(summary.ShippingFee)</span>
                             </div>
 
                             <hr />
 
                             <div class="d-flex justify-content-between fw-bold fs-5 mb-3">
                                 <span>Tổng cộng</span>
-                                <span class="checkout-total">@Vnd(summary.GrandTotal)</span>
+                                <span class="checkout-total" id="selected-grand-total">@Vnd(summary.GrandTotal)</span>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-grid mt-4">
-                        <a href="/checkout" class="btn btn-success btn-lg">ĐẶT HÀNG</a>
-                    </div>
+                    <form id="checkout-selected-form"
+                          asp-controller="Cart"
+                          asp-action="CheckoutSelected"
+                          method="post"
+                          class="d-grid mt-4">
+                        @Html.AntiForgeryToken()
+                        <div id="selected-product-inputs"></div>
+                        <button type="submit" class="btn btn-success btn-lg" id="checkout-btn">ĐẶT HÀNG</button>
+                        <small class="text-muted mt-2">
+                            Bạn có thể tick chọn sản phẩm để thanh toán đúng các món đã chọn.
+                        </small>
+                    </form>
                 </aside>
             </div>
         }
     </main>
+
+    <script>
+        (() => {
+            const cartView = document.getElementById("cart-view");
+            if (!cartView) return;
+
+            const summaryData = document.getElementById("cart-summary-data");
+            const selectAll = document.getElementById("cart-select-all");
+            const itemChecks = Array.from(document.querySelectorAll(".cart-item-check"));
+            const itemRows = Array.from(document.querySelectorAll(".cart-item-row"));
+            const selectedInline = document.getElementById("cart-selected-inline");
+            const selectedItemCount = document.getElementById("selected-item-count");
+            const selectedSubTotal = document.getElementById("selected-sub-total");
+            const selectedShippingFee = document.getElementById("selected-shipping-fee");
+            const selectedGrandTotal = document.getElementById("selected-grand-total");
+            const freeShipMessage = document.getElementById("freeship-message");
+            const freeShipBar = document.getElementById("freeship-bar");
+            const selectedInputsWrap = document.getElementById("selected-product-inputs");
+            const checkoutBtn = document.getElementById("checkout-btn");
+
+            const totalItems = Number(summaryData?.getAttribute("data-total-items") || itemChecks.length || 0);
+            const freeShipThreshold = Number(summaryData?.getAttribute("data-free-ship-threshold") || 0);
+            const defaultShippingFee = Number(summaryData?.getAttribute("data-shipping-fee") || 0);
+
+            const vnd = (value) => {
+                const safe = Number.isFinite(value) ? value : 0;
+                return safe.toLocaleString("vi-VN") + " ₫";
+            };
+
+            const getRowMeta = (row) => {
+                const lineTotal = Number(row.getAttribute("data-line-total") || 0);
+                return {
+                    lineTotal: Number.isFinite(lineTotal) ? lineTotal : 0
+                };
+            };
+
+            const setCheckoutDisabled = (disabled) => {
+                if (!(checkoutBtn instanceof HTMLButtonElement)) return;
+                checkoutBtn.classList.toggle("disabled", disabled);
+                checkoutBtn.disabled = disabled;
+            };
+
+            const updateSummaryBySelection = () => {
+                let checkedCount = 0;
+                let subTotal = 0;
+
+                itemRows.forEach((row) => {
+                    const checkbox = row.querySelector(".cart-item-check");
+                    if (!(checkbox instanceof HTMLInputElement)) return;
+
+                    const isChecked = checkbox.checked;
+                    row.classList.toggle("is-unchecked", !isChecked);
+
+                    if (isChecked) {
+                        checkedCount += 1;
+                        subTotal += getRowMeta(row).lineTotal;
+                    }
+                });
+
+                const shippingFee = checkedCount === 0
+                    ? 0
+                    : (subTotal >= freeShipThreshold ? 0 : defaultShippingFee);
+                const grandTotal = subTotal + shippingFee;
+
+                if (selectedInline) {
+                    selectedInline.textContent = `Đã chọn ${checkedCount}/${totalItems} sản phẩm`;
+                }
+                if (selectedItemCount) {
+                    selectedItemCount.textContent = `${checkedCount} sản phẩm`;
+                }
+                if (selectedSubTotal) {
+                    selectedSubTotal.textContent = vnd(subTotal);
+                }
+                if (selectedShippingFee) {
+                    selectedShippingFee.textContent = vnd(shippingFee);
+                }
+                if (selectedGrandTotal) {
+                    selectedGrandTotal.textContent = vnd(grandTotal);
+                }
+
+                if (freeShipMessage) {
+                    if (checkedCount === 0) {
+                        freeShipMessage.innerHTML = "Hãy chọn ít nhất 1 sản phẩm để tiếp tục đặt hàng.";
+                    } else if (subTotal >= freeShipThreshold) {
+                        freeShipMessage.innerHTML = "<strong>Chúc mừng! Bạn đã được miễn phí vận chuyển.</strong>";
+                    } else {
+                        const remain = Math.max(0, freeShipThreshold - subTotal);
+                        freeShipMessage.innerHTML = `Thêm <strong>${vnd(remain)}</strong> nữa để được miễn phí vận chuyển!`;
+                    }
+                }
+
+                if (freeShipBar) {
+                    const progress = freeShipThreshold <= 0
+                        ? 0
+                        : Math.min(100, Math.round((subTotal / freeShipThreshold) * 100));
+                    freeShipBar.style.width = `${progress}%`;
+                }
+
+                if (selectedInputsWrap) {
+                    selectedInputsWrap.innerHTML = "";
+                    itemRows.forEach((row) => {
+                        const checkbox = row.querySelector(".cart-item-check");
+                        if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) {
+                            return;
+                        }
+
+                        const productId = Number(checkbox.getAttribute("data-product-id") || 0);
+                        if (!Number.isFinite(productId) || productId <= 0) {
+                            return;
+                        }
+
+                        const input = document.createElement("input");
+                        input.type = "hidden";
+                        input.name = "selectedProductIds";
+                        input.value = String(productId);
+                        selectedInputsWrap.appendChild(input);
+                    });
+                }
+
+                if (selectAll instanceof HTMLInputElement) {
+                    selectAll.checked = checkedCount > 0 && checkedCount === itemChecks.length;
+                    selectAll.indeterminate = checkedCount > 0 && checkedCount < itemChecks.length;
+                }
+
+                setCheckoutDisabled(checkedCount === 0);
+            };
+
+            if (selectAll instanceof HTMLInputElement) {
+                selectAll.addEventListener("change", () => {
+                    itemChecks.forEach((check) => {
+                        if (check instanceof HTMLInputElement) {
+                            check.checked = selectAll.checked;
+                        }
+                    });
+                    updateSummaryBySelection();
+                });
+            }
+
+            itemChecks.forEach((check) => {
+                if (!(check instanceof HTMLInputElement)) return;
+                check.addEventListener("change", updateSummaryBySelection);
+            });
+
+            updateSummaryBySelection();
+        })();
+    </script>
 </body>
 </html>

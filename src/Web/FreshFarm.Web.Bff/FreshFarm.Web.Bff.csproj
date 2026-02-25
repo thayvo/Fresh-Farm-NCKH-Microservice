@@ -5,16 +5,38 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>9a45ef31-2020-40f7-a8ef-733e2afc71f1</UserSecretsId>
+    <EnableLegacySeller>false</EnableLegacySeller>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.23" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Common" Version="8.0.23" />
     <PackageReference Include="Microsoft.OpenApi" Version="1.6.14" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.23" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\BuildingBlocks\FreshFarm.Contracts\FreshFarm.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Areas\Admin\Controllers\" />
+    <Folder Include="Areas\Admin\Data\" />
+    <Folder Include="Areas\Admin\Models\" />
+    <Folder Include="Areas\Admin\Views\" />
+    <Folder Include="Areas\Seller\Controllers\" />
+    <Folder Include="Areas\Seller\Data\" />
+    <Folder Include="Areas\Seller\Models\" />
+    <Folder Include="Areas\Seller\Views\" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableLegacySeller)' != 'true'">
+    <!-- Keep legacy Seller sources in repo but exclude from default build until migrated -->
+    <Compile Remove="Areas/Seller/**/*.cs" />
+    <Content Remove="Areas/Seller/**/*.cshtml" />
+    <None Remove="Areas/Seller/**/*.cshtml" />
+    <RazorGenerate Remove="Areas/Seller/**/*.cshtml" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,128 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyUsersVM
+@{
+    ViewBag.Title = "Thành viên tích điểm";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold">Thành viên</h2>
+        <form class="d-flex" method="get">
+            <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tìm theo tên..." />
+            <button class="btn btn-primary ms-2" type="submit"><i class="bi bi-search"></i></button>
+        </form>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Thành viên</th>
+                        <th class="text-end">Điểm quý hiện tại</th>
+                        <th>Hạng</th>
+                        <th class="text-end">Tổng điểm</th>
+                        <th class="text-end">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows == null || !Model.Rows.Any())
+                    {
+                        <tr><td colspan="4" class="text-muted">Không có dữ liệu.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var u in Model.Rows)
+                        {
+                            <tr>
+                                <td>@u.FullName</td>
+                                <td class="text-end">@u.CurrentQuarterPoints</td>
+                                <td>@(string.IsNullOrWhiteSpace(u.RankName)?"-":u.RankName)</td>
+                                <td class="text-end">@u.TotalPoints</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="openAdjust(@u.UserID, '@u.FullName')">
+                                        <i class="bi bi-pencil"></i> Điều chỉnh
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <div>
+                Trang @Model.Page / @((int)Math.Ceiling((double)Model.Total / Model.PageSize)) - Tổng @Model.Total
+            </div>
+            <div class="btn-group">
+                @{
+                    var totalPages = (int)Math.Ceiling((double)Model.Total / Model.PageSize);
+                    var prev = Math.Max(1, Model.Page - 1);
+                    var next = Math.Min(totalPages == 0 ? 1 : totalPages, Model.Page + 1);
+                }
+                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { q = Model.Query, page = prev, pageSize = Model.PageSize })">«</a>
+                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { q = Model.Query, page = next, pageSize = Model.PageSize })">»</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adjust Modal -->
+    <div class="modal fade" id="adjustModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Điều chỉnh điểm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="@Url.Action("AdjustPoints","Loyalty", new { area = "Seller" })" onsubmit="return submitAdjust(event)">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body">
+                        <input type="hidden" name="userId" id="adjUserId" />
+                        <div class="mb-2">
+                            <label class="form-label">Thành viên</label>
+                            <input type="text" class="form-control" id="adjUserName" disabled />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Điểm (+/-)</label>
+                            <input type="number" class="form-control" name="points" required />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Lý do</label>
+                            <input type="text" class="form-control" name="reason" />
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="includeInRank" id="includeRank">
+                            <label class="form-check-label" for="includeRank">Tính vào điểm xếp hạng quý</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        <button type="submit" class="btn btn-primary">Lưu</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>var _modal;
+    function openAdjust(id, name) {
+        document.getElementById('adjUserId').value = id;
+        document.getElementById('adjUserName').value = name;
+        var el = document.getElementById('adjustModal');
+        _modal = new bootstrap.Modal(el);
+        _modal.show();
+    }
+    async function submitAdjust(e) {
+        e.preventDefault();
+        const form = e.target;
+        const resp = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        const json = await resp.json();
+        if (json && json.success) {
+            location.reload();
+        } else {
+            alert(json && json.message ? json.message : 'Có lỗi xảy ra');
+        }
+        return false;
+    }</script>

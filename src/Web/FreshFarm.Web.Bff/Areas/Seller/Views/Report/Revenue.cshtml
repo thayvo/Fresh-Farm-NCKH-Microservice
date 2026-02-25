@@ -1,0 +1,310 @@
+﻿@model FreshFram.Areas.Admin.Data.RevenueReportViewModel
+@{
+    ViewBag.Title = "Báo Cáo Doanh Thu";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            Báo Cáo Doanh Thu
+        </h2>
+    </div>
+
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @ViewBag.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" action="@Url.Action("Revenue", "Report")">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4 col-lg-3">
+                        <label for="fromDate" class="form-label fw-semibold">Từ ngày</label>
+                        <input type="date" id="fromDate" name="fromDate" class="form-control"
+                               value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="toDate" class="form-label fw-semibold">Đến ngày</label>
+                        <input type="date" id="toDate" name="toDate" class="form-control"
+                               value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="viewBy" class="form-label fw-semibold">Xem theo</label>
+                        <select id="viewBy" name="viewBy" class="form-select">
+                            <option value="day" @(Model.ViewBy == "day" ? "selected" : "")>Ngày</option>
+                            <option value="week" @(Model.ViewBy == "week" ? "selected" : "")>Tuần</option>
+                            <option value="month" @(Model.ViewBy == "month" ? "selected" : "")>Tháng</option>
+                            <option value="year" @(Model.ViewBy == "year" ? "selected" : "")>Năm</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 col-lg-3">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-cash-coin fs-1 text-success opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tổng Doanh Thu</h6>
+                            <h3 class="fw-bold">@Model.TotalRevenue.ToString("#,##0")₫</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-receipt-cutoff fs-1 text-primary opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tổng Đơn Hàng</h6>
+                            <h3 class="fw-bold">@Model.TotalOrders.ToString("#,##0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-info h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-basket fs-1 text-info opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">
+                                Giá Trị Đơn Trung Bình
+                            </h6>
+                            <h3 class="fw-bold">@Model.AverageOrderValue.ToString("#,##0")₫</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-graph-up fs-1 text-warning opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">
+                                Lợi Nhuận Ước Tính
+                            </h6>
+                            <h3 class="fw-bold">@Model.EstimatedProfit.ToString("#,##0")₫</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-bar-chart-line-fill"></i> Xu hướng doanh thu
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-trophy-fill"></i> Top 5 sản phẩm theo doanh thu
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="topProductsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title fw-bold mb-0">
+                <i class="bi bi-table"></i> Chi tiết doanh thu theo ngày
+            </h5>
+            <a href="@Url.Action("ExportRevenueExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, viewBy = Model.ViewBy })"
+               class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ngày</th>
+                        <th>Tổng đơn</th>
+                        <th>Sản phẩm bán ra</th>
+                        <th>Doanh thu</th>
+                        <th>Lợi nhuận</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.DailyRevenues != null && Model.DailyRevenues.Any())
+                    {
+                        <p>Có @Model.DailyRevenues.Count bản ghi</p>
+                        foreach (var daily in Model.DailyRevenues)
+                        {
+                            <tr>
+                                <td>@daily.DateFormatted</td>
+                                <td>@daily.TotalOrders</td>
+                                <td>@daily.TotalProducts</td>
+                                <td>@daily.Revenue.ToString("#,##0")₫</td>
+                                <td class="text-success">@daily.Profit.ToString("#,##0")₫</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                Không có dữ liệu. Model.DailyRevenues = @(Model.DailyRevenues == null ? "null" : "empty list")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+@section scripts {
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Dữ liệu từ Model
+        var trendLabels = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendLabels));
+        var trendData = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendData));
+
+        var topProductNames = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.ProductName).ToList()));
+        var topProductRevenues = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.TotalRevenue / 1000000).ToList()));
+
+        // --- Biểu đồ Xu hướng doanh thu (Line Chart) ---
+        const revenueTrendCtx = document.getElementById("revenueTrendChart");
+        if (revenueTrendCtx) {
+          new Chart(revenueTrendCtx, {
+            type: "line",
+            data: {
+              labels: trendLabels,
+              datasets: [
+                {
+                  label: "Doanh thu (triệu ₫)",
+                  data: trendData,
+                  borderColor: "#008a4f",
+                  backgroundColor: "rgba(0, 138, 79, 0.1)",
+                  fill: true,
+                  tension: 0.4,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: true,
+                  position: 'top'
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' triệu ₫';
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) {
+                      return value.toFixed(1) + ' triệu';
+                    }
+                  }
+                }
+              }
+            },
+          });
+        }
+
+        // --- Biểu đồ Top Sản phẩm (Bar Chart) ---
+        const topProductsCtx = document.getElementById("topProductsChart");
+        if (topProductsCtx) {
+          new Chart(topProductsCtx, {
+            type: "bar",
+            data: {
+              labels: topProductNames,
+              datasets: [
+                {
+                  label: "Doanh thu (triệu ₫)",
+                  data: topProductRevenues,
+                  backgroundColor: [
+                    "rgba(0, 138, 79, 0.8)",
+                    "rgba(0, 138, 79, 0.7)",
+                    "rgba(0, 138, 79, 0.6)",
+                    "rgba(0, 138, 79, 0.5)",
+                    "rgba(0, 138, 79, 0.4)",
+                  ],
+                  borderRadius: 5,
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: false,
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return 'Doanh thu: ' + context.parsed.x.toFixed(2) + ' triệu ₫';
+                    }
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) {
+                      return value.toFixed(1) + ' triệu';
+                    }
+                  }
+                }
+              }
+            },
+          });
+        }
+      });
+    </script>
+}

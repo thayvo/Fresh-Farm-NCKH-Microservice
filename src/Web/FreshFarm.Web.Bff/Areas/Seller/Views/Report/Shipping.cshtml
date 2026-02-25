@@ -1,0 +1,352 @@
+﻿@model FreshFram.Areas.Admin.Data.ShippingReportViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using System.Linq
+@{
+    ViewBag.Title = "Báo Cáo Vận Chuyển";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var staffOptions = ViewBag.DeliveryStaffs as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>();
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            <i class="bi bi-truck"></i> Báo Cáo Vận Chuyển
+        </h2>
+    </div>
+
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> @ViewBag.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" action="@Url.Action("Shipping", "Report")">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4 col-lg-3">
+                        <label for="fromDate" class="form-label fw-semibold">Từ ngày</label>
+                        <input type="date" id="fromDate" name="fromDate" class="form-control"
+                               value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="toDate" class="form-label fw-semibold">Đến ngày</label>
+                        <input type="date" id="toDate" name="toDate" class="form-control"
+                               value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="staffId" class="form-label fw-semibold">Nhân viên giao hàng</label>
+                        <select id="staffId" name="staffId" class="form-select">
+                            <option value="" @(Model.SelectedStaffId.HasValue ? "" : "selected")>Tat ca nhan vien</option>
+                            @foreach (var staff in staffOptions)
+                            {
+                                var isSelected = Model.SelectedStaffId.HasValue && staff.Value == Model.SelectedStaffId.Value.ToString();
+                                <option value="@staff.Value" @(isSelected ? "selected" : "")>@staff.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="status" class="form-label fw-semibold">Trạng thái</label>
+                        <select id="status" name="status" class="form-select">
+                            @{ var st = string.IsNullOrWhiteSpace(Model.Status) ? "all" : Model.Status.ToLower(); }
+                            <option value="all" @(st == "all" ? "selected" : "")>Tất cả</option>
+                            <option value="pending" @(st == "pending" ? "selected" : "")>Chờ xử lý</option>
+                            <option value="processing" @(st == "processing" ? "selected" : "")>Đang xử lý</option>
+                            <option value="ready" @(st == "ready" ? "selected" : "")>Sẵn sàng giao</option>
+                            <option value="shipped" @(st == "shipped" ? "selected" : "")>Đang vận chuyển</option>
+                            <option value="delivered" @(st == "delivered" || st == "completed" ? "selected" : "")>Đã giao hàng</option>
+                            <option value="canceled" @(st == "canceled" || st == "cancelled" ? "selected" : "")>Đã hủy / Chuyển hoàn</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8 col-lg-6">
+                        <label for="q" class="form-label fw-semibold">Tìm kiếm</label>
+                        <input type="text" id="q" name="q" class="form-control" value="@Model.Query" placeholder="Mã đơn, tên khách, số điện thoại, địa chỉ" />
+                    </div>
+                    <div class="col-md-12 col-lg-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" name="sort" value="@Model.Sort" />
+                <input type="hidden" name="page" value="@Model.CurrentPage" />
+                <input type="hidden" name="pageSize" value="@Model.PageSize" />
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-truck fs-1 text-primary opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Đơn Đã Giao</h6>
+                            <h3 class="fw-bold">@Model.DeliveredOrders.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-cash-coin fs-1 text-success opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tổng Phí Vận Chuyển</h6>
+                            <h3 class="fw-bold">@Model.TotalShippingFee.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-info h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-clock-history fs-1 text-info opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Thời Gian Giao TB</h6>
+                            <h3 class="fw-bold">@Model.AverageDeliveryTime.ToString("F1") ngày</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-danger h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-box-arrow-in-left fs-1 text-danger opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tỉ Lệ Chuyển Hoàn</h6>
+                            <h3 class="fw-bold">@Model.ReturnRate.ToString("F1")%</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-bar-chart-fill"></i> Hiệu suất nhân viên giao hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="staffPerformanceChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-distribute-vertical"></i> Phân bố thời gian giao hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="deliveryTimeDistributionChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title fw-bold mb-0">
+                <i class="bi bi-table"></i> Lịch sử giao hàng
+            </h5>
+            <a href="@Url.Action("ExportShippingExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query })"
+               class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead>
+                    <tr>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "code_asc" ? "code_desc" : "code_asc"), page = 1, pageSize = Model.PageSize })">Mã đơn hàng</a>
+                        </th>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "customer_asc" ? "customer_desc" : "customer_asc"), page = 1, pageSize = Model.PageSize })">Khách hàng</a>
+                        </th>
+                        <th>SĐT</th>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "staff_asc" ? "staff_desc" : "staff_asc"), page = 1, pageSize = Model.PageSize })">Nhân viên giao</a>
+                        </th>
+                        <th>Địa chỉ giao hàng</th>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "date_asc" ? "date_desc" : "date_asc"), page = 1, pageSize = Model.PageSize })">Ngày đặt</a>
+                        </th>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "expected_asc" ? "expected_desc" : "expected_asc"), page = 1, pageSize = Model.PageSize })">Ngày dự kiến</a>
+                        </th>
+                        <th>
+                            <a href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = (Model.Sort == "status_asc" ? "status_desc" : "status_asc"), page = 1, pageSize = Model.PageSize })">Trạng thái</a>
+                        </th>
+                        <th>Thời gian giao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.RecentShippings != null && Model.RecentShippings.Any())
+                    {
+                        foreach (var item in Model.RecentShippings)
+                        {
+                            <tr>
+                                <td>@item.OrderCode</td>
+                                <td>@item.CustomerName</td>
+                                <td>@item.CustomerPhone</td>
+                                <td>@item.DeliveryStaffName</td>
+                                <td>@item.DeliveryAddress</td>
+                                <td>@item.ShippingDateFormatted</td>
+                                <td>@item.ExpectedDeliveryDateFormatted</td>
+                                <td>
+                                    <span class="badge @item.StatusBadgeClass">@item.StatusText</span>
+                                </td>
+                                <td>
+                                    @if (item.ActualDeliveryDays.HasValue)
+                                    {
+                                        @item.ActualDeliveryDays.Value @: ngày
+                                    }
+                                    else
+                                    {
+                                        @:Đang giao
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted">Không có dữ liệu.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <small class="text-muted">Trang @Model.CurrentPage/@(Model.TotalPages == 0 ? 1 : Model.TotalPages) • Tổng @Model.TotalRecords kết quả</small>
+            @{ var totalPages = Model.TotalPages <= 0 ? 1 : Model.TotalPages; var current = Model.CurrentPage <= 0 ? 1 : Model.CurrentPage; var start = Math.Max(1, current - 3); var end = Math.Min(totalPages, current + 3); }
+            <nav aria-label="Shipping pagination">
+                <ul class="pagination mb-0">
+                    <li class="page-item @(current == 1 ? "disabled" : "")">
+                        <a class="page-link" href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = Model.Sort, page = current - 1, pageSize = Model.PageSize })">&laquo;</a>
+                    </li>
+                    @for (int i = start; i <= end; i++)
+                    {
+                        <li class="page-item @(i == current ? "active" : "")">
+                            <a class="page-link" href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = Model.Sort, page = i, pageSize = Model.PageSize })">@i</a>
+                        </li>
+                    }
+                    <li class="page-item @(current >= totalPages ? "disabled" : "")">
+                        <a class="page-link" href="@Url.Action("Shipping", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, staffId = Model.SelectedStaffId, status = Model.Status, q = Model.Query, sort = Model.Sort, page = current + 1, pageSize = Model.PageSize })">&raquo;</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</main>
+
+@section scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        var staffNames = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.StaffPerformances.Select(s => s.StaffName)));
+        var staffOrders = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.StaffPerformances.Select(s => s.TotalOrders)));
+        var staffSuccessRates = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.StaffPerformances.Select(s => s.SuccessRate)));
+
+        var timeRanges = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.DeliveryTimeDistributions.Select(d => d.TimeRange)));
+        var timeRangeCounts = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.DeliveryTimeDistributions.Select(d => d.OrderCount)));
+
+        const staffPerformanceCtx = document.getElementById("staffPerformanceChart");
+        if (staffPerformanceCtx) {
+          new Chart(staffPerformanceCtx, {
+            type: "bar",
+            data: {
+              labels: staffNames,
+              datasets: [
+                {
+                  label: "Số lượng đơn",
+                  data: staffOrders,
+                  backgroundColor: "rgba(13, 110, 253, 0.8)",
+                  borderRadius: 5,
+                },
+                {
+                  label: "Tỉ lệ giao thành công (%)",
+                  data: staffSuccessRates,
+                  backgroundColor: "rgba(25, 135, 84, 0.7)",
+                  borderRadius: 5,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { beginAtZero: true }
+              },
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: function (context) {
+                      if (context.datasetIndex === 1) {
+                        return context.dataset.label + ": " + context.parsed.y.toFixed(2) + "%";
+                      }
+                      return context.dataset.label + ": " + context.parsed.y;
+                    }
+                  }
+                }
+              }
+            },
+          });
+        }
+
+        const deliveryTimeCtx = document.getElementById("deliveryTimeDistributionChart");
+        if (deliveryTimeCtx) {
+          new Chart(deliveryTimeCtx, {
+            type: "bar",
+            data: {
+              labels: timeRanges,
+              datasets: [
+                {
+                  label: "Số lượng đơn",
+                  data: timeRangeCounts,
+                  backgroundColor: [
+                    "rgba(25, 135, 84, 0.8)",
+                    "rgba(13, 202, 240, 0.8)",
+                    "rgba(255, 193, 7, 0.8)",
+                    "rgba(220, 53, 69, 0.8)",
+                  ],
+                  borderRadius: 5,
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+            },
+          });
+        }
+      });
+    </script>
+}

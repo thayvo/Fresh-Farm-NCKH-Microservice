@@ -2,6 +2,7 @@
 using FreshFarm.Web.Bff.Services; // Dùng service cart session.
 using Microsoft.AspNetCore.Authorization; // Dùng [Authorize].
 using Microsoft.AspNetCore.Mvc; // Dùng Controller/IActionResult.
+using System.Text.Json;
 
 namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 
@@ -9,6 +10,36 @@ namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 public sealed class CartController : Controller // Controller MVC cho trang giỏ.
 {
     private readonly ICartSessionService _cart; // Service thao tác cart trong session.
+
+    // thêm trong class CartController
+    private const string CheckoutSelectedProductIdsSessionKey = "CHECKOUT_SELECTED_PRODUCT_IDS";
+
+    [HttpPost("/cart/checkout-selected")]
+    [ValidateAntiForgeryToken]
+    public IActionResult CheckoutSelected([FromForm] int[] selectedProductIds)
+    {
+        var cartIds = _cart.GetItems()
+            .Select(x => x.ProductId)
+            .ToHashSet();
+
+        var validSelectedIds = (selectedProductIds ?? Array.Empty<int>())
+            .Where(id => id > 0 && cartIds.Contains(id))
+            .Distinct()
+            .ToList();
+
+        if (validSelectedIds.Count == 0)
+        {
+            HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);
+            TempData["CheckoutError"] = "Vui lòng chọn ít nhất 1 sản phẩm để thanh toán.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        HttpContext.Session.SetString(
+            CheckoutSelectedProductIdsSessionKey,
+            JsonSerializer.Serialize(validSelectedIds));
+
+        return RedirectToAction("Index", "Checkout");
+    }
 
     public CartController(ICartSessionService cart) // Inject service qua DI.
     {

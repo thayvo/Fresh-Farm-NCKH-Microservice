@@ -1,0 +1,139 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.Category
+@{
+    ViewBag.Title = "Sửa Danh Mục";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    ViewBag.BreadcrumbParentTitle = "Quản lý danh mục";
+    ViewBag.BreadcrumbParentUrl = Url.Action("ManageCategories", "Category");
+    ViewBag.BreadcrumbCurrentTitle = "Chỉnh sửa";
+
+    Func<string, string> catImg = f =>
+        Url.Content(string.IsNullOrWhiteSpace(f) ? "~/Images/no-image.png"
+                                                 : "~/Images/" + f);
+}
+<main class="container-fluid p-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Chỉnh sửa danh mục</h2>
+        @Html.Partial("_Breadcrumb")
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            @using (Html.BeginForm("Edit", "Category", FormMethod.Post, new { area = "Seller", enctype = "multipart/form-data" }))
+            {
+                @Html.AntiForgeryToken()
+                @Html.HiddenFor(m => m.CategoryID)
+                @Html.HiddenFor(m => m.ImageCategoriesName) <!-- giữ tên ảnh cũ -->
+                @Html.HiddenFor(m => m.CreatedDate)
+
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label class="form-label">Tên danh mục <span class="text-danger">*</span></label>
+                            @Html.TextBoxFor(m => m.CategoryName, new { @class = "form-control", placeholder = "Nhập tên danh mục", maxlength = "100" })
+                            @Html.ValidationMessageFor(m => m.CategoryName, "", new { @class = "text-danger small" })
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả</label>
+                            @Html.TextAreaFor(m => m.Description, new { @class = "form-control", rows = "4", placeholder = "Mô tả (tùy chọn)", maxlength = "500" })
+                            @Html.ValidationMessageFor(m => m.Description, "", new { @class = "text-danger small" })
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card bg-light border-0">
+                            <div class="card-body">
+                                <h6 class="card-title mb-3">Ảnh danh mục</h6>
+
+                                <!-- Ảnh hiện tại (cũ) -->
+                                <label class="form-label fw-semibold">Ảnh hiện tại</label>
+                                <div class="mb-3 text-center">
+                                    <img id="imgCurrent" src="@catImg(Model.ImageCategoriesName)"
+                                         class="rounded border"
+                                         style="width:160px;height:160px;object-fit:cover;" />
+                                    <div class="small text-muted mt-1">
+                                        @(!string.IsNullOrWhiteSpace(Model.ImageCategoriesName) ? Model.ImageCategoriesName : "no-image.png")
+                                    </div>
+                                </div>
+
+                                <!-- Xem trước ảnh mới -->
+                                <label class="form-label fw-semibold">Xem trước ảnh mới</label>
+                                <div class="mb-3 text-center">
+                                    <img id="imgPreview" src="@catImg(Model.ImageCategoriesName)"
+                                         class="rounded border"
+                                         style="width:160px;height:160px;object-fit:cover;" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <input type="file" name="ImageFile" id="ImageFile" class="form-control"
+                                           accept=".jpg,.jpeg,.png,.gif,.webp" />
+                                    <small class="text-muted d-block mt-1">
+                                        Tối đa 2MB. Hỗ trợ: JPG, PNG, GIF, WEBP.
+                                    </small>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    @Html.CheckBoxFor(m => m.IsActive, new { @class = "form-check-input", id = "IsActive" })
+                                    <label class="form-check-label" for="IsActive">
+                                        <span id="statusText">@(Model.IsActive ? "Đang kích hoạt" : "Đã ẩn")</span>
+                                    </label>
+                                </div>
+
+                                <hr />
+                                <small class="text-muted d-block mb-2">
+                                    <strong>Slug hiện tại:</strong>
+                                    @(string.IsNullOrEmpty(Model.Slug) ? "Chưa có" : Model.Slug)
+                                </small>
+                                <small class="text-muted d-block mb-2"><strong>Ngày tạo:</strong> @Model.CreatedDate.ToString("dd/MM/yyyy HH:mm")</small>
+                                @if (Model.UpdatedDate.HasValue)
+                                {
+                                    <small class="text-muted d-block"><strong>Cập nhật:</strong> @Model.UpdatedDate.Value.ToString("dd/MM/yyyy HH:mm")</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <a href="@Url.Action("ManageCategories", "Category")" class="btn btn-secondary">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle me-1"></i> Cập nhật danh mục
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        // Cập nhật xem trước ảnh mới (không ảnh hưởng "Ảnh hiện tại")
+        document.getElementById('ImageFile').addEventListener('change', function (e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            document.getElementById('imgPreview').src = url;
+        });
+
+        // Đồng bộ text trạng thái
+        (function () {
+            var $is = $('#IsActive'), $txt = $('#statusText');
+            function sync() {
+                if ($is.is(':checked')) { $txt.text('Đang kích hoạt').removeClass('text-danger').addClass('text-success'); }
+                else { $txt.text('Đã ẩn').removeClass('text-success').addClass('text-danger'); }
+            }
+            $is.on('change', sync); sync();
+        })();
+    </script>
+}

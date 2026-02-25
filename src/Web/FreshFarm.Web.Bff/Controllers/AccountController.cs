@@ -139,6 +139,16 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         return RedirectToAction(nameof(SignIn)); // Ve trang signin.
     }
 
+    [HttpGet] // Route convention: /Account/AvatarById?id=123.
+    [AllowAnonymous] // Avatar fallback co the truy cap khong can login.
+    public IActionResult AvatarById(int id = 0) // Tra ve avatar SVG mac dinh theo id.
+    {
+        var palette = new[] { "#2F855A", "#B7791F", "#2B6CB0", "#9B2C2C", "#805AD5", "#319795" }; // Bang mau avatar.
+        var color = palette[System.Math.Abs(id) % palette.Length]; // Chon mau on dinh theo user id.
+        var svg = $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><rect width='120' height='120' rx='24' fill='{color}'/><circle cx='60' cy='44' r='20' fill='rgba(255,255,255,0.25)'/><path d='M20 105c6-19 18-29 40-29s34 10 40 29' fill='rgba(255,255,255,0.25)'/><text x='60' y='72' text-anchor='middle' font-family='Arial,sans-serif' font-size='34' font-weight='700' fill='white'>U</text></svg>"; // SVG nhe de fallback.
+        return Content(svg, "image/svg+xml"); // Tra anh avatar.
+    }
+
     [HttpGet("/account/orders")] // Route GET order history.
     [Authorize] // Chi user login moi xem duoc.
     public async Task<IActionResult> OrderHistory() // Render lich su don.

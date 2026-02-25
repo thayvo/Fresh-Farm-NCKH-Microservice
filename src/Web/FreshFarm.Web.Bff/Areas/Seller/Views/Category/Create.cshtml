@@ -1,0 +1,96 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.Category
+@{
+    ViewBag.Title = "Thêm Danh Mục";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    ViewBag.BreadcrumbParentTitle = "Quản lý danh mục";
+    ViewBag.BreadcrumbParentUrl = Url.Action("ManageCategories", "Category");
+    ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
+
+    Func<string, string> catImg = f =>
+        Url.Content(string.IsNullOrWhiteSpace(f) ? "~/Images/no-image.png"
+                                                 : "~/Images/Categories/" + f);
+}
+<main class="container-fluid p-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Thêm danh mục mới</h2>
+        @Html.Partial("_Breadcrumb")
+    </div>
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            @using (Html.BeginForm("Create", "Category", FormMethod.Post, new { area = "Seller", enctype = "multipart/form-data" }))
+            {
+                @Html.AntiForgeryToken()
+
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label class="form-label">Tên danh mục <span class="text-danger">*</span></label>
+                            @Html.TextBoxFor(m => m.CategoryName, new { @class = "form-control", placeholder = "VD: Rau lá, Củ quả...", maxlength = "100" })
+                            @Html.ValidationMessageFor(m => m.CategoryName, "", new { @class = "text-danger small" })
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả</label>
+                            @Html.TextAreaFor(m => m.Description, new { @class = "form-control", rows = "4", placeholder = "Mô tả (tùy chọn)", maxlength = "500" })
+                            @Html.ValidationMessageFor(m => m.Description, "", new { @class = "text-danger small" })
+                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i> Tối đa 500 ký tự. Slug sẽ được tạo tự động.</small>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card bg-light border-0">
+                            <div class="card-body">
+                                <h6 class="card-title">Ảnh danh mục</h6>
+                                <div class="mb-3 text-center">
+                                    <img id="imgPreview" src="@Url.Content("~/Images/no-image.png")"
+                                         class="rounded border"
+                                         style="width:160px;height:160px;object-fit:cover;" />
+                                </div>
+                                <div class="mb-3">
+                                    <input type="file" name="ImageFile" id="ImageFile" class="form-control"
+                                           accept=".jpg,.jpeg,.png,.gif,.webp" />
+                                    <small class="text-muted d-block mt-1">Tối đa 2MB. Hỗ trợ: JPG, PNG, GIF, WEBP.</small>
+                                </div>
+                                <div class="form-check form-switch">
+                                    @Html.CheckBoxFor(m => m.IsActive, new { @class = "form-check-input", @checked = "checked" })
+                                    <label class="form-check-label">Kích hoạt</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-end">
+                    <a href="@Url.Action("ManageCategories", "Category")" class="btn btn-secondary">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i> Lưu danh mục
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('ImageFile').addEventListener('change', function (e) {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+            const url = URL.createObjectURL(f);
+            const img = document.getElementById('imgPreview');
+            img.src = url;
+        });
+    </script>
+}

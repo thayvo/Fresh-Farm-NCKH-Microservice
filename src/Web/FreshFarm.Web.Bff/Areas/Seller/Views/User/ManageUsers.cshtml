@@ -1,0 +1,782 @@
+﻿@model IEnumerable<FreshFram.Models.UserAdmin>
+@{
+    ViewBag.Title = "Quản Lý Người Dùng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var roles = (IEnumerable<FreshFram.Models.Role>)(ViewBag.Roles ?? Enumerable.Empty<FreshFram.Models.Role>());
+    Func<string, string> nz = s => string.IsNullOrWhiteSpace(s) ? "-" : s;
+
+    var q = (Request.Query["searchTerm"].ToString() ?? "").Trim();
+    var total = Model?.Count() ?? 0;
+    var active = Model?.Count(x => x.IsActive) ?? 0;
+    var inactive = total - active;
+}
+
+<style>
+    :root {
+        --primary-blue: #2563eb;
+        --primary-blue-dark: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --secondary-blue: #60a5fa;
+        --accent-blue: #dbeafe;
+        --success-green: #10b981;
+        --danger-red: #ef4444;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-900: #111827;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        padding: 2rem;
+        border-radius: 16px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(37, 99, 235, 0.2);
+    }
+
+        .page-header h2 {
+            color: white;
+            font-size: 1.75rem;
+            margin: 0;
+            font-weight: 700;
+        }
+
+    .search-box {
+        background: white;
+        border-radius: 12px;
+        padding: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+        .search-box input {
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 0.625rem 1rem;
+            transition: all 0.3s;
+        }
+
+            .search-box input:focus {
+                border-color: var(--primary-blue);
+                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            }
+
+    .btn-primary-custom {
+        background: var(--primary-blue);
+        border: none;
+        border-radius: 10px;
+        padding: 0.625rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+        .btn-primary-custom:hover {
+            background: var(--primary-blue-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+
+    .btn-success-custom {
+        background: var(--success-green);
+        border: none;
+        border-radius: 10px;
+        padding: 0.625rem 1.5rem;
+        color: white;
+        font-weight: 600;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+        .btn-success-custom:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+            color: white;
+        }
+
+    .stats-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border-left: 5px solid var(--primary-blue);
+        transition: all 0.3s;
+    }
+
+        .stats-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+    .stats-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary-blue);
+        line-height: 1;
+        margin: 0.5rem 0;
+    }
+
+    .stats-label {
+        color: var(--gray-600);
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stats-detail {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-top: 1px solid var(--gray-200);
+        margin-top: 1rem;
+        color: var(--gray-700);
+        font-size: 0.9rem;
+    }
+
+    .main-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .card-header-custom {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-light) 100%);
+        color: white;
+        padding: 1.25rem 1.5rem;
+        font-weight: 600;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table-custom {
+        margin: 0;
+    }
+
+        .table-custom thead th {
+            background: var(--gray-50);
+            color: var(--gray-700);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--gray-200);
+            padding: 1rem;
+        }
+
+        .table-custom tbody tr {
+            transition: all 0.2s;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+            .table-custom tbody tr:hover {
+                background: var(--accent-blue);
+                transform: scale(1.01);
+            }
+
+        .table-custom tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+        }
+
+    .user-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid var(--primary-blue);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+    }
+
+    .badge-custom {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-primary-custom {
+        background: var(--accent-blue);
+        color: var(--primary-blue);
+    }
+
+    .badge-success-custom {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .badge-secondary-custom {
+        background: var(--gray-200);
+        color: var(--gray-700);
+    }
+
+    .badge-light-custom {
+        background: var(--gray-100);
+        color: var(--gray-600);
+    }
+
+    .btn-action {
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        border: 2px solid;
+        transition: all 0.3s;
+        font-weight: 600;
+    }
+
+    .btn-edit {
+        border-color: var(--primary-blue);
+        color: var(--primary-blue);
+        background: white;
+    }
+
+        .btn-edit:hover {
+            background: var(--primary-blue);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+    .btn-delete {
+        border-color: var(--danger-red);
+        color: var(--danger-red);
+        background: white;
+    }
+
+        .btn-delete:hover {
+            background: var(--danger-red);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+    .card-footer-custom {
+        background: var(--gray-50);
+        padding: 1rem 1.5rem;
+        color: var(--gray-600);
+        font-size: 0.85rem;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .modal-content {
+        border-radius: 16px;
+        border: none;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-light) 100%);
+        color: white;
+        border-radius: 16px 16px 0 0;
+        padding: 1.5rem;
+    }
+
+    .modal-title {
+        font-weight: 700;
+    }
+
+    .modal-body {
+        padding: 2rem;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--gray-700);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid var(--gray-200);
+        border-radius: 10px;
+        padding: 0.625rem 1rem;
+        transition: all 0.3s;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid var(--gray-200);
+    }
+
+    .btn-secondary {
+        background: var(--gray-200);
+        border: none;
+        color: var(--gray-700);
+        border-radius: 10px;
+        padding: 0.625rem 1.5rem;
+        font-weight: 600;
+    }
+
+        .btn-secondary:hover {
+            background: var(--gray-300);
+            color: var(--gray-900);
+        }
+
+    .btn-danger {
+        background: var(--danger-red);
+        border: none;
+        border-radius: 10px;
+        padding: 0.625rem 1.5rem;
+        font-weight: 600;
+    }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+    .empty-state {
+        padding: 3rem;
+        text-align: center;
+        color: var(--gray-600);
+    }
+
+        .empty-state i {
+            font-size: 3rem;
+            color: var(--gray-300);
+            margin-bottom: 1rem;
+        }
+</style>
+
+<main class="container-fluid p-4">
+    <div class="page-header">
+        <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+            <h2 class="mb-0"><i class="bi bi-people-fill me-2"></i>Quản Lý Người Dùng</h2>
+            <div class="d-flex gap-2 flex-wrap">
+                @using (Html.BeginForm("SearchUsers", "User", FormMethod.Post, new { area = "Seller", @class = "search-box d-flex gap-2" }))
+                {
+                    @Html.AntiForgeryToken()
+                    <input name="searchTerm" class="form-control" value="@q" placeholder="🔍 Tìm kiếm username, họ tên, email, SĐT..." style="min-width: 280px;" />
+                    <button class="btn btn-primary-custom" type="submit">
+                        <i class="bi bi-search"></i><span class="d-none d-sm-inline ms-1">Tìm kiếm</span>
+                    </button>
+                }
+                <button class="btn btn-success-custom" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                    <i class="bi bi-plus-circle me-2"></i>Thêm mới
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-9">
+            <div class="main-card">
+                <div class="card-header-custom">
+                    <h6 class="mb-0"><i class="bi bi-table me-2"></i>Danh sách quản trị viên</h6>
+                    <span class="small">
+                        <i class="bi bi-circle-fill text-success me-1" style="font-size: 0.5rem;"></i>
+                        Tổng: <strong>@total</strong> • Hoạt động: <strong>@active</strong> • Ngưng: <strong>@inactive</strong>
+                    </span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-custom">
+                        <thead>
+                            <tr class="text-nowrap">
+                                <th style="width:70px">ID</th>
+                                <th style="min-width:180px">Tên đăng nhập</th>
+                                <th style="min-width:180px">Họ tên</th>
+                                @*<th style="min-width:220px">Email</th>*@
+                                <th style="min-width:120px">SĐT</th>
+                                <th style="min-width:120px">Quyền</th>
+                                <th style="min-width:110px">Trạng thái</th>
+                                @*<th style="min-width:150px">Lần đăng nhập</th>
+                                <th style="min-width:130px">Ngày tạo</th>*@
+                                <th style="width:140px" class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model != null && Model.Any())
+                            {
+                                foreach (var u in Model)
+                                {
+                                    <tr data-id="@u.AdminID" data-name="@u.UserName">
+                                        <td class="text-muted fw-semibold">#@u.AdminID</td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                @if (!string.IsNullOrWhiteSpace(u.Avatar))
+                                                {
+                                                    <img src="@u.Avatar" alt="" class="user-avatar">
+                                                }
+                                                else
+                                                {
+                                                    <div class="user-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold" style="font-size: 0.875rem;">
+                                                        @(string.IsNullOrWhiteSpace(u.UserName) ? "?" : u.UserName.Substring(0, 1).ToUpper())
+                                                    </div>
+                                                }
+                                                <span class="fw-semibold">@nz(u.UserName)</span>
+                                            </div>
+                                        </td>
+                                        <td class="fw-medium">@nz(u.FullName)</td>
+                                        @*<td>
+                                            @if (!string.IsNullOrWhiteSpace(u.Email))
+                                            {
+                                                <a href="mailto:@u.Email" class="text-decoration-none" style="color: var(--primary-blue);">
+                                                    <i class="bi bi-envelope me-1"></i>@nz(u.Email)
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>*@
+                                        <td>
+                                            @if (!string.IsNullOrWhiteSpace(u.Phone))
+                                            {
+                                                <span><i class="bi bi-telephone me-1"></i>@nz(u.Phone)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (u.Role != null)
+                                            {
+                                                <span class="badge badge-primary-custom">
+                                                    <i class="bi bi-shield-check me-1"></i>@u.Role.RoleName
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-light-custom">Chưa gán</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (u.IsActive)
+                                            {
+                                                <span class="badge badge-success-custom">
+                                                    <i class="bi bi-check-circle-fill me-1"></i>Hoạt động
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge badge-secondary-custom">
+                                                    <i class="bi bi-pause-circle-fill me-1"></i>Ngưng
+                                                </span>
+                                            }
+                                        </td>
+                                        @*<td class="text-muted">
+                                            <i class="bi bi-clock me-1"></i>
+                                            @(u.LastLogin.HasValue ? u.LastLogin.Value.ToString("HH:mm dd/MM/yyyy") : "-")
+                                        </td>
+                                        <td class="text-muted">
+                                            <i class="bi bi-calendar3 me-1"></i>
+                                            @((u.CreatedDate == DateTime.MinValue) ? "-" : u.CreatedDate.ToString("dd/MM/yyyy"))
+                                        </td>*@
+                                        <td class="text-center text-nowrap">
+                                            <button class="btn btn-sm btn-action btn-edit js-edit" title="Chỉnh sửa" data-bs-toggle="modal" data-bs-target="#editUserModal">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-action btn-delete js-delete" title="Xóa" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="10" class="empty-state">
+                                        <i class="bi bi-inbox"></i>
+                                        <div class="fw-semibold">Chưa có người dùng nào</div>
+                                        <div class="small">Nhấn nút "Thêm mới" để tạo quản trị viên đầu tiên</div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer-custom text-end">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Cập nhật lần cuối: @DateTime.Now.ToString("HH:mm dd/MM/yyyy")
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3">
+            <div class="stats-card mb-4">
+                <div class="stats-label">
+                    <i class="bi bi-people me-1"></i>Tổng số người dùng
+                </div>
+                <div class="stats-number">@total</div>
+                <div class="stats-detail">
+                    <div><i class="bi bi-check-circle text-success me-1"></i>Đang hoạt động</div>
+                    <div class="fw-bold" style="color: var(--success-green);">@active</div>
+                </div>
+                <div class="stats-detail" style="border-top: none; margin-top: 0;">
+                    <div><i class="bi bi-pause-circle text-secondary me-1"></i>Tạm ngưng</div>
+                    <div class="fw-bold text-secondary">@inactive</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@* ===== MODALS ===== *@
+
+@* CREATE *@
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            @using (Html.BeginForm("CreateUser", "User", FormMethod.Post, new { area = "Seller", id = "frmCreateUser" }))
+            {
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2"></i>Thêm quản trị viên mới</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person-badge me-1"></i>Tên đăng nhập</label>
+                            <input name="userName" class="form-control" required placeholder="Nhập tên đăng nhập" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-key me-1"></i>Mật khẩu</label>
+                            <input name="password" type="text" class="form-control" required placeholder="Nhập mật khẩu" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-person me-1"></i>Họ tên đầy đủ</label>
+                            <input name="fullName" class="form-control" required placeholder="Nhập họ tên" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-envelope me-1"></i>Email</label>
+                            <input name="email" type="email" class="form-control" required placeholder="example@email.com" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-telephone me-1"></i>Số điện thoại</label>
+                            <input name="phone" class="form-control" placeholder="Nhập số điện thoại" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-image me-1"></i>Avatar URL</label>
+                            <input name="avatar" class="form-control" placeholder="https://..." />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-toggle-on me-1"></i>Trạng thái</label>
+                            <select name="isActive" class="form-select">
+                                <option value="true" selected>✓ Hoạt động</option>
+                                <option value="false">✕ Ngưng hoạt động</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-shield-check me-1"></i>Phân quyền</label>
+                            <select name="roleId" class="form-select">
+                                <option value="">-- Chưa gán quyền --</option>
+                                @foreach (var r in roles)
+                                {
+                                    <option value="@r.RoleID">@r.RoleName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                    </button>
+                    <button class="btn btn-primary-custom" type="submit">
+                        <i class="bi bi-check-circle me-1"></i>Lưu lại
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* EDIT *@
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            @using (Html.BeginForm("UpdateUser", "User", FormMethod.Post, new { area = "Seller", id = "frmEditUser" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="e_userId" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Cập nhật thông tin quản trị viên</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person-badge me-1"></i>Tên đăng nhập</label>
+                            <input name="userName" id="e_userName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-envelope me-1"></i>Email</label>
+                            <input name="email" id="e_email" type="email" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person me-1"></i>Họ tên</label>
+                            <input name="fullName" id="e_fullName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-telephone me-1"></i>Số điện thoại</label>
+                            <input name="phone" id="e_phone" class="form-control" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-image me-1"></i>Avatar URL</label>
+                            <input name="avatar" id="e_avatar" class="form-control" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label"><i class="bi bi-toggle-on me-1"></i>Trạng thái</label>
+                            <select name="isActive" id="e_isActive" class="form-select">
+                                <option value="true">✓ Hoạt động</option>
+                                <option value="false">✕ Ngưng hoạt động</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label"><i class="bi bi-shield-check me-1"></i>Phân quyền</label>
+                            <select name="roleId" id="e_roleId" class="form-select">
+                                <option value="">-- Chưa gán quyền --</option>
+                                @foreach (var r in roles)
+                                {
+                                    <option value="@r.RoleID">@r.RoleName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-key me-1"></i>Đổi mật khẩu (tùy chọn)</label>
+                            <input name="newPassword" id="e_newPassword" type="text" class="form-control" placeholder="Để trống nếu không muốn thay đổi mật khẩu" />
+                            <small class="text-muted"><i class="bi bi-info-circle me-1"></i>Chỉ nhập nếu muốn cập nhật mật khẩu mới</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                    </button>
+                    <button class="btn btn-primary-custom" type="submit">
+                        <i class="bi bi-check-circle me-1"></i>Cập nhật
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* DELETE *@
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            @using (Html.BeginForm("DeleteUser", "User", FormMethod.Post, new { area = "Seller", id = "frmDeleteUser" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="d_userId" />
+                <div class="modal-header bg-danger">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Xác nhận xóa quản trị viên</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning d-flex align-items-center" role="alert">
+                        <i class="bi bi-exclamation-circle-fill me-2 fs-4"></i>
+                        <div>
+                            <strong>Cảnh báo!</strong> Hành động này không thể hoàn tác.
+                        </div>
+                    </div>
+                    <p class="mb-0">Bạn có chắc chắn muốn xóa quản trị viên <strong class="text-danger" id="d_userName">này</strong> khỏi hệ thống?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                    </button>
+                    <button class="btn btn-danger" type="submit">
+                        <i class="bi bi-trash me-1"></i>Xóa ngay
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section scripts{
+    <script>
+(function () {
+    function anti() { return $('input[name="__RequestVerificationToken"]').first().val(); }
+
+    // CREATE
+    $('#frmCreateUser').on('submit', function (e) {
+        e.preventDefault();
+        const $f = $(this);
+        $.ajax({
+            url: $f.attr('action'),
+            type: 'POST',
+            data: $f.serialize(),
+            headers: { 'RequestVerificationToken': anti() },
+            success: function (res) {
+                if (res && res.success) { $('#createUserModal').modal('hide'); location.reload(); }
+                else { alert(res && res.message ? res.message : 'Lỗi không xác định.'); }
+            },
+            error: function () { alert('Có lỗi mạng.'); }
+        });
+    });
+
+    // OPEN EDIT
+    $(document).on('click', '.js-edit', function () {
+        const id = $(this).closest('tr').data('id');
+        $.get('@Url.Action("GetUserById","User", new { area = "Seller" })', { id: id }, function (res) {
+            if (!res || !res.success) { alert(res && res.message ? res.message : 'Không lấy được dữ liệu.'); return; }
+            const d = res.data;
+            $('#e_userId').val(d.userId);
+            $('#e_userName').val(d.userName);
+            $('#e_fullName').val(d.fullName);
+            $('#e_email').val(d.email);
+            $('#e_phone').val(d.phone || '');
+            $('#e_avatar').val(d.avatar || '');
+            $('#e_isActive').val(d.isActive ? 'true' : 'false');
+            $('#e_roleId').val(d.roleId || '');
+        });
+    });
+
+    // UPDATE
+    $('#frmEditUser').on('submit', function (e) {
+        e.preventDefault();
+        const $f = $(this);
+        $.ajax({
+            url: $f.attr('action'),
+            type: 'POST',
+            data: $f.serialize(),
+            headers: { 'RequestVerificationToken': anti() },
+            success: function (res) {
+                if (res && res.success) { $('#editUserModal').modal('hide'); location.reload(); }
+                else { alert(res && res.message ? res.message : 'Lỗi không xác định.'); }
+            },
+            error: function () { alert('Có lỗi mạng.'); }
+        });
+    });
+
+    // OPEN DELETE
+    $(document).on('click', '.js-delete', function () {
+        const $tr = $(this).closest('tr');
+        const id = $tr.data('id');
+        const name = $tr.data('name') || $tr.find('td:nth-child(2)').text().trim();
+        $('#d_userId').val(id);
+        $('#d_userName').text(name || 'quản trị viên này');
+    });
+
+    // DELETELe
+    $('#frmDeleteUser').on('submit', function (e) {
+        e.preventDefault();
+        const $f = $(this);
+        $.ajax({
+            url: $f.attr('action'),
+            type: 'POST',
+            data: $f.serialize(),
+            headers: { 'RequestVerificationToken': anti() },
+            success: function (res) {
+                if (res && res.success) { $('#deleteModal').modal('hide'); location.reload(); }
+                else { alert(res && res.message ? res.message : 'Không thể xóa.'); }
+            },
+            error: function () { alert('Có lỗi mạng.'); }
+        });
+    });
+})();
+    </script>
+}

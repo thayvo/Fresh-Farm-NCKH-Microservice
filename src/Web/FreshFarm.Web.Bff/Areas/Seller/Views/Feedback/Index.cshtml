@@ -1,0 +1,167 @@
+﻿@model IEnumerable<FreshFarm.Areas.Admin.Data.FeedbackViewModel>
+@{
+    ViewBag.Title = "Quản lý phản hồi người dùng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold text-primary mb-0">
+            <i class="bi bi-chat-dots"></i> Quản lý phản hồi người dùng
+        </h4>
+        <div class="d-flex">
+            <input type="text" id="searchBox" class="form-control me-2" placeholder="Tìm theo tên, email hoặc chủ đề..." style="width: 250px;" />
+            <button class="btn btn-outline-primary" onclick="filterFeedbacks()">
+                <i class="bi bi-search"></i> Tìm kiếm
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 200px;">Người gửi</th>
+                            <th style="width: 220px;">Email</th>
+                            <th style="width: 120px;">SĐT</th>
+                            <th>Chủ đề</th>
+                            <th>Nội dung</th>
+                            <th class="text-center" style="width: 130px;">Ngày gửi</th>
+                            <th class="text-center" style="width: 120px;">Trạng thái</th>
+                            <th class="text-center" style="width: 180px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedbackTable">
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var item in Model)
+                            {
+                                var statusClass = item.StatusDisplay == "Đã xử lý" ? "text-success fw-bold" : "text-warning fw-bold";
+
+                                <tr id="row-@item.Id">
+                                    <td>
+                                        <div>@item.SenderName</div>
+                                    </td>
+                                    <td>@item.SenderEmail</td>
+                                    <td>@item.SenderPhone</td>
+                                    <td>@item.Subject</td>
+                                    <td>@item.ShortMessage</td>
+                                    <td class="text-center">@item.CreatedAtFormatted</td>
+                                    <td class="text-center @statusClass">@item.StatusDisplay</td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="showDetail(@item.Id)">
+                                            <i class="bi bi-eye"></i> Xem
+                                        </button>
+                                        @if (item.StatusDisplay != "Đã xử lý")
+                                        {
+                                            <button class="btn btn-sm btn-outline-success me-1" onclick="updateStatus(@item.Id)">
+                                                <i class="bi bi-check2-circle"></i> Xử lý
+                                            </button>
+                                        }
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteFeedback(@item.Id)">
+                                            <i class="bi bi-trash"></i> Xóa
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    Không có phản hồi nào.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xem chi tiết -->
+<div class="modal fade" id="feedbackDetailModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-chat-dots"></i> Chi tiết phản hồi</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Người gửi:</dt>
+                    <dd class="col-sm-9" id="detailName"></dd>
+
+                    <dt class="col-sm-3">Email:</dt>
+                    <dd class="col-sm-9" id="detailEmail"></dd>
+
+                    <dt class="col-sm-3">Số điện thoại:</dt>
+                    <dd class="col-sm-9" id="detailPhone"></dd>
+
+                    <dt class="col-sm-3">Chủ đề:</dt>
+                    <dd class="col-sm-9" id="detailSubject"></dd>
+
+                    <dt class="col-sm-3">Nội dung:</dt>
+                    <dd class="col-sm-9" id="detailMessage"></dd>
+
+                    <dt class="col-sm-3">Ngày gửi:</dt>
+                    <dd class="col-sm-9" id="detailCreated"></dd>
+
+                    <dt class="col-sm-3">Ghi chú admin:</dt>
+                    <dd class="col-sm-9" id="detailNote"></dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+    function filterFeedbacks() {
+        const keyword = $('#searchBox').val().toLowerCase().trim();
+        $('#feedbackTable tr').each(function () {
+            const text = $(this).text().toLowerCase();
+            $(this).toggle(text.includes(keyword));
+        });
+    }
+
+    function updateStatus(id) {
+        $.post('@Url.Action("UpdateStatus", "Feedback", new { area = "Seller" })',
+            { id: id, status: "processed" },
+            function (res) {
+                alert(res.message);
+                if (res.success) {
+                    const row = $('#row-' + id);
+                    row.find('td:nth-child(7)').text("Đã xử lý").removeClass("text-warning").addClass("text-success fw-bold");
+                    row.find('button.btn-outline-success').remove(); // ẩn nút xử lý
+                }
+            });
+    }
+
+    function deleteFeedback(id) {
+        if (!confirm('Bạn có chắc muốn xóa phản hồi này?')) return;
+        $.post('@Url.Action("Delete", "Feedback", new { area = "Seller" })',
+            { id: id },
+            function (res) {
+                alert(res.message);
+                if (res.success) $('#row-' + id).fadeOut();
+            });
+    }
+
+    function showDetail(id) {
+        const row = $('#row-' + id);
+        $('#detailName').text(row.find('td:nth-child(1)').text());
+        $('#detailEmail').text(row.find('td:nth-child(2)').text());
+        $('#detailPhone').text(row.find('td:nth-child(3)').text());
+        $('#detailSubject').text(row.find('td:nth-child(4)').text());
+        $('#detailMessage').text(row.find('td:nth-child(5)').text());
+        $('#detailCreated').text(row.find('td:nth-child(6)').text());
+        $('#detailNote').text(row.find('td:nth-child(8)').text() || "(Chưa có)");
+        $('#feedbackDetailModal').modal('show');
+    }
+    </script>
+}

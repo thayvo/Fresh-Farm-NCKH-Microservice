@@ -1,0 +1,61 @@
+@using System.Linq
+@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Controllers.ReviewController.ReportedReviewRow>
+@{
+    ViewBag.Title = "Bình luận bị báo cáo";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var rows = Model ?? Enumerable.Empty<FreshFarm.Web.Bff.Areas.Seller.Controllers.ReviewController.ReportedReviewRow>();
+}
+
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0 fw-bold text-primary">
+            <i class="bi bi-flag"></i> Bình luận bị báo cáo
+        </h4>
+        <a class="btn btn-outline-primary" href="@Url.Action("ManageReview", "Review", new { area = "Seller" })">
+            <i class="bi bi-arrow-left"></i> Về quản lý đánh giá
+        </a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            @if (rows.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Mã review</th>
+                                <th>Khách hàng</th>
+                                <th>Sản phẩm</th>
+                                <th>Điểm</th>
+                                <th>Số lượt báo cáo</th>
+                                <th>Bị báo cáo từ</th>
+                                <th>Nội dung</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in rows)
+                            {
+                                <tr>
+                                    <td>#@item.ReviewID</td>
+                                    <td>@item.CustomerName</td>
+                                    <td>@item.ProductName</td>
+                                    <td>@item.Rating</td>
+                                    <td><span class="badge bg-danger">@item.OpenCount</span></td>
+                                    <td>@item.FirstReportAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@item.Comment</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success mb-0">
+                    Hiện không có bình luận nào đang bị báo cáo.
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,199 @@
+﻿@model FreshFram.Models.DashboardViewModel
+
+@{
+    ViewBag.Title = "Dashboard";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <h2 class="fw-bold mb-4">Bảng điều khiển</h2>
+
+    <!-- 4 Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm border-primary stat-card h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h6 class="text-muted text-uppercase">Doanh thu (Tháng)</h6>
+                            <h4 class="fw-bold" data-dashboard-field="monthRevenue">@string.Format("{0:N0}₫", Model.MonthlyRevenue)</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-currency-dollar fs-2 text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm border-success stat-card h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h6 class="text-muted text-uppercase">Đơn hàng mới</h6>
+                            <h4 class="fw-bold" data-dashboard-field="newOrders">@Model.NewOrdersCount</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-cart-check-fill fs-2 text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm border-warning stat-card h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h6 class="text-muted text-uppercase">Khách hàng</h6>
+                            <h4 class="fw-bold">@Model.TotalCustomers</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-person-plus-fill fs-2 text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm border-danger stat-card h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h6 class="text-muted text-uppercase">Sản phẩm sắp hết</h6>
+                            <h4 class="fw-bold">@Model.LowStockProducts</h4>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-exclamation-triangle-fill fs-2 text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">Doanh thu 7 ngày gần nhất</div>
+                <div class="card-body" style="height:320px;">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">Tỉ lệ danh mục bán chạy</div>
+                <div class="card-body" style="height:320px;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Orders -->
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Đơn hàng gần đây</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Mã đơn hàng</th>
+                        <th>Khách hàng</th>
+                        <th>Ngày đặt</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in Model.RecentOrders)
+                    {
+                        <tr>
+                            <td>@order.OrderCode</td>
+                            <td>@order.CustomerName</td>
+                            <td>@order.OrderDate.ToString("dd/MM/yyyy")</td>
+                            <td>@string.Format("{0:N0}₫", order.TotalAmount)</td>
+                            <td><span class="badge @order.StatusBadgeClass">@order.Status</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+@section scripts
+{
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Sales Chart
+        var salesCtx = document.getElementById("salesChart");
+        var salesLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartLabels));
+        var salesData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.ChartData));
+        if (salesCtx) {
+          window.adminSalesChart = new Chart(salesCtx, {
+            type: "line",
+            data: {
+              labels: salesLabels,
+              datasets: [{
+                label: "Doanh thu (₫)",
+                data: salesData,
+                fill: false,
+                borderColor: "rgb(0,138,79)",
+                tension: 0.1
+              }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+          });
+        }
+
+        // Category Chart
+        var catCtx = document.getElementById("categoryChart");
+        var catLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryLabels));
+        var catData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CategoryData));
+        if (catCtx) {
+          window.adminCategoryChart = new Chart(catCtx, {
+            type: "doughnut",
+            data: {
+              labels: catLabels,
+              datasets: [{ data: catData, hoverOffset: 4 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+          });
+        }
+
+        // Realtime: cập nhật card doanh thu & đơn mới theo SignalR
+        (function initAdminDashboardRealtime() {
+            if (!window.jQuery || !$.connection || !$.connection.orderHub) return;
+            var hub = $.connection.orderHub;
+
+            function refreshStats() {
+                $.getJSON('@Url.Action("GetStatistics", "Order", new { area = "Seller" })', function (res) {
+                    if (!res || !res.success || !res.data) return;
+                    var data = res.data;
+                    var revEl = document.querySelector('[data-dashboard-field="monthRevenue"]');
+                    if (revEl) revEl.textContent = (data.monthRevenue || "0") + "₫";
+                    var newEl = document.querySelector('[data-dashboard-field="newOrders"]');
+                    if (newEl) newEl.textContent = data.pendingOrders || 0;
+                });
+            }
+
+            hub.client.orderStatusChanged = function () {
+                refreshStats();
+            };
+
+            $.connection.hub.start().done(function () {
+                if (hub.server && hub.server.joinAdmin) {
+                    hub.server.joinAdmin();
+                }
+            });
+        })();
+      });
+    </script>
+}

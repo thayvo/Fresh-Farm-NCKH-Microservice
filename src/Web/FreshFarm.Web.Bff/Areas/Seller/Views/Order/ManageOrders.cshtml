@@ -1,0 +1,890 @@
+﻿@{
+    ViewBag.Title = "Quản Lý Đơn Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    :root {
+        --primary-blue: #0ea5e9;
+        --primary-blue-dark: #0284c7;
+        --primary-blue-light: #38bdf8;
+        --bg-blue-light: #f0f9ff;
+        --border-blue: #bae6fd;
+    }
+
+    /* Background gradient */
+    main.container-fluid {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        min-height: 100vh;
+    }
+
+    /* Header styles */
+    .page-header {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+    }
+
+    .page-header h2 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .page-header h2::before {
+        content: "📦";
+        font-size: 2rem;
+    }
+
+    /* Card improvements */
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: transform 0.2s, box-shadow 0.2s;
+        background: white;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .search-card {
+        border-left: 4px solid var(--primary-blue);
+    }
+
+    /* Form controls */
+    .form-control, .form-select {
+        border: 2px solid var(--border-blue);
+        border-radius: 8px;
+        padding: 0.625rem 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15);
+    }
+
+    /* Button styles */
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        border: none;
+        border-radius: 8px;
+        padding: 0.625rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+        background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #0369a1 100%);
+    }
+
+    /* Table improvements */
+    .table-responsive {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        color: white;
+    }
+
+    .table thead th {
+        border: none;
+        padding: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+
+    .table tbody tr {
+        transition: all 0.2s;
+        border-bottom: 1px solid #e0f2fe;
+    }
+
+    .table tbody tr:hover {
+        background-color: var(--bg-blue-light);
+        transform: scale(1.01);
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        vertical-align: middle;
+    }
+
+    /* Badge styles */
+    .badge {
+        padding: 0.5rem 0.875rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-ready {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        color: white;
+    }
+
+    .bg-secondary { background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important; }
+    .bg-info { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important; }
+    .bg-warning { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important; }
+    .bg-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important; }
+    .bg-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important; }
+
+    /* Action buttons */
+    .btn-sm {
+        border-radius: 6px;
+        padding: 0.375rem 0.75rem;
+        transition: all 0.2s;
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+    }
+
+    .btn-success:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-primary.btn-sm {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        border: none;
+    }
+
+    .btn-primary.btn-sm:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border: none;
+    }
+
+    .btn-danger:hover {
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Pagination */
+    .pagination .page-link {
+        color: var(--primary-blue);
+        border: 2px solid var(--border-blue);
+        border-radius: 6px;
+        margin: 0 0.25rem;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .pagination .page-link:hover {
+        background-color: var(--bg-blue-light);
+        border-color: var(--primary-blue);
+        transform: translateY(-2px);
+    }
+
+    .pagination .page-item.active .page-link {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        border-color: var(--primary-blue);
+        box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+    }
+
+    .pagination .page-item.disabled .page-link {
+        background-color: #f1f5f9;
+        border-color: #e2e8f0;
+    }
+
+    /* Card footer */
+    .card-footer {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+        border-top: 2px solid var(--border-blue);
+        padding: 1rem 1.5rem;
+        border-radius: 0 0 12px 12px;
+    }
+
+    #pagination-info {
+        color: var(--primary-blue-dark);
+        font-weight: 600;
+    }
+
+    /* Modal improvements */
+    .modal-content {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.25rem 1.5rem;
+    }
+
+    .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+    }
+
+    .modal-title {
+        font-weight: 700;
+        font-size: 1.25rem;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        border-top: 2px solid var(--border-blue);
+        padding: 1rem 1.5rem;
+    }
+
+    /* Loading spinner */
+    .spinner-border {
+        color: var(--primary-blue);
+    }
+
+    /* Icons styling */
+    .bi {
+        font-size: 1rem;
+    }
+
+    /* Input group icon */
+    .search-icon {
+        position: absolute;
+        right: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--primary-blue);
+        pointer-events: none;
+    }
+
+    .position-relative {
+        position: relative;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #64748b;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    /* Responsive improvements */
+    @@media (max-width: 768px) {
+        .page-header {
+            padding: 1.5rem;
+        }
+
+        .page-header h2 {
+            font-size: 1.5rem;
+        }
+
+        .table {
+            font-size: 0.875rem;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+        }
+    }
+</style>
+
+<script>
+/* ============================
+   Phân trang & tìm kiếm (AJAX)
+   ============================ */
+(function(){
+    var PAGE_SIZE = 10;
+    var currentPage = 1;
+    var totalItems = 0;
+    var usingSearch = false;
+    var currentFilters = { searchTerm: '', statusFilter: '', dateFilter: '' };
+
+    function updatePaginationInfo(total, page, pageSize) {
+        var info = document.getElementById('pagination-info');
+        var totalPages = Math.max(1, Math.ceil((total || 0) / (pageSize || PAGE_SIZE)));
+        var current = Math.min(Math.max(1, page || 1), totalPages);
+        var from = total === 0 ? 0 : ((current - 1) * (pageSize || PAGE_SIZE)) + 1;
+        var to = Math.min(total || 0, current * (pageSize || PAGE_SIZE));
+        if (info) info.textContent = 'Hiển thị ' + from + '-' + to + ' / ' + (total || 0);
+    }
+
+    function renderPagination(total, page, pageSize) {
+        var wrapper = document.getElementById('pagination-wrapper');
+        if (!wrapper) return;
+        wrapper.innerHTML = '';
+        var totalPages = Math.max(1, Math.ceil((total || 0) / (pageSize || PAGE_SIZE)));
+        var current = Math.min(Math.max(1, page || 1), totalPages);
+
+        function makeLi(text, p, disabled, active){
+            var li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+            var a = document.createElement('a');
+            a.className = 'page-link'; a.href = '#'; a.textContent = text;
+            if (!disabled) a.onclick = function(e){ e.preventDefault(); goToPage(p); };
+            li.appendChild(a); return li;
+        }
+        wrapper.appendChild(makeLi('«', current - 1, current <= 1, false));
+        var span = 2; var start = Math.max(1, current - span); var end = Math.min(totalPages, current + span);
+        if (start > 1) wrapper.appendChild(makeLi('1', 1, false, current === 1));
+        if (start > 2) { var ell=document.createElement('li'); ell.className='page-item disabled'; ell.innerHTML='<span class="page-link">…</span>'; wrapper.appendChild(ell); }
+        for (var p = start; p <= end; p++) wrapper.appendChild(makeLi(String(p), p, false, p === current));
+        if (end < totalPages - 1) { var ell2=document.createElement('li'); ell2.className='page-item disabled'; ell2.innerHTML='<span class="page-link">…</span>'; wrapper.appendChild(ell2); }
+        if (end < totalPages) wrapper.appendChild(makeLi(String(totalPages), totalPages, false, current === totalPages));
+        wrapper.appendChild(makeLi('»', current + 1, current >= totalPages, false));
+    }
+
+    function goToPage(p){ if (usingSearch) searchOrders(p); else loadOrders(p); }
+
+    window.loadOrders = function(page){
+        currentPage = (typeof page === 'number' && page > 0) ? page : (currentPage || 1);
+        usingSearch = false;
+        $.ajax({
+            url: '@Url.Action("GetOrdersPaged", "Order", new { area = "Seller" })',
+            type: 'GET', dataType: 'json', data: { page: currentPage, pageSize: PAGE_SIZE },
+            success: function(data){
+                if (data?.success){
+                    totalItems = data.total || 0;
+                    renderTable(data.data || []);
+                    renderPagination(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                    updatePaginationInfo(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                } else { showError(data?.message || 'Lỗi không xác định'); }
+            }, error: function(xhr, status, error){ showError('Lỗi khi tải dữ liệu: ' + error); }
+        });
+    };
+
+    window.searchOrders = function(page){
+        currentPage = (typeof page === 'number' && page > 0) ? page : (currentPage || 1);
+        usingSearch = true;
+        $.ajax({
+            url: '@Url.Action("SearchOrdersPaged", "Order", new { area = "Seller" })',
+            type: 'GET', dataType: 'json',
+            data: {
+                searchTerm: currentFilters.searchTerm,
+                statusFilter: currentFilters.statusFilter,
+                dateFilter: currentFilters.dateFilter,
+                page: currentPage, pageSize: PAGE_SIZE
+            },
+            success: function(data){
+                if (data?.success){
+                    totalItems = data.total || 0; var items = data.data || [];
+                    if (items.length === 0) {
+                        const tb = document.getElementById('orders-table-body');
+                        tb.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">🔍</div><p>Không tìm thấy kết quả</p></div></td></tr>';
+                    } else { renderTable(items); }
+                    renderPagination(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                    updatePaginationInfo(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                } else { showError(data?.message || 'Lỗi không xác định'); }
+            }, error: function(xhr, status, error){ showError('Lỗi khi tìm kiếm: ' + error); }
+        });
+    };
+
+    function __bindOrderHandlers(){
+        $('#searchBtn').off('click').on('click', function(){
+            currentFilters.searchTerm = $('#searchInput').val().trim();
+            currentFilters.statusFilter = $('#statusFilter').val();
+            currentFilters.dateFilter = $('#dateFilter').val();
+            searchOrders(1);
+        });
+        $('#statusFilter').off('change').on('change', function(){ currentFilters.statusFilter = this.value; searchOrders(1); });
+        $('#dateFilter').off('change').on('change', function(){ currentFilters.dateFilter = this.value; searchOrders(1); });
+        $('#searchInput').off('input').on('input', function(){
+            if (this.value.trim() === '') {
+                currentFilters.searchTerm = '';
+                if (!currentFilters.statusFilter && !currentFilters.dateFilter) { usingSearch = false; loadOrders(1); }
+            }
+        });
+        $('#searchInput').off('keypress').on('keypress', function(e){ if (e.key === 'Enter') $('#searchBtn').click(); });
+
+        try {
+            var sf = document.getElementById('statusFilter');
+            if (sf && !Array.from(sf.options).some(function(o){ return o.value==='Ready'; })){
+                var opt = document.createElement('option');
+                opt.value = 'Ready'; opt.text = 'Đã xử lý / Sẵn sàng giao';
+                var idx = Array.from(sf.options).findIndex(function(o){ return o.value==='Processing'; });
+                if (idx>=0 && sf.options.length>idx+1) sf.add(opt, sf.options[idx+1]); else sf.add(opt);
+            }
+            var os = document.getElementById('orderStatusSelect');
+            if (os && !Array.from(os.options).some(function(o){ return o.value==='Ready'; })){
+                var opt2 = document.createElement('option');
+                opt2.value = 'Ready'; opt2.text = 'Đã xử lý / Sẵn sàng giao';
+                var idx2 = Array.from(os.options).findIndex(function(o){ return o.value==='Processing'; });
+                if (idx2>=0 && os.options.length>idx2+1) os.add(opt2, os.options[idx2+1]); else os.add(opt2);
+            }
+        } catch(e) { console.warn(e); }
+
+        loadOrders(1);
+    }
+    if (window.jQuery) { $(__bindOrderHandlers); }
+    else { window.addEventListener('load', __bindOrderHandlers); }
+})();
+</script>
+
+<main class="container-fluid p-4">
+    <div class="page-header">
+        <h2>Quản lý đơn hàng</h2>
+    </div>
+
+    <div class="card shadow-sm mb-4 search-card">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <div class="position-relative">
+                        <input type="text" class="form-control" id="searchInput"
+                               placeholder="Tìm theo mã đơn hàng, tên khách hàng..." />
+                        <i class="bi bi-search search-icon"></i>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="statusFilter">
+                        <option value="">Lọc theo trạng thái</option>
+                        <option value="All">Tất cả</option>
+                        <option value="Pending">Chờ xử lý</option>
+                        <option value="Processing">Đang xử lý</option>
+                        <option value="Shipped">Đang giao hàng</option>
+                        <option value="Delivered">Đã giao hàng</option>
+                        <option value="Canceled">Đã hủy</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="date" class="form-control" id="dateFilter" />
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" id="searchBtn">
+                        <i class="bi bi-search me-2"></i>Tìm kiếm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Mã ĐH</th>
+                            <th>Khách hàng</th>
+                            <th>Ngày đặt</th>
+                            <th class="text-end">Tổng tiền</th>
+                            <th>Trạng thái</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-table-body">
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Đang tải...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <span class="small" id="pagination-info"></span>
+            <nav>
+                <ul class="pagination justify-content-end mb-0" id="pagination-wrapper"></ul>
+            </nav>
+        </div>
+    </div>
+</main>
+
+@section modal{
+    <div class="modal fade" id="orderDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="detailModalOrderId">Chi tiết đơn hàng</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailModalBody">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-primary" id="btnPrintInvoice">
+                        <i class="bi bi-printer me-2"></i>In hóa đơn
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editOrderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cập nhật đơn hàng</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Mã đơn hàng: <strong id="editOrderId"></strong></p>
+                    <div class="mb-3">
+                        <label for="orderStatusSelect" class="form-label">Trạng thái đơn hàng</label>
+                        <select class="form-select" id="orderStatusSelect">
+                            <option value="Pending">Chờ xử lý</option>
+                            <option value="Processing">Đang xử lý</option>
+                            <option value="Ready">Đã xử lý / Sẵn sàng giao</option>
+                            <option value="Shipped">Đang giao hàng</option>
+                            <option value="Delivered">Đã giao hàng</option>
+                            <option value="Canceled">Đã hủy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary" id="saveOrderStatusBtn">
+                        <i class="bi bi-check-lg me-2"></i>Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteOrderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa đơn hàng <strong id="deleteOrderCode"></strong> không?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                        <i class="bi bi-trash me-2"></i>Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+let currentEditingOrderId = null;
+let currentDeletingOrderId = null;
+let currentViewingOrderId = null;
+
+function getToken(){
+    return $('input[name="__RequestVerificationToken"]').val();
+}
+function vnd(n){ return Number(n||0).toLocaleString('vi-VN') + '₫'; }
+function fmtDate(d){ try{ return d ? new Date(d).toLocaleString('vi-VN') : ''; }catch(e){return d||'';} }
+
+function showError(message) {
+    const tableBody = document.getElementById('orders-table-body');
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><div class="empty-state"><div class="empty-state-icon">⚠️</div><p>${message}</p></div></td></tr>`;
+}
+
+function getStatusText(status) {
+    switch(status) {
+        case "Processing": return "Đang xử lý";
+        case "Ready": return "Đã xử lý / Sẵn sàng giao";
+        case "Shipped": return "Đang giao hàng";
+        case "Delivered": return "Đã giao hàng";
+        case "Canceled": return "Đã hủy";
+        case "Pending": return "Chờ xử lý";
+        default: return status || '';
+    }
+}
+
+function renderTable(ordersToShow) {
+    const tableBody = document.getElementById('orders-table-body');
+
+    if (!ordersToShow || ordersToShow.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">📦</div><p>Không có đơn hàng</p></div></td></tr>';
+        return;
+    }
+
+    let html = '';
+    ordersToShow.forEach(o => {
+        const badgeClass = o.StatusBadgeClass || ({
+            Pending:'bg-secondary',
+            Processing:'bg-info',
+            Ready:'badge-ready',
+            Shipped:'bg-warning',
+            Delivered:'bg-success',
+            Canceled:'bg-danger'
+        }[o.Status] || 'bg-secondary');
+
+        html += `
+            <tr data-order-id="${o.OrderID}">
+                <td><strong>${o.OrderCode ?? ''}</strong></td>
+                <td>${o.CustomerName ?? ''}</td>
+                <td>${fmtDate(o.OrderDate)}</td>
+                <td class="text-end"><strong>${vnd(o.TotalAmount)}</strong></td>
+                <td><span class="badge ${badgeClass}">${getStatusText(o.Status)}</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-success me-1" title="Chi tiết"><i class="bi bi-eye-fill"></i></button>
+                    <button class="btn btn-sm btn-primary me-1" title="Sửa"><i class="bi bi-pencil-square"></i></button>
+                    <button class="btn btn-sm btn-danger" title="Xóa"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    tableBody.innerHTML = html;
+
+    tableBody.onclick = function(ev){
+        const btn = ev.target.closest('button');
+        if(!btn) return;
+        const tr = btn.closest('tr');
+        const id = tr ? parseInt(tr.getAttribute('data-order-id')) : NaN;
+        const code = tr ? (tr.querySelector('td:first-child')?.textContent.trim() || '') : '';
+        const statusText = tr?.querySelector('.badge')?.textContent.trim() || '';
+
+        const toKey = (t) => {
+            const s = (t || '').toLowerCase().trim();
+            if (s === 'chờ xử lý') return 'Pending';
+            if (s === 'đang xử lý') return 'Processing';
+            if (s === 'đã xử lý / sẵn sàng giao') return 'Ready';
+            if (s === 'đang giao hàng') return 'Shipped';
+            if (s === 'đã giao hàng') return 'Delivered';
+            if (s === 'đã hủy') return 'Canceled';
+            return '';
+        };
+
+        if(btn.querySelector('.bi-pencil-square')){ if(id) window.editOrderStatus(id, code, toKey(statusText)); }
+        else if(btn.querySelector('.bi-eye-fill')){ if(id) window.viewOrderDetail(id); }
+        else if(btn.querySelector('.bi-trash')){ if(id) window.deleteOrder(id, code); }
+    };
+}
+
+function safeText(str){ return String(str ?? ''); }
+
+window.viewOrderDetail = function(orderId) {
+    currentViewingOrderId = orderId;
+    const modalBody = document.getElementById('detailModalBody');
+    modalBody.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Đang tải...</span></div></div>';
+
+    $.ajax({
+        url: '@Url.Action("GetOrderDetail", "Order", new { area = "Seller" })',
+        type: 'GET',
+        dataType: 'json',
+        data: { orderId: orderId },
+        success: function(data) {
+            if (data?.success) {
+                let itemsHtml = '';
+                (data.items || []).forEach(item => {
+                    itemsHtml += `
+                        <tr>
+                            <td>${safeText(item.productName)}</td>
+                            <td>${safeText(item.quantity)}</td>
+                            <td class="text-end">${vnd(item.unitPrice)}</td>
+                            <td class="text-end">${vnd(item.totalPrice)}</td>
+                        </tr>
+                    `;
+                });
+
+                modalBody.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><strong>Thông tin khách hàng</strong></h6>
+                            <p class="mb-1"><strong>Tên:</strong> ${safeText(data.customerName)}</p>
+                            <p class="mb-1"><strong>Email:</strong> ${safeText(data.customerEmail)}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><strong>Thông tin đơn hàng</strong></h6>
+                            <p class="mb-1"><strong>Ngày đặt:</strong> ${fmtDate(data.orderDate)}</p>
+                            <p class="mb-1"><strong>Trạng thái:</strong> ${safeText(data.status)}</p>
+                            <p class="mb-1"><strong>Thanh toán:</strong> ${safeText(data.paymentMethod)}</p>
+                            <p class="mb-1"><strong>TT thanh toán:</strong> ${safeText(data.paymentStatus)}</p>
+                        </div>
+                    </div>
+                    <hr />
+                    <h6><strong>Thông tin người nhận</strong></h6>
+                    <p class="mb-1"><strong>Tên người nhận:</strong> ${safeText(data.buyerFullName)}</p>
+                    <p class="mb-1"><strong>SĐT:</strong> ${safeText(data.buyerPhone)}</p>
+                    <p class="mb-1"><strong>Email:</strong> ${safeText(data.buyerEmail)}</p>
+                    <p class="mb-1"><strong>Địa chỉ:</strong> ${safeText(data.address)}</p>
+                    ${data.orderNote ? `<p class="mb-1"><strong>Ghi chú:</strong> ${safeText(data.orderNote)}</p>` : ''}
+                    <hr />
+                    <h6><strong>Chi tiết sản phẩm</strong></h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Sản phẩm</th>
+                                <th>SL</th>
+                                <th class="text-end">Giá</th>
+                                <th class="text-end">Tạm tính</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end">Tạm tính:</td>
+                                <td class="text-end">${vnd(data.subtotal)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end">Phí vận chuyển:</td>
+                                <td class="text-end">${vnd(data.shippingFee)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">Tổng cộng:</td>
+                                <td class="text-end fw-bold">${vnd(data.total)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `;
+
+                document.getElementById('detailModalOrderId').textContent = 'Chi tiết đơn hàng ' + (data.orderCode || '');
+                new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
+            } else {
+                alert('Lỗi: ' + (data?.message || 'Không xác định'));
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+            alert('Lỗi khi tải dữ liệu: ' + error);
+        }
+    });
+};
+
+const printBtn = document.getElementById('btnPrintInvoice');
+if (printBtn) {
+    printBtn.addEventListener('click', function(){
+        if (!currentViewingOrderId) { alert('Chưa có đơn hàng để in.'); return; }
+        const url = '@Url.Action("PrintInvoice","Order", new { area="Seller"})' + '?orderId=' + encodeURIComponent(currentViewingOrderId);
+        window.open(url, '_blank');
+    });
+}
+
+window.editOrderStatus = function(orderId, orderCode, currentStatus) {
+    currentEditingOrderId = orderId;
+    document.getElementById('editOrderId').textContent = orderCode || '';
+    document.getElementById('orderStatusSelect').value = currentStatus || 'Pending';
+    new bootstrap.Modal(document.getElementById('editOrderModal')).show();
+};
+
+document.getElementById('saveOrderStatusBtn')?.addEventListener('click', function() {
+    const newStatus = document.getElementById('orderStatusSelect').value;
+
+    $.ajax({
+        url: '@Url.Action("UpdateOrderStatus", "Order", new { area = "Seller" })',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+            __RequestVerificationToken: getToken(),
+            orderId: currentEditingOrderId,
+            newStatus: newStatus
+        },
+        success: function(data) {
+            if (data?.success) {
+                const row = document.querySelector(`tr[data-order-id="${currentEditingOrderId}"]`);
+                if (row) {
+                    const badgeSpan = row.querySelector('.badge');
+                    if (badgeSpan) {
+                        const map = { Pending:'bg-secondary', Processing:'bg-info', Ready:'badge-ready', Shipped:'bg-warning', Delivered:'bg-success', Canceled:'bg-danger' };
+                        const cls = data.statusClass || map[newStatus] || 'bg-secondary';
+                        badgeSpan.className = 'badge ' + cls;
+                        badgeSpan.textContent = data.statusText || (function(s){
+                            return {Pending:'Chờ xử lý',Processing:'Đang xử lý',Ready:'Đã xử lý / Sẵn sàng giao',Shipped:'Đang giao hàng',Delivered:'Đã giao hàng',Canceled:'Đã hủy'}[s] || s;
+                        })(newStatus);
+                    }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide();
+                alert('Cập nhật thành công');
+            } else {
+                alert('Lỗi: ' + (data?.message || 'Không xác định'));
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+            alert('Lỗi khi cập nhật: ' + error);
+        }
+    });
+});
+
+window.deleteOrder = function(orderId, orderCode) {
+    currentDeletingOrderId = orderId;
+    document.getElementById('deleteOrderCode').textContent = orderCode || '';
+    new bootstrap.Modal(document.getElementById('deleteOrderModal')).show();
+};
+
+document.getElementById('confirmDeleteBtn')?.addEventListener('click', function() {
+    $.ajax({
+        url: '@Url.Action("DeleteOrder", "Order", new { area = "Seller" })',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+            __RequestVerificationToken: getToken(),
+            orderId: currentDeletingOrderId
+        },
+        success: function(data) {
+            if (data?.success) {
+                bootstrap.Modal.getInstance(document.getElementById('deleteOrderModal')).hide();
+                alert('Xóa thành công');
+                if (typeof usingSearch !== 'undefined' && usingSearch) { window.searchOrders(currentPage); }
+                else { window.loadOrders(currentPage); }
+            } else {
+                alert('Lỗi: ' + (data?.message || 'Không xác định'));
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+            alert('Lỗi khi xóa: ' + error);
+        }
+    });
+});
+
+(function initOrderRealtime() {
+    if (!window.jQuery || !$.connection || !$.connection.orderHub) return;
+    var hub = $.connection.orderHub;
+
+    hub.client.orderStatusChanged = function (payload) {
+        if (!payload || !payload.orderId) return;
+        if (typeof usingSearch !== 'undefined' && usingSearch) {
+            if (typeof currentPage === 'number') window.searchOrders(currentPage);
+            else window.searchOrders(1);
+        } else {
+            if (typeof currentPage === 'number') window.loadOrders(currentPage);
+            else window.loadOrders(1);
+        }
+    };
+
+    $.connection.hub.start().done(function () {
+        if (hub.server && hub.server.joinAdmin) {
+            hub.server.joinAdmin();
+        }
+    });
+})();
+    </script>
+}

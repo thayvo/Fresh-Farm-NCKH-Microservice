@@ -1,0 +1,617 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyDashboardVM
+@{
+    ViewBag.Title = "Tích điểm";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    // Null-safe & format helpers
+    string N0(long v) => v.ToString("N0");
+    string N0i(int v) => v.ToString("N0");
+    string N0d(decimal v) => v.ToString("N0");
+
+    var totalEarned = Model?.TotalEarned ?? 0;
+    var totalRedeemed = Model?.TotalRedeemed ?? 0;
+    var usersWithPoints = Model?.UsersWithPoints ?? 0;
+    var currentQuarter = Model?.CurrentQuarter ?? (byte)0;
+    var currentYear = Model?.CurrentYear ?? 0;
+
+    var topQuarterUsers = Model?.TopQuarterUsers;
+    var recentActivities = Model?.RecentActivities;
+}
+
+<style>
+    .loyalty-dashboard {
+        background: #f8fafc;
+        min-height: 100vh;
+        padding: 1.5rem;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        border-radius: 20px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.75rem;
+        box-shadow: 0 10px 40px rgba(37, 99, 235, 0.2);
+    }
+
+    .dashboard-title {
+        color: white;
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+
+        .dashboard-title i {
+            font-size: 1.5rem;
+            margin-right: 0.75rem;
+        }
+
+    .sync-form {
+        background: white;
+        padding: 0.6rem 1rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+        .sync-form input[type="date"] {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.4rem 0.85rem;
+            font-size: 0.9rem;
+            height: 2.5rem;
+            transition: all 0.2s;
+            background: #f8fafc;
+        }
+
+            .sync-form input[type="date"]:focus {
+                border-color: #3b82f6;
+                background: white;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                outline: none;
+            }
+
+    .btn-sync {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 0.5rem 1.25rem;
+        height: 2.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+        .btn-sync:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+        }
+
+        .btn-sync:active {
+            transform: translateY(0);
+        }
+
+    .info-alert {
+        background: white;
+        border-left: 5px solid #3b82f6;
+        border-radius: 12px;
+        padding: 1.25rem 1.75rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+        .info-alert i {
+            color: #3b82f6;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .info-alert strong {
+            color: #1e40af;
+        }
+
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 1.75rem;
+        height: 100%;
+        transition: all 0.3s ease;
+        border: 1px solid #f1f5f9;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        position: relative;
+        overflow: hidden;
+    }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, #3b82f6, #60a5fa);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.15);
+            border-color: #dbeafe;
+        }
+
+        .stat-card.success::before {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+
+        .stat-card.warning::before {
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        }
+
+        .stat-card.info::before {
+            background: linear-gradient(90deg, #06b6d4, #22d3ee);
+        }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.75rem;
+        display: block;
+    }
+
+    .stat-value {
+        color: #0f172a;
+        font-size: 2.25rem;
+        font-weight: 800;
+        margin: 0;
+        line-height: 1;
+    }
+
+    .stat-icon {
+        position: absolute;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 3.5rem;
+        opacity: 0.08;
+    }
+
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        border: 1px solid #f1f5f9;
+        height: 100%;
+        transition: all 0.3s;
+    }
+
+        .content-card:hover {
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            border-color: #e2e8f0;
+        }
+
+    .content-card-header {
+        background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        color: white;
+        padding: 1.25rem 1.75rem;
+        font-weight: 700;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+        letter-spacing: 0.3px;
+    }
+
+        .content-card-header i {
+            margin-right: 0.6rem;
+            font-size: 1.1rem;
+        }
+
+    .table-modern {
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+        .table-modern thead th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 1.1rem 1.75rem;
+            border: none;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .table-modern tbody tr {
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.15s;
+        }
+
+            .table-modern tbody tr:last-child {
+                border-bottom: none;
+            }
+
+            .table-modern tbody tr:hover {
+                background: #f8fafc;
+                transform: scale(1.005);
+            }
+
+        .table-modern tbody td {
+            padding: 1.1rem 1.75rem;
+            vertical-align: middle;
+            color: #334155;
+        }
+
+            .table-modern tbody td strong {
+                color: #1e293b;
+                font-weight: 600;
+            }
+
+    .badge-earn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        letter-spacing: 0.8px;
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+        display: inline-block;
+    }
+
+    .badge-redeem {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        font-weight: 700;
+        font-size: 0.7rem;
+        letter-spacing: 0.8px;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+        display: inline-block;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .btn-action {
+        background: white;
+        color: #2563eb;
+        border: 2px solid #3b82f6;
+        padding: 0.85rem 1.75rem;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        transition: all 0.25s;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+    }
+
+        .btn-action i {
+            font-size: 1.1rem;
+        }
+
+        .btn-action:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 24px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-action.secondary {
+            color: #475569;
+            border-color: #94a3b8;
+        }
+
+            .btn-action.secondary:hover {
+                background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+                border-color: #64748b;
+                color: white;
+            }
+
+        .btn-action.dark {
+            color: #1e293b;
+            border-color: #475569;
+        }
+
+            .btn-action.dark:hover {
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                border-color: #1e293b;
+                color: white;
+            }
+
+    .empty-state {
+        color: #94a3b8;
+        font-style: italic;
+        padding: 3rem 2rem;
+        text-align: center;
+        font-size: 0.95rem;
+    }
+
+    .card-footer-link {
+        padding: 1rem 1.75rem;
+        border-top: 1px solid #f1f5f9;
+        background: #f8fafc;
+    }
+
+        .card-footer-link .btn {
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.5rem 1.25rem;
+            transition: all 0.2s;
+        }
+
+            .card-footer-link .btn:hover {
+                transform: translateX(4px);
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-header {
+            padding: 1.25rem 1.5rem;
+        }
+
+        .dashboard-title {
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
+        }
+
+        .sync-form {
+            width: 100%;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+            .sync-form input[type="date"],
+            .sync-form .btn-sync {
+                width: 100%;
+            }
+
+        .stat-value {
+            font-size: 1.8rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .btn-action {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<main class="loyalty-dashboard">
+    <div class="dashboard-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <h2 class="dashboard-title">
+                <i class="bi bi-trophy-fill"></i>Quản lý Tích điểm
+            </h2>
+
+            <form class="sync-form" method="post"
+                  action="@Url.Action("SyncAward","Loyalty", new { area = "Seller" })"
+                  onsubmit="return syncAward(event)">
+                @Html.AntiForgeryToken()
+                <input type="date" name="start" class="form-control form-control-sm" placeholder="Từ ngày" />
+                <input type="date" name="end" class="form-control form-control-sm" placeholder="Đến ngày" />
+                <button type="submit" class="btn-sync">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span>Đồng bộ điểm</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="info-alert">
+        <i class="bi bi-info-circle-fill"></i>
+        <div>
+            <strong>Lưu ý:</strong> Điểm thưởng sẽ được cộng tự động khi đơn chuyển sang trạng thái <strong>Delivered</strong>. Chức năng đồng bộ chỉ dùng khi cần xử lý ngoại lệ.
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <a class="btn-action" href="@Url.Action("Users","Loyalty", new { area = "Seller" })">
+            <i class="bi bi-people"></i>
+            <span>Danh sách thành viên</span>
+        </a>
+        <a class="btn-action secondary" href="@Url.Action("History","Loyalty", new { area = "Seller" })">
+            <i class="bi bi-clock-history"></i>
+            <span>Lịch sử điểm</span>
+        </a>
+        <a class="btn-action dark" href="@Url.Action("Config","Loyalty", new { area = "Seller" })">
+            <i class="bi bi-gear"></i>
+            <span>Cấu hình</span>
+        </a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card success">
+                <span class="stat-label">Tổng điểm đã tích</span>
+                <h4 class="stat-value">@N0(totalEarned)</h4>
+                <i class="bi bi-arrow-up-circle stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card">
+                <span class="stat-label">Tổng điểm đã dùng</span>
+                <h4 class="stat-value">@N0(totalRedeemed)</h4>
+                <i class="bi bi-arrow-down-circle stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card warning">
+                <span class="stat-label">Người dùng có điểm</span>
+                <h4 class="stat-value">@N0i(usersWithPoints)</h4>
+                <i class="bi bi-people-fill stat-icon"></i>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="stat-card info">
+                <span class="stat-label">Quý hiện tại</span>
+                <h4 class="stat-value">@($"Q{currentQuarter}/{currentYear}")</h4>
+                <i class="bi bi-calendar-check stat-icon"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="content-card">
+                <div class="content-card-header">
+                    <i class="bi bi-star-fill"></i>Top thành viên theo quý hiện tại
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-modern">
+                        <thead>
+                            <tr>
+                                <th>Thành viên</th>
+                                <th class="text-end">Điểm quý</th>
+                                <th class="text-end">Tổng điểm</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (topQuarterUsers == null || !topQuarterUsers.Any())
+                            {
+                                <tr><td colspan="3" class="empty-state">Chưa có dữ liệu.</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var u in topQuarterUsers)
+                                {
+                                    <tr>
+                                        <td><strong>@(u?.FullName ?? "(Không tên)")</strong></td>
+                                        <td class="text-end"><span style="color: #3b82f6; font-weight: 700;">@N0i(u?.QuarterPoints ?? 0)</span></td>
+                                        <td class="text-end"><strong>@N0i(u?.TotalPoints ?? 0)</strong></td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer-link">
+                    <a class="btn btn-outline-primary btn-sm w-100"
+                       href="@Url.Action("History","Loyalty", new { area = "Seller" })">
+                        Xem thêm <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="content-card">
+                <div class="content-card-header">
+                    <i class="bi bi-clock-history"></i>Hoạt động gần đây
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-modern">
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Thành viên</th>
+                                <th class="text-end">Điểm</th>
+                                <th>Loại</th>
+                                <th>Lý do</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (recentActivities == null || !recentActivities.Any())
+                            {
+                                <tr><td colspan="5" class="empty-state">Chưa có dữ liệu.</td></tr>
+                            }
+                            else
+                            {
+                                foreach (var r in recentActivities)
+                                {
+                                    var dir = r?.Direction ?? "";
+                                    var badgeClass = dir == "EARN" ? "badge-earn" : (dir == "REDEEM" ? "badge-redeem" : "badge bg-secondary");
+                                    <tr>
+                                        <td style="white-space: nowrap;">@(r?.CreatedAt.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                        <td><strong>@(r?.UserName ?? "(Không tên)")</strong></td>
+                                        <td class="text-end"><strong style="color: #1e293b;">@N0i(r?.Points ?? 0)</strong></td>
+                                        <td><span class="@badgeClass">@dir</span></td>
+                                        <td>@(r?.Reason ?? "-")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@section scripts{
+    <script>
+        async function syncAward(e) {
+            e.preventDefault();
+            const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            if (btn) btn.disabled = true;
+
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+
+                if (!resp.ok) {
+                    alert('Lỗi mạng hoặc server (HTTP ' + resp.status + ')');
+                    return false;
+                }
+
+                const ct = resp.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) {
+                    const text = await resp.text();
+                    alert(text || 'Có lỗi xảy ra');
+                    return false;
+                }
+
+                const json = await resp.json();
+                if (json && json.success) {
+                    alert('Đồng bộ xong: thành công ' + (json.ok ?? 0) + ', lỗi ' + (json.fail ?? 0));
+                    location.reload();
+                } else {
+                    alert(json && json.message ? json.message : 'Có lỗi xảy ra');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Có lỗi xảy ra');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+            return false;
+        }
+    </script>
+}

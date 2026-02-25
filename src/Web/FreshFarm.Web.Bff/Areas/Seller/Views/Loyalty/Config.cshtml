@@ -1,0 +1,49 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyConfigVM
+@{
+    ViewBag.Title = "Cấu hình tích điểm";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <h2 class="fw-bold mb-3">Cấu hình tích điểm</h2>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Tỷ lệ tích (EarnRate)</label>
+                        <input type="number" class="form-control" step="0.0001" name="EarnRate" value="@Model.EarnRate" />
+                        <small class="text-muted">Mặc định 0.01 (1% giá trị đơn). 1 điểm = 1 VND.</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Tính cả phí ship</label>
+                        <select class="form-select" name="IncludeShippingFee">
+                            <option value="false" @(Model.IncludeShippingFee ? "" : "selected")>Không</option>
+                            <option value="true" @(Model.IncludeShippingFee ? "selected" : "")>Có</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Từ khóa thanh toán thành công</label>
+                        <input type="text" class="form-control" name="PaidKeywords" value="@Model.PaidKeywords" />
+                        <small class="text-muted">Phân tách bằng ; ví dụ: "Đã thanh toán;Da thanh toan"</small>
+                    </div>
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Lưu</button>
+                    @if (Model.UpdatedAt.HasValue)
+                    {
+                        <span class="text-muted">Cập nhật: @Model.UpdatedAt.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+

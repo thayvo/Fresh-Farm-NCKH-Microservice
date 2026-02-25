@@ -8,5 +8,13 @@ namespace FreshFarm.Web.Bff.Controllers
         {
             return View();
         }
+
+        [HttpGet("/search")]
+        [HttpGet("/home/search")]
+        public IActionResult Search(string? q)
+        {
+            ViewData["SearchKeyword"] = q ?? string.Empty;
+            return View();
+        }
     }
 }

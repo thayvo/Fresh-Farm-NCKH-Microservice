@@ -1,0 +1,193 @@
+﻿@{
+    string currentAction = ViewContext.RouteData.Values["action"].ToString();
+    string currentController = ViewContext.RouteData.Values["controller"].ToString();
+}
+
+<nav id="sidebar">
+    <div class="sidebar-header text-center">
+        <h3><i class="bi bi-person-workspace"></i> Admin</h3>
+    </div>
+
+    <ul class="nav flex-column">
+        <!-- Bảng điều khiển -->
+        <li class="nav-item">
+            <a class="nav-link @(currentAction == "Dashboard" && currentController == "Home" ? "active" : "")"
+               href="@Url.Action("Dashboard", "Home")">
+                <i class="bi bi-grid-1x2-fill"></i> Bảng điều khiển
+            </a>
+        </li>
+
+        <!-- Quản lý đơn hàng -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Order" ? "active" : "")"
+               href="@Url.Action("ManageOrders", "Order")">
+                <i class="bi bi-receipt"></i> Quản lý đơn hàng
+            </a>
+        </li>
+
+        <!-- Quản lý sản phẩm -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Product" ? "active" : "")"
+               href="@Url.Action("ManageProducts", "Product")">
+                <i class="bi bi-box-seam-fill"></i> Quản lý sản phẩm
+            </a>
+        </li>
+
+        <!-- Quản lý khách hàng -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Customer" ? "active" : "")"
+               href="@Url.Action("ManageCustomers", "Customer")">
+                <i class="bi bi-people-fill"></i> Quản lý khách hàng
+            </a>
+        </li>
+
+        <!-- Quản lý mã giảm giá -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Coupon" ? "active" : "")"
+               href="@Url.Action("ManageCoupons", "Coupon")">
+                <i class="bi bi-ticket-perforated-fill"></i> Quản lý mã giảm giá
+            </a>
+        </li>
+
+        <!-- Quản lý đánh giá -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Review" && currentAction == "ManageReview" ? "active" : "")"
+               href="@Url.Action("ManageReview", "Review")">
+                <i class="bi bi-star-fill"></i> Quản lý đánh giá
+            </a>
+        </li>
+
+        <!-- Quản lý vận chuyển -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Shipping" && currentAction == "ManageShipping" ? "active" : "")"
+               href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller" })">
+                <i class="bi bi-truck"></i> Quản lý vận chuyển
+            </a>
+        </li>
+
+        <!-- Quản lý danh mục (Submenu) -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "active" : "")"
+               href="#StatusSubmenu"
+               data-bs-toggle="collapse"
+               role="button"
+               aria-expanded="@(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "true" : "false")"
+               aria-controls="StatusSubmenu">
+                <i class="bi bi-list-ul"></i> Quản lý danh mục
+            </a>
+            <ul class="collapse list-unstyled submenu @(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "show" : "")"
+                id="StatusSubmenu">
+                <li>
+                    <a class="nav-link @(currentController == "Status" && currentAction == "Status" ? "active" : "")"
+                       href="@Url.Action("Status", "Status")">
+                        <i class="bi bi-toggle2-on"></i>Trạng thái
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Status" && currentAction == "StatusType" ? "active" : "")"
+                       href="@Url.Action("StatusType", "Status")">
+                        <i class="bi bi-layers"></i>Loại trạng thái
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Category" ? "active" : "")"
+                       href="@Url.Action("ManageCategories", "Category")">
+                        <i class="bi bi-tags-fill"></i>Danh mục sản phẩm
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Unit" ? "active" : "")"
+                       href="@Url.Action("Index", "Unit")">
+                        <i class="bi bi-rulers"></i>Đơn vị tính
+                    </a>
+                </li>
+            </ul>
+        </li>
+
+        <!-- Báo cáo & Thống kê (Submenu) -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Report" ? "active" : "")"
+               href="#reportSubmenu"
+               data-bs-toggle="collapse"
+               role="button"
+               aria-expanded="@(currentController == "Report" ? "true" : "false")"
+               aria-controls="reportSubmenu">
+                <i class="bi bi-graph-up-arrow"></i> Báo cáo & Thống kê
+            </a>
+            <ul class="collapse list-unstyled submenu @(currentController == "Report" ? "show" : "")"
+                id="reportSubmenu">
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Revenue" ? "active" : "")"
+                       href="@Url.Action("Revenue", "Report")">
+                        <i class="bi bi-cash-coin"></i>Doanh thu
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Order" ? "active" : "")"
+                       href="@Url.Action("Order", "Report")">
+                        <i class="bi bi-receipt-cutoff"></i> Đơn hàng
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Customer" ? "active" : "")"
+                       href="@Url.Action("Customer", "Report")">
+                        <i class="bi bi-people-fill"></i>Khách hàng
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Product" ? "active" : "")"
+                       href="@Url.Action("Product", "Report")">
+                        <i class="bi bi-box-seam"></i> Sản phẩm
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Shipping" ? "active" : "")"
+                       href="@Url.Action("Shipping", "Report")">
+                        <i class="bi bi-truck"></i>Vận chuyển
+                    </a>
+                </li>
+                <li>
+                    <a class="nav-link @(currentController == "Report" && currentAction == "Review" ? "active" : "")"
+                       href="@Url.Action("Review", "Report")">
+                        <i class="bi bi-chat-quote-fill"></i>Đánh giá & Phản hồi
+                    </a>
+                </li>
+            </ul>
+        </li>
+
+        <!-- Quản lý kho -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Warehouse" ? "active" : "")"
+               href="@Url.Action("Index", "Warehouse")">
+                <i class="bi bi-box-fill"></i>Quản lý kho
+            </a>
+        </li>
+
+        <!-- Quản lý người dùng -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "User" ? "active" : "")"
+               href="@Url.Action("ManageUsers", "User")">
+                <i class="bi bi-person-fill-gear"></i> Quản lý người dùng
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "SupportChat" ? "active" : "")"
+               href="@Url.Action("Index", "SupportChat", new { area = "Seller" })">
+                <i class="bi bi-chat-dots-fill"></i> Hỗ trợ khách hàng
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="@Url.Action("Index", "Feedback", new { area = "Seller" })">
+                <i class="bi bi-chat-dots"></i>
+                <span>Phản hồi người dùng</span>
+            </a>
+        </li>
+        <!-- Cài đặt -->
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Setting" ? "active" : "")"
+               href="@Url.Action("Index", "Setting")">
+                <i class="bi bi-gear-fill"></i> Cài đặt
+            </a>
+        </li>
+    </ul>
+</nav>

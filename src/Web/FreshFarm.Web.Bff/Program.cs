@@ -77,6 +77,9 @@ app.UseAuthentication(); // Doc cookie auth.
 app.UseAuthorization(); // Enforce [Authorize].
 
 app.MapControllers(); // Map API controllers.
+app.MapControllerRoute( // Map MVC area route cho Seller/Admin modules.
+    name: "areas",
+    pattern: "{area:exists}/{controller=Home}/{action=Dashboard}/{id?}");
 app.MapControllerRoute( // Map MVC default route.
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

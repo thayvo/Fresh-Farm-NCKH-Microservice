@@ -1,0 +1,102 @@
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyHistoryVM
+@{
+    ViewBag.Title = "Lịch sử tích điểm";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    // Phòng thủ null
+    var userIdVal = Model?.UserID ?? 0;
+    var dirVal = Model?.Direction ?? "";
+    var startStr = Model?.Start?.ToString("yyyy-MM-dd");
+    var endStr = Model?.End?.ToString("yyyy-MM-dd");
+    var page = Model?.Page ?? 1;
+    var pageSize = Model?.PageSize ?? 10;
+    var total = Model?.Total ?? 0;
+    var totalPages = (int)System.Math.Ceiling(total / (double)pageSize);
+    if (totalPages < 1) { totalPages = 1; } // để tránh chia cho 0 và UI xấu
+
+    var prev = System.Math.Max(1, page - 1);
+    var next = System.Math.Min(totalPages, page + 1);
+}
+
+<main class="container-fluid p-4">
+    <h2 class="fw-bold mb-3">Lịch sử điểm</h2>
+
+    <form class="row g-2 mb-3" method="get" action="@Url.Action("History", new { area = "Seller" })">
+        <div class="col-md-2">
+            <input type="number" class="form-control" name="userId" value="@(userIdVal == 0 ? "" : userIdVal.ToString())" placeholder="UserID" />
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" name="direction">
+                <option value="">-- Loại --</option>
+                <option value="EARN" @(dirVal == "EARN" ? "selected" : "")>EARN</option>
+                <option value="REDEEM" @(dirVal == "REDEEM" ? "selected" : "")>REDEEM</option>
+                <option value="ADJUST" @(dirVal == "ADJUST" ? "selected" : "")>ADJUST</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control" name="start" value="@startStr" />
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control" name="end" value="@endStr" />
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-search"></i> Lọc
+            </button>
+        </div>
+    </form>
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>User</th>
+                        <th>Order</th>
+                        <th class="text-end">Điểm</th>
+                        <th>Loại</th>
+                        <th>Lý do</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model?.Rows == null || !Model.Rows.Any())
+                    {
+                        <tr><td colspan="6" class="text-muted">Không có dữ liệu.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var r in Model.Rows)
+                        {
+                            <tr>
+                                <td>@r.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@r.UserName (#@r.UserID)</td>
+                                <td>@(r.OrderID.HasValue ? ("#" + r.OrderID.Value.ToString("D6")) : "-")</td>
+                                <td class="text-end">@r.Points</td>
+                                <td>
+                                    <span class="badge @(r.Direction=="EARN"?"bg-success":(r.Direction=="REDEEM"?"bg-primary":"bg-secondary"))">
+                                        @r.Direction
+                                    </span>
+                                </td>
+                                <td>@r.Reason</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <div>
+                Trang @page / @totalPages - Tổng @total
+            </div>
+            <div class="btn-group">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="@Url.Action("History", new { area = "Seller", userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = prev, pageSize = pageSize })">«</a>
+
+                <a class="btn btn-sm btn-outline-primary"
+                   href="@Url.Action("History", new { area = "Seller", userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = next, pageSize = pageSize })">»</a>
+            </div>
+        </div>
+    </div>
+</main>

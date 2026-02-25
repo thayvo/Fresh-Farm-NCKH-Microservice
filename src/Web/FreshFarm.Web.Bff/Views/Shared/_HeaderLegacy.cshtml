@@ -1,14 +1,32 @@
+@using System.Globalization
+@using FreshFarm.Web.Bff.Dtos
+@using FreshFarm.Web.Bff.Services
+@inject ICartSessionService CartSessionService
 @{
-    var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
-    var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
-    var currentUrl = $"{currentPath}{currentQuery}";
-    var displayName = User.Identity?.Name;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var searchKeyword = Context.Request.Query["q"].ToString();
+    var cartItems = isAuthenticated ? CartSessionService.GetItems() : new List<CartItemDto>();
+    var totalQuantity = cartItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);
+    var previewItems = cartItems.AsEnumerable().Reverse().Take(5).ToList();
+    var previewQuantity = previewItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);
+    var remainingQuantity = Math.Max(0, totalQuantity - previewQuantity);
+    var productThumbPool = new[]
+    {
+        "https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg",
+        "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
+        "https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg",
+        "https://images.pexels.com/photos/2090902/pexels-photo-2090902.jpeg",
+        "https://images.pexels.com/photos/4198019/pexels-photo-4198019.jpeg"
+    };
+
+    string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", amount);
+    string ProductThumb(int productId) => productThumbPool[Math.Abs(productId) % productThumbPool.Length];
 }
 
-<header class="py-3 bg-white border-bottom">
+<header class="header-main-shell border-bottom">
     <div class="container">
-        <div class="row align-items-center g-3">
-            <div class="col-lg-3 col-md-4 col-12 d-flex align-items-center gap-2">
+        <div class="header-main-wrap">
+            <div class="header-brand-wrap">
                 <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
                     <span class="brand-logo">FF</span>
                     <span>
@@ -18,59 +36,88 @@
                 </a>
             </div>
 
-            <div class="col-lg-6 col-md-8 col-12">
-                <form id="headerSearchForm" class="d-flex" autocomplete="off">
+            <div class="header-search-wrap">
+                <form id="headerSearchForm" class="header-search-form" autocomplete="off" method="get" action="/search">
                     <input id="headerSearchInput"
-                           class="form-control me-2"
+                           name="q"
+                           class="form-control header-search-input"
                            type="search"
-                           placeholder="Nhập tên sản phẩm cần tìm" />
-                    <button class="btn btn-search" type="submit">Tìm</button>
+                           placeholder="Tìm kiếm nông sản, trái cây, rau sạch..."
+                           value="@searchKeyword" />
+                    <button class="btn btn-search header-search-btn" type="submit">
+                        <i class="bi bi-search"></i>
+                    </button>
                 </form>
+                <div class="header-search-keywords d-none d-md-flex">
+                    <a href="#" data-header-keyword="Rau sạch">Rau sạch</a>
+                    <a href="#" data-header-keyword="Trái cây">Trái cây</a>
+                    <a href="#" data-header-keyword="Nông sản hữu cơ">Nông sản hữu cơ</a>
+                    <a href="#" data-header-keyword="Thực phẩm tươi">Thực phẩm tươi</a>
+                    <a href="#" data-header-keyword="Giao nhanh">Giao nhanh</a>
+                </div>
             </div>
 
-            <div class="col-lg-3 col-12 d-flex justify-content-lg-end align-items-center">
-                <div class="user-actions d-flex align-items-center gap-3">
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <span class="text-muted small d-none d-lg-inline">Chào, @(string.IsNullOrWhiteSpace(displayName) ? "bạn" : displayName)</span>
-                        <a href="/account/profile" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-person-circle"></i><span class="d-none d-lg-inline">Tài khoản</span>
+            <div class="header-actions-wrap">
+                @if (isAuthenticated)
+                {
+                    <div class="header-cart-dropdown">
+                        <a href="/cart" class="header-cart-link" title="Giỏ hàng">
+                            <i class="bi bi-cart3"></i><span class="d-none d-md-inline">Giỏ hàng</span>
+                            @if (totalQuantity > 0)
+                            {
+                                <span class="header-cart-badge">@totalQuantity</span>
+                            }
                         </a>
-                        <a href="/cart" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-cart3"></i><span class="d-none d-lg-inline">Giỏ hàng</span>
-                        </a>
-                        <a href="/account/orders" class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-receipt"></i><span class="d-none d-lg-inline">Đơn hàng</span>
-                        </a>
-                        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-link nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0 text-decoration-none">
-                                <i class="bi bi-box-arrow-right"></i><span class="d-none d-lg-inline">Đăng xuất</span>
-                            </button>
-                        </form>
-                    }
-                    else
-                    {
-                        <a asp-controller="Account"
-                           asp-action="SignIn"
-                           asp-route-returnUrl="@currentUrl"
-                           class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-person"></i><span class="d-none d-lg-inline">Đăng nhập</span>
-                        </a>
-                        <a asp-controller="Account"
-                           asp-action="SignIn"
-                           asp-route-returnUrl="/cart"
-                           class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-cart3"></i><span class="d-none d-lg-inline">Giỏ hàng</span>
-                        </a>
-                        <a asp-controller="Account"
-                           asp-action="SignIn"
-                           asp-route-returnUrl="/account/orders"
-                           class="nav-link d-flex align-items-center gap-2 text-dark fw-medium p-0">
-                            <i class="bi bi-receipt"></i><span class="d-none d-lg-inline">Đơn hàng</span>
-                        </a>
-                    }
-                </div>
+
+                        <div class="header-cart-panel">
+                            <div class="header-cart-title">Sản phẩm mới thêm</div>
+
+                            @if (previewItems.Count == 0)
+                            {
+                                <div class="header-cart-empty">Giỏ hàng của bạn đang trống.</div>
+                            }
+                            else
+                            {
+                                <div class="header-cart-list">
+                                    @foreach (var item in previewItems)
+                                    {
+                                        var qty = item.Quantity <= 0 ? 1 : item.Quantity;
+                                        <a href="/cart" class="header-cart-item">
+                                            <img class="header-cart-thumb" src="@ProductThumb(item.ProductId)" alt="@item.ProductName" />
+                                            <span class="header-cart-name-wrap">
+                                                <span class="header-cart-name">@item.ProductName</span>
+                                                <span class="header-cart-qty">x@qty</span>
+                                            </span>
+                                            <span class="header-cart-price">@Vnd(item.UnitPrice)</span>
+                                        </a>
+                                    }
+                                </div>
+
+                                <div class="header-cart-footer">
+                                    @if (remainingQuantity > 0)
+                                    {
+                                        <span class="header-cart-meta">Còn @remainingQuantity sản phẩm trong giỏ</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="header-cart-meta">@totalQuantity sản phẩm trong giỏ</span>
+                                    }
+                                    <a href="/cart" class="header-cart-view-btn">Xem Giỏ Hàng</a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <a asp-controller="Account"
+                       asp-action="SignIn"
+                       asp-route-returnUrl="/cart"
+                       class="header-cart-link"
+                       title="Giỏ hàng">
+                        <i class="bi bi-cart3"></i><span class="d-none d-md-inline">Giỏ hàng</span>
+                    </a>
+                }
             </div>
         </div>
     </div>

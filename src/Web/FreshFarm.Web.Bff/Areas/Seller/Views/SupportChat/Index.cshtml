@@ -1,0 +1,865 @@
+﻿@{
+    ViewBag.Title = "Hỗ trợ khách hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-3" id="supportChatRoot">
+    <style>
+        :root {
+            --primary-blue: #0ea5e9;
+            --primary-blue-dark: #0284c7;
+            --primary-blue-light: #38bdf8;
+            --bg-blue-light: #f0f9ff;
+            --bg-blue-lighter: #e0f2fe;
+            --border-blue: #bae6fd;
+            --text-blue: #075985;
+        }
+
+        #supportChatRoot {
+            height: calc(100vh - 70px);
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, var(--bg-blue-light) 0%, var(--bg-blue-lighter) 100%);
+        }
+
+        /* Header with gradient */
+        .page-header-support {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+        }
+
+        .page-header-support h2 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .page-header-support h2::before {
+            content: "💬";
+            font-size: 1.75rem;
+        }
+
+        #supportChatShell {
+            flex: 1;
+            display: flex;
+            gap: 0.75rem;
+            overflow: hidden;
+        }
+
+        .support-chat-col {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Card improvements */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            background: white;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, var(--primary-blue-light) 0%, var(--primary-blue) 100%);
+            color: white;
+            border-radius: 12px 12px 0 0 !important;
+            padding: 1rem 1.25rem;
+            border: none;
+        }
+
+        /* Search input */
+        .input-group-text {
+            background: white;
+            border: 2px solid var(--border-blue);
+            border-right: none;
+            color: var(--primary-blue);
+        }
+
+        .input-group .form-control {
+            border: 2px solid var(--border-blue);
+            border-left: none;
+        }
+
+        .input-group .form-control:focus {
+            border-color: var(--primary-blue);
+            box-shadow: none;
+        }
+
+        .input-group .form-control:focus + .input-group-text,
+        .input-group-text:has(+ .form-control:focus) {
+            border-color: var(--primary-blue);
+        }
+
+        /* Button group filter */
+        .btn-group .btn-outline-secondary {
+            border-color: white;
+            color: white;
+            background: transparent;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-group .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: white;
+            color: white;
+        }
+
+        .btn-group .btn-outline-secondary.active {
+            background: white;
+            border-color: white;
+            color: var(--primary-blue);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Conversation list */
+        #supportConvListWrapper,
+        #supportAdminMessages,
+        #supportChatRightBody {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .list-group-item {
+            border: none;
+            border-bottom: 1px solid var(--bg-blue-lighter);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .list-group-item:hover {
+            background: var(--bg-blue-light);
+            transform: translateX(5px);
+        }
+
+        .list-group-item.active {
+            background: linear-gradient(135deg, var(--bg-blue-light) 0%, var(--bg-blue-lighter) 100%);
+            border-left: 4px solid var(--primary-blue);
+            color: var(--text-blue);
+        }
+
+        .list-group-item.active .fw-semibold {
+            color: var(--primary-blue);
+        }
+
+        /* Badges */
+        .badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .badge.bg-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+        }
+
+        .badge.bg-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        }
+
+        .badge.bg-secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+        }
+
+        .badge.bg-primary {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%) !important;
+        }
+
+        .badge.bg-info {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+        }
+
+        .badge.bg-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+        }
+
+        /* Chat header */
+        .card-header.d-flex {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+        }
+
+        #supportChatTitle {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        #supportChatSubTitle {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+
+        /* Close button */
+        #supportChatCloseBtn {
+            border: 2px solid white;
+            color: white;
+            background: transparent;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        #supportChatCloseBtn:hover:not(:disabled) {
+            background: white;
+            color: #ef4444;
+            transform: scale(1.05);
+        }
+
+        #supportChatCloseBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+
+        /* Messages area */
+        #supportAdminMessages {
+            background: var(--bg-blue-light);
+            padding: 1.25rem;
+        }
+
+        .support-chat-message {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @@keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        /* Avatar styling */
+        .support-chat-message .support-msg-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 2px solid var(--border-blue);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .support-chat-message-wrapper {
+            position: relative;
+            max-width: 65%;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        /* Căn trái cho cả tin của mình và của khách (bubble ngoài cùng trái, menu ở bên phải) */
+        .support-chat-message.other {
+            justify-content: flex-start;
+        }
+
+        .support-chat-message.me {
+            justify-content: flex-start;
+        }
+
+        .support-chat-message .bubble {
+            display: inline-block;
+            padding: 0.75rem 1rem;
+            border-radius: 16px;
+            word-wrap: break-word;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .support-chat-message .bubble:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .support-chat-message.me .bubble {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .support-chat-message.other .bubble {
+            background: white;
+            color: #1e293b;
+            border-bottom-left-radius: 4px;
+            border: 1px solid var(--border-blue);
+        }
+
+        .support-chat-message.system {
+            justify-content: center;
+        }
+
+        .support-chat-message.system .bubble {
+            background: transparent;
+            color: #64748b;
+            font-size: 0.8rem;
+            box-shadow: none;
+        }
+
+        /* Message actions */
+        .support-msg-actions {
+            opacity: 0;
+            transition: opacity 0.18s ease-out;
+            color: #94a3b8;
+            font-size: 10px;
+            pointer-events: none;
+            background: rgba(255,255,255,0.95);
+            border-radius: 999px;
+            padding: 6px 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            align-self: center;
+            white-space: nowrap;
+        }
+
+        .support-chat-message:hover .support-msg-actions {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .support-msg-actions a {
+            border: none;
+            background: transparent;
+            padding: 2px;
+            margin: 0;
+            color: var(--primary-blue);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .support-msg-actions a:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--primary-blue-dark);
+        }
+
+        .support-msg-actions a i {
+            font-size: 11px;
+        }
+
+        .support-msg-actions a.text-danger {
+            color: #dc2626;
+        }
+
+        .support-msg-actions a.text-danger:hover {
+            color: #dc2626 !important;
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        /* Message meta (time, seen) */
+        .support-msg-meta {
+            font-size: 9px;
+            color: #94a3b8;
+        }
+
+        /* Reply preview */
+        #supportReplyPreview {
+            background: var(--bg-blue-lighter);
+            border-left: 4px solid var(--primary-blue);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            color: var(--text-blue);
+        }
+
+
+        /* Typing indicator */
+        #supportAdminTyping {
+            color: var(--primary-blue);
+            font-style: italic;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @@keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Footer input area */
+        .card-footer {
+            background: white;
+            border-top: 2px solid var(--border-blue);
+            padding: 1rem 1.25rem;
+        }
+
+        #supportAdminInput {
+            border: 2px solid var(--border-blue);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        #supportAdminInput:focus {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 0.2rem rgba(14, 165, 233, 0.15);
+        }
+
+        /* Message actions positioning */
+        .support-chat-message.me .support-msg-actions {
+            text-align: right;
+        }
+
+        .support-chat-message.other .support-msg-actions {
+            text-align: left;
+        }
+
+        /* Date Separator - Premium Design */
+        .support-chat-date-separator {
+            text-align: center;
+            margin: 16px 0 12px;
+            position: relative;
+            clear: both;
+        }
+
+        .support-chat-date-separator span {
+            display: inline-block;
+            background: rgba(0, 0, 0, 0.08);
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 12px;
+            letter-spacing: 0.3px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* Reply Quote Styling - Premium Design */
+        .support-chat-reply-quote {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.05) 100%);
+            border-left: 3px solid #10b981;
+            padding: 6px 10px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .support-chat-reply-quote::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .support-chat-reply-quote:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%);
+            transform: translateX(2px);
+        }
+
+        .support-chat-reply-quote:hover::before {
+            opacity: 1;
+        }
+
+        .support-chat-reply-quote-from {
+            font-weight: 600;
+            font-size: 0.75rem;
+            margin-bottom: 3px;
+            color: #10b981;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .support-chat-reply-quote-from::before {
+            content: '↩';
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .support-chat-reply-quote-content {
+            font-size: 0.85rem;
+            color: rgba(0, 0, 0, 0.65);
+            line-height: 1.4;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-style: italic;
+            padding-left: 2px;
+        }
+
+        /* For messages in light bubbles (other user) */
+        .support-chat-message.other .support-chat-reply-quote {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(5, 150, 105, 0.03) 100%);
+        }
+
+        .support-chat-message.other .support-chat-reply-quote:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.06) 100%);
+        }
+
+        /* For messages in green bubbles (admin/me) */
+        .support-chat-message.me .support-chat-reply-quote {
+            background: rgba(255, 255, 255, 0.15);
+            border-left-color: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+        }
+
+        .support-chat-message.me .support-chat-reply-quote::before {
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .support-chat-message.me .support-chat-reply-quote:hover {
+            background: rgba(255, 255, 255, 0.22);
+        }
+
+        .support-chat-message.me .support-chat-reply-quote-from {
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 700;
+        }
+
+        .support-chat-message.me .support-chat-reply-quote-content {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        /* Action buttons */
+        .btn-outline-secondary.btn-sm {
+            border: 2px solid var(--border-blue);
+            color: var(--primary-blue);
+            background: white;
+            transition: all 0.2s;
+        }
+
+        .btn-outline-secondary.btn-sm:hover {
+            background: var(--bg-blue-light);
+            border-color: var(--primary-blue);
+            color: var(--primary-blue-dark);
+            transform: scale(1.1);
+        }
+
+        .btn-primary.btn-sm {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+            border: none;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+            transition: all 0.2s;
+        }
+
+        .btn-primary.btn-sm:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
+        }
+
+        /* Tabs */
+        .nav-tabs {
+            border: none;
+        }
+
+        .nav-tabs .nav-link {
+            color: white;
+            border: none;
+            background: transparent;
+            font-weight: 600;
+            transition: all 0.2s;
+            opacity: 0.8;
+        }
+
+        .nav-tabs .nav-link:hover {
+            opacity: 1;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-tabs .nav-link.active {
+            background: white;
+            color: var(--primary-blue);
+            border: none;
+            border-radius: 6px 6px 0 0;
+            opacity: 1;
+        }
+
+        /* Right panel */
+        #supportChatRightBody {
+            padding: 1.25rem;
+        }
+
+        .tab-content .card {
+            border: 1px solid var(--border-blue);
+            background: white;
+        }
+
+        /* Avatar styling */
+        .rounded-circle {
+            border: 3px solid var(--border-blue);
+        }
+
+        /* User profile in right panel */
+        .text-center .rounded-circle {
+            border: 4px solid var(--primary-blue-light);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+        }
+
+        /* Order cards in right panel */
+        #pane-orders .card {
+            transition: all 0.2s;
+            border: 1px solid var(--border-blue) !important;
+        }
+
+        #pane-orders .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2) !important;
+            border-color: var(--primary-blue) !important;
+        }
+
+        #pane-orders a {
+            color: var(--primary-blue);
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        #pane-orders a:hover {
+            color: var(--primary-blue-dark);
+            transform: scale(1.05);
+        }
+
+        /* Scrollbar styling */
+        #supportConvListWrapper::-webkit-scrollbar,
+        #supportAdminMessages::-webkit-scrollbar,
+        #supportChatRightBody::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #supportConvListWrapper::-webkit-scrollbar-track,
+        #supportAdminMessages::-webkit-scrollbar-track,
+        #supportChatRightBody::-webkit-scrollbar-track {
+            background: var(--bg-blue-lighter);
+        }
+
+        #supportConvListWrapper::-webkit-scrollbar-thumb,
+        #supportAdminMessages::-webkit-scrollbar-thumb,
+        #supportChatRightBody::-webkit-scrollbar-thumb {
+            background: var(--primary-blue-light);
+            border-radius: 3px;
+        }
+
+        #supportConvListWrapper::-webkit-scrollbar-thumb:hover,
+        #supportAdminMessages::-webkit-scrollbar-thumb:hover,
+        #supportChatRightBody::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-blue);
+        }
+
+        /* Empty state */
+        .text-muted {
+            color: #64748b !important;
+        }
+
+        /* Loading spinner */
+        .spinner-border {
+            color: var(--primary-blue);
+        }
+
+        /* Responsive */
+        @@media (max-width: 992px) {
+            #supportChatShell {
+                flex-direction: column;
+            }
+
+            .support-chat-col {
+                width: 100% !important;
+                max-height: 400px;
+            }
+        }
+
+        /* Close button */
+        .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        /* Profile section styling */
+        #pane-profile .fw-semibold,
+        #pane-orders .fw-semibold {
+            color: var(--primary-blue);
+        }
+
+        /* Time stamps */
+        .support-msg-meta {
+            color: #94a3b8;
+        }
+
+        /* Reaction emoji */
+        .support-msg-reaction {
+            font-size: 1.1rem;
+        }
+
+        /* Reaction badge + picker (đồng bộ với user) */
+        .support-msg-reaction-badge {
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            background: #fff;
+            border-radius: 999px;
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            z-index: 10;
+        }
+
+        .support-msg-reaction-picker {
+            position: absolute;
+            right: 0;
+            bottom: 100%;
+            margin-bottom: 6px;
+            background: #fff;
+            border: 1px solid rgba(148, 163, 184, 0.45);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 6px;
+            z-index: 1050;
+        }
+
+        .support-msg-reaction-option {
+            border: none;
+            background: transparent;
+            padding: 2px;
+            border-radius: 999px;
+            cursor: pointer;
+            line-height: 1;
+            font-size: 18px;
+        }
+
+        .support-msg-reaction-option:hover {
+            background: #f1f5f9;
+        }
+
+        .support-msg-reaction-indicator {
+            display: none; /* dùng badge + chip, không cần indicator thứ 2 */
+        }
+
+        /* Message seen avatar */
+        .msg-avatar-seen {
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+
+    <div class="page-header-support">
+        <h2>Hỗ trợ khách hàng trực tuyến</h2>
+    </div>
+
+    <div id="supportChatShell">
+        <!-- Cột trái: Danh sách hội thoại -->
+        <div class="support-chat-col" style="width:25%;">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="supportConvSearch" placeholder="Tìm tên / SĐT..." />
+                    </div>
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <button type="button" class="btn btn-outline-secondary active" data-filter="all">Tất cả</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="unread">Chưa đọc</button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="open">Chưa giải quyết</button>
+                    </div>
+                </div>
+                <div class="list-group list-group-flush" id="supportConvListWrapper">
+                    <div class="p-3 text-muted small">Đang tải danh sách...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột giữa: Khung chat -->
+        <div class="support-chat-col" style="width:50%;">
+            <div class="card shadow-sm h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold" id="supportChatTitle">Chọn một cuộc trò chuyện</div>
+                        <small id="supportChatSubTitle" class="text-white"></small>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="supportChatCloseBtn" disabled>
+                        <i class="bi bi-x-circle me-1"></i> Kết thúc
+                    </button>
+                </div>
+                <div class="card-body small" id="supportAdminMessages">
+                    <p class="text-muted">Chưa chọn cuộc trò chuyện nào.</p>
+                </div>
+                <div class="card-footer">
+                    <div id="supportReplyPreview" class="small mb-2 d-none">
+                        <i class="bi bi-reply-fill me-1"></i>Đang trả lời: <span id="supportReplyPreviewText"></span>
+                        <button type="button" class="btn-close btn-sm ms-2" id="supportReplyCancel"></button>
+                    </div>
+                    <div id="supportAdminTyping" class="small mb-2 d-none">
+                        <i class="bi bi-chat-dots me-1"></i>Khách đang soạn tin...
+                    </div>
+                    <div class="d-flex gap-2">
+                        <textarea id="supportAdminInput" class="form-control form-control-sm" rows="1"
+                                  style="resize:none; max-height:120px;" placeholder="Nhập câu trả lời..."
+                                  autocomplete="off"></textarea>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" title="Gửi ảnh (chưa hỗ trợ)">
+                            <i class="bi bi-paperclip"></i>
+                        </button>
+                        <button class="btn btn-primary btn-sm" type="button" id="supportAdminSend">
+                            <i class="bi bi-send-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cột phải: Thông tin khách -->
+        <div class="support-chat-col" style="width:25%;">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="supportRightTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-profile" data-bs-toggle="tab" data-bs-target="#pane-profile" type="button" role="tab">
+                                <i class="bi bi-person-circle me-1"></i>Thông tin
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-orders" data-bs-toggle="tab" data-bs-target="#pane-orders" type="button" role="tab">
+                                <i class="bi bi-bag-check me-1"></i>Đơn gần đây
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body tab-content" id="supportChatRightBody">
+                    <div class="tab-pane fade show active" id="pane-profile" role="tabpanel">
+                        <p class="text-muted small text-center">Chưa chọn khách hàng.</p>
+                    </div>
+                    <div class="tab-pane fade" id="pane-orders" role="tabpanel">
+                        <p class="text-muted small text-center">Chưa chọn khách hàng.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@section scripts {
+    <script src="~/Scripts/support-chat-admin.js"></script>
+}

@@ -1,0 +1,300 @@
+﻿@model FreshFram.Models.Setting
+
+@{
+    ViewBag.Title = "Cài Đặt Cửa Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<style type="text/css">
+    .settings-nav .nav-link {
+        color: #343a40;
+        font-weight: 500;
+    }
+
+        .settings-nav .nav-link.active {
+            color: var(--primary-green);
+            background-color: #e6f4ed;
+            border-left: 3px solid var(--primary-green);
+        }
+
+        .settings-nav .nav-link:hover {
+            background-color: #f1f3f5;
+        }
+
+    .form-control:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 0.2rem rgba(52, 168, 83, 0.25);
+    }
+</style>
+
+<main class="container-fluid p-4">
+    <h2 class="fw-bold mb-4">
+        <i class="bi bi-gear-fill me-2"></i>Cài Đặt Cửa Hàng
+    </h2>
+
+    @if (!string.IsNullOrEmpty(ViewBag.Error))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@ViewBag.Error
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form id="settingForm" method="post" action="@Url.Action("Save", "Setting")">
+        @Html.AntiForgeryToken()
+
+        <div class="row g-4">
+            <!-- MENU CÀI ĐẶT -->
+            <div class="col-lg-3">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-2">
+                        <div class="nav flex-column nav-pills settings-nav" role="tablist" aria-orientation="vertical">
+                            <button class="nav-link text-start active" data-bs-toggle="pill"
+                                    data-bs-target="#settings-general" type="button">
+                                <i class="bi bi-shop me-2"></i> Cài đặt chung
+                            </button>
+                            <button class="nav-link text-start" data-bs-toggle="pill"
+                                    data-bs-target="#settings-payment" type="button">
+                                <i class="bi bi-credit-card-fill me-2"></i> Thanh toán
+                            </button>
+                            <button class="nav-link text-start" data-bs-toggle="pill"
+                                    data-bs-target="#settings-shipping" type="button">
+                                <i class="bi bi-truck me-2"></i> Vận chuyển
+                            </button>
+                            <button class="nav-link text-start" data-bs-toggle="pill"
+                                    data-bs-target="#settings-notifications" type="button">
+                                <i class="bi bi-bell-fill me-2"></i> Thông báo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NỘI DUNG CÀI ĐẶT -->
+            <div class="col-lg-9">
+                <div class="tab-content">
+                    <!-- CÀI ĐẶT CHUNG -->
+                    <div class="tab-pane fade show active" id="settings-general">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-info-circle me-2"></i>Thông tin cửa hàng
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label fw-bold">Tên cửa hàng</label>
+                                        @Html.TextBoxFor(m => m.StoreName, new { @class = "form-control", required = "required" })
+                                        @Html.ValidationMessageFor(m => m.StoreName, "", new { @class = "text-danger small" })
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold">Địa chỉ</label>
+                                        @Html.TextBoxFor(m => m.StoreAddress, new { @class = "form-control", required = "required" })
+                                        @Html.ValidationMessageFor(m => m.StoreAddress, "", new { @class = "text-danger small" })
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Email hỗ trợ</label>
+                                        @Html.TextBoxFor(m => m.StoreEmail, new { @type = "email", @class = "form-control", required = "required" })
+                                        @Html.ValidationMessageFor(m => m.StoreEmail, "", new { @class = "text-danger small" })
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Số điện thoại</label>
+                                        @Html.TextBoxFor(m => m.StorePhone, new { @type = "tel", @class = "form-control", required = "required" })
+                                        @Html.ValidationMessageFor(m => m.StorePhone, "", new { @class = "text-danger small" })
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CÀI ĐẶT THANH TOÁN -->
+                    <div class="tab-pane fade" id="settings-payment">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-wallet2 me-2"></i>Cổng thanh toán
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check form-switch fs-5 mb-3">
+                                    @Html.CheckBoxFor(m => m.IsCODEnabled, new { @class = "form-check-input", id = "codSwitch" })
+                                    <label class="form-check-label" for="IsCODEnabled">
+                                        Thanh toán khi nhận hàng (COD)
+                                    </label>
+                                </div>
+                                <hr />
+                                <h6 class="fw-bold">
+                                    <i class="bi bi-bank me-2"></i>Chuyển khoản ngân hàng
+                                </h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Hướng dẫn chuyển khoản</label>
+                                    @Html.TextAreaFor(m => m.BankTransferInstructions, new { @rows = "3", @class = "form-control" })
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Thông tin tài khoản</label>
+                                    @Html.TextAreaFor(m => m.BankAccountInfo, new { @rows = "3", @class = "form-control" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CÀI ĐẶT VẬN CHUYỂN -->
+                    <div class="tab-pane fade" id="settings-shipping">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-box-seam me-2"></i>Cài đặt vận chuyển
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Các cài đặt chi tiết về khu vực và phương thức vận chuyển được quản lý tại
+                                    <a href="@Url.Action("ManageShipping", "Shipping")" class="alert-link">trang quản lý vận chuyển</a>.
+                                </div>
+                                <hr />
+                                <h6 class="fw-bold">Cài đặt nhanh</h6>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Phí vận chuyển mặc định</label>
+                                    @Html.TextBoxFor(m => m.DefaultShippingFee, new { @type = "number", @step = "1000", @class = "form-control", required = "required" })
+                                    <small class="text-muted">Đơn vị: VND</small>
+                                    @Html.ValidationMessageFor(m => m.DefaultShippingFee, "", new { @class = "text-danger small" })
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Miễn phí vận chuyển cho đơn hàng trên</label>
+                                    @Html.TextBoxFor(m => m.FreeShippingThreshold, new { @type = "number", @step = "1000", @class = "form-control", required = "required" })
+                                    <small class="text-muted">Đơn vị: VND</small>
+                                    @Html.ValidationMessageFor(m => m.FreeShippingThreshold, "", new { @class = "text-danger small" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CÀI ĐẶT THÔNG BÁO -->
+                    <div class="tab-pane fade" id="settings-notifications">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-envelope me-2"></i>Thông báo qua Email
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <p class="text-muted">Cấu hình email gửi đến khách hàng và quản trị viên.</p>
+                                <h6 class="fw-bold mb-3">Tự động gửi email khi:</h6>
+                                <div class="form-check form-switch mb-2">
+                                    @Html.CheckBoxFor(m => m.IsEmailNewOrderEnabled, new { @class = "form-check-input" })
+                                    <label class="form-check-label" for="IsEmailNewOrderEnabled">
+                                        Có đơn hàng mới
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    @Html.CheckBoxFor(m => m.IsEmailDeliveredEnabled, new { @class = "form-check-input" })
+                                    <label class="form-check-label" for="IsEmailDeliveredEnabled">
+                                        Đơn hàng được giao thành công
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    @Html.CheckBoxFor(m => m.IsEmailCancelledEnabled, new { @class = "form-check-input" })
+                                    <label class="form-check-label" for="IsEmailCancelledEnabled">
+                                        Đơn hàng bị hủy
+                                    </label>
+                                </div>
+                                <hr />
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Email admin nhận thông báo</label>
+                                    @Html.TextBoxFor(m => m.AdminNotificationEmail, new { @type = "email", @class = "form-control", required = "required" })
+                                    @Html.ValidationMessageFor(m => m.AdminNotificationEmail, "", new { @class = "text-danger small" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NÚT LƯỚI -->
+        <div class="text-end mt-4">
+            <button type="submit" class="btn btn-success btn-lg" id="saveBtn">
+                <i class="bi bi-check-circle me-2"></i>Lưu tất cả thay đổi
+            </button>
+        </div>
+    </form>
+
+    <!-- THÔNG BÁO THÀNH CÔNG -->
+    <div id="successMessage" class="alert alert-success alert-dismissible fade show position-fixed bottom-0 end-0 m-4"
+         role="alert" style="display: none; z-index: 9999; min-width: 300px;">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        <strong>Thành công!</strong> <span id="successText">Cài đặt đã được lưu.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- THÔNG BÁO LỖI -->
+    <div id="errorMessage" class="alert alert-danger alert-dismissible fade show position-fixed bottom-0 end-0 m-4"
+         role="alert" style="display: none; z-index: 9999; min-width: 300px;">
+        <i class="bi bi-exclamation-circle-fill me-2"></i>
+        <strong>Lỗi!</strong> <span id="errorText">Có lỗi xảy ra.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+</main>
+
+@section scripts {
+    <script>
+        $(document).ready(function () {
+            $('#settingForm').on('submit', function (e) {
+                e.preventDefault();
+
+                // Vô hiệu hóa nút
+                var $saveBtn = $('#saveBtn');
+                var originalBtnText = $saveBtn.html();
+                $saveBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...');
+
+                // Serialize dữ liệu form
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("Save", "Setting")',
+                    type: 'POST',
+                    data: formData,
+                    dataType: 'json',
+                    success: function (response) {
+                        if (response.success) {
+                            // Hiển thị thông báo thành công
+                            $('#successText').text(response.message);
+                            var successMsg = $('#successMessage');
+                            successMsg.fadeIn();
+
+                            // Ẩn thông báo sau 4 giây
+                            setTimeout(function () {
+                                successMsg.fadeOut();
+                            }, 4000);
+                        } else {
+                            // Hiển thị thông báo lỗi
+                            $('#errorText').text(response.message);
+                            $('#errorMessage').fadeIn();
+
+                            setTimeout(function () {
+                                $('#errorMessage').fadeOut();
+                            }, 4000);
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('Error:', error);
+                        $('#errorText').text('Lỗi khi lưu cài đặt: ' + error);
+                        $('#errorMessage').fadeIn();
+
+                        setTimeout(function () {
+                            $('#errorMessage').fadeOut();
+                        }, 4000);
+                    },
+                    complete: function () {
+                        // Khôi phục nút
+                        $saveBtn.prop('disabled', false).html(originalBtnText);
+                    }
+                });
+
+                return false;
+            });
+        });
+    </script>
+}

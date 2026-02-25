@@ -1,0 +1,481 @@
+﻿@model IEnumerable<FreshFram.Models.Status>
+@{
+    ViewBag.Title = "Quản Lý Trạng Thái";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Quản Lý Trạng Thái</h2>
+        <button class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#modalAdd"
+                id="btnAddNew">
+            <i class="bi bi-plus-circle"></i> Thêm trạng thái
+        </button>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <!-- Bộ lọc và tìm kiếm -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <input type="hidden" name="page" value="1" />
+                <div class="col-md-4">
+                    <input type="text"
+                           name="searchTerm"
+                           value="@ViewBag.SearchTerm"
+                           class="form-control"
+                           placeholder="Tìm theo tên trạng thái..." />
+                </div>
+                <div class="col-md-3">
+                    @Html.DropDownList("statusTypeID", (SelectList)ViewBag.StatusTypes, "-- Loại trạng thái --", new { @class = "form-select" })
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Lọc
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bảng danh sách trạng thái -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-success">
+                        <tr>
+                            <th>#</th>
+                            <th>Tên trạng thái</th>
+                            <th>Loại trạng thái</th>
+                            <th>Màu hiển thị</th>
+                            <th>Thứ tự</th>
+                            <th>Ghi chú</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            int index = (ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1;
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td>@index</td>
+                                    <td>
+                                        <span class="badge" style="background-color: @item.ColorCode">
+                                            @item.StatusName
+                                        </span>
+                                    </td>
+                                    <td>@item.StatusType.StatusTypeName</td>
+                                    <td>
+                                        <span style="color: @item.ColorCode">
+                                            <i class="bi bi-square-fill"></i>
+                                        </span>
+                                        <small class="text-muted">@item.ColorCode</small>
+                                    </td>
+                                    <td>@item.DisplayOrder</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(item.Note))
+                                        {
+                                            <small>@item.Note</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary me-1 btn-edit"
+                                                data-id="@item.StatusID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalEdit">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger btn-delete"
+                                                data-id="@item.StatusID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalDelete">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                index++;
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    Chưa có trạng thái nào
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Phân trang -->
+            @if (ViewBag.TotalPages > 1)
+            {
+                <nav aria-label="Phân trang" class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">
+                            Hiển thị <strong>@((ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1)</strong>
+                            đến <strong>@Math.Min(ViewBag.CurrentPage * ViewBag.PageSize, ViewBag.TotalItems)</strong>
+                            trong tổng số <strong>@ViewBag.TotalItems</strong> mục
+                        </div>
+
+                        <ul class="pagination mb-0">
+                            <li class="page-item @(ViewBag.CurrentPage == 1 ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("Status", new { page = ViewBag.CurrentPage - 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">
+                                    <span>&laquo;</span>
+                                </a>
+                            </li>
+
+                            @{
+                                int currentPage = ViewBag.CurrentPage;
+                                int totalPages = ViewBag.TotalPages;
+                                int startPage = Math.Max(1, currentPage - 2);
+                                int endPage = Math.Min(totalPages, currentPage + 2);
+
+                                if (startPage > 1)
+                                {
+                                    <li class="page-item">
+                                        <a class="page-link" href="@Url.Action("Status", new { page = 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">1</a>
+                                    </li>
+                                    if (startPage > 2)
+                                    {
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    }
+                                }
+
+                                for (int i = startPage; i <= endPage; i++)
+                                {
+                                    <li class="page-item @(i == currentPage ? "active" : "")">
+                                        <a class="page-link" href="@Url.Action("Status", new { page = i, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">@i</a>
+                                    </li>
+                                }
+
+                                if (endPage < totalPages)
+                                {
+                                    if (endPage < totalPages - 1)
+                                    {
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    }
+                                    <li class="page-item">
+                                        <a class="page-link" href="@Url.Action("Status", new { page = totalPages, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">@totalPages</a>
+                                    </li>
+                                }
+                            }
+
+                            <li class="page-item @(ViewBag.CurrentPage == ViewBag.TotalPages ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("Status", new { page = ViewBag.CurrentPage + 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">
+                                    <span>&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+            }
+        </div>
+    </div>
+</main>
+
+@section modal {
+    <!-- Modal thêm trạng thái -->
+    <div class="modal fade" id="modalAdd" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Thêm trạng thái mới</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAdd">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Tên trạng thái <span class="text-danger">*</span></label>
+                            <input type="text" name="StatusName" class="form-control" placeholder="Nhập tên trạng thái..." required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Loại trạng thái <span class="text-danger">*</span></label>
+                            @Html.DropDownList("StatusTypeID", (SelectList)ViewBag.StatusTypes, "-- Chọn loại --", new { @class = "form-select", required = "required" })
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Màu hiển thị</label>
+                            <input type="color" name="ColorCode" class="form-control form-control-color" value="#28a745" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Thứ tự hiển thị</label>
+                            <input type="number" name="DisplayOrder" class="form-control" value="0" min="0" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ghi chú</label>
+                            <textarea name="Note" class="form-control" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-success" id="btnSaveAdd">Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal sửa trạng thái -->
+    <div class="modal fade" id="modalEdit" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Chỉnh sửa trạng thái</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEdit">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="StatusID" id="EditStatusID" />
+                        <div class="mb-3">
+                            <label class="form-label">Tên trạng thái <span class="text-danger">*</span></label>
+                            <input type="text" name="StatusName" id="EditStatusName" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Loại trạng thái <span class="text-danger">*</span></label>
+                            @Html.DropDownList("StatusTypeID", (SelectList)ViewBag.StatusTypes, "-- Chọn loại --", new { @class = "form-select", id = "EditStatusTypeID", required = "required" })
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Màu hiển thị</label>
+                            <input type="color" name="ColorCode" id="EditColorCode" class="form-control form-control-color" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Thứ tự hiển thị</label>
+                            <input type="number" name="DisplayOrder" id="EditDisplayOrder" class="form-control" min="0" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ghi chú</label>
+                            <textarea name="Note" id="EditNote" class="form-control" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-primary" id="btnSaveEdit">Cập nhật</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal xóa -->
+    <div class="modal fade" id="modalDelete" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa trạng thái này không?</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button class="btn btn-danger" id="btnConfirmDelete">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+        let currentDeleteId = 0;
+
+        function showNotification(message, type = 'info') {
+            const oldAlert = document.querySelector('.dynamic-alert');
+            if (oldAlert) oldAlert.remove();
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;';
+
+            const iconMap = {
+                'success': 'bi-check-circle-fill',
+                'danger': 'bi-x-circle-fill',
+                'warning': 'bi-exclamation-triangle-fill',
+                'info': 'bi-info-circle-fill'
+            };
+
+            alertDiv.innerHTML = `<i class="bi ${iconMap[type]} me-2"></i><span>${message}</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button
+></button>`;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => { alertDiv.classList.remove('show'); setTimeout(() => alertDiv.remove(), 150); }, 5000);
+        }
+
+        // Reset form khi mở modal thêm mới
+        document.getElementById('btnAddNew').addEventListener('click', function() {
+            document.getElementById('formAdd').reset();
+        });
+
+        // Xử lý thêm mới
+        document.getElementById('btnSaveAdd').addEventListener('click', function() {
+            const form = document.getElementById('formAdd');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+
+            fetch('@Url.Action("CreateStatus", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalAdd')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            });
+        });
+
+        // Xử lý sửa - Load dữ liệu
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+
+                fetch('@Url.Action("GetStatusDetail", "Status")?id=' + id)
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.success) {
+                            const data = result.data;
+                            document.getElementById('EditStatusID').value = data.StatusID;
+                            document.getElementById('EditStatusName').value = data.StatusName;
+                            document.getElementById('EditStatusTypeID').value = data.StatusTypeID;
+                            document.getElementById('EditColorCode').value = data.ColorCode;
+                            document.getElementById('EditDisplayOrder').value = data.DisplayOrder;
+                            document.getElementById('EditNote').value = data.Note || '';
+                        } else {
+                            showNotification(result.message, 'danger');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showNotification('Không thể tải thông tin trạng thái', 'danger');
+                    });
+            });
+        });
+
+        // Xử lý cập nhật
+        document.getElementById('btnSaveEdit').addEventListener('click', function() {
+            const form = document.getElementById('formEdit');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...';
+
+            fetch('@Url.Action("EditStatus", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            });
+        });
+
+        // Xử lý xóa
+        document.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.addEventListener('click', function() {
+                currentDeleteId = this.dataset.id;
+            });
+        });
+
+        document.getElementById('btnConfirmDelete').addEventListener('click', function() {
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+            const deleteBtn = this;
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
+
+            fetch('@Url.Action("DeleteStatus", "Status")?id=' + currentDeleteId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: '__RequestVerificationToken=' + encodeURIComponent(token)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('modalDelete')).hide();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification(data.message, 'danger');
+                }
+            })
+            .catch(err => {
+                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                console.error(err);
+            })
+            .finally(() => {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            });
+        });
+    </script>
+}

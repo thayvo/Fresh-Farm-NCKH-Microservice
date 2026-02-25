@@ -1,0 +1,383 @@
+﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.WarehouseTransactionViewModel>
+@{
+    ViewBag.Title = "Lịch Sử Nhập Xuất Kho";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    var currentPage = ViewBag.CurrentPage ?? 1;
+    var totalPages = ViewBag.TotalPages ?? 1;
+    var totalItems = ViewBag.TotalItems ?? 0;
+}
+
+<style>
+    .transaction-card {
+        border-radius: 12px;
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+
+        .transaction-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+
+    .badge-import {
+        background: linear-gradient(135deg, #28a745, #5cb85c);
+    }
+
+    .badge-export {
+        background: linear-gradient(135deg, #dc3545, #e4606d);
+    }
+
+    .stats-card {
+        border-radius: 10px;
+        padding: 1.5rem;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+</style>
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="bi bi-journal-text text-primary me-2"></i>Lịch Sử Nhập Xuất Kho
+            </h2>
+            <p class="text-muted mb-0">Danh sách tất cả phiếu nhập/xuất kho</p>
+        </div>
+        <div>
+            <a href="@Url.Action("Index", "Warehouse")" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Quay lại kho
+            </a>
+        </div>
+    </div>
+
+    <!-- Thống kê nhanh -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small">Tổng phiếu</div>
+                        <h4 class="mb-0">@totalItems</h4>
+                    </div>
+                    <i class="bi bi-file-earmark-text fs-1 text-primary opacity-25"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small">Phiếu nhập</div>
+                        <h4 class="mb-0 text-success">@(Model?.Count(t => t.TransactionType == "Import") ?? 0)</h4>
+                    </div>
+                    <i class="bi bi-box-arrow-in-down fs-1 text-success opacity-25"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small">Phiếu xuất</div>
+                        <h4 class="mb-0 text-danger">@(Model?.Count(t => t.TransactionType == "Export") ?? 0)</h4>
+                    </div>
+                    <i class="bi bi-box-arrow-up fs-1 text-danger opacity-25"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small">Tổng giá trị</div>
+                        <h4 class="mb-0 text-primary">@((Model?.Sum(t => t.TotalAmount) ?? 0).ToString("N0")) ₫</h4>
+                    </div>
+                    <i class="bi bi-cash-stack fs-1 text-primary opacity-25"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Loại phiếu</label>
+                    <select name="transactionType" class="form-select" onchange="this.form.submit()">
+                        <option value="">Tất cả</option>
+                        <option value="Import" @(ViewBag.TransactionType == "Import" ? "selected" : "")>Phiếu nhập</option>
+                        <option value="Export" @(ViewBag.TransactionType == "Export" ? "selected" : "")>Phiếu xuất</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Từ ngày</label>
+                    <input type="date" name="fromDate" class="form-select" value="@ViewBag.FromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Đến ngày</label>
+                    <input type="date" name="toDate" class="form-select" value="@ViewBag.ToDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel me-2"></i>Lọc
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transaction List -->
+    <div class="row g-4">
+        @if (Model != null && Model.Any())
+        {
+            foreach (var item in Model)
+            {
+                var badgeClass = item.TransactionType == "Import" ? "badge-import" : "badge-export";
+                var iconClass = item.TransactionType == "Import" ? "bi-box-arrow-in-down" : "bi-box-arrow-up";
+                var typeText = item.TransactionType == "Import" ? "Nhập kho" : "Xuất kho";
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="card transaction-card" onclick="viewTransactionDetails(@item.TransactionID)">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <h5 class="mb-0">@item.TransactionCode</h5>
+                                <span class="badge @badgeClass text-white">
+                                    <i class="bi @iconClass me-1"></i>@typeText
+                                </span>
+                            </div>
+                            <div class="small text-muted mb-2">
+                                <i class="bi bi-calendar3 me-1"></i>
+                                @item.TransactionDate.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                            <div class="mb-2">
+                                <strong>Tổng SL:</strong> @item.TotalQuantity sản phẩm
+                            </div>
+                            <div class="mb-2">
+                                <strong>Tổng tiền:</strong> @item.TotalAmount.ToString("N0") ₫
+                            </div>
+                            <div class="small text-muted">
+                                <i class="bi bi-person me-1"></i>@item.CreatedByName
+                            </div>
+                            @if (!string.IsNullOrEmpty(item.Notes))
+                            {
+                                <div class="small text-muted mt-2">
+                                    <i class="bi bi-sticky me-1"></i>
+                                    @(item.Notes.Length > 50 ? item.Notes.Substring(0, 50) + "..." : item.Notes)
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                        <p class="text-muted">Chưa có phiếu nào</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Pagination -->
+    @if (totalPages > 1)
+    {
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage - 1 })">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                @for (int i = 1; i <= totalPages; i++)
+                {
+                    <li class="page-item @(i == currentPage ? "active" : "")">
+                        <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = i })">@i</a>
+                    </li>
+                }
+                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                    <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage + 1 })">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    }
+</main>
+
+<!-- ✅ MODAL XEM CHI TIẾT PHIẾU -->
+<div class="modal fade" id="transactionModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" id="modalHeader">
+                <h5 class="modal-title">
+                    <i class="bi bi-receipt me-2"></i>Chi Tiết Phiếu: <span id="modalTransactionCode"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="transactionDetailsContent">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-3">Đang tải...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="printTransaction()">
+                    <i class="bi bi-printer me-2"></i>In phiếu
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts {
+    <script>
+        function viewTransactionDetails(id) {
+            $('#transactionModal').modal('show');
+            $('#transactionDetailsContent').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Đang tải...</p></div>');
+
+            $.get('@Url.Action("GetTransactionDetails", "Warehouse")', { id: id }, function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    const transactionCode = data.TransactionCode ?? data.transactionCode ?? '';
+                    const transactionType = data.TransactionType ?? data.transactionType ?? '';
+                    const transactionDate = data.TransactionDate ?? data.transactionDate;
+                    const createdByName = data.CreatedByName ?? data.createdByName ?? '';
+                    const totalQuantity = Number(data.TotalQuantity ?? data.totalQuantity ?? 0);
+                    const totalAmount = Number(data.TotalAmount ?? data.totalAmount ?? 0);
+                    const notes = data.Notes ?? data.notes;
+                    const details = data.Details ?? data.details ?? [];
+
+                    $('#modalTransactionCode').text(transactionCode);
+
+                    // Đổi màu header theo loại phiếu
+                    const headerClass = transactionType === 'Import' ? 'bg-success text-white' : 'bg-danger text-white';
+                    $('#modalHeader').attr('class', 'modal-header ' + headerClass);
+
+                    let html = `
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6>Thông tin phiếu</h6>
+                                <table class="table table-sm">
+                                    <tr><th>Mã phiếu:</th><td>${transactionCode}</td></tr>
+                                    <tr><th>Loại:</th><td><span class="badge ${transactionType === 'Import' ? 'bg-success' : 'bg-danger'}">${transactionType === 'Import' ? 'Nhập kho' : 'Xuất kho'}</span></td></tr>
+                                    <tr><th>Ngày:</th><td>${formatDateTime(transactionDate)}</td></tr>
+                                    <tr><th>Người tạo:</th><td>${createdByName}</td></tr>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Tổng kết</h6>
+                                <table class="table table-sm">
+                                    <tr><th>Tổng SL:</th><td>${totalQuantity} sản phẩm</td></tr>
+                                    <tr><th>Tổng tiền:</th><td class="text-primary fw-bold">${totalAmount.toLocaleString('vi-VN')} ₫</td></tr>
+                                    <tr><th>Ghi chú:</th><td>${notes || '—'}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <h6>Chi tiết sản phẩm</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Ảnh</th>
+                                        <th>Mã SP</th>
+                                        <th>Tên sản phẩm</th>
+                                        <th class="text-end">SL</th>
+                                        <th class="text-end">Đơn giá</th>
+                                        <th class="text-end">Thành tiền</th>
+                                        <th>Lô</th>
+                                        <th>HSD</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    details.forEach(item => {
+                        const imageFileName = item.ImageFileName ?? item.imageFileName ?? 'no-image.png';
+                        const sku = item.SKU ?? item.sku ?? '';
+                        const productName = item.ProductName ?? item.productName ?? '';
+                        const quantity = Number(item.Quantity ?? item.quantity ?? 0);
+                        const unitPrice = Number(item.UnitPrice ?? item.unitPrice ?? 0);
+                        const amount = Number(item.Amount ?? item.amount ?? 0);
+                        const batchCode = item.BatchCode ?? item.batchCode;
+                        const expiryDate = item.ExpiryDate ?? item.expiryDate;
+                        html += `
+                            <tr>
+                                <td class="text-center">
+                                    <img src="/Images/${imageFileName}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"
+                                         onerror="this.src='/Images/no-image.png'">
+                                </td>
+                                <td>${sku}</td>
+                                <td>${productName}</td>
+                                <td class="text-end">${quantity}</td>
+                                <td class="text-end">${unitPrice.toLocaleString('vi-VN')} ₫</td>
+                                <td class="text-end fw-bold">${amount.toLocaleString('vi-VN')} ₫</td>
+                                <td>${batchCode || '—'}</td>
+                                <td>${formatDate(expiryDate)}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `</tbody></table></div>`;
+                    $('#transactionDetailsContent').html(html);
+                } else {
+                    $('#transactionDetailsContent').html('<div class="alert alert-danger">' + response.message + '</div>');
+                }
+            });
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                let date;
+                if (dateStr.indexOf('/Date(') === 0) {
+                    const timestamp = parseInt(dateStr.substr(6));
+                    date = new Date(timestamp);
+                } else {
+                    date = new Date(dateStr);
+                }
+                if (isNaN(date.getTime())) return '—';
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+            } catch (e) {
+                return '—';
+            }
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                let date;
+                if (dateStr.indexOf('/Date(') === 0) {
+                    const timestamp = parseInt(dateStr.substr(6));
+                    date = new Date(timestamp);
+                } else {
+                    date = new Date(dateStr);
+                }
+                if (isNaN(date.getTime())) return '—';
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${day}/${month}/${year} ${hours}:${minutes}`;
+            } catch (e) {
+                return '—';
+            }
+        }
+
+        function printTransaction() {
+            window.print();
+        }
+    </script>
+}

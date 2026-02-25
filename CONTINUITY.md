@@ -1,349 +1,81 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Hoàn thiện UI BFF theo hướng view-first, bám phong cách dự án cũ.
-  - Bổ sung UX auth:
-    - Đăng nhập từ trang nào thì quay lại đúng trang đó.
-    - Sau đăng nhập hiển thị lời chào có tên người dùng.
-  - Có tài liệu học tập tổng hợp toàn bộ tiến trình:
-    - làm gì trước/sau,
-    - tạo file trước/sau,
-    - tổ chức thư mục dự án và lý do.
-  - Success criteria:
-    - Cụm Shared đã tái sử dụng được.
-    - Home giữ đúng luồng dữ liệu sản phẩm và bố cục cũ.
-    - Có lộ trình rõ ràng cho các cụm view kế tiếp (Account/Checkout/Cart).
+  - Migrate dan Seller/Admin sang .NET 8 theo phase, uu tien go dependency legacy tung cum.
+  - Success hien tai: cum `Product + Category + Unit + Order + Customer + Coupon + Warehouse + Shipping` da chay service-first, khong con phu thuoc `FreshFram.*` va `FreshFarmDBEntities` trong cac module nay.
 - **Constraints/Assumptions**:
-  - User ưu tiên tiếng Việt có dấu.
-  - Tập trung sửa `views` và `.md`.
-  - Mục tiêu hiện tại là giống giao diện cũ trước, logic nâng sau.
-  - `docs/` đang bị ignore bởi `.gitignore`.
+  - Giu tuong thich views hien co, han che doi UI lon.
+  - Khong dung lenh pha huy git; khong revert thay doi unrelated cua user.
+  - Moi truong assistant chua co `dotnet` nen khong build/test runtime duoc.
 - **Key decisions**:
-  - Tạo các partial legacy trong `Views/Shared` thay vì giữ block lớn trong `Home/Index`.
-  - Giữ `Home/Index` làm trang host dữ liệu, còn phần chrome UI (promo/header/nav/footer/toast) tách shared.
-  - Không đụng controller/service trong bước Shared.
-  - Bước 4 và Bước 6 tiếp tục theo nguyên tắc chỉ sửa `views` và `.md`, ưu tiên style giống dự án cũ.
-  - Kết quả lệnh của assistant chạy trong sandbox riêng, không phản ánh trực tiếp toolchain trên máy local của user.
-  - Dùng `returnUrl` theo hướng an toàn:
-    - Nhận `returnUrl` ở `AccountController.SignIn` (GET/POST).
-    - Chỉ redirect khi `Url.IsLocalUrl(returnUrl)` để tránh open redirect.
-    - Fallback về `OrderHistory` nếu không có `returnUrl` hợp lệ.
-  - Ưu tiên roadmap hiện tại:
-    - Hoàn thiện BFF luồng khách mua (Customer flow) trước.
-    - Seller chỉ bắt đầu khi customer flow đã ổn định end-to-end.
-  - Quy ước đặt tên DTO:
-    - Có thể đặt file gom nhóm (vd: `AccountDtos.cs`, `ProfileDtos.cs`) chứa nhiều class DTO.
-    - Nếu file chỉ chứa 1 class, ưu tiên trùng tên file với class để dễ tìm (vd: `ProfileUpdateRequestDto.cs`).
+  - Giu chien luoc migrate theo module (khong big-bang).
+  - Product/Category/Unit, Order, Customer, Coupon deu chuyen qua `IHttpClientFactory` + API service, bo EF truc tiep trong BFF.
+  - Bo sung endpoint admin-order trong Ordering API de giu tuong thich views Seller.
+  - Da siet auth role `Seller` cho Catalog CRUD endpoints va admin-order endpoints thong qua policy `SellerOnly`.
+  - Bo sung endpoint admin-customer (Identity API) va admin-coupon + customer-order-metrics (Ordering API) de phuc vu Seller views.
+  - Warehouse + Shipping migrate theo huong service-first MVP:
+    - Warehouse qua `Catalog API` endpoint admin.
+    - Shipping qua `Ordering API` endpoint admin.
+    - Chap nhan gioi han tam thoi o transaction warehouse (in-memory) va delivery assignment shipping (chua mo rong schema service).
+  - Cum phase 5 (`Report + Review + SupportChat + Setting + User`) se thuc hien theo lot nho 5.0 -> 5.6 trong `ROADMAP_SELLER_ADMIN_MIGRATION.md`.
 - **State**:
   - *Done*:
-    - Đã tạo mới các partial shared:
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ToastLegacy.cshtml`
-    - Đã cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`:
-      - Dùng `@await Html.PartialAsync(...)` cho promo/header/nav/footer/toast.
-      - Giữ nguyên JS IDs quan trọng (`headerSearchForm`, `headerSearchInput`) để script Home tiếp tục hoạt động.
-    - Đã cập nhật kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Đánh dấu trạng thái `[Đã làm]` cho Bước 1 Shared.
-    - Đã hoàn thiện Bước 2 cho Home:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` để bám sát style/animation từ dự án cũ.
-      - Nâng popup coupon theo cấu trúc chi tiết hơn (welcome icon, coupon info, expiry warning).
-      - Giữ nguyên luồng API BFF (`/bff/products`) và CTA sang `/checkout`.
-    - Đã cập nhật kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Đánh dấu trạng thái `[Đã làm]` cho Bước 2 Home.
-    - Đã hoàn thiện Bước 3 cho cụm Account Auth:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml` theo phong cách auth của dự án cũ.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml` theo phong cách auth của dự án cũ.
-      - Giữ bind model BFF qua `asp-for`, không đổi controller.
-      - Bổ sung fallback logo khi chưa có assets cũ.
-    - Đã cập nhật kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Đánh dấu trạng thái `[Đã làm]` cho Bước 3 Account Auth.
-    - Đã hoàn thiện phần Checkout của Bước 5:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml` theo bố cục checkout bản cũ.
-      - Giữ nguyên luồng dữ liệu query string (`productId`, `productName`, `unitPrice`, `unitSymbol`) và submit hiện tại.
-      - Không đổi controller/service.
-    - Đã hoàn thiện phần Success của Bước 5:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml` về layout success bản cũ.
-      - Giữ nhánh fallback khi thiếu dữ liệu đơn hàng.
-      - Giữ nút xem chi tiết đơn vừa đặt và redirect về `/?from=thankyou`.
-    - Đã cập nhật kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Ghi trạng thái `[Đã làm]` cho Checkout `Index` và `Success`.
-    - Đã hoàn thiện Bước 4 cho cụm Order:
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_BreadCrumb.cshtml`.
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml`.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml` theo layout account kiểu cũ.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml` đồng bộ style account + dữ liệu BFF.
-    - Đã hoàn thiện Bước 6 cho cụm Cart UI shell:
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`.
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_CartSummary.cshtml`.
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`.
-    - Đã cập nhật kế hoạch:
-      - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-      - Ghi trạng thái `[Đã làm]` cho Bước 4 và Bước 6.
-    - Đã tạo thêm tài liệu kế hoạch mới theo yêu cầu user:
-      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
-      - Chốt thứ tự ưu tiên P0/P1/P2/P3 cho vòng tiếp theo.
-      - Nêu rõ rủi ro hiện tại: model mismatch giữa `CartController.Index()` (`CartSummaryDto`) và `Views/Cart/Index.cshtml` (đang dùng list item).
-    - Đã thực thi các mục liên quan `views` trong kế hoạch mới:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`:
-        - Đổi model sang `CartSummaryDto`.
-        - Dùng `Model.Items/Model.SubTotal/Model.ShippingFee/Model.GrandTotal`.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`:
-        - Thêm anti-forgery form ẩn.
-        - Thêm nút `Thêm vào giỏ` trên card sản phẩm.
-        - Thêm JS submit `POST /cart/add` qua form ẩn.
-      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md`:
-        - Đánh dấu `[Đã làm]` cho P0 và phần view của P1.
-    - Đã triển khai hướng B (checkout nhiều item từ cart):
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`:
-        - Bỏ thao tác mô phỏng client-side.
-        - Nối form thật tới `POST /cart/update`, `POST /cart/remove`, `POST /cart/clear`.
-        - Nút đặt hàng điều hướng `/checkout` (không gắn query string 1 item).
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
-        - Render nhiều item theo `Items[i]`.
-        - Bỏ phụ thuộc query string `productId/unitPrice/unitSymbol`.
-        - Tính lại tạm tính/tổng theo danh sách item + shipping fee.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
-        - GET `/checkout` lấy đầy đủ item từ cart session.
-        - POST `/checkout` normalize request trước khi gọi Ordering API.
-        - Giữ clear cart sau khi đặt đơn thành công.
-      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md`:
-        - Đánh dấu trạng thái `[Đã làm]` cho P1/P2 theo hướng B.
-    - Đã hoàn thiện UX auth theo yêu cầu mới:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`:
-        - GET/POST `SignIn` nhận `returnUrl`.
-        - Redirect an toàn qua helper `NormalizeReturnUrl` + `RedirectToLocal`.
-        - Trả lại đúng trang trước đăng nhập khi `returnUrl` hợp lệ.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`:
-        - Ưu tiên đọc `ViewData["ReturnUrl"]`, fallback `returnUrl`/`ReturnUrl` từ query.
-        - Giữ hidden input `returnUrl` khi submit.
-      - Cập nhật link đăng nhập mang `returnUrl` theo trang hiện tại:
-        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
-        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
-        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
-      - Cập nhật header hiển thị lời chào khi đã đăng nhập:
-        - `Chào, {User.Identity.Name}` (fallback `bạn` nếu thiếu tên).
-    - Đã tạo tài liệu học tập tổng hợp theo yêu cầu:
-      - `docs/hoctap.md`
-      - Nội dung gồm:
-        - timeline theo mốc commit/tài liệu,
-        - thứ tự triển khai theo pha (A -> G),
-        - thứ tự tạo/sửa file trọng tâm trong BFF,
-        - tổ chức thư mục và lý do kỹ thuật.
-    - Đã xác nhận trạng thái UI thông tin tài khoản:
-      - Chưa có trang profile/account-info riêng theo dự án cũ.
-      - Hiện mới có các màn account: `SignIn`, `SignUp`, `OrderHistory`, `OrderDetail` và lời chào tên ở header.
-    - Đã triển khai phần view cho “Thông tin tài khoản” theo yêu cầu mới:
-      - Tạo `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml` thêm menu `Thông tin tài khoản` -> `/account/profile`.
-      - Cập nhật `docs/ke-hoach-tiep-theo-sau-step4-step6.md` với hướng dẫn tự sửa `.cs`:
-        - action `GET /account/profile`,
-        - skeleton `POST /account/profile` để bật lưu dữ liệu thật.
-      - Đã thêm guard avatar khi tên user rỗng để tránh lỗi `Substring`.
-    - Đã rà soát và vá thêm các thiếu sót Account ở mức `views`:
-      - `SignIn`/`SignUp` giữ `returnUrl` khi chuyển qua lại giữa 2 trang.
-      - `SignUp` form nhận kèm query `returnUrl` để không mất ngữ cảnh ở luồng UI.
-      - Header khi đã đăng nhập có link nhanh `Tài khoản` -> `/account/profile`.
-      - Header khi chưa đăng nhập, bấm `Đơn hàng` sẽ chuyển tới `SignIn` với `returnUrl=/account/orders`.
-      - `Profile` thêm khối hiển thị `TempData["SuccessMessage"]` / `TempData["ErrorMessage"]` / `ViewBag.Error`.
-      - `Profile` bổ sung CTA về trang chủ.
-      - `Profile` breadcrumb trỏ đúng `/account/profile`.
-      - `Profile` form đã chuẩn bị sẵn bind field (`FullName`, `Email`, `Phone`, `Address`) + anti-forgery + `ReturnUrl`.
-      - `_AccountNav` mở rộng active state cho action `ProfileUpdate`.
-      - `Profile` đã bỏ trạng thái demo:
-        - Bật nút `Lưu thay đổi` dạng `submit`,
-        - bỏ thông báo placeholder “chưa có action”,
-        - thêm client-side validation (`needs-validation`).
-    - Đã bổ sung checklist phần thiếu `.cs` trong:
-      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
-      - gồm: route profile GET/POST, giữ `returnUrl` sau signup, map claim email/phone.
-    - Kết quả tool quan trọng:
-      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -nologo` thất bại do môi trường thiếu `dotnet` (`command not found`).
-    - Đã rà soát thực trạng profile/email/phone/address theo code hiện tại:
-      - `Profile.cshtml` đang lấy `Email/Phone` từ claim cookie, không đọc trực tiếp từ DB/API.
-      - `SignIn` mới map `NameIdentifier`, `Name`, `Role`; chưa map `email/phone` từ JWT sang cookie claims.
-      - `ProfileUpdate` gọi `PUT /auth/profile` nhưng `Identity AuthController` chưa có endpoint này.
-      - Chưa có luồng/screen “sổ địa chỉ nhiều địa chỉ” trong BFF hiện tại.
-      - `docs/final3.sql` cũ có `AddressBook`, `vw_UserAddresses`, unique default address index, SP save/default.
-      - `Identity` hiện tại chỉ có bảng users/auth/roles/sessions (không có model/table address book trong service).
-      - Ràng buộc chuẩn email/phone 10 số chưa có ở tầng API hiện tại (mới có required/max-length/unique).
-    - Đã cập nhật kế hoạch cực chi tiết theo yêu cầu user:
-      - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
-      - Bổ sung section mới gồm:
-        - script SQL chuẩn hóa `Users.Phone` + tạo `AddressBook`,
-        - DTO Identity/BFF có DataAnnotation validate email/phone 10 số,
-        - code đầy đủ cho endpoint Identity (`/auth/profile`, `/auth/addresses`, create/update/set-default/delete),
-        - code đầy đủ cho BFF `AccountController` để gọi API thật,
-        - checklist test chi tiết + checkpoint git sau từng mốc.
-    - Đã thực hiện đúng phạm vi user cho phép: chỉ sửa 3 file view profile/address.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`:
-        - Bind `ProfilePageViewModel` thay vì đọc claim trực tiếp.
-        - Form `ProfileUpdate` dùng field đúng DTO (`FullName`, `Email`, `Phone`, `ReturnUrl`).
-        - Thêm khu vực `Sổ địa chỉ` và nút mở modal thêm địa chỉ.
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`:
-        - Render danh sách địa chỉ từ `Model.Addresses`.
-        - Form `POST SetDefaultAddress` cho từng item + anti-forgery.
-      - Tạo mới `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressFormModal.cshtml`:
-        - Form `POST CreateAddress` + anti-forgery.
-        - Field map đúng `UpsertProfileAddressRequestDto`.
-        - Validate client-side cho phone 10 số bắt đầu 0.
-    - Đã kiểm tra nhanh phần `.cs` sau khi sửa view:
-      - Identity đã có endpoint profile/address (`GET/PUT profile`, `GET/POST addresses`, `set-default`, `delete`).
-      - Identity `Program.cs` đã có `AddAuthorization()`.
-      - Identity models/dbcontext đã có `AddressBook`.
-      - BFF `AccountController` đã có action tương ứng cho profile + create/set-default address.
-    - Đã nối views với action CRUD địa chỉ mới trong BFF:
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`
-        - Thêm form `UpdateAddress` (qua modal sửa từng địa chỉ).
-        - Thêm form `DeleteAddress` (POST + anti-forgery + confirm).
-        - Giữ form `SetDefaultAddress`.
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressFormModal.cshtml`
-        - Bổ sung hidden `IsDefault=false` để bind bool ổn định khi checkbox không tick.
-    - Kết quả tool:
-      - `dotnet --version` thất bại trong môi trường assistant (`command not found`), không thể build/compile tại đây.
-    - Đã cập nhật chi tiết tài liệu học tập theo tiến độ mới nhất:
-      - `docs/hoctap.md`
-      - Bổ sung các phần mới:
-        - trạng thái cập nhật gần nhất của customer flow,
-        - tiến độ theo cụm kỹ thuật Identity/BFF/Views,
-        - danh sách file tạo/sửa mới nhất,
-        - checklist test tay profile/address/cart/checkout/order,
-        - danh sách điểm còn mở và thứ tự ưu tiên bước tiếp theo.
-    - Đã tạo tài liệu chuyên đề kết nối service theo yêu cầu mới:
-      - `docs/hoc-ket-noi-service.md`
-      - Nội dung chính:
-        - bản đồ đầy đủ các điểm BFF gọi Identity/Catalog/Ordering theo file và line,
-        - giải thích kiến trúc `IHttpClientFactory` + named clients + token/session/cookie,
-        - quy trình chuẩn thêm call service mới (config, DTO, auth header, error handling),
-        - phần lý thuyết nền tảng cần học sâu (HTTP semantics, auth, resilience),
-        - lộ trình học hiệu quả theo giai đoạn + checklist dùng lại nhanh.
-    - Đã rà soát hiện trạng checkout/profile theo yêu cầu mới:
-      - Ràng buộc mạnh cho email/phone hiện có ở profile/address (BFF + Identity DTO).
-      - Checkout hiện mới kiểm tra required cơ bản; chưa có regex phone/email ở BFF/Ordering cho luồng tạo đơn.
-      - User đã có “sổ địa chỉ” ở trang profile, nhưng checkout chưa tích hợp chọn địa chỉ đã lưu/mặc định.
-    - Đã triển khai ngay bước 1-2 cho checkout theo yêu cầu user:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`:
-        - GET `/checkout` gọi Identity `/auth/addresses` để lấy địa chỉ đã lưu.
-        - Prefill shipping từ địa chỉ mặc định (nếu có).
-        - POST `/checkout` hỗ trợ mode `saved/new`, nhận `selectedAddressId` và map địa chỉ đã chọn vào payload đặt đơn.
-        - Giữ state chọn địa chỉ khi validation fail hoặc Ordering API fail.
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
-        - Thêm UI chọn `Dùng địa chỉ đã lưu` hoặc `Nhập địa chỉ mới`.
-        - Thêm dropdown chọn địa chỉ đã lưu (kèm dữ liệu người nhận/điện thoại/địa chỉ).
-        - Thêm JS tự fill shipping fields khi chọn địa chỉ đã lưu.
-        - Giữ khả năng nhập địa chỉ mới thủ công.
-        - Bổ sung pattern phone 10 số bắt đầu bằng 0 ở form checkout.
-    - Đã làm tiếp bước 3 theo phạm vi “chỉ views”:
-      - Cập nhật `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`:
-        - Bật cơ chế `needs-validation` + `novalidate` cho form checkout.
-        - Thêm `invalid-feedback` rõ ràng cho các field shipping và chọn địa chỉ đã lưu.
-        - Bổ sung ràng buộc HTML cho shipping:
-          - `FullName`: `maxlength=100`,
-          - `Phone`: `pattern ^0\\d{9}$`, `inputmode=numeric`, `minlength/maxlength=10`,
-          - `Email`: `type=email`, `maxlength=100`,
-          - `AddressDetail`: `maxlength=255`.
-        - JS cập nhật rule `required` theo mode `saved/new`.
-        - JS chặn submit khi form invalid và thêm class `was-validated`.
-        - JS lọc ký tự số cho field phone khi nhập tay.
-    - Đã sửa lỗi Razor `RZ1031` ở checkout view:
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-      - Nguyên nhân: đặt biểu thức C# trực tiếp trong vùng khai báo thuộc tính của thẻ `<option>`.
-      - Cách sửa: tách thành `if/else` để render 2 nhánh `<option>` có/không có `selected`.
-    - Đã sửa lỗi runtime `RuntimeBinderException` ở checkout view:
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-      - Nguyên nhân: gọi `int.TryParse(...)` với biểu thức xuất phát từ `ViewBag` (`dynamic`) gây mơ hồ overload ở runtime.
-      - Cách sửa: ép `ViewBag.SelectedAddressId` về `object?`, tách ra chuỗi trung gian rồi mới `int.TryParse(...)`.
-    - Đã sửa lỗi redirect loop `ERR_TOO_MANY_REDIRECTS` khi vào `/checkout`:
-      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
-      - Nguyên nhân: cookie auth còn hiệu lực nhưng `ACCESS_TOKEN` trong session bị mất; `Checkout` redirect sang `SignIn`, còn `SignIn` thấy đã đăng nhập lại redirect ngược về `Checkout` -> lặp 302.
-      - Cách sửa: ở GET/POST `/checkout`, khi thiếu token thì `SignOutAsync` cookie + remove session key trước khi redirect sang signin.
-    - Đã sửa lỗi lấy `userId` từ JWT trong Identity API:
-      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
-      - Triệu chứng: BFF checkout hiển thị `Không tải được sổ địa chỉ: Token không chứa user id hợp lệ.`
-      - Nguyên nhân: Identity đọc claim `sub` trực tiếp; trong một số cấu hình JwtBearer, `sub` được map sang `ClaimTypes.NameIdentifier`.
-      - Cách sửa: thêm helper `TryGetCurrentUserId(...)` để đọc fallback từ cả `JwtRegisteredClaimNames.Sub` và `ClaimTypes.NameIdentifier`, rồi dùng lại ở toàn bộ action profile/address.
-    - Đã xác nhận lý do UI “địa chỉ đã lưu / địa chỉ mới” không hiện ở checkout:
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-      - Block radio + select chỉ render khi `savedAddresses.Any()` là `true`.
-      - Khi gọi `/auth/addresses` lỗi thì `savedAddresses` rỗng, view rơi vào nhánh `else` và chỉ render hidden `addressMode=new`.
-    - Đã chỉnh UI checkout phần chọn địa chỉ theo hướng giống luồng cũ:
-      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-      - Luôn render khối “Nguồn địa chỉ giao hàng” với 2 mode:
-        - `Dùng địa chỉ đã lưu`
-        - `Nhập địa chỉ mới`
-      - Khi chưa có địa chỉ lưu:
-        - disable mode `saved`,
-        - hiển thị hướng dẫn sang `/account/profile` để thêm địa chỉ,
-        - vẫn giữ mode `new` hoạt động bình thường.
-      - Cập nhật JS đồng bộ:
-        - mode `saved` chỉ bật khi select có option thật,
-        - tự fallback về `new` nếu không có dữ liệu địa chỉ,
-        - giữ validation đúng cho từng mode.
-    - Đã sửa lỗi crash sau khi đặt hàng do `TempData` không serialize được `decimal`:
-      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
-      - Triệu chứng: `DefaultTempDataSerializer cannot serialize an object of type 'System.Decimal'`.
-      - Cách sửa:
-        - `TempData["TotalAmount"]` đổi từ `decimal` sang chuỗi invariant.
-        - `TempData["OrderDate"]` lưu chuỗi ISO (`"O"`) để an toàn serialize.
-    - Đã chỉnh Home theo yêu cầu bám dự án cũ và bỏ “Yêu thích”:
-      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
-        - Xóa nút trái tim trên card sản phẩm (featured + suggest).
-        - Xóa logic JS/localStorage của wishlist.
-        - Xóa CSS `btn-wishlist` liên quan.
-      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
-        - Thêm shortcut `Giỏ hàng` ở header cho cả user đã đăng nhập và chưa đăng nhập.
-    - Đã xác định nguyên nhân phải đăng nhập lại thường xuyên:
-      - BFF lưu `ACCESS_TOKEN` trong `Session` (`AccountController`), không nằm trong cookie auth.
-      - `Session` đang dùng `AddDistributedMemoryCache` (`Program.cs`) nên mất khi app restart và hết hạn theo `IdleTimeout`.
-      - Các controller (`Checkout`, `Account`, `BffOrders`) chủ động `SignOutAsync` khi cookie còn nhưng thiếu `ACCESS_TOKEN` để tránh redirect loop.
-      - Cookie auth hiện tại không cấp `IsPersistent=true` khi login, nên đóng browser cũng có thể mất phiên đăng nhập.
+    - Hoan tat phase `Product + Category + Unit` service-first (controllers + views + Catalog API endpoints/DTOs).
+    - Hoan tat phase `Order` service-first:
+      - Viet lai `Areas/Seller/Controllers/OrderController.cs` theo goi Ordering API.
+      - Tao model local `Areas/Seller/Models/OrderSellerModels.cs`.
+      - Cap nhat `Areas/Seller/Views/Order/PrintInvoice.cshtml` sang model moi.
+      - Mo rong `Services/Ordering/.../OrdersController.cs` cho paged/search/detail/status/delete/statistics.
+    - Hoan tat buoc siet auth:
+      - `Catalog API`: POST/PUT/DELETE/toggle cho Product/Category/Unit da yeu cau `SellerOnly`.
+      - `Ordering API`: toan bo `api/orders/admin/*` da yeu cau `SellerOnly`.
+      - `BFF Seller`: Product/Category/Unit/Order controller da dat `[Authorize(Roles = \"Seller\")]`.
+    - Hoan tat phase `Customer + Coupon` service-first:
+      - Viet lai `Areas/Seller/Controllers/CustomerController.cs` theo goi `Identity` + `Ordering`.
+      - Viet lai `Areas/Seller/Controllers/CouponController.cs` theo goi `Ordering` + `Identity`.
+      - Tao model local `Areas/Seller/Models/CustomerCouponSellerModels.cs`.
+      - Cap nhat views `Areas/Seller/Views/Customer/*` va `Areas/Seller/Views/Coupon/ManageCoupons.cshtml` sang model namespace moi.
+      - Them `Identity API`: `Controllers/AdminCustomersController.cs`.
+      - Them `Ordering API`: `Controllers/AdminCustomersController.cs`, `Controllers/CouponsAdminController.cs`.
+      - Da siet policy `SellerOnly` cho endpoint moi o Identity/Ordering.
+    - Hoan tat phase `Warehouse + Shipping` service-first (MVP):
+      - Viet lai `Areas/Seller/Controllers/WarehouseController.cs` theo goi `Catalog API`.
+      - Viet lai `Areas/Seller/Controllers/ShippingController.cs` theo goi `Ordering API`.
+      - Tao model local `Areas/Seller/Models/WarehouseShippingSellerModels.cs`.
+      - Cap nhat views `Areas/Seller/Views/Warehouse/*` va `Areas/Seller/Views/Shipping/ManageShipping.cshtml` sang model namespace moi.
+      - Them `Catalog API`: `Controllers/WarehouseAdminController.cs`.
+      - Them `Ordering API`: `Controllers/ShippingAdminController.cs`.
+      - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong cum `Seller/Warehouse` va `Seller/Shipping`.
+      - UNCONFIRMED runtime limitation:
+        - Warehouse transaction log hien la in-memory.
+        - Shipping delivery assignment chi o muc placeholder (khong co data assignment tu service schema hien tai).
+    - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `AdminAuthorize`, `NoCache` trong cum Seller Order.
+    - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong cum Seller Customer/Coupon.
+    - Ra soat lai namespace/model-view phase `Customer + Coupon`: khop namespace `FreshFarm.Web.Bff.Areas.Seller.Models.*`, khong thay `using` legacy trong cum nay.
+    - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md`: danh dau xong phase Customer + Coupon.
+    - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md`: chia nho cum phase 5 thanh lot 5.0 -> 5.6 (scope + DoD + cau lenh giao viec mau).
+    - Da truy xuat line-number cho section Phase 3.5 de user ra lenh tung lot chinh xac theo dong.
+    - Hoan tat lot 5.0 (inventory + mapping, khong sua logic):
+      - Tao `LOT_5_0_INVENTORY_MAPPING.md` gom:
+        - action inventory 5 controller,
+        - mapping action -> API endpoint de xuat,
+        - mapping field toi thieu cho toan bo views cum 5,
+        - ket qua static audit legacy dependencies.
+      - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md` danh dau lot 5.0 da xong.
   - *Now*:
-    - User hỏi lý do vì sao luôn bị yêu cầu đăng nhập lại.
+    - San sang thuc thi lot 5.1 (Setting + User) theo service-first.
   - *Next*:
-    - Chốt hướng sửa phiên đăng nhập:
-      - (A) giữ token trong session nhưng chuyển sang session store bền vững (Redis/SQL),
-      - (B) hoặc bổ sung cơ chế rehydrate token khi session mất,
-      - (C) bật đăng nhập persistent cookie nếu muốn giữ phiên sau khi đóng browser.
-    - Nếu muốn giống cũ hơn nữa (layout card địa chỉ thay cho dropdown), thực hiện bước refactor UI lần 2.
-    - Nếu còn lỗi backend validation thì tiếp tục theo checklist sửa `.cs` đã hướng dẫn.
-    - Theo ưu tiên kỹ thuật hiện tại:
-      - test local đầy đủ các thao tác address CRUD trên `/account/profile`,
-      - nếu ổn định thì nối địa chỉ mặc định sang checkout,
-      - sau đó polish customer flow trước khi tách Seller flow.
+    - Cho lenh cua user de chay lot 5.1.
 - **Open questions** (UNCONFIRMED if needed):
-  - UNCONFIRMED: JWT của môi trường hiện tại luôn có claim `username`; nếu đổi claim type cần map lại chỗ tạo `ClaimTypes.Name`.
-  - UNCONFIRMED: User muốn đồng bộ “sổ địa chỉ” về Identity service hay tạo service Address riêng để dùng chung cho checkout/profile.
+  - Khong co.
 - **Working set** (files/ids/commands):
+  - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
   - `CONTINUITY.md`
-  - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderHistory.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/OrderDetail.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ToastLegacy.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_BreadCrumb.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_AccountNav.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_CartSummary.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
-  - `docs/ke-hoach-thuc-thi-bff-sau-signin-signup.md`
-  - `docs/ke-hoach-tiep-theo-sau-step4-step6.md`
-  - `docs/hoctap.md`
-  - `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
-  - Local evidence from user screenshot:
-    - `dotnet --list-sdks`: `9.0.304`
-    - Installed runtimes include `Microsoft.AspNetCore.App 8.0.19` and `Microsoft.NETCore.App 8.0.19`
+  - `LOT_5_0_INVENTORY_MAPPING.md`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{ReportController.cs,ReviewController.cs,SupportChatController.cs,SettingController.cs,UserController.cs}`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/{Report/*,Review/*,SupportChat/*,Setting/*,User/*}`
+  - Commands da dung chinh:
+    - `rg -n "FreshFram|FreshFarmDBEntities|AdminAuthorize|NoCache" ...`
+    - `sed -n ...` de doi chieu controller/view/API
+    - `nl -ba ROADMAP_SELLER_ADMIN_MIGRATION.md | sed -n '70,220p'`
+    - `dotnet --version` (khong co trong moi truong)

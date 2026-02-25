@@ -1,0 +1,81 @@
+@model FreshFarm.Web.Bff.Areas.Seller.Models.CreateCustomerViewModel
+
+@{
+    ViewBag.Title = "Thêm Khách Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="mb-4">
+        <h2 class="fw-bold">Thêm khách hàng mới</h2>
+        @{
+            ViewBag.BreadcrumbParentTitle = "Quản lý khách hàng";
+            ViewBag.BreadcrumbParentUrl = Url.Action("ManageCustomers", "Customer");
+            ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
+        }
+        @Html.Partial("_Breadcrumb")
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            @using (Html.BeginForm("Create", "Customer", FormMethod.Post, new { @class = "row g-3" }))
+            {
+                @Html.AntiForgeryToken()
+
+                @* Hiển thị thông báo lỗi chung *@
+                @Html.ValidationSummary(true, "", new { @class = "alert alert-danger" })
+
+                <div class="col-md-6">
+                    <label class="form-label">Tên đăng nhập *</label>
+                    @Html.TextBoxFor(m => m.UserName, new { @class = "form-control", required = "required", placeholder = "Nhập tên đăng nhập" })
+                    @Html.ValidationMessageFor(m => m.UserName, "", new { @class = "text-danger small" })
+                    <small class="text-muted">Tên đăng nhập để đăng nhập vào hệ thống</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Họ và tên *</label>
+                    @Html.TextBoxFor(m => m.FullName, new { @class = "form-control", required = "required", placeholder = "Nhập họ và tên" })
+                    @Html.ValidationMessageFor(m => m.FullName, "", new { @class = "text-danger small" })
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Email *</label>
+                    @Html.TextBoxFor(m => m.Email, new { @class = "form-control", type = "email", required = "required", placeholder = "example@email.com" })
+                    @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger small" })
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Số điện thoại *</label>
+                    @Html.TextBoxFor(m => m.Phone, new { @class = "form-control", type = "tel", required = "required", placeholder = "0987654321" })
+                    @Html.ValidationMessageFor(m => m.Phone, "", new { @class = "text-danger small" })
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Mật khẩu *</label>
+                    @Html.PasswordFor(m => m.Password, new { @class = "form-control", required = "required", placeholder = "Nhập mật khẩu" })
+                    @Html.ValidationMessageFor(m => m.Password, "", new { @class = "text-danger small" })
+                    <small class="text-muted">Tối thiểu 6 ký tự</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Xác nhận mật khẩu *</label>
+                    @Html.PasswordFor(m => m.ConfirmPassword, new { @class = "form-control", required = "required", placeholder = "Nhập lại mật khẩu" })
+                    @Html.ValidationMessageFor(m => m.ConfirmPassword, "", new { @class = "text-danger small" })
+                </div>
+
+                <div class="col-12 mt-4 text-end">
+                    <a href="@Url.Action("ManageCustomers", "Customer")" class="btn btn-secondary">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i> Lưu khách hàng
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</main>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

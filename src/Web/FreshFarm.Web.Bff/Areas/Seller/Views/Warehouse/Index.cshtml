@@ -1,0 +1,457 @@
+﻿@using System.Linq
+@model FreshFarm.Web.Bff.Areas.Seller.Models.WarehouseStatsViewModel
+
+@{
+    ViewBag.Title = "Quản Lý Kho";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    var sampleProduct = Model?.Products?.FirstOrDefault();
+    var nearDays = sampleProduct?.EffectiveNearExpiryDays ?? 7;
+
+    var currentPage = ViewBag.CurrentPage ?? 1;
+    var totalPages = ViewBag.TotalPages ?? 1;
+    var totalItems = ViewBag.TotalItems ?? 0;
+}
+
+<style type="text/css">
+    .stats-card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        background: linear-gradient(135deg, var(--card-bg) 0%, var(--card-bg-light) 100%);
+    }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-card.primary {
+            --card-bg: #28a745;
+            --card-bg-light: #5cb85c;
+            color: white;
+        }
+
+        .stats-card.warning {
+            --card-bg: #ffc107;
+            --card-bg-light: #ffcd39;
+            color: #212529;
+        }
+
+        .stats-card.danger {
+            --card-bg: #dc3545;
+            --card-bg-light: #e4606d;
+            color: white;
+        }
+
+        .stats-card.info {
+            --card-bg: #17a2b8;
+            --card-bg-light: #3ab4c5;
+            color: white;
+        }
+
+    .stats-icon {
+        font-size: 3rem;
+        opacity: 0.8;
+    }
+
+    .table-card {
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .search-box {
+        border-radius: 25px;
+        border: 2px solid #dee2e6;
+    }
+
+    .stock-bar {
+        height: 8px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #e9ecef;
+    }
+
+        .stock-bar .progress-bar {
+            transition: width 0.3s ease;
+        }
+
+    .expiry-badge {
+        border-radius: 999px;
+        padding: 0.15rem 0.7rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .expired-row {
+        background-color: #fff5f5;
+    }
+
+    .near-expiry-row {
+        background-color: #fff9e6;
+    }
+
+    .filter-btn {
+        border-radius: 999px;
+    }
+
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        margin-right: 4px;
+    }
+
+    .pagination {
+        margin-top: 1.5rem;
+    }
+</style>
+
+<main class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="fw-bold mb-1">
+                    <i class="bi bi-boxes text-primary me-2"></i>Quản Lý Kho
+                </h2>
+                <div class="text-muted small">
+                    <span class="legend-dot" style="background-color:#fff5f5;border:1px solid #dc3545;"></span> Hàng đã hết hạn
+                    <span class="ms-3 legend-dot" style="background-color:#fff9e6;border:1px solid #ffc107;"></span> Hàng sắp hết hạn (≤ @nearDays ngày)
+                </div>
+            </div>
+            <div>
+                <a href="@Url.Action("TransactionHistory", "Warehouse")" class="btn btn-primary btn-lg">
+                    <i class="bi bi-plus-circle me-2"></i>Lịch sử
+                </a>
+                <a href="@Url.Action("ImportCart", "Warehouse")" class="btn btn-primary btn-lg">
+                    <i class="bi bi-plus-circle me-2"></i>Nhập kho
+                </a>
+                <a href="@Url.Action("ExportCart", "Warehouse")" class="btn btn-outline-primary btn-lg ms-2">
+                    <i class="bi bi-box-arrow-right me-2"></i>Xuất kho
+                </a>
+
+                <button class="btn btn-danger btn-lg filter-btn ms-2"
+                        onclick="exportAllExpired()">
+                    <i class="bi bi-trash me-2"></i>Xuất toàn bộ hết hạn
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1 opacity-75">Tổng sản phẩm</p>
+                            <h2 class="fw-bold mb-0">@Model.TotalProducts</h2>
+                            <small class="opacity-75">
+                                <i class="bi bi-arrow-up"></i> Đang quản lý
+                            </small>
+                        </div>
+                        <i class="bi bi-box-seam stats-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stats-card warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1 opacity-75">Sắp hết hàng</p>
+                            <h2 class="fw-bold mb-0">@Model.LowStockCount</h2>
+                            <small class="opacity-75">
+                                <i class="bi bi-exclamation-triangle"></i> Cần nhập thêm
+                            </small>
+                        </div>
+                        <i class="bi bi-exclamation-triangle stats-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stats-card danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1 opacity-75">Hết hàng</p>
+                            <h2 class="fw-bold mb-0">@Model.OutOfStockCount</h2>
+                            <small class="opacity-75"><i class="bi bi-x-circle"></i> Cần xử lý ngay</small>
+                        </div>
+                        <i class="bi bi-x-octagon stats-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card stats-card info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="mb-1 opacity-75">Giá trị kho</p>
+                            <h2 class="fw-bold mb-0">@string.Format("{0:N0}", Model.TotalWarehouseValue)</h2>
+                            <small class="opacity-75"><i class="bi bi-currency-dollar"></i> VNĐ</small>
+                        </div>
+                        <i class="bi bi-cash-stack stats-icon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters + Table -->
+    <div class="card table-card">
+        <div class="card-body">
+            <!-- Filters -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <form method="get" class="d-flex">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text"
+                                   class="form-control search-box border-start-0"
+                                   placeholder="Tìm kiếm sản phẩm, mã SKU..."
+                                   id="searchInput"
+                                   name="searchTerm"
+                                   value="@ViewBag.SearchTerm" />
+                            <button type="submit" class="btn btn-outline-secondary">Tìm</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-6 text-end">
+                    <form method="get" class="d-flex justify-content-end gap-2">
+                        <input type="hidden" name="searchTerm" value="@ViewBag.SearchTerm" />
+                        <select class="form-select d-inline-block w-auto filter-btn me-2"
+                                name="categoryFilter"
+                                onchange="this.form.submit()">
+                            <option value="">Tất cả danh mục</option>
+                            <option value="Rau lá" @(ViewBag.CategoryFilter == "Rau lá" ? "selected" : "")>Rau lá</option>
+                            <option value="Rau ăn hoa / thân / mầm" @(ViewBag.CategoryFilter == "Rau ăn hoa / thân / mầm" ? "selected" : "")>Rau ăn hoa/thân/mầm</option>
+                            <option value="Rau ăn quả" @(ViewBag.CategoryFilter == "Rau ăn quả" ? "selected" : "")>Rau ăn quả</option>
+                            <option value="Củ & rễ" @(ViewBag.CategoryFilter == "Củ & rễ" ? "selected" : "")>Củ & rễ</option>
+                            <option value="Nấm" @(ViewBag.CategoryFilter == "Nấm" ? "selected" : "")>Nấm</option>
+                            <option value="Rau thơm & gia vị" @(ViewBag.CategoryFilter == "Rau thơm & gia vị" ? "selected" : "")>Rau thơm & gia vị</option>
+                            <option value="Trái cây" @(ViewBag.CategoryFilter == "Trái cây" ? "selected" : "")>Trái cây</option>
+                        </select>
+
+                        <select class="form-select d-inline-block w-auto filter-btn me-2"
+                                name="stockStatusFilter"
+                                onchange="this.form.submit()">
+                            <option value="">Trạng thái kho</option>
+                            <option value="in-stock" @(ViewBag.StockStatusFilter == "in-stock" ? "selected" : "")>Còn hàng</option>
+                            <option value="low-stock" @(ViewBag.StockStatusFilter == "low-stock" ? "selected" : "")>Sắp hết</option>
+                            <option value="out-of-stock" @(ViewBag.StockStatusFilter == "out-of-stock" ? "selected" : "")>Hết hàng</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-center">Ảnh</th>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Danh mục</th>
+                            <th class="text-center">HSD</th>
+                            <th class="text-center">Cảnh báo HSD</th>
+                            <th class="text-end">Tồn kệ</th>
+                            <th class="text-end">Tồn trong kho</th>
+                            <th class="text-end">Tồn tổng</th>
+                            <th class="text-center">TT tồn kho</th>
+                            <th class="text-end">Giá nhập</th>
+                            <th class="text-end">Giá bán</th>
+                            <th class="text-center">Chi tiết</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Products != null && Model.Products.Any())
+                        {
+                            foreach (var item in Model.Products)
+                            {
+                                var stockClass = item.StockQuantity == 0
+                                    ? "text-danger fw-bold"
+                                    : item.StockQuantity <= 10
+                                        ? "text-warning fw-bold"
+                                        : "text-success fw-bold";
+
+                                var rowClass = item.IsExpired
+                                    ? "expired-row"
+                                    : (item.IsNearExpiry ? "near-expiry-row" : "");
+
+                                <tr id="row-@item.ProductID" class="@rowClass">
+                                    <td class="text-center">
+                                        <img src="~/Images/@item.ImageFileName"
+                                             alt="@item.ProductName"
+                                             style="width:48px;height:48px;object-fit:cover;border-radius:6px;" />
+                                    </td>
+                                    <td>@item.SKU</td>
+                                    <td class="fw-semibold">@item.ProductName</td>
+                                    <td>@item.CategoryName</td>
+                                    <td class="text-center">
+                                        @if (item.ExpiryDate.HasValue)
+                                        {
+                                            @item.ExpiryDate.Value.ToString("dd/MM/yyyy")
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="expiry-badge @item.ExpiryStatusClass">
+                                            @item.ExpiryStatusText
+                                        </span>
+                                        @if (item.DaysUntilExpiry.HasValue)
+                                        {
+                                            if (item.IsExpired)
+                                            {
+                                                <div class="small text-danger mt-1">
+                                                    Quá hạn @Math.Abs(item.DaysUntilExpiry.Value) ngày
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div class="small text-muted mt-1">
+                                                    Còn @item.DaysUntilExpiry.Value ngày
+                                                </div>
+                                            }
+                                        }
+                                    </td>
+                                    <td class="text-end">@item.ShelfQuantity</td>
+                                    <td class="text-end">@item.WarehouseQuantity</td>
+                                    <td class="text-end @stockClass">@item.StockQuantity</td>
+                                    <td class="text-center">
+                                        <span class="@item.StockStatusClass">@item.StockStatus</span>
+                                    </td>
+                                    <td class="text-end">
+                                        @item.ImportPrice.ToString("N0") ₫
+                                    </td>
+                                    <td class="text-end">
+                                        @item.SellPrice.ToString("N0") ₫
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="@Url.Action("Details", "Warehouse", new { id = item.ProductID })"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i> Chi tiết
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="13" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    Không có sản phẩm nào.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            @if (totalPages > 1)
+            {
+                <nav aria-label="Phân trang">
+                    <ul class="pagination justify-content-center">
+                        <!-- Previous -->
+                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                            <a class="page-link" href="@Url.Action("Index", new {
+                                searchTerm = ViewBag.SearchTerm,
+                                categoryFilter = ViewBag.CategoryFilter,
+                                stockStatusFilter = ViewBag.StockStatusFilter,
+                                page = currentPage - 1
+                            })">
+                                <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+
+                        <!-- Page numbers -->
+                        @for (int i = 1; i <= totalPages; i++)
+                        {
+                            if (i == 1 || i == totalPages || (i >= currentPage - 2 && i <= currentPage + 2))
+                            {
+                                <li class="page-item @(i == currentPage ? "active" : "")">
+                                    <a class="page-link" href="@Url.Action("Index", new {
+                                        searchTerm = ViewBag.SearchTerm,
+                                        categoryFilter = ViewBag.CategoryFilter,
+                                        stockStatusFilter = ViewBag.StockStatusFilter,
+                                        page = i
+                                    })">@i</a>
+                                </li>
+                            }
+                            else if (i == currentPage - 3 || i == currentPage + 3)
+                            {
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            }
+                        }
+
+                        <!-- Next -->
+                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                            <a class="page-link" href="@Url.Action("Index", new {
+                                searchTerm = ViewBag.SearchTerm,
+                                categoryFilter = ViewBag.CategoryFilter,
+                                stockStatusFilter = ViewBag.StockStatusFilter,
+                                page = currentPage + 1
+                            })">
+                                <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+
+            <!-- Summary -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div class="text-muted small">
+                    Hiển thị @((currentPage - 1) * 10 + 1) - @Math.Min(currentPage * 10, totalItems)
+                    trong tổng số <strong>@totalItems</strong> sản phẩm.
+                    <span class="ms-3">
+                        Ngưỡng sắp hết hạn: ≤ @nearDays ngày.
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+@section scripts{
+    <script>
+        function exportAllExpired() {
+            if (!confirm("Bạn có chắc muốn xuất TẤT CẢ sản phẩm hết hạn?")) return;
+
+            $.post('@Url.Action("ExportAllExpired", "Warehouse", new { area = "Seller" })',
+                { __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                function (res) {
+                    if (res.success) {
+                        alert("Đã xuất toàn bộ sản phẩm hết hạn");
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        alert(res.message);
+                    }
+                }
+            );
+        }
+    </script>
+}
+
+@section modal{
+    @Html.AntiForgeryToken()
+}

@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Authentication.Cookies; // CookieAuthenticationDefaul
 using Microsoft.AspNetCore.Authorization; // [Authorize].
 using Microsoft.AspNetCore.Mvc; // Controller + IActionResult.
 using System.Net.Http.Headers; // AuthenticationHeaderValue.
-
+using System.Text.Json; // thêm ở đầu file
 namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 
 [Authorize] // Checkout bắt buộc đăng nhập.
 public sealed class CheckoutController : Controller // MVC controller cho checkout.
 {
+    private const string CheckoutSelectedProductIdsSessionKey = "CHECKOUT_SELECTED_PRODUCT_IDS";
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key token trong session.
     private const decimal DefaultShippingFee = 15000m; // Mức ship mặc định cho MVP.
 
@@ -26,12 +27,18 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     [HttpGet("/checkout")] // Render checkout từ dữ liệu cart hiện tại.
     public async Task<IActionResult> Index()
     {
-        var vm = BuildCheckoutModelFromCart(); // Tạo model checkout nhiều item từ cart.
-        if (vm is null) // Cart rỗng.
+        var selectedProductIds = GetSelectedProductIdsFromSession();
+        var vm = BuildCheckoutModelFromCart(selectedProductIds);
+
+        if (vm is null)
         {
-            TempData["CheckoutError"] = "Giỏ hàng đang trống, vui lòng chọn sản phẩm trước.";
-            return RedirectToAction("Index", "Cart"); // Quay về cart.
+            HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);
+            TempData["CheckoutError"] = selectedProductIds.Count > 0
+                ? "Các sản phẩm đã chọn không còn trong giỏ hàng."
+                : "Giỏ hàng đang trống, vui lòng chọn sản phẩm trước.";
+            return RedirectToAction("Index", "Cart");
         }
+
 
         var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy JWT từ session.
         if (string.IsNullOrWhiteSpace(token)) // Session mất token.
@@ -109,6 +116,13 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         }
 
         request = NormalizeRequest(request); // Chuẩn hóa payload để tránh dữ liệu bẩn.
+        var selectedProductIds = GetSelectedProductIdsFromSession();
+        if (selectedProductIds.Count > 0)
+        {
+            request.Items = request.Items
+                .Where(x => selectedProductIds.Contains(x.ProductId))
+                .ToList();
+        }
 
         if (!ModelState.IsValid) // Nếu đã có lỗi trước đó (ví dụ địa chỉ đã lưu không hợp lệ).
         {
@@ -160,13 +174,23 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         TempData["RecipientPhone"] = request.Shipping.Phone;
         TempData["RecipientAddress"] = request.Shipping.AddressDetail ?? "Chưa cập nhật";
 
-        _cart.Clear(); // Đặt đơn thành công thì xóa cart.
+        _cart.Clear();
+        HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);
         return RedirectToAction(nameof(Success));
+
     }
 
-    private CheckoutSubmitRequestDto? BuildCheckoutModelFromCart() // Map cart session -> checkout model.
+    private CheckoutSubmitRequestDto? BuildCheckoutModelFromCart(IReadOnlyCollection<int>? selectedProductIds = null)
     {
         var cartItems = _cart.GetItems();
+
+        if (selectedProductIds is { Count: > 0 })
+        {
+            cartItems = cartItems
+                .Where(x => selectedProductIds.Contains(x.ProductId))
+                .ToList();
+        }
+
         if (cartItems.Count == 0)
         {
             return null;
@@ -186,6 +210,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             Payment = new CheckoutPaymentInputDto { PaymentMethod = "COD" }
         };
     }
+
 
     private static CheckoutSubmitRequestDto NormalizeRequest(CheckoutSubmitRequestDto request) // Chuẩn hóa request trước khi call Ordering.
     {
@@ -298,4 +323,24 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         public int OrderId { get; set; }
         public decimal TotalAmount { get; set; }
     }
+    private IReadOnlyCollection<int> GetSelectedProductIdsFromSession()
+    {
+        var raw = HttpContext.Session.GetString(CheckoutSelectedProductIdsSessionKey);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<int>();
+        }
+
+        try
+        {
+            var ids = JsonSerializer.Deserialize<List<int>>(raw) ?? new List<int>();
+            return ids.Where(x => x > 0).Distinct().ToList();
+        }
+        catch
+        {
+            HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);
+            return Array.Empty<int>();
+        }
+    }
+
 }

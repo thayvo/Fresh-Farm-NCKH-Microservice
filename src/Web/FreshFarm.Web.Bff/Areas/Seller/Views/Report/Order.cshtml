@@ -1,0 +1,309 @@
+﻿@model FreshFram.Areas.Admin.Data.OrderReportViewModel
+@{
+    ViewBag.Title = "Báo Cáo Đơn Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">
+            Báo Cáo Đơn Hàng
+        </h2>
+    </div>
+
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @ViewBag.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <form method="get" action="@Url.Action("Order", "Report")">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4 col-lg-3">
+                        <label for="fromDate" class="form-label fw-semibold">Từ ngày</label>
+                        <input type="date" id="fromDate" name="fromDate" class="form-control" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="toDate" class="form-label fw-semibold">Đến ngày</label>
+                        <input type="date" id="toDate" name="toDate" class="form-control" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="orderStatus" class="form-label fw-semibold">Trạng thái</label>
+                        <select id="orderStatus" name="orderStatus" class="form-select">
+                            <option value="all" @(Model.OrderStatus == "all" ? "selected" : "")>Tất cả trạng thái</option>
+                            <option value="Pending" @(Model.OrderStatus == "Pending" ? "selected" : "")>Chờ xử lý</option>
+                            <option value="Shipped" @(Model.OrderStatus == "Shipped" ? "selected" : "")>Đang giao</option>
+                            <option value="Completed" @(Model.OrderStatus == "Completed" ? "selected" : "")>Thành công</option>
+                            <option value="Cancelled" @(Model.OrderStatus == "Cancelled" ? "selected" : "")>Đã hủy</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 col-lg-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-receipt-cutoff fs-1 text-primary opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tổng Đơn Hàng</h6>
+                            <h3 class="fw-bold">@Model.TotalOrders.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-cart-check fs-1 text-success opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Đơn Thành Công</h6>
+                            <h3 class="fw-bold">@Model.SuccessOrders.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-danger h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-cart-x fs-1 text-danger opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Đơn Bị Hủy</h6>
+                            <h3 class="fw-bold">@Model.CancelledOrders.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-pie-chart fs-1 text-warning opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase">Tỷ Lệ Hủy</h6>
+                            <h3 class="fw-bold">@Model.CancelRate.ToString("F2")%</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-bar-chart-line-fill"></i> Xu hướng đơn hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="orderTrendChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-pie-chart-fill"></i> Phân bổ trạng thái đơn hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="orderStatusChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title fw-bold mb-0">
+                <i class="bi bi-table"></i> Danh sách đơn hàng gần đây
+            </h5>
+            <a href="@Url.Action("ExportOrderExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, orderStatus = Model.OrderStatus })" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
+            </a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Mã ĐH</th>
+                        <th>Khách hàng</th>
+                        <th>Ngày đặt</th>
+                        <th>Tổng tiền</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-center">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.RecentOrders != null && Model.RecentOrders.Any())
+                    {
+                        foreach (var order in Model.RecentOrders)
+                        {
+                            <tr>
+                                <td><a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })">@order.OrderCode</a></td>
+                                <td>@order.CustomerName</td>
+                                <td>@order.OrderDateFormatted</td>
+                                <td>@order.TotalAmount.ToString("#,##0")₫</td>
+                                <td class="text-center">
+                                    <span class="badge @order.StatusBadgeClass">@order.StatusText</span>
+                                </td>
+                                <td class="text-center">
+                                    <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Không có đơn hàng nào
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+@section scripts {
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // Dữ liệu từ server
+        var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
+        var trendTotalData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendTotalData));
+        var trendSuccessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendSuccessData));
+        var trendCancelledData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendCancelledData));
+
+        var statusSuccessCount = @Model.StatusSuccessCount;
+        var statusShippingCount = @Model.StatusShippingCount;
+        var statusPendingCount = @Model.StatusPendingCount;
+        var statusCancelledCount = @Model.StatusCancelledCount;
+
+        // --- Biểu đồ Xu hướng đơn hàng (Line Chart) ---
+        const orderTrendCtx = document.getElementById("orderTrendChart");
+        if (orderTrendCtx) {
+          new Chart(orderTrendCtx, {
+            type: "line",
+            data: {
+              labels: trendLabels,
+              datasets: [
+                {
+                  label: "Tổng đơn",
+                  data: trendTotalData,
+                  borderColor: "#0d6efd",
+                  backgroundColor: "rgba(13, 110, 253, 0.1)",
+                  tension: 0.3,
+                  fill: true
+                },
+                {
+                  label: "Thành công",
+                  data: trendSuccessData,
+                  borderColor: "#198754",
+                  backgroundColor: "rgba(25, 135, 84, 0.1)",
+                  tension: 0.3,
+                  fill: true
+                },
+                {
+                  label: "Đã hủy",
+                  data: trendCancelledData,
+                  borderColor: "#dc3545",
+                  backgroundColor: "rgba(220, 53, 69, 0.1)",
+                  tension: 0.3,
+                  fill: true
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'top',
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    stepSize: 1
+                  }
+                }
+              }
+            },
+          });
+        }
+
+        // --- Biểu đồ Phân bổ trạng thái (Doughnut Chart) ---
+        const orderStatusCtx = document.getElementById("orderStatusChart");
+        if (orderStatusCtx) {
+          new Chart(orderStatusCtx, {
+            type: "doughnut",
+            data: {
+              labels: ["Thành công", "Đang giao", "Chờ xử lý", "Đã hủy"],
+              datasets: [
+                {
+                  label: "Số lượng đơn",
+                  data: [statusSuccessCount, statusShippingCount, statusPendingCount, statusCancelledCount],
+                  backgroundColor: [
+                    "rgba(25, 135, 84, 0.8)", // success
+                    "rgba(13, 202, 240, 0.8)", // info
+                    "rgba(255, 193, 7, 0.8)", // warning
+                    "rgba(220, 53, 69, 0.8)", // danger
+                  ],
+                  borderColor: [
+                    "rgba(25, 135, 84, 1)",
+                    "rgba(13, 202, 240, 1)",
+                    "rgba(255, 193, 7, 1)",
+                    "rgba(220, 53, 69, 1)",
+                  ],
+                  borderWidth: 2,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                }
+              }
+            },
+          });
+        }
+      });
+    </script>
+}

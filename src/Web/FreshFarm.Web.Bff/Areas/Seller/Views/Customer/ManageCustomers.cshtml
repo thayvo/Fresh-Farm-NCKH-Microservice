@@ -1,0 +1,558 @@
+@model List<FreshFarm.Web.Bff.Areas.Seller.Models.CustomerViewModel>
+
+@{
+    ViewBag.Title = "Quản Lý Khách Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<style>
+    .customer-avatar {
+        width: 45px;
+        height: 45px;
+        object-fit: cover;
+    }
+</style>
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-2">Quản lý khách hàng</h2>
+            @if (ViewBag.CurrentSort != null)
+            {
+                <span class="badge bg-info">
+                    <i class="bi bi-funnel-fill me-1"></i>
+                    @switch (ViewBag.CurrentSort.ToString())
+                    {
+                        case "spent_desc":@:Chi tiêu nhiều nhất
+                            break;
+                        case "spent_asc": @:Chi tiêu ít nhất
+                            break;
+                        case "orders_desc": @:Đơn hàng nhiều nhất
+                            break;
+                        case "orders_asc": @:Đơn hàng ít nhất
+                            break;
+                        case "name_asc": @:Tên A-Z
+                            break;
+                        case "name_desc": @:Tên Z-A
+                            break;
+                        case "date_asc": @:Đăng ký cũ nhất
+                            break;
+                        default: @:Đăng ký mới nhất
+                            break;
+                    }
+                </span>
+            }
+        </div>
+        <a href="@Url.Action("Index", "Loyalty")" class="btn btn-success">
+            <i class="bi bi-plus-circle me-2"></i> Quản lý tích điểm
+        </a>
+        <a href="@Url.Action("Create", "Customer")" class="btn btn-success">
+            <i class="bi bi-plus-circle me-2"></i> Thêm khách hàng mới
+        </a>
+    </div>
+
+    @* Hiển thị thông báo *@
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-2"></i>@TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>@TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @* Thống kê nhanh *@
+    @if (Model != null && Model.Any())
+    {
+        var topSpender = Model.OrderByDescending(c => c.TotalSpent).FirstOrDefault();
+        var topOrders = Model.OrderByDescending(c => c.OrderCount).FirstOrDefault();
+        var totalCustomers = ViewBag.TotalRecords ?? Model.Count();
+        var activeCustomers = Model.Count(c => c.OrderCount > 0);
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-75">Tổng khách hàng</p>
+                                <h3 class="mb-0 fw-bold">@totalCustomers</h3>
+                            </div>
+                            <i class="bi bi-people fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-75">Đã mua hàng</p>
+                                <h3 class="mb-0 fw-bold">@activeCustomers</h3>
+                            </div>
+                            <i class="bi bi-cart-check fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-75 small">Chi tiêu cao nhất</p>
+                                <h6 class="mb-0 fw-bold">@(topSpender?.FullName ?? "N/A")</h6>
+                                <small class="opacity-75">@(topSpender?.TotalSpentFormatted ?? "0₫")</small>
+                            </div>
+                            <i class="bi bi-trophy fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-75 small">Đơn hàng nhiều nhất</p>
+                                <h6 class="mb-0 fw-bold">@(topOrders?.FullName ?? "N/A")</h6>
+                                <small class="opacity-75">@(topOrders?.OrderCount ?? 0) đơn</small>
+                            </div>
+                            <i class="bi bi-star fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-6 mb-2">
+                    <label class="form-label small text-muted mb-1">Sắp xếp theo</label>
+                    <select id="sortSelect" class="form-select">
+                        <option value="date_desc" @(ViewBag.CurrentSort == "date_desc" ? "selected" : "")>Ngày đăng ký (Mới nhất)</option>
+                        <option value="date_asc" @(ViewBag.CurrentSort == "date_asc" ? "selected" : "")>Ngày đăng ký (Cũ nhất)</option>
+                        <option value="spent_desc" @(ViewBag.CurrentSort == "spent_desc" ? "selected" : "")>💰 Chi tiêu nhiều nhất</option>
+                        <option value="spent_asc" @(ViewBag.CurrentSort == "spent_asc" ? "selected" : "")>💰 Chi tiêu ít nhất</option>
+                        <option value="orders_desc" @(ViewBag.CurrentSort == "orders_desc" ? "selected" : "")>📦 Đơn hàng nhiều nhất</option>
+                        <option value="orders_asc" @(ViewBag.CurrentSort == "orders_asc" ? "selected" : "")>📦 Đơn hàng ít nhất</option>
+                        <option value="name_asc" @(ViewBag.CurrentSort == "name_asc" ? "selected" : "")>Tên A-Z</option>
+                        <option value="name_desc" @(ViewBag.CurrentSort == "name_desc" ? "selected" : "")>Tên Z-A</option>
+                    </select>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <label class="form-label small text-muted mb-1">Tìm kiếm</label>
+                    <div class="input-group">
+                        <input type="text" id="searchInput"
+                               class="form-control"
+                               placeholder="Tên, email, hoặc số điện thoại..." />
+                        <button class="btn btn-primary" id="searchBtn">
+                            <i class="bi bi-search"></i> Tìm
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Khách hàng</th>
+                            <th>Số điện thoại</th>
+                            <th>Tổng chi tiêu</th>
+                            <th>Số đơn hàng</th>
+                            <th>Ngày đăng ký</th>
+                            <th>Trạng thái</th>
+                            <th class="text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customer-table-body">
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var customer in Model)
+                            {
+                                <tr data-id="@customer.UserID">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="@customer.AvatarUrl"
+                                                 class="customer-avatar rounded-circle me-3"
+                                                 alt="Avatar" />
+                                            <div>
+                                                <div class="fw-bold">@customer.FullName</div>
+                                                <div class="text-muted small">@customer.Email</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@(customer.Phone ?? "N/A")</td>
+                                    <td>@customer.TotalSpentFormatted</td>
+                                    <td>@customer.OrderCount</td>
+                                    <td>@customer.CreatedDateFormatted</td>
+                                    <td>
+                                        @if (customer.IsActive)
+                                        {
+                                            <span class="badge bg-success">Hoạt động</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Chưa mua hàng</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-success btn-detail"
+                                                title="Chi tiết"
+                                                data-id="@customer.UserID"
+                                                data-name="@customer.FullName"
+                                                data-email="@customer.Email"
+                                                data-phone="@customer.Phone"
+                                                data-date="@customer.CreatedDateFormatted"
+                                                data-spent="@customer.TotalSpentFormatted"
+                                                data-orders="@customer.OrderCount"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#customerDetailModal">
+                                            <i class="bi bi-eye-fill"></i>
+                                        </button>
+                                        <a href="@Url.Action("Edit", "Customer", new { id = customer.UserID })"
+                                           class="btn btn-sm btn-primary" title="Sửa">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-danger btn-delete"
+                                                title="Xóa"
+                                                data-id="@customer.UserID"
+                                                data-name="@customer.FullName"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#deleteModal">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                                    <p class="text-muted mt-2">Chưa có khách hàng nào</p>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="text-muted small" id="pagination-info">
+                @if (ViewBag.TotalRecords != null)
+                {
+                    var start = ((ViewBag.CurrentPage ?? 1) - 1) * 10 + 1;
+                    var end = Math.Min(start + 9, ViewBag.TotalRecords);
+                    @:Hiển thị @start-@end trên tổng số @ViewBag.TotalRecords khách hàng
+                }
+            </span>
+            <nav>
+                <ul class="pagination justify-content-end mb-0" id="pagination-wrapper">
+                    @if (ViewBag.TotalPages != null && ViewBag.TotalPages > 1)
+                    {
+                        int currentPage = ViewBag.CurrentPage ?? 1;
+                        int totalPages = ViewBag.TotalPages;
+                        string sortBy = ViewBag.CurrentSort ?? "date_desc";
+
+                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                            <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = currentPage - 1 })">Trước</a>
+                        </li>
+
+                        for (int i = 1; i <= totalPages; i++)
+                        {
+                            <li class="page-item @(i == currentPage ? "active" : "")">
+                                <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = i })">@i</a>
+                            </li>
+                        }
+
+                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                            <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = currentPage + 1 })">Sau</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+</main>
+
+@section modal {
+    <!-- Modal Chi tiết -->
+    <div class="modal fade" id="customerDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="detailModalCustomerName"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Email:</dt>
+                        <dd class="col-sm-8" id="detailModalEmail"></dd>
+                        <dt class="col-sm-4">Số điện thoại:</dt>
+                        <dd class="col-sm-8" id="detailModalPhone"></dd>
+                        <dt class="col-sm-4">Ngày đăng ký:</dt>
+                        <dd class="col-sm-8" id="detailModalDate"></dd>
+                        <dt class="col-sm-4">Tổng chi tiêu:</dt>
+                        <dd class="col-sm-8" id="detailModalSpent"></dd>
+                        <dt class="col-sm-4">Số đơn hàng:</dt>
+                        <dd class="col-sm-8" id="detailModalOrders"></dd>
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Xóa -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Bạn có chắc chắn muốn xóa khách hàng <strong id="deleteCustomerName"></strong> không?</p>
+                    <p class="text-danger small mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Lưu ý: Không thể xóa khách hàng đã có đơn hàng
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tableBody = document.getElementById("customer-table-body");
+            let deleteUserId = null;
+
+            // === SẮP XẾP ===
+            const sortSelect = document.getElementById("sortSelect");
+            sortSelect.addEventListener("change", function() {
+                const sortBy = this.value;
+                window.location.href = '@Url.Action("ManageCustomers", "Customer")?sortBy=' + sortBy;
+            });
+
+            // === TÌM KIẾM ===
+            const searchInput = document.getElementById("searchInput");
+            const searchBtn = document.getElementById("searchBtn");
+
+            function performSearch() {
+                const keyword = searchInput.value.trim();
+                if (!keyword) {
+                    window.location.href = '@Url.Action("ManageCustomers", "Customer")';
+                    return;
+                }
+
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang tìm...';
+
+                fetch('@Url.Action("Search", "Customer")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ keyword: keyword })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        renderSearchResults(data.data);
+                    } else {
+                        alert(data.message || 'Có lỗi xảy ra khi tìm kiếm');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Có lỗi xảy ra khi tìm kiếm');
+                })
+                .finally(() => {
+                    searchBtn.disabled = false;
+                    searchBtn.innerHTML = '<i class="bi bi-search"></i> Tìm';
+                });
+            }
+
+            function renderSearchResults(customers) {
+                tableBody.innerHTML = '';
+
+                if (customers.length === 0) {
+                    tableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="bi bi-search fs-1 text-muted"></i>
+                                <p class="text-muted mt-2">Không tìm thấy kết quả phù hợp</p>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                const avatarBase = '@Url.Action("AvatarById", "Account", new { area = "" })';
+                customers.forEach(customer => {
+                    const userId = customer.UserID ?? customer.userID;
+                    const fullName = customer.FullName ?? customer.fullName ?? '';
+                    const email = customer.Email ?? customer.email ?? '';
+                    const phone = customer.Phone ?? customer.phone ?? '';
+                    const totalSpent = Number(customer.TotalSpent ?? customer.totalSpent ?? 0);
+                    const orderCount = Number(customer.OrderCount ?? customer.orderCount ?? 0);
+                    const createdDate = customer.CreatedDate ?? customer.createdDate;
+                    const createdDateText = createdDate ? new Date(createdDate).toLocaleDateString('vi-VN') : '';
+
+                    const row = document.createElement('tr');
+                    row.dataset.id = userId;
+                    row.innerHTML = `
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="${avatarBase}/${userId}"
+                                     class="customer-avatar rounded-circle me-3"
+                                     alt="Avatar" />
+                                <div>
+                                    <div class="fw-bold">${fullName}</div>
+                                    <div class="text-muted small">${email}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${phone || 'N/A'}</td>
+                        <td>${totalSpent.toLocaleString('vi-VN')}₫</td>
+                        <td>${orderCount}</td>
+                        <td>${createdDateText}</td>
+                        <td>
+                            ${orderCount > 0
+                                ? '<span class="badge bg-success">Hoạt động</span>'
+                                : '<span class="badge bg-secondary">Chưa mua hàng</span>'}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-success btn-detail" title="Chi tiết"
+                                    data-id="${userId}"
+                                    data-name="${fullName}"
+                                    data-email="${email}"
+                                    data-phone="${phone || 'N/A'}"
+                                    data-date="${createdDateText}"
+                                    data-spent="${totalSpent.toLocaleString('vi-VN')}₫"
+                                    data-orders="${orderCount}"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#customerDetailModal">
+                                <i class="bi bi-eye-fill"></i>
+                            </button>
+                            <a href="@Url.Action("Edit", "Customer")?id=${userId}"
+                               class="btn btn-sm btn-primary" title="Sửa">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+                            <button class="btn btn-sm btn-danger btn-delete" title="Xóa"
+                                    data-id="${userId}"
+                                    data-name="${fullName}"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteModal">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                // Re-attach event listeners
+                attachEventListeners();
+            }
+
+            function attachEventListeners() {
+                document.querySelectorAll(".btn-detail").forEach(btn => {
+                    btn.addEventListener("click", function() {
+                        document.getElementById("detailModalCustomerName").textContent = this.dataset.name;
+                        document.getElementById("detailModalEmail").textContent = this.dataset.email;
+                        document.getElementById("detailModalPhone").textContent = this.dataset.phone;
+                        document.getElementById("detailModalDate").textContent = this.dataset.date;
+                        document.getElementById("detailModalSpent").textContent = this.dataset.spent;
+                        document.getElementById("detailModalOrders").textContent = this.dataset.orders;
+                    });
+                });
+
+                document.querySelectorAll(".btn-delete").forEach(btn => {
+                    btn.addEventListener("click", function() {
+                        deleteUserId = this.dataset.id;
+                        document.getElementById("deleteCustomerName").textContent = this.dataset.name;
+                    });
+                });
+            }
+
+            searchBtn.addEventListener("click", performSearch);
+            searchInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") performSearch();
+            });
+
+            // === MODAL CHI TIẾT ===
+            attachEventListeners();
+
+            // === MODAL XÓA ===
+            document.getElementById("confirmDeleteBtn").addEventListener("click", function() {
+                if (!deleteUserId) return;
+
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...';
+
+                const formData = new FormData();
+                formData.append('id', deleteUserId);
+                formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
+
+                fetch('@Url.Action("Delete", "Customer")', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const row = tableBody.querySelector(`tr[data-id="${deleteUserId}"]`);
+                        if (row) {
+                            row.remove();
+                        }
+
+                        bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+
+                        const alert = document.createElement('div');
+                        alert.className = 'alert alert-success alert-dismissible fade show';
+                        alert.innerHTML = `<i class="bi bi-check-circle me-2"></i>${data.message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+                        document.querySelector('main').insertBefore(alert, document.querySelector('main').firstChild);
+
+                        setTimeout(() => alert.remove(), 3000);
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Có lỗi xảy ra khi xóa khách hàng');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Xóa';
+                });
+            });
+        });
+    </script>
+    @Html.AntiForgeryToken()
+}

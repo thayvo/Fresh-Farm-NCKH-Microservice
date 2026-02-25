@@ -1,0 +1,358 @@
+﻿@model FreshFram.Areas.Admin.Data.CustomerReportViewModel
+
+@{
+    ViewBag.Title = "Báo Cáo Khách Hàng";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<main class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Báo Cáo Khách Hàng</h2>
+    </div>
+
+    @if (ViewBag.ErrorMessage != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @ViewBag.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @using (Html.BeginForm("Customer", "Report", FormMethod.Get, new { area = "Seller", id = "filterForm" }))
+    {
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4 col-lg-3">
+                        <label for="registerFromDate" class="form-label fw-semibold">Ngày đăng ký (Từ)</label>
+                        <input type="date"
+                               id="registerFromDate"
+                               name="registerFromDate"
+                               value="@(Model.RegisterFromDate?.ToString("yyyy-MM-dd"))"
+                               class="form-control" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="registerToDate" class="form-label fw-semibold">Ngày đăng ký (Đến)</label>
+                        <input type="date"
+                               id="registerToDate"
+                               name="registerToDate"
+                               value="@(Model.RegisterToDate?.ToString("yyyy-MM-dd"))"
+                               class="form-control" />
+                    </div>
+                    <div class="col-md-4 col-lg-3">
+                        <label for="customerSegment" class="form-label fw-semibold">Phân khúc</label>
+                        <select id="customerSegment" name="customerSegment" class="form-select">
+                            <option value="all" @(Model.CustomerSegment == "all" ? "selected" : "")>Tất cả khách hàng</option>
+                            <option value="new" @(Model.CustomerSegment == "new" ? "selected" : "")>Khách hàng mới</option>
+                            <option value="returning" @(Model.CustomerSegment == "returning" ? "selected" : "")>Khách hàng quay lại</option>
+                            <option value="vip" @(Model.CustomerSegment == "vip" ? "selected" : "")>Khách hàng VIP</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 col-lg-3">
+                        <button type="submit" class="btn btn-info w-100 text-white">
+                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-info h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-people-fill fs-1 text-info opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase mb-1">Tổng Khách Hàng</h6>
+                            <h3 class="fw-bold mb-0">@Model.TotalCustomers.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-person-plus-fill fs-1 text-success opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase mb-1">Khách Hàng Mới</h6>
+                            <h3 class="fw-bold mb-0">@Model.NewCustomers</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-arrow-repeat fs-1 text-primary opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase mb-1">Tỷ Lệ Quay Lại</h6>
+                            <h3 class="fw-bold mb-0">@Model.ReturnRateFormatted</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card shadow-sm stat-card border-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-wallet2 fs-1 text-warning opacity-75"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h6 class="text-muted text-uppercase mb-1">Chi Tiêu TB/Khách</h6>
+                            <h3 class="fw-bold mb-0">@Model.AverageSpendingFormatted</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-graph-up"></i> Tăng trưởng khách hàng mới
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="customerGrowthChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="card-title fw-bold mb-0">
+                        <i class="bi bi-pie-chart-fill"></i> Phân khúc khách hàng
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="customerSegmentChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="card-title fw-bold mb-0">
+                <i class="bi bi-trophy-fill"></i> Top khách hàng chi tiêu nhiều nhất
+            </h5>
+            <!-- Nút xuất dùng fetch + Blob (không rời trang) -->
+            <button class="btn btn-outline-success btn-sm" type="button" onclick="exportToExcelAjax(this)">
+                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-center">Hạng</th>
+                        <th>Khách hàng</th>
+                        <th>Ngày đăng ký</th>
+                        <th class="text-center">Tổng đơn hàng</th>
+                        <th>Tổng chi tiêu</th>
+                        <th class="text-center">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.TopCustomers != null && Model.TopCustomers.Any())
+                    {
+                        foreach (var customer in Model.TopCustomers)
+                        {
+                            <tr>
+                                <td class="text-center fw-bold">@customer.Rank</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <img src="@customer.AvatarUrl"
+                                             alt="Avatar"
+                                             class="rounded-circle me-2"
+                                             width="32"
+                                             height="32"
+                                             onerror="this.src='https://via.placeholder.com/32'" />
+                                        <span>@customer.FullName</span>
+                                    </div>
+                                </td>
+                                <td>@customer.CreatedDateFormatted</td>
+                                <td class="text-center">@customer.TotalOrders</td>
+                                <td class="fw-bold text-success">@customer.TotalSpentFormatted</td>
+                                <td class="text-center">
+                                    <a href="@Url.Action("Edit", "Customer", new { area = "Seller", id = customer.UserID })"
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Chỉnh sửa thông tin khách hàng">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
+                                <span class="text-muted">Không có dữ liệu khách hàng</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+@section scripts{
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Dữ liệu từ Model
+            var growthLabels = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.GrowthLabels));
+            var growthData   = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.GrowthData));
+
+            // Biểu đồ Line - tăng trưởng KH mới
+            var customerGrowthCtx = document.getElementById("customerGrowthChart");
+            if (customerGrowthCtx) {
+                new Chart(customerGrowthCtx, {
+                    type: "line",
+                    data: {
+                        labels: growthLabels,
+                        datasets: [{
+                            label: "Khách hàng mới",
+                            data: growthData,
+                            borderColor: "#0dcaf0",
+                            backgroundColor: "rgba(13, 202, 240, 0.1)",
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'top' } },
+                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    }
+                });
+            }
+
+            // Biểu đồ Doughnut - phân khúc KH
+            var customerSegmentCtx = document.getElementById("customerSegmentChart");
+            if (customerSegmentCtx) {
+                new Chart(customerSegmentCtx, {
+                    type: "doughnut",
+                    data: {
+                        labels: ["Khách hàng mới", "Khách quay lại", "Khách VIP", "Khác"],
+                        datasets: [{
+                            label: "Số lượng khách hàng",
+                            data: [@Model.NewCustomerCount, @Model.ReturningCustomerCount, @Model.VIPCustomerCount, @Model.OtherCustomerCount],
+                            backgroundColor: [
+                                "rgba(25, 135, 84, 0.8)",
+                                "rgba(13, 110, 253, 0.8)",
+                                "rgba(255, 193, 7, 0.8)",
+                                "rgba(108, 117, 125, 0.7)"
+                            ],
+                            borderColor: "#fff",
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: true, position: 'right' } }
+                    }
+                });
+            }
+        });
+
+        // === Xuất Excel bằng fetch + Blob (không rời trang) ===
+        async function exportToExcelAjax(btn) {
+            try {
+                const originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Đang xuất...';
+
+                const f = document.getElementById('registerFromDate').value;
+                const t = document.getElementById('registerToDate').value;
+                const s = document.getElementById('customerSegment').value;
+
+                let url = '@Url.Action("ExportCustomerExcel", "Report", new { area = "Seller" })';
+                const qs = [];
+                if (f) qs.push('registerFromDate=' + encodeURIComponent(f));
+                if (t) qs.push('registerToDate='   + encodeURIComponent(t));
+                if (s) qs.push('customerSegment='  + encodeURIComponent(s));
+                if (qs.length) url += '?' + qs.join('&');
+
+                const res = await fetch(url, { method: 'GET', credentials: 'include' });
+
+                // Kiểm tra đúng content-type Excel (phòng trường hợp bị redirect HTML)
+                const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+                if (!res.ok || ct.indexOf('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') === -1) {
+                    const text = await res.text();
+                    throw new Error('Không nhận được file Excel. Có thể phiên đăng nhập đã hết hạn hoặc server trả lỗi.\n' + text.substring(0, 300));
+                }
+
+                const blob = await res.blob();
+
+                // Lấy tên file từ Content-Disposition
+                let fileName = `BaoCaoKhachHang_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.xlsx`;
+                const cd = res.headers.get('Content-Disposition') || '';
+                const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
+                if (m && (m[1] || m[2])) {
+                    try { fileName = decodeURIComponent(m[1] || m[2]); } catch (e) { fileName = m[1] || m[2]; }
+                }
+
+                // Tạo link ảo để tải file
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(objectUrl);
+            } catch (err) {
+                alert('Xuất Excel thất bại: ' + (err && err.message ? err.message : err));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Xuất Excel';
+            }
+        }
+    </script>
+
+    <style>
+        .stat-card {
+            transition: transform 0.2s;
+        }
+
+            .stat-card:hover {
+                transform: translateY(-5px);
+            }
+    </style>
+}

@@ -2,21 +2,46 @@
     var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
     var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
     var currentUrl = $"{currentPath}{currentQuery}";
+    var displayName = User.Identity?.Name;
 }
 
 <div class="promo-bar py-2 d-none d-lg-block">
-    <div class="container-fluid d-flex justify-content-between">
-        <div class="d-flex align-items-center gap-2">
-            <a href="tel:19001234"><i class="bi bi-telephone-fill"></i> Hotline: 1900.1234</a>
+    <div class="container promo-inner d-flex align-items-center justify-content-between">
+        <div class="promo-links d-flex align-items-center gap-2">
+            <a href="#">Kênh Người Bán</a>
             <span>|</span>
-            <a href="#"><i class="bi bi-truck"></i> Freeship cho đơn hàng từ 500.000đ</a>
+            <a href="#">Trở thành Người bán FreshFarm</a>
         </div>
-        <div class="desktop-links d-flex align-items-center gap-2">
-            <a href="/account/orders"><i class="bi bi-receipt"></i> Lịch sử đơn hàng</a>
-            <span>|</span>
-            <a asp-controller="Account" asp-action="SignIn" asp-route-returnUrl="@currentUrl">
-                <i class="bi bi-person-fill"></i> Tài khoản
-            </a>
+
+        <div class="promo-links d-flex align-items-center gap-2">
+            <a href="#"><i class="bi bi-bell"></i> Thông báo</a>
+            <a href="#"><i class="bi bi-question-circle"></i> Hỗ trợ</a>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <span>|</span>
+                <div class="promo-account-dropdown">
+                    <a href="/account/profile" class="promo-account-trigger">
+                        <i class="bi bi-person-circle"></i>
+                        @(string.IsNullOrWhiteSpace(displayName) ? "Tài khoản" : displayName)
+                        <i class="bi bi-chevron-down small"></i>
+                    </a>
+                    <div class="promo-account-menu">
+                        <a href="/account/profile" class="promo-account-item">Tài khoản của tôi</a>
+                        <a href="/account/orders" class="promo-account-item">Đơn mua</a>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="promo-account-item promo-account-btn">Đăng xuất</button>
+                        </form>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <span>|</span>
+                <a asp-controller="Account" asp-action="SignUp" asp-route-returnUrl="@currentUrl">Đăng ký</a>
+                <span>|</span>
+                <a asp-controller="Account" asp-action="SignIn" asp-route-returnUrl="@currentUrl">Đăng nhập</a>
+            }
         </div>
     </div>
 </div>

@@ -1,0 +1,593 @@
+﻿@using Microsoft.AspNetCore.Http
+@model List<FreshFram.Models.Review>
+
+@{
+    ViewBag.Title = "Quản lý đánh giá";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Func<string, string> imgUrl = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
+}
+
+<style>
+    .customer-avatar {
+        width: 40px;
+        height: 40px;
+        object-fit: cover
+    }
+
+    .product-thumb {
+        width: 50px;
+        height: 50px;
+        object-fit: cover
+    }
+
+    .star-rating .bi-star-fill {
+        color: #ffc107
+    }
+
+    .reply-section {
+        background: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+        margin-top: 15px;
+        padding: 10px 15px;
+        border-radius: 4px
+    }
+
+    .reply-author {
+        font-weight: 600;
+        color: #0d6efd;
+        font-size: .95rem
+    }
+
+    .reply-date {
+        font-size: .85rem;
+        color: #6c757d
+    }
+</style>
+
+<main class="container-fluid p-4">
+    <h2 class="fw-bold mb-4">Quản lý đánh giá</h2>
+
+    @using (Html.BeginForm(null, null, FormMethod.Post, new { id = "__ajaxAntiForgeryForm" }))
+    {
+        @Html.AntiForgeryToken()
+    }
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Tìm theo tên khách hàng, sản phẩm..." />
+                </div>
+                <div class="col-md-3">
+                    <select id="ratingFilter" class="form-select">
+                        <option value="">Lọc theo xếp hạng</option>
+                        <option value="5">5 sao</option>
+                        <option value="4">4 sao</option>
+                        <option value="3">3 sao</option>
+                        <option value="2">2 sao</option>
+                        <option value="1">1 sao</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select id="statusFilter" class="form-select">
+                        <option value="">Lọc theo trạng thái</option>
+                        <option value="1">Đã duyệt</option>
+                        <option value="0">Chờ duyệt</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-primary w-100" id="filterBtn">Lọc</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body" id="reviews-list">
+            @if (Model != null && Model.Count > 0)
+            {
+
+                foreach (var review in Model.Where(r => r.ReplyTo == null))
+                {
+                    var productImg = imgUrl(review.Product != null ? review.Product.ImageFileName : null);
+
+                    <div class="card shadow-sm border-0 mb-3 review-item" data-review-id="@review.ReviewID">
+                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <img src="@Url.Action("AvatarById","Account", new { area = "", id = review.UserID })" class="customer-avatar rounded-circle me-2" alt="avatar" />
+                                <div class="fw-bold">@(review.User != null ? review.User.FullName : "—")</div>
+                            </div>
+                            <div class="text-end">
+                                @if (review.IsApproved)
+                                {
+                                    <span class="badge bg-success">Đang hiển thị</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Đã ẩn</span>
+                                }
+                                <small class="text-muted ms-2">@review.CreatedAt.ToString("dd/MM/yyyy")</small>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="d-flex mb-2">
+                                <img src="@productImg" class="product-thumb rounded me-3" alt="product" />
+                                <div>
+                                    <h6 class="mb-0">
+                                        Đánh giá cho sản phẩm:
+                                        <a href="@Url.Action("Edit","Product", new { id = review.ProductID })" class="text-decoration-none">
+                                            @(review.Product != null ? review.Product.ProductName : "—")
+                                        </a>
+                                    </h6>
+                                    <div class="star-rating">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            if (i <= review.Rating)
+                                            {<i class="bi bi-star-fill"></i> }
+                                            else if (i - 0.5 <= review.Rating)
+                                            { <i class="bi bi-star-half"></i> }
+                                            else
+                                            { <i class="bi bi-star"></i>}
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="mb-0">@review.Comment</p>
+
+                            <!-- ✅ Thêm phần hiển thị báo cáo -->
+                            @{
+
+                                var reports = (review.ReviewReports as IEnumerable<FreshFram.Models.ReviewReport> ?? new List<FreshFram.Models.ReviewReport>())
+                                    .Where(rp => rp.Status == 0)
+                                    .ToList();
+
+                                var reportCount = reports.Count;
+                            }
+                            @if (reportCount > 0)
+                            {
+                                <div class="mt-2">
+                                    <span class="badge bg-warning text-dark">
+                                        🚨 Có @reportCount báo cáo
+                                    </span>
+                                    <a href="javascript:void(0)"
+                                       class="text-primary ms-2 toggle-report-detail"
+                                       data-review-id="@review.ReviewID"
+                                       data-expanded="false">
+                                        Xem chi tiết
+                                    </a>
+                                </div>
+
+                                <!-- Khối chứa chi tiết báo cáo -->
+                                <div class="report-detail-container mt-2 d-none" id="report-detail-@review.ReviewID">
+                                    <div class="text-muted">Đang tải báo cáo...</div>
+                                </div>
+                            }
+                            <!-- ✅ Kết thúc phần hiển thị báo cáo -->
+
+                            @{
+                                var replies = Model.Where(r => r.ReplyTo == review.ReviewID).ToList();
+                                var replyCount = replies.Count;
+                            }
+                            @if (replyCount > 0)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 btn-admin-toggle-replies" data-id="@review.ReviewID">
+                                    <i class="bi bi-chat-dots"></i> Xem @replyCount phản hồi
+                                </button>
+                                <div class="admin-replies d-none" data-for="@review.ReviewID">
+                                    @foreach (var reply in replies)
+                                    {
+                                        var isAdminMirror = reply.User != null && reply.User.UserName != null && reply.User.UserName.StartsWith("ADMIN_");
+                                        var displayName = reply.User != null
+                                            ? (reply.User.FullName ?? reply.User.UserName)
+                                            : (isAdminMirror ? (Context.Session.GetString("ADMIN_NAME") ?? "Admin") : "-");
+                                        <div class="reply-section">
+                                            <img src="@Url.Action("AvatarById","Account", new { area = "", id = reply.UserID })" class="customer-avatar rounded-circle me-2" alt="avatar" style="float:left;margin-right:.5rem;width:40px;height:40px;object-fit:cover" />
+                                            <div class="reply-author">
+                                                <i class="bi bi-reply-all me-1"></i>@displayName
+                                                @if (isAdminMirror)
+                                                {
+                                                    <span class="badge bg-primary ms-1">Quản trị viên</span>
+                                                }
+                                            </div>
+                                            <div class="reply-date">@reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                                            <p class="mb-0 mt-2">@reply.Comment</p>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="card-footer bg-light text-end">
+                            <button class="btn btn-sm btn-outline-secondary btn-toggle-visibility me-1" data-review-id="@review.ReviewID">
+                                <i class="bi bi-eye-slash me-1"></i> @(review.IsApproved ? "Ẩn bình luận" : "Bỏ ẩn")
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary me-1"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#replyModal"
+                                    data-review-id="@review.ReviewID">
+                                <i class="bi bi-reply-fill me-1"></i> Phản hồi
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger btn-delete me-1"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#deleteModal"
+                                    data-review-id="@review.ReviewID">
+                                <i class="bi bi-trash me-1"></i> Xóa
+                            </button>
+                        </div>
+                    </div>
+                }
+
+            }
+            else
+            {
+                <div class="alert alert-info">Không có đánh giá nào</div>
+            }
+        </div>
+
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="text-muted small" id="pagination-info"></span>
+            <nav><ul class="pagination justify-content-end mb-0" id="pagination-wrapper"></ul></nav>
+        </div>
+    </div>
+</main>
+
+@section modal {
+    <div class="modal fade" id="replyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Phản hồi đánh giá</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nội dung phản hồi</label>
+                        <textarea id="replyContent" class="form-control" rows="4" placeholder="Viết câu trả lời của bạn..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary" id="submitReplyBtn">Gửi phản hồi</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận xóa</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body"><p>Bạn có chắc chắn muốn xóa đánh giá này không?</p></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+document.addEventListener("DOMContentLoaded", function () {
+    const reviewsList = document.getElementById("reviews-list");
+    let allItems = Array.from(reviewsList.querySelectorAll(".review-item"));
+    const paginationWrapper = document.getElementById("pagination-wrapper");
+    const paginationInfo = document.getElementById("pagination-info");
+    const itemsPerPage = 10; let currentPage = 1;
+
+    const token = document.querySelector("#__ajaxAntiForgeryForm input[name='__RequestVerificationToken']").value;
+
+    function setupPagination(items){
+        paginationWrapper.innerHTML = "";
+        const pageCount = Math.ceil(items.length / itemsPerPage) || 1;
+
+        const prevLi = document.createElement("li");
+        prevLi.className = `page-item ${currentPage===1 ? "disabled":""}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" data-page="prev">Trước</a>`;
+        paginationWrapper.appendChild(prevLi);
+
+        for(let i=1;i<=pageCount;i++){
+            const li = document.createElement("li");
+            li.className = `page-item ${i===currentPage?"active":""}`;
+            li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+            paginationWrapper.appendChild(li);
+        }
+
+        const nextLi = document.createElement("li");
+        nextLi.className = `page-item ${currentPage===pageCount ? "disabled":""}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" data-page="next">Sau</a>`;
+        paginationWrapper.appendChild(nextLi);
+    }
+    function displayPage(items, page){
+        const start=(page-1)*itemsPerPage, end=start+itemsPerPage;
+        items.forEach((el, idx)=> el.style.display = (idx>=start && idx<end) ? "" : "none");
+        if(items.length===0) paginationInfo.textContent = "Không có đánh giá.";
+        else paginationInfo.textContent = `Hiển thị ${start+1}-${Math.min(end, items.length)} / ${items.length} đánh giá`;
+    }
+    function refresh(){
+        if((currentPage-1)*itemsPerPage >= allItems.length && currentPage>1) currentPage--;
+        setupPagination(allItems); displayPage(allItems, currentPage);
+    }
+    paginationWrapper.addEventListener("click", e=>{
+        e.preventDefault(); const a=e.target.closest("a"); if(!a) return;
+        const page=a.dataset.page, pageCount=Math.ceil(allItems.length/itemsPerPage)||1;
+        if(page==="prev" && currentPage>1) currentPage--;
+        else if(page==="next" && currentPage<pageCount) currentPage++;
+        else if(!isNaN(page)) currentPage=parseInt(page);
+        refresh();
+    });
+
+    let currentReviewId = null;
+    const deleteModalEl = document.getElementById("deleteModal");
+    const replyModalEl = document.getElementById("replyModal");
+
+    reviewsList.addEventListener("click", function (ev){
+        const btn = ev.target.closest(".btn-approve"); if(!btn) return;
+        const reviewId = btn.dataset.reviewId;
+
+        $.ajax({
+            url: '@Url.Action("ApproveReview","Review", new { area="Seller"})',
+            type: 'POST',
+            data: { __RequestVerificationToken: token, reviewId: reviewId },
+            success: function(res){
+                if(res.success){
+                    const card = btn.closest(".review-item");
+                    const badge = card.querySelector(".badge");
+                    badge.classList.remove("bg-warning","text-dark");
+                    badge.classList.add("bg-success"); badge.textContent="Đã duyệt";
+                    btn.remove();
+                    if ($.notify) $.notify(res.message, "success");
+                }else{
+                    if ($.notify) $.notify(res.message || "Duyệt không thành công", "error");
+                }
+            },
+            error: function(){ if ($.notify) $.notify("Lỗi khi duyệt đánh giá","error"); }
+        });
+    });
+
+    document.querySelectorAll("[data-bs-target='#replyModal']").forEach(btn=>{
+        btn.addEventListener("click", function(){ currentReviewId = this.dataset.reviewId; });
+    });
+
+    document.getElementById("submitReplyBtn").addEventListener("click", function(){
+        const content = document.getElementById("replyContent").value.trim();
+        if(!content){ if ($.notify) $.notify("Vui lòng nhập nội dung phản hồi","warning"); return; }
+
+        $.ajax({
+            url: '@Url.Action("ReplyReview","Review", new { area="Seller"})',
+            type: 'POST',
+            data: { __RequestVerificationToken: token, reviewId: currentReviewId, content: content },
+            success: function(res){
+                if(res.success){
+                    document.getElementById("replyContent").value = "";
+                    bootstrap.Modal.getInstance(replyModalEl).hide();
+                    if ($.notify) $.notify(res.message,"success");
+                    setTimeout(()=> location.reload(), 600);
+                }else{
+                    if ($.notify) $.notify(res.message || "Phản hồi thất bại","error");
+                }
+            },
+            error: function(){ if ($.notify) $.notify("Lỗi khi gửi phản hồi","error"); }
+        });
+    });
+
+    document.querySelectorAll("[data-bs-target='#deleteModal']").forEach(btn=>{
+        btn.addEventListener("click", function(){ currentReviewId = this.dataset.reviewId; });
+    });
+    document.getElementById("confirmDeleteBtn").addEventListener("click", function(){
+        $.ajax({
+            url: '@Url.Action("DeleteReview","Review", new { area="Seller"})',
+            type: 'POST',
+            data: { __RequestVerificationToken: token, reviewId: currentReviewId },
+            success: function(res){
+                if(res.success){
+                    bootstrap.Modal.getInstance(deleteModalEl).hide();
+                    const card = document.querySelector(`.review-item[data-review-id='${currentReviewId}']`);
+                    if(card){ card.remove(); allItems = Array.from(reviewsList.querySelectorAll(".review-item")); refresh(); }
+                    if ($.notify) $.notify(res.message,"success");
+                }else{
+                    if ($.notify) $.notify(res.message || "Xóa thất bại","error");
+                }
+            },
+            error: function(){ if ($.notify) $.notify("Lỗi khi xóa đánh giá","error"); }
+        });
+    });
+
+    document.getElementById("filterBtn").addEventListener("click", function(){
+        const search = document.getElementById("searchInput").value;
+        const rating = document.getElementById("ratingFilter").value;
+        const status = document.getElementById("statusFilter").value;
+
+        window.location.href = '@Url.Action("FilterReviews","Review", new { area="Seller"})'
+            + '?search=' + encodeURIComponent(search)
+            + '&rating=' + rating + '&status=' + status;
+    });
+
+    // Toggle hide/unhide comment
+    reviewsList.addEventListener("click", function (ev){
+        const btn = ev.target.closest(".btn-toggle-visibility"); if(!btn) return;
+        const reviewId = btn.dataset.reviewId;
+        $.ajax({
+            url: '@Url.Action("ToggleVisibility","Review", new { area="Seller"})',
+            type: 'POST',
+            data: { __RequestVerificationToken: token, reviewId: reviewId },
+            success: function(res){
+                if(res && res.success){
+                    const card = btn.closest(".review-item");
+                    const badge = card.querySelector(".badge");
+                    if(res.approved){
+                        badge.classList.remove("bg-secondary");
+                        badge.classList.add("bg-success");
+                        badge.textContent = "Đang hiển thị";
+                        btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i> Ẩn bình luận';
+                    } else {
+                        badge.classList.remove("bg-success");
+                        badge.classList.add("bg-secondary");
+                        badge.textContent = "Đã ẩn";
+                        btn.innerHTML = '<i class="bi bi-eye me-1"></i> Bỏ ẩn';
+                    }
+                    if ($.notify) $.notify(res.message, "success");
+                } else {
+                    if ($.notify) $.notify((res && res.message) || "Thao tác thất bại", "error");
+                }
+            },
+            error: function(){ if ($.notify) $.notify("Lỗi khi thay đổi trạng thái bình luận","error"); }
+        });
+    });
+
+        // Toggle replies visibility
+    reviewsList.addEventListener("click", function(ev){
+        const t = ev.target.closest('.btn-admin-toggle-replies');
+        if (!t) return;
+        ev.preventDefault();
+        const rid = t.getAttribute('data-id');
+        const box = reviewsList.querySelector('.admin-replies[data-for="' + rid + '"]');
+        if (box){
+            const hidden = box.classList.contains('d-none');
+            box.classList.toggle('d-none');
+            t.innerHTML = hidden ? '<i class="bi bi-chat-dots"></i> Ẩn phản hồi' : '<i class="bi bi-chat-dots"></i> Xem ' + box.children.length + ' phản hồi';
+        }
+    });refresh();
+});
+    $(document).on('click', '.view-report-detail', function () {
+    var btn = $(this);
+    var reviewId = btn.data('review-id');
+    var container = $('#report-detail-' + reviewId);
+    container.removeClass('d-none').html('<div class="text-muted">Đang tải báo cáo...</div>');
+
+    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })',
+        { reviewId: reviewId, page: 1 },
+        function (res) {
+            if (res.success) {
+                var html = '<ul class="list-group">';
+                res.data.forEach(function (rp) {
+                    html += `<li class="list-group-item">
+                        <b>Người báo cáo:</b> ${rp.reporter} <br/>
+                        <b>Lý do:</b> ${rp.reason} <br/>
+                        <b>Ngày:</b> ${rp.createdAt}
+                        ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
+                    </li>`;
+                });
+                html += '</ul>';
+
+                if (res.totalPages > 1) {
+                    html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
+                    for (var i = 1; i <= res.totalPages; i++) {
+                        html += `<li class="page-item ${i === res.page ? 'active' : ''}">
+                                    <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
+                                 </li>`;
+                    }
+                    html += '</ul></nav>';
+                }
+
+                container.html(html);
+            } else {
+                container.html('<div class="text-danger">' + res.message + '</div>');
+            }
+        });
+});
+
+// Xử lý phân trang
+$(document).on('click', '.report-page', function (e) {
+    e.preventDefault();
+    var reviewId = $(this).data('id');
+    var page = $(this).data('page');
+    var container = $('#report-detail-' + reviewId);
+
+    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })',
+        { reviewId: reviewId, page: page },
+        function (res) {
+            if (res.success) {
+                var html = '<ul class="list-group">';
+                res.data.forEach(function (rp) {
+                    html += `<li class="list-group-item">
+                        <b>Người báo cáo:</b> ${rp.reporter} <br/>
+                        <b>Lý do:</b> ${rp.reason} <br/>
+                        <b>Ngày:</b> ${rp.createdAt}
+                        ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
+                    </li>`;
+                });
+                html += '</ul>';
+
+                if (res.totalPages > 1) {
+                    html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
+                    for (var i = 1; i <= res.totalPages; i++) {
+                        html += `<li class="page-item ${i === res.page ? 'active' : ''}">
+                                    <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
+                                 </li>`;
+                    }
+                    html += '</ul></nav>';
+                }
+
+                container.html(html);
+            }
+        });
+});
+        $(document).on('click', '.toggle-report-detail', function () {
+    var btn = $(this);
+    var reviewId = btn.data('review-id');
+    var container = $('#report-detail-' + reviewId);
+    var expanded = btn.data('expanded');
+
+    if (!expanded) {
+        // Mở chi tiết
+        btn.text('Ẩn chi tiết').data('expanded', true);
+        container.removeClass('d-none').html('<div class="text-muted">Đang tải báo cáo...</div>');
+
+        loadReportPage(reviewId, 1);
+    } else {
+        // Ẩn chi tiết
+        btn.text('Xem chi tiết').data('expanded', false);
+        container.addClass('d-none');
+    }
+});
+
+// Hàm tải báo cáo theo trang
+function loadReportPage(reviewId, page) {
+    var container = $('#report-detail-' + reviewId);
+    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })', { reviewId: reviewId, page: page }, function (res) {
+        if (res.success) {
+            var html = '<ul class="list-group">';
+            res.data.forEach(function (rp) {
+                html += `<li class="list-group-item">
+                    <b>Người báo cáo:</b> ${rp.reporter} <br/>
+                    <b>Lý do:</b> ${rp.reason} <br/>
+                    <b>Ngày:</b> ${rp.createdAt}
+                    ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
+                </li>`;
+            });
+            html += '</ul>';
+
+            // Phân trang
+            if (res.totalPages > 1) {
+                html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
+                for (var i = 1; i <= res.totalPages; i++) {
+                    html += `<li class="page-item ${i === res.page ? 'active' : ''}">
+                                <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
+                             </li>`;
+                }
+                html += '</ul></nav>';
+            }
+
+            container.html(html);
+        } else {
+            container.html('<div class="text-danger">' + res.message + '</div>');
+        }
+    });
+}
+
+// Xử lý click phân trang
+$(document).on('click', '.report-page', function (e) {
+    e.preventDefault();
+    var reviewId = $(this).data('id');
+    var page = $(this).data('page');
+    loadReportPage(reviewId, page);
+});
+    </script>
+}
