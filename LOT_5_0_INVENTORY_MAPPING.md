@@ -21,7 +21,8 @@
 - Ket qua:
   - Con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong toan bo 5 controllers.
   - Con `FreshFram.*` o toan bo views thuoc cum 5 (model namespace).
-  - `SupportChat/Index.cshtml` tham chieu `~/Scripts/support-chat-admin.js` nhung khong tim thay file trong workspace (`UNCONFIRMED` contract JSON day du).
+  - `SupportChat/Index.cshtml` tham chieu `~/Scripts/support-chat-admin.js`; file da duoc copy ve:
+    - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`.
 
 ## 3) Action inventory + action-to-API mapping de xuat
 
@@ -29,6 +30,11 @@ Quy uoc endpoint de xuat:
 - `Identity API` cho admin user management.
 - `SellerOps API` (service moi/aggregator) cho Setting, SupportChat, Review moderation, Report read/export.
 - Muc nay la mapping de migrate, chua phai implementation.
+- Ghi chu cap nhat:
+  - Lot 5.2 da implement SupportChat theo `Ordering API` route `api/orders/admin/support-chat/*` de giu service-first va contract view hien tai.
+  - Lot 5.3 da implement Review theo `Ordering API` route `api/orders/admin/reviews/*`.
+  - Lot 5.4 da implement Report read theo `Ordering API` route `api/orders/admin/reports/*`.
+  - Lot 5.5 da implement Report export theo `Ordering API` route `api/orders/admin/reports/*/export` (CSV mo bang Excel).
 
 ### 3.1 SettingController
 | Action (line) | HTTP | Output hien tai | Nguon hien tai | API endpoint de xuat |
@@ -50,11 +56,11 @@ Quy uoc endpoint de xuat:
 | Action (line) | HTTP | Output hien tai | Nguon hien tai | API endpoint de xuat |
 |---|---|---|---|---|
 | `Index` (24) | GET | View `SupportChat/Index` | render page | `GET /seller/support-chat` (BFF page) |
-| `Conversations` (30) | GET | JSON `{ok,conversations}` | `_chatService.GetConversationsForAdmin()` | `GET /api/seller-ops/support-chat/conversations` |
-| `Messages` (37) | GET | JSON `{ok,messages}` | `_chatService.GetMessages(conversationId,take)` | `GET /api/seller-ops/support-chat/conversations/{id}/messages?take=` |
-| `ConversationDetails` (44) | GET | JSON `{ok,profile,orders}` | `db.SupportConversations` + `db.Orders` | `GET /api/seller-ops/support-chat/conversations/{id}/details` |
-| `Close` (98) | POST | JSON `{ok:true}` | `_chatService.CloseConversation` | `POST /api/seller-ops/support-chat/conversations/{id}/close` |
-| `MarkAsRead` (105) | POST | JSON `{ok:true}` | `_chatService.MarkAsRead(...,true)` | `POST /api/seller-ops/support-chat/conversations/{id}/mark-read` |
+| `Conversations` (30) | GET | JSON `{ok,conversations}` | `_chatService.GetConversationsForAdmin()` | `GET /api/orders/admin/support-chat/conversations` |
+| `Messages` (37) | GET | JSON `{ok,messages}` | `_chatService.GetMessages(conversationId,take)` | `GET /api/orders/admin/support-chat/conversations/{id}/messages?take=` |
+| `ConversationDetails` (44) | GET | JSON `{ok,profile,orders}` | `db.SupportConversations` + `db.Orders` | `GET /api/orders/admin/support-chat/conversations/{id}/details` |
+| `Close` (98) | POST | JSON `{ok:true}` | `_chatService.CloseConversation` | `POST /api/orders/admin/support-chat/conversations/{id}/close` |
+| `MarkAsRead` (105) | POST | JSON `{ok:true}` | `_chatService.MarkAsRead(...,true)` | `POST /api/orders/admin/support-chat/conversations/{id}/mark-read` |
 
 ### 3.4 ReviewController
 | Action (line) | HTTP | Output hien tai | Nguon hien tai | API endpoint de xuat |
@@ -119,7 +125,8 @@ Quy uoc endpoint de xuat:
     - `profile.userId,fullName,email,phone,avatarUrl,totalPoints,rankName`
     - `orders[].orderId,orderCode,orderDate,totalAmount,status`
   - `Close/MarkAsRead`: `{ok:true}`
-- `UNCONFIRMED`: field day du cua `conversations/messages` do file `~/Scripts/support-chat-admin.js` khong co trong workspace.
+- Ghi chu:
+  - File script da co trong workspace: `wwwroot/Scripts/support-chat-admin.js`.
 
 ### 4.4 Review (moderation)
 - File: `Areas/Seller/Views/Review/ManageReview.cshtml`
@@ -194,7 +201,7 @@ Quy uoc endpoint de xuat:
     - `POST DeleteReview` tra `success,message`.
 
 ## 5) Open gaps cho lot tiep theo
-- `SupportChat` script file `support-chat-admin.js` khong co -> can chot contract JSON truoc lot 5.2 (`UNCONFIRMED`).
-- `ReportController` qua lon (3161 lines), nen tach theo 5.4 (read) va 5.5 (export/write) nhu roadmap.
-- Co overlap nghiep vu xoa review o `ReviewController.DeleteReview` va `ReportController.DeleteReview`; can unify endpoint trong lot 5.3/5.5.
-
+- Cum 5 da migrate xong theo service-first (5.1 -> 5.6), xem `ROADMAP_SELLER_ADMIN_MIGRATION.md`.
+- Van con overlap nghiep vu xoa review o `ReviewController.DeleteReview` va `ReportController.DeleteReview` (2 route khac nhau theo 2 luong du lieu).
+- `SupportChat` da duoc chot polling-safe fallback (khong vo JS neu khong co SignalR hub), nhung realtime hub mode (send/typing/reaction realtime) chua bat.
+- Cap nhat 2026-02-27: Phase 5 module `Loyalty` va `Status` da migrate service-first, static audit Seller area khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity`.

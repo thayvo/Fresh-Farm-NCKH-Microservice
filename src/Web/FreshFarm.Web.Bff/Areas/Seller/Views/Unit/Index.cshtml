@@ -20,335 +20,551 @@
 }
 
 <style>
-    .page-header {
-        background: white;
-        border-radius: 15px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
-    .stats-card {
-        background: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-
-        .stats-card:hover {
-            transform: translateY(-5px);
+    /* ANIMATION */
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
         }
 
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    /* GLASS CARD CHUNG */
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border-radius: 1.5rem;
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        animation: fadeInUp .6s ease-out;
+    }
+
+    /* HEADER GRADIENT + QUÉT ÁNH SÁNG */
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        position: relative;
+        overflow: hidden;
+        animation: fadeInUp .5s ease-out;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .grad-header-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+        border-radius: 1.25rem;
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* STATS CARDS */
+    .stats-card {
+        border-radius: 1.5rem;
+        background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+        box-shadow: 0 15px 40px rgba(15, 23, 42, 0.12);
+        padding: 1.5rem;
+        animation: fadeInUp .6s ease-out .05s backwards;
+    }
+
     .stats-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 12px;
+        width: 56px;
+        height: 56px;
+        border-radius: 1.25rem;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1.8rem;
+        color: #fff;
     }
 
         .stats-icon.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            box-shadow: 0 12px 30px rgba(37, 99, 235, 0.5);
         }
 
         .stats-icon.success {
-            background: linear-gradient(135deg, #28a745 0%, #5cb85c 100%);
-            color: white;
+            background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+            box-shadow: 0 12px 30px rgba(34, 197, 94, 0.5);
         }
 
         .stats-icon.warning {
-            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
-            color: white;
+            background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+            box-shadow: 0 12px 30px rgba(239, 68, 68, 0.5);
         }
 
+    /* MAIN CARD (DANH SÁCH) */
     .main-card {
-        background: white;
-        border-radius: 15px;
+        border-radius: 1.5rem;
         padding: 2rem;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        background: rgba(255,255,255,0.98);
+        backdrop-filter: blur(18px);
+        border: 1px solid rgba(191, 219, 254, 0.9);
+        box-shadow: 0 20px 60px rgba(15,23,42,0.18);
+        animation: fadeInUp .6s ease-out .1s backwards;
     }
 
-    .unit-card {
-        background: #f8f9fa;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        border: 2px solid #e9ecef;
+    /* SEARCH + FILTER */
+    .search-box {
+        border-radius: 999px;
+        border: 2px solid #bfdbfe;
+        padding: 0.7rem 1rem;
         transition: all 0.3s ease;
+        background-color: #fff;
+    }
+
+        .search-box:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.2);
+        }
+
+    .search-icon-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+        .search-icon-wrapper .search-box {
+            padding-left: 2.75rem;
+        }
+
+        .search-icon-wrapper i.bi-search {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #60a5fa;
+        }
+
+    .filter-pill {
+        border-radius: 999px;
+        border: 2px solid #bfdbfe;
+        padding: 0.55rem 1.25rem;
+        background: #fff;
+        transition: all .3s ease;
+    }
+
+        .filter-pill:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.2);
+        }
+
+    /* BUTTONS */
+    .btn-custom {
+        border-radius: 999px;
+        padding: 0.6rem 1.6rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        border: none;
+    }
+
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+        }
+
+    /* UNIT CARD */
+    .unit-card {
+        background: linear-gradient(135deg, #f9fafb 0%, #eff6ff 100%);
+        border-radius: 1.2rem;
+        padding: 1.35rem 1.5rem;
+        margin-bottom: 1rem;
+        border: 2px solid #e5e7eb;
+        transition: all 0.3s ease;
+        animation: slideIn .4s ease-out backwards;
     }
 
         .unit-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
-            transform: translateX(5px);
+            border-color: #3b82f6;
+            box-shadow: 0 10px 24px rgba(37,99,235,0.18);
+            transform: translateX(4px);
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
         }
 
         .unit-card.active {
-            border-color: #28a745;
-            background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(92, 184, 92, 0.1) 100%);
+            border-color: #22c55e;
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(22, 163, 74, 0.04) 100%);
         }
 
     .unit-icon {
         width: 50px;
         height: 50px;
-        border-radius: 10px;
+        border-radius: 1rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.5rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-size: 1.4rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         color: white;
+        box-shadow: 0 10px 22px rgba(37,99,235,0.4);
     }
 
     .badge-custom {
         padding: 0.5rem 1rem;
-        border-radius: 20px;
+        border-radius: 999px;
         font-weight: 500;
     }
-
-    .btn-custom {
-        border-radius: 25px;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-
-        .btn-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
 
     .action-btn {
         width: 38px;
         height: 38px;
-        border-radius: 10px;
+        border-radius: 0.875rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         transition: all 0.3s ease;
-        border: none;
+        border-width: 2px;
     }
 
         .action-btn:hover {
-            transform: scale(1.1);
+            transform: scale(1.08);
         }
 
+    /* MODAL */
     .modal-content {
-        border-radius: 15px;
+        border-radius: 1.5rem;
         border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
     }
 
     .modal-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         color: white;
-        border-radius: 15px 15px 0 0;
+        border-radius: 1.5rem 1.5rem 0 0;
     }
 
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
     .form-control, .form-select {
-        border-radius: 10px;
-        border: 2px solid #e9ecef;
+        border-radius: 0.9rem;
+        border: 2px solid #e5e7eb;
         padding: 0.7rem 1rem;
+        transition: all .3s ease;
     }
 
         .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 0.25rem rgba(59,130,246,0.2);
         }
 
-    .search-box {
-        border-radius: 25px;
-        border: 2px solid #e9ecef;
-        padding: 0.7rem 1.5rem;
-        transition: all 0.3s ease;
-    }
-
-        .search-box:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
+    /* EMPTY STATE */
     .empty-state {
         text-align: center;
-        padding: 3rem;
-        color: #6c757d;
+        padding: 3rem 1rem;
+        color: #6b7280;
     }
 
         .empty-state i {
             font-size: 4rem;
             margin-bottom: 1rem;
-            opacity: 0.3;
+            opacity: 0.35;
+            color: #3b82f6;
         }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .main-card {
+            padding: 1.5rem;
+        }
+    }
 </style>
-<div class="container mt-4">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="fw-bold mb-2">
-                    <i class="bi bi-rulers text-primary me-2"></i>
-                    Quản Lý Đơn Vị Tính
-                </h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a href="@Url.Action("Dashboard", "Home")" class="text-decoration-none">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="#" class="text-decoration-none">Cài đặt</a></li>
-                        <li class="breadcrumb-item active">Đơn vị tính</li>
-                    </ol>
-                </nav>
-            </div>
-            <div>
-                <a href="@Url.Action("Create", "Unit")" class="btn btn-success btn-custom me-2">
-                    <i class="bi bi-file-earmark-plus me-2"></i>Thêm trang riêng
-                </a>
-                <button class="btn btn-primary btn-custom" data-bs-toggle="modal" data-bs-target="#addUnitModal">
-                    <i class="bi bi-plus-circle me-2"></i>Thêm nhanh
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Stats Cards -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-1">Tổng đơn vị</p>
-                        <h3 class="fw-bold mb-0">@(stats?.TotalUnits ?? 0)</h3>
-                        <small class="text-success"><i class="bi bi-arrow-up"></i> +@(stats?.NewUnitsThisMonth ?? 0) mới</small>
-                    </div>
-                    <div class="stats-icon primary">
-                        <i class="bi bi-rulers"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-1">Đang sử dụng</p>
-                        <h3 class="fw-bold mb-0">@(stats?.ActiveUnits ?? 0)</h3>
-                        <small class="text-success"><i class="bi bi-check-circle"></i> Hoạt động</small>
-                    </div>
-                    <div class="stats-icon success">
-                        <i class="bi bi-check-circle"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-1">Không sử dụng</p>
-                        <h3 class="fw-bold mb-0">@(stats?.InactiveUnits ?? 0)</h3>
-                        <small class="text-muted"><i class="bi bi-pause-circle"></i> Tạm dừng</small>
-                    </div>
-                    <div class="stats-icon warning">
-                        <i class="bi bi-pause-circle"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<main class="min-vh-100">
+    <div class="container-fluid py-4">
 
-    <!-- Main Content -->
-    <div class="main-card">
-        <!-- Search and Filter -->
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <div class="input-group">
-                    <span class="input-group-text bg-white border-end-0">
+        <!-- HEADER -->
+        <div class="grad-header p-4 p-md-5 mb-4">
+            <div class="grad-header-inner">
+                <div class="d-flex justify-content-between align-items-start align-items-md-center flex-column flex-md-row gap-3">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="icon-gradient">
+                            <i class="bi bi-rulers text-white" style="font-size:2rem;"></i>
+                        </div>
+                        <div>
+                            <h2 class="fw-bold mb-2 text-white" style="text-shadow:0 4px 12px rgba(0,0,0,0.35);">
+                                Quản Lý Đơn Vị Tính
+                            </h2>
+                            <nav aria-label="breadcrumb">
+                                <ol class="breadcrumb mb-0">
+                                    <li class="breadcrumb-item">
+                                        <a href="@Url.Action("Dashboard", "Home", new { area = "Seller" })" class="text-white-50 text-decoration-none">Dashboard</a>
+                                    </li>
+                                    <li class="breadcrumb-item">
+                                        <span class="text-white-50">Cài đặt</span>
+                                    </li>
+                                    <li class="breadcrumb-item active text-white" aria-current="page">Đơn vị tính</li>
+                                </ol>
+                            </nav>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="@Url.Action("Create", "Unit")"
+                           class="btn btn-success btn-custom d-flex align-items-center gap-2">
+                            <i class="bi bi-file-earmark-plus"></i>
+                            <span>Thêm trang riêng</span>
+                        </a>
+                        <button class="btn btn-primary btn-custom d-flex align-items-center gap-2"
+                                data-bs-toggle="modal" data-bs-target="#addUnitModal">
+                            <i class="bi bi-plus-circle"></i>
+                            <span>Thêm nhanh</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Tổng đơn vị</p>
+                            <h3 class="fw-bold mb-0 text-primary-blue">@(stats?.TotalUnits ?? 0)</h3>
+                            <small class="text-success">
+                                <i class="bi bi-arrow-up"></i> +@(stats?.NewUnitsThisMonth ?? 0) mới
+                            </small>
+                        </div>
+                        <div class="stats-icon primary">
+                            <i class="bi bi-rulers"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Đang sử dụng</p>
+                            <h3 class="fw-bold mb-0 text-success">@(stats?.ActiveUnits ?? 0)</h3>
+                            <small class="text-success">
+                                <i class="bi bi-check-circle"></i> Hoạt động
+                            </small>
+                        </div>
+                        <div class="stats-icon success">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Không sử dụng</p>
+                            <h3 class="fw-bold mb-0 text-danger">@(stats?.InactiveUnits ?? 0)</h3>
+                            <small class="text-muted">
+                                <i class="bi bi-pause-circle"></i> Tạm dừng
+                            </small>
+                        </div>
+                        <div class="stats-icon warning">
+                            <i class="bi bi-pause-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="main-card">
+            <!-- Search + Filter -->
+            <div class="row mb-4 align-items-center">
+                <div class="col-md-8 mb-3 mb-md-0">
+                    <div class="search-icon-wrapper">
                         <i class="bi bi-search"></i>
-                    </span>
-                    <input type="text" class="form-control search-box border-start-0" placeholder="Tìm kiếm đơn vị tính..." id="searchInput">
+                        <input type="text" class="form-control search-box" placeholder="Tìm kiếm đơn vị tính..."
+                               id="searchInput" />
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <select class="form-select filter-pill d-inline-block w-auto" id="filterStatus">
+                        <option value="all">Tất cả trạng thái</option>
+                        <option value="active">Đang sử dụng</option>
+                        <option value="inactive">Không sử dụng</option>
+                    </select>
                 </div>
             </div>
-            <div class="col-md-4 text-end">
-                <select class="form-select d-inline-block w-auto" style="border-radius: 25px;" id="filterStatus">
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="active">Đang sử dụng</option>
-                    <option value="inactive">Không sử dụng</option>
-                </select>
-            </div>
-        </div>
 
-        <!-- Units List -->
-        <div class="row" id="unitsList">
-            @if (Model != null && Model.Any())
-            {
-                foreach (var unit in Model)
+            <!-- Units List -->
+            <div class="row" id="unitsList">
+                @if (Model != null && Model.Any())
                 {
-                    <div class="col-md-6">
-                        <div class="unit-card @(unit.IsActive ? "active" : "")" data-status="@(unit.IsActive ? "active" : "inactive")" data-unit-id="@unit.UnitID">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center flex-grow-1">
-                                    <div class="unit-icon me-3" style="@(unit.IsActive ? "" : "opacity: 0.5;")">
-                                        <i class="bi bi-@GetIconByType(unit.UnitType)"></i>
-                                    </div>
-                                    <div class="flex-grow-1">
-                                        <h5 class="mb-1 fw-bold @(unit.IsActive ? "" : "text-muted")">@unit.UnitName</h5>
-                                        <p class="text-muted mb-1 small">
-                                            <i class="bi bi-tag me-1"></i>Ký hiệu: <strong>@unit.Symbol</strong>
-                                        </p>
-                                        <p class="text-muted mb-0 small">
-                                            <i class="bi bi-list-ul me-1"></i>Loại: @unit.UnitType
-                                        </p>
-                                        @if (!string.IsNullOrEmpty(unit.Description))
-                                        {
-                                            <p class="text-muted mb-0 small mt-1">
-                                                <i class="bi bi-info-circle me-1"></i>@unit.Description
+                    foreach (var unit in Model)
+                    {
+                        <div class="col-md-6">
+                            <div class="unit-card @(unit.IsActive ? "active" : "")"
+                                 data-status="@(unit.IsActive ? "active" : "inactive")"
+                                 data-unit-id="@unit.UnitID">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center flex-grow-1">
+                                        <div class="unit-icon me-3" style="@(unit.IsActive ? "" : "opacity: 0.5;")">
+                                            <i class="bi bi-@GetIconByType(unit.UnitType)"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <h5 class="mb-1 fw-bold @(unit.IsActive ? "" : "text-muted")">
+                                                @unit.UnitName
+                                            </h5>
+                                            <p class="text-muted mb-1 small">
+                                                <i class="bi bi-tag me-1"></i>
+                                                Ký hiệu: <strong>@unit.Symbol</strong>
                                             </p>
-                                        }
+                                            <p class="text-muted mb-0 small">
+                                                <i class="bi bi-list-ul me-1"></i>Loại: @unit.UnitType
+                                            </p>
+                                            @if (!string.IsNullOrEmpty(unit.Description))
+                                            {
+                                                <p class="text-muted mb-0 small mt-1">
+                                                    <i class="bi bi-info-circle me-1"></i>@unit.Description
+                                                </p>
+                                            }
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge @(unit.IsActive ? "bg-success" : "bg-secondary") badge-custom mb-2">
-                                        <i class="bi bi-@(unit.IsActive ? "check-circle" : "pause-circle") me-1"></i>@(unit.IsActive ? "Đang dùng" : "Không dùng")
-                                    </span>
-                                    <div>
-                                        <a href="@Url.Action("Edit", "Unit", new { id = unit.UnitID })"
-                                           class="action-btn btn btn-sm btn-outline-primary me-1"
-                                           title="Chỉnh sửa đơn vị">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
+                                    <div class="text-end ms-3">
+                                        <span class="badge @(unit.IsActive ? "bg-success" : "bg-secondary") badge-custom mb-2">
+                                            <i class="bi bi-@(unit.IsActive ? "check-circle" : "pause-circle") me-1"></i>
+                                            @(unit.IsActive ? "Đang dùng" : "Không dùng")
+                                        </span>
+                                        <div>
+                                            <a href="@Url.Action("Edit", "Unit", new { id = unit.UnitID })"
+                                               class="action-btn btn btn-sm btn-outline-primary me-1"
+                                               title="Chỉnh sửa đơn vị">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
 
-                                        <button class="action-btn btn btn-sm btn-outline-danger" title="Xóa" onclick="deleteUnit(@unit.UnitID, '@unit.UnitName')">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                            <button class="action-btn btn btn-sm btn-outline-danger"
+                                                    title="Xóa"
+                                                    onclick="deleteUnit(@unit.UnitID, '@unit.UnitName')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    }
+                }
+                else
+                {
+                    <div class="col-12">
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <h5>Chưa có đơn vị tính nào</h5>
+                            <p>Nhấn nút "Thêm đơn vị" để thêm đơn vị tính mới</p>
+                        </div>
                     </div>
                 }
-            }
-            else
-            {
-                <div class="col-12">
-                    <div class="empty-state">
-                        <i class="bi bi-inbox"></i>
-                        <h5>Chưa có đơn vị tính nào</h5>
-                        <p>Nhấn nút "Thêm đơn vị" để thêm đơn vị tính mới</p>
-                    </div>
-                </div>
-            }
-        </div>
+            </div>
 
-        <!-- Empty State for Search -->
-        <div class="empty-state d-none" id="emptyState">
-            <i class="bi bi-inbox"></i>
-            <h5>Không tìm thấy đơn vị tính nào</h5>
-            <p>Thử tìm kiếm với từ khóa khác hoặc thêm đơn vị mới</p>
+            <!-- Empty State for Search -->
+            <div class="empty-state d-none" id="emptyState">
+                <i class="bi bi-inbox"></i>
+                <h5>Không tìm thấy đơn vị tính nào</h5>
+                <p>Thử tìm kiếm với từ khóa khác hoặc thêm đơn vị mới</p>
+            </div>
         </div>
     </div>
-</div>
+</main>
 
 @section modal{
 
@@ -444,17 +660,16 @@
     </div>
 }
 
-
 @section scripts{
     <script>
       // Tìm kiếm và lọc
-      let allUnits = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+      let allUnits = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model));
 
-      $('#searchInput').on('keyup', function() {
+      $('#searchInput').on('keyup', function () {
           filterUnits();
       });
 
-      $('#filterStatus').on('change', function() {
+      $('#filterStatus').on('change', function () {
           filterUnits();
       });
 
@@ -463,7 +678,7 @@
           const statusFilter = $('#filterStatus').val();
 
           let visibleCount = 0;
-          $('.unit-card').parent().each(function() {
+          $('.unit-card').parent().each(function () {
               const card = $(this).find('.unit-card');
               const unitName = card.find('h5').text().toLowerCase();
               const unitSymbol = card.find('strong').first().text().toLowerCase();
@@ -495,7 +710,7 @@
               url: '@Url.Action("CreateAjax", "Unit")',
               type: 'POST',
               data: formData,
-              success: function(response) {
+              success: function (response) {
                   if (response.success) {
                       alert(response.message);
                       location.reload();
@@ -503,19 +718,19 @@
                       alert(response.message);
                   }
               },
-              error: function() {
+              error: function () {
                   alert('Có lỗi xảy ra, vui lòng thử lại!');
               }
           });
       }
 
-      // Sửa đơn vị
+      // Sửa đơn vị (mở modal)
       function editUnit(id) {
           $.ajax({
               url: '@Url.Action("GetById", "Unit")',
               type: 'GET',
               data: { id: id },
-              success: function(response) {
+              success: function (response) {
                   if (response.success) {
                       $('#editUnitID').val(response.data.UnitID);
                       $('#editUnitName').val(response.data.UnitName);
@@ -527,7 +742,7 @@
                       alert(response.message);
                   }
               },
-              error: function() {
+              error: function () {
                   alert('Có lỗi xảy ra khi tải dữ liệu!');
               }
           });
@@ -540,7 +755,7 @@
               url: '@Url.Action("Edit", "Unit")',
               type: 'POST',
               data: formData,
-              success: function(response) {
+              success: function (response) {
                   if (response.success) {
                       alert(response.message);
                       location.reload();
@@ -548,7 +763,7 @@
                       alert(response.message);
                   }
               },
-              error: function() {
+              error: function () {
                   alert('Có lỗi xảy ra, vui lòng thử lại!');
               }
           });
@@ -564,7 +779,7 @@
                       id: id,
                       __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
                   },
-                  success: function(response) {
+                  success: function (response) {
                       if (response.success) {
                           alert(response.message);
                           location.reload();
@@ -572,7 +787,7 @@
                           alert(response.message);
                       }
                   },
-                  error: function() {
+                  error: function () {
                       alert('Có lỗi xảy ra, vui lòng thử lại!');
                   }
               });

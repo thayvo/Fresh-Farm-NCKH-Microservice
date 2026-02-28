@@ -5,422 +5,709 @@
 }
 
 <style>
-    .export-cart-card {
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Header gradient với hiệu ứng quét ánh sáng */
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        position: relative;
+        overflow: hidden;
+        animation: fadeInUp .5s ease-out;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .grad-header-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .header-icon {
+        background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+        border-radius: 1.25rem;
+        padding: 1rem 1.2rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.4);
+    }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out .05s backwards;
+    }
+
+    .form-control,
+    .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .8rem 1rem;
+        transition: all .3s ease;
+        background-color: #ffffff;
+    }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
 
     .product-search-box {
-        border-radius: 8px;
-        border: 2px solid #dee2e6;
+        border-radius: 1rem;
     }
 
+    .btn-pill {
+        border-radius: 2rem;
+        padding: .7rem 1.8rem;
+        font-weight: 600;
+        border: none;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.22);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-outline-secondary {
+        border-radius: 2rem;
+        border-width: 2px;
+    }
+
+    .btn-warning-main {
+        background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+        color: #fff;
+    }
+
+        .btn-warning-main:hover {
+            background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
+            color: #fff;
+        }
+
+    .btn-danger-main {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: #fff;
+    }
+
+        .btn-danger-main:hover {
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+            color: #fff;
+        }
+
     .cart-item {
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid #e5e7eb;
         padding: 1rem 0;
-        transition: background-color 0.2s;
+        transition: background-color 0.2s, transform .2s ease;
     }
 
         .cart-item:hover {
-            background-color: #f8f9fa;
+            background: linear-gradient(90deg, rgba(59,130,246,0.06) 0%, rgba(248,250,252,1) 100%);
+            transform: translateY(-1px);
         }
 
     .cart-summary {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #22c55e 100%);
         color: white;
-        border-radius: 12px;
-        padding: 1.5rem;
+        border-radius: 1.5rem;
+        padding: 1.5rem 1.75rem;
+        box-shadow: 0 18px 40px rgba(15,23,42,0.4);
+        animation: fadeInUp .6s ease-out .15s backwards;
     }
 
-    .btn-add-to-cart {
-        border-radius: 8px;
-        padding: 0.5rem 1.5rem;
+    .cart-summary-divider {
+        border-bottom: 1px solid rgba(255,255,255,0.25);
+    }
+
+    .export-cart-header {
+        padding: 1.1rem 1.5rem;
+        border-bottom: 1px solid rgba(148,163,184,0.3);
+    }
+
+    .export-cart-card {
+        animation: fadeInUp .6s ease-out .05s backwards;
+    }
+
+    .badge-soft {
+        border-radius: 999px;
+        padding: .3rem .75rem;
+        font-size: .8rem;
+        background: rgba(15,23,42,0.06);
+        color: #475569;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+    }
+
+    .dynamic-alert {
+        animation: slideIn .35s ease-out;
+        border-radius: 1.25rem;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+        border: none;
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 4px rgba(220,53,69,.1) !important;
+    }
+
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 4px rgba(25,135,84,.1) !important;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .btn-pill {
+            width: 100%;
+            justify-content: center;
+        }
     }
 </style>
 
-<!-- ✅ THÊM ANTI-FORGERY TOKEN NGAY ĐẦU TRANG -->
+<!-- Anti-forgery token -->
 <div style="display:none;">
     @Html.AntiForgeryToken()
 </div>
 
-<main class="container-fluid p-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-1">
-                <i class="bi bi-box-arrow-right text-warning me-2"></i>Xuất Kho
-            </h2>
-            <p class="text-muted mb-0">Thêm nhiều sản phẩm vào giỏ xuất trước khi xác nhận</p>
-        </div>
-        <a href="@Url.Action("Index", "Warehouse", new { area = "Seller" })" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i>Quay lại kho
-        </a>
-    </div>
-
-    <div class="row g-4">
-        <!-- Left: Form thêm sản phẩm -->
-        <div class="col-lg-7">
-            <div class="card export-cart-card">
-                <div class="card-header bg-warning">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Thêm sản phẩm vào giỏ xuất</h5>
-                </div>
-                <div class="card-body">
-                    <form id="addToCartForm">
-                        <div class="row g-3">
-                            <!-- Tìm kiếm sản phẩm -->
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Tìm sản phẩm <span class="text-danger">*</span></label>
-                                <input type="hidden" id="selectedProductId" />
-                                <input type="text"
-                                       id="productSearchInput"
-                                       class="form-control product-search-box"
-                                       list="productDatalist"
-                                       placeholder="Nhập tên hoặc mã SKU sản phẩm..."
-                                       autocomplete="off" />
-                                <datalist id="productDatalist">
-                                    @if (Model.Products != null)
-                                    {
-                                        foreach (var item in Model.Products.Where(p => p.StockQuantity > 0))
-                                        {
-                                            var displayText = $"{item.ProductName} ({item.SKU}) - Tồn: {item.StockQuantity}";
-                                            <option value="@displayText" data-id="@item.ProductID" data-stock="@item.StockQuantity"></option>
-                                        }
-                                    }
-                                </datalist>
-                                <div id="productInfo" class="mt-2 text-muted small"></div>
-                            </div>
-
-                            <!-- Số lượng -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Số lượng xuất <span class="text-danger">*</span></label>
-                                <input type="number" id="quantity" class="form-control" min="1" value="1" required />
-                                <small class="text-muted" id="stockInfo"></small>
-                            </div>
-
-                            <!-- Lý do xuất -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Lý do xuất <span class="text-danger">*</span></label>
-                                <select id="exportReason" class="form-select" required>
-                                    <option value="">-- Chọn lý do --</option>
-                                    <option value="Bán hàng">Bán hàng</option>
-                                    <option value="Hư hỏng">Hư hỏng</option>
-                                    <option value="Hết hạn">Hết hạn</option>
-                                    <option value="Khác">Khác</option>
-                                </select>
-                            </div>
-
-                            <!-- Ghi chú -->
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Ghi chú</label>
-                                <textarea id="notes" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
-                            </div>
-
-                            <!-- Nút thêm vào giỏ -->
-                            <div class="col-12">
-                                <button type="button" class="btn btn-warning btn-add-to-cart w-100" onclick="addToExportCart()">
-                                    <i class="bi bi-cart-plus me-2"></i>Thêm vào giỏ xuất
-                                </button>
-                            </div>
+<div class="min-vh-100">
+    <main class="container-fluid py-4">
+        <!-- Header gradient -->
+        <div class="grad-header p-4 p-md-5 mb-4">
+            <div class="grad-header-inner">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="header-icon">
+                            <i class="bi bi-box-arrow-right fs-2 text-white"></i>
                         </div>
-                    </form>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size: 2.2rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+                                Xuất Kho
+                            </h1>
+                            <p class="mb-0 text-white-50" style="font-size: 1.02rem;">
+                                Thêm nhiều sản phẩm vào giỏ xuất trước khi xác nhận xuất kho
+                            </p>
+                        </div>
+                    </div>
+
+                    <a href="@Url.Action("Index", "Warehouse", new { area = "Seller" })"
+                       class="btn btn-outline-secondary btn-pill bg-white bg-opacity-80">
+                        <i class="bi bi-arrow-left me-2"></i>Quay lại kho
+                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- Right: Giỏ xuất -->
-        <div class="col-lg-5">
-            <div class="card export-cart-card">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">
-                        <i class="bi bi-cart3 me-2"></i>Giỏ xuất
-                        <span class="badge bg-light text-dark" id="cartCount">0</span>
-                    </h5>
-                </div>
-                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                    <div id="exportCartItems">
-                        <div class="text-center text-muted py-5">
-                            <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-                            <p>Giỏ xuất đang trống</p>
+        <div class="row g-4">
+            <!-- Left: Form thêm sản phẩm -->
+            <div class="col-lg-7">
+                <div class="card-glass export-cart-card h-100">
+                    <div class="export-cart-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 text-primary-blue">
+                                <i class="bi bi-plus-circle me-2 text-warning"></i>Thêm sản phẩm vào giỏ xuất
+                            </h5>
+                            <span class="badge-soft small">
+                                Chỉ hiển thị sản phẩm còn tồn trong kho
+                            </span>
                         </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <form id="addToCartForm">
+                            <div class="row g-3">
+                                <!-- Tìm kiếm sản phẩm -->
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold text-primary-blue">
+                                        Tìm sản phẩm <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="hidden" id="selectedProductId" />
+                                    <input type="text"
+                                           id="productSearchInput"
+                                           class="form-control product-search-box"
+                                           list="productDatalist"
+                                           placeholder="Nhập tên hoặc mã SKU sản phẩm..."
+                                           autocomplete="off" />
+                                    <datalist id="productDatalist">
+                                        @if (Model.Products != null)
+                                        {
+                                            foreach (var item in Model.Products.Where(p => p.StockQuantity > 0))
+                                            {
+                                                var displayText = $"{item.ProductName} ({item.SKU}) - Tồn: {item.StockQuantity}";
+                                                <option value="@displayText"
+                                                        data-id="@item.ProductID"
+                                                        data-stock="@item.StockQuantity"></option>
+                                            }
+                                        }
+                                    </datalist>
+                                    <div id="productInfo" class="mt-2 text-muted small"></div>
+                                </div>
+
+                                <!-- Số lượng -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-primary-blue">
+                                        Số lượng xuất <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" id="quantity" class="form-control" min="1" value="1" required />
+                                    <small class="text-muted" id="stockInfo"></small>
+                                </div>
+
+                                <!-- Lý do xuất -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold text-primary-blue">
+                                        Lý do xuất <span class="text-danger">*</span>
+                                    </label>
+                                    <select id="exportReason" class="form-select" required>
+                                        <option value="">-- Chọn lý do --</option>
+                                        <option value="Bán hàng">Bán hàng</option>
+                                        <option value="Hư hỏng">Hư hỏng</option>
+                                        <option value="Hết hạn">Hết hạn</option>
+                                        <option value="Khác">Khác</option>
+                                    </select>
+                                </div>
+
+                                <!-- Ghi chú -->
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold text-primary-blue">Ghi chú</label>
+                                    <textarea id="notes" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
+                                </div>
+
+                                <!-- Nút thêm vào giỏ -->
+                                <div class="col-12">
+                                    <button type="button"
+                                            class="btn btn-warning-main btn-pill w-100"
+                                            onclick="addToExportCart()">
+                                        <i class="bi bi-cart-plus me-2"></i>Thêm vào giỏ xuất
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
 
-            <!-- Summary -->
-            <div class="cart-summary mt-3">
-                <h6 class="mb-3"><i class="bi bi-receipt me-2"></i>Tổng kết</h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Tổng số sản phẩm:</span>
-                    <strong id="totalProducts">0</strong>
+            <!-- Right: Giỏ xuất -->
+            <div class="col-lg-5">
+                <div class="card-glass export-cart-card mb-3">
+                    <div class="export-cart-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-danger">
+                            <i class="bi bi-cart3 me-2"></i>Giỏ xuất
+                        </h5>
+                        <span class="badge rounded-pill bg-danger text-white px-3 py-2">
+                            Tổng mục: <span id="cartCount">0</span>
+                        </span>
+                    </div>
+                    <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                        <div id="exportCartItems">
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                                <p>Giỏ xuất đang trống</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-3 pb-3 border-bottom">
-                    <span>Tổng số lượng xuất:</span>
-                    <strong id="totalQuantity">0</strong>
+
+                <!-- Summary -->
+                <div class="cart-summary mt-3">
+                    <h6 class="mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-receipt"></i>
+                        <span>Tổng kết xuất kho</span>
+                    </h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tổng số sản phẩm:</span>
+                        <strong id="totalProducts">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 pb-3 cart-summary-divider">
+                        <span>Tổng số lượng xuất:</span>
+                        <strong id="totalQuantity">0</strong>
+                    </div>
+                    <button class="btn btn-light w-100 fw-bold btn-pill text-primary-blue"
+                            onclick="confirmExportAll()"
+                            id="btnConfirmExport"
+                            disabled>
+                        <i class="bi bi-check-circle me-2"></i>Xác nhận xuất kho
+                    </button>
                 </div>
-                <button class="btn btn-light w-100 fw-bold" onclick="confirmExportAll()" id="btnConfirmExport" disabled>
-                    <i class="bi bi-check-circle me-2"></i>Xác nhận xuất kho
-                </button>
             </div>
         </div>
-    </div>
-</main>
+    </main>
+</div>
 
 @section scripts {
     <script>
-    let exportCart = [];
-    let productIdCounter = 0;
-    let currentMaxStock = 0;
+        let exportCart = [];
+        let productIdCounter = 0;
+        let currentMaxStock = 0;
 
-    // Xử lý chọn sản phẩm từ datalist
-    document.getElementById('productSearchInput').addEventListener('change', function() {
-        const input = this.value;
-        const datalist = document.getElementById('productDatalist');
-        const options = datalist.options;
+        // Dynamic notification giống các view khác
+        function showNotification(message, type = 'info') {
+            const old = document.querySelector('.dynamic-alert');
+            if (old) old.remove();
 
-        for (let i = 0; i < options.length; i++) {
-            if (options[i].value === input) {
-                const productId = options[i].getAttribute('data-id');
-                const stock = parseInt(options[i].getAttribute('data-stock'));
-
-                document.getElementById('selectedProductId').value = productId;
-                currentMaxStock = stock;
-
-                document.getElementById('productInfo').innerHTML =
-                    `<i class="bi bi-check-circle text-success"></i> Đã chọn: ${input}`;
-                document.getElementById('stockInfo').innerHTML =
-                    `Tồn kho hiện tại: <strong>${stock}</strong>`;
-                document.getElementById('quantity').max = stock;
-                return;
-            }
-        }
-
-        document.getElementById('selectedProductId').value = '';
-        currentMaxStock = 0;
-        document.getElementById('productInfo').innerHTML =
-            `<i class="bi bi-exclamation-circle text-danger"></i> Không tìm thấy sản phẩm`;
-        document.getElementById('stockInfo').innerHTML = '';
-    });
-
-    // Thêm vào giỏ xuất
-    function addToExportCart() {
-        const productId = document.getElementById('selectedProductId').value;
-        const productName = document.getElementById('productSearchInput').value;
-        const quantity = parseInt(document.getElementById('quantity').value);
-        const reason = document.getElementById('exportReason').value;
-        const notes = document.getElementById('notes').value;
-
-        // Validation
-        if (!productId) {
-            alert('Vui lòng chọn sản phẩm');
-            return;
-        }
-        if (!quantity || quantity <= 0) {
-            alert('Vui lòng nhập số lượng xuất hợp lệ');
-            return;
-        }
-        if (quantity > currentMaxStock) {
-            alert(`Số lượng xuất không được vượt quá tồn kho (${currentMaxStock})`);
-            return;
-        }
-        if (!reason) {
-            alert('Vui lòng chọn lý do xuất');
-            return;
-        }
-
-        // Kiểm tra đã có sản phẩm này trong giỏ chưa
-        const existingItem = exportCart.find(item => item.productId === productId);
-        if (existingItem) {
-            const newTotal = existingItem.quantity + quantity;
-            if (newTotal > currentMaxStock) {
-                alert(`Tổng số lượng xuất (${newTotal}) vượt quá tồn kho (${currentMaxStock})`);
-                return;
-            }
-            existingItem.quantity = newTotal;
-        } else {
-            const item = {
-                id: ++productIdCounter,
-                productId: productId,
-                productName: productName,
-                quantity: quantity,
-                reason: reason,
-                notes: notes
+            const iconMap = {
+                success: 'check-circle-fill',
+                danger: 'exclamation-triangle-fill',
+                warning: 'exclamation-circle-fill',
+                info: 'info-circle-fill'
             };
-            exportCart.push(item);
+
+            const div = document.createElement('div');
+            div.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            div.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:500px;';
+            div.innerHTML =
+                `<div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-${iconMap[type]} fs-4"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+
+            document.body.appendChild(div);
+
+            setTimeout(() => {
+                div.style.animation = 'slideOut .3s ease-out';
+                setTimeout(() => div.remove(), 300);
+            }, 4000);
         }
 
-        updateCartUI();
-        resetForm();
-        showToast('Đã thêm vào giỏ xuất!', 'success');
-    }
+        // Xử lý chọn sản phẩm từ datalist
+        document.getElementById('productSearchInput').addEventListener('change', function () {
+            const input = this.value;
+            const datalist = document.getElementById('productDatalist');
+            const options = datalist.options;
 
-    // Cập nhật giao diện giỏ xuất
-    function updateCartUI() {
-        const container = document.getElementById('exportCartItems');
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value === input) {
+                    const productId = options[i].getAttribute('data-id');
+                    const stock = parseInt(options[i].getAttribute('data-stock'));
 
-        if (exportCart.length === 0) {
-            container.innerHTML = `
-                <div class="text-center text-muted py-5">
-                    <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-                    <p>Giỏ xuất đang trống</p>
-                </div>
-            `;
-            document.getElementById('btnConfirmExport').disabled = true;
-        } else {
-            let html = '';
-            exportCart.forEach(item => {
-                html += `
-                    <div class="cart-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <h6 class="mb-1">${item.productName}</h6>
-                                <div class="small text-muted">
-                                    <div>SL xuất: <strong>${item.quantity}</strong></div>
-                                    <div>Lý do: ${item.reason}</div>
-                                    ${item.notes ? `<div>Ghi chú: ${item.notes}</div>` : ''}
-                                </div>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart(${item.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
+                    document.getElementById('selectedProductId').value = productId;
+                    currentMaxStock = stock;
+
+                    document.getElementById('productInfo').innerHTML =
+                        `<i class="bi bi-check-circle text-success"></i> Đã chọn: ${input}`;
+                    document.getElementById('stockInfo').innerHTML =
+                        `Tồn kho hiện tại: <strong>${stock}</strong>`;
+                    document.getElementById('quantity').max = stock;
+                    return;
+                }
+            }
+
+            document.getElementById('selectedProductId').value = '';
+            currentMaxStock = 0;
+            document.getElementById('productInfo').innerHTML =
+                `<i class="bi bi-exclamation-circle text-danger"></i> Không tìm thấy sản phẩm`;
+            document.getElementById('stockInfo').innerHTML = '';
+        });
+
+        // Thêm vào giỏ xuất
+        function addToExportCart() {
+            const productId = document.getElementById('selectedProductId').value;
+            const productName = document.getElementById('productSearchInput').value;
+            const quantity = parseInt(document.getElementById('quantity').value);
+            const reason = document.getElementById('exportReason').value;
+            const notes = document.getElementById('notes').value;
+
+            // Validation
+            if (!productId) {
+                showNotification('Vui lòng chọn sản phẩm hợp lệ từ danh sách.', 'danger');
+                return;
+            }
+            if (!quantity || quantity <= 0) {
+                showNotification('Vui lòng nhập số lượng xuất hợp lệ.', 'danger');
+                return;
+            }
+            if (quantity > currentMaxStock) {
+                showNotification(`Số lượng xuất không được vượt quá tồn kho (${currentMaxStock}).`, 'danger');
+                return;
+            }
+            if (!reason) {
+                showNotification('Vui lòng chọn lý do xuất.', 'danger');
+                return;
+            }
+
+            // Kiểm tra đã có sản phẩm này trong giỏ chưa
+            const existingItem = exportCart.find(item => item.productId === productId);
+            if (existingItem) {
+                const newTotal = existingItem.quantity + quantity;
+                if (newTotal > currentMaxStock) {
+                    showNotification(`Tổng số lượng xuất (${newTotal}) vượt quá tồn kho (${currentMaxStock}).`, 'danger');
+                    return;
+                }
+                existingItem.quantity = newTotal;
+                existingItem.notes = notes || existingItem.notes;
+                existingItem.reason = reason;
+            } else {
+                const item = {
+                    id: ++productIdCounter,
+                    productId: productId,
+                    productName: productName,
+                    quantity: quantity,
+                    reason: reason,
+                    notes: notes
+                };
+                exportCart.push(item);
+            }
+
+            updateCartUI();
+            resetForm();
+            showNotification('Đã thêm sản phẩm vào giỏ xuất.', 'success');
+        }
+
+        // Cập nhật giao diện giỏ xuất
+        function updateCartUI() {
+            const container = document.getElementById('exportCartItems');
+
+            if (exportCart.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                        <p>Giỏ xuất đang trống</p>
                     </div>
                 `;
-            });
-            container.innerHTML = html;
-            document.getElementById('btnConfirmExport').disabled = false;
+                document.getElementById('btnConfirmExport').disabled = true;
+            } else {
+                let html = '';
+                exportCart.forEach(item => {
+                    html += `
+                        <div class="cart-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1 text-primary-blue">${item.productName}</h6>
+                                    <div class="small text-muted">
+                                        <div>SL xuất: <strong>${item.quantity}</strong></div>
+                                        <div>Lý do: ${item.reason}</div>
+                                        ${item.notes ? `<div>Ghi chú: ${item.notes}</div>` : ''}
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-danger-main btn-pill" onclick="removeFromCart(${item.id})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+                document.getElementById('btnConfirmExport').disabled = false;
+            }
+
+            document.getElementById('cartCount').textContent = exportCart.length;
+            document.getElementById('totalProducts').textContent = exportCart.length;
+
+            const totalQty = exportCart.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('totalQuantity').textContent = totalQty;
         }
 
-        document.getElementById('cartCount').textContent = exportCart.length;
-        document.getElementById('totalProducts').textContent = exportCart.length;
-
-        const totalQty = exportCart.reduce((sum, item) => sum + item.quantity, 0);
-        document.getElementById('totalQuantity').textContent = totalQty;
-    }
-
-    // Xóa khỏi giỏ
-    function removeFromCart(id) {
-        exportCart = exportCart.filter(item => item.id !== id);
-        updateCartUI();
-        showToast('Đã xóa khỏi giỏ xuất', 'warning');
-    }
-
-    // Reset form
-    function resetForm() {
-        document.getElementById('selectedProductId').value = '';
-        document.getElementById('productSearchInput').value = '';
-        document.getElementById('productInfo').innerHTML = '';
-        document.getElementById('stockInfo').innerHTML = '';
-        document.getElementById('quantity').value = '1';
-        document.getElementById('exportReason').value = '';
-        document.getElementById('notes').value = '';
-        currentMaxStock = 0;
-    }
-
-    // ✅ XÁC NHẬN XUẤT TOÀN BỘ GIỎ - ĐÃ SỬA
-    function confirmExportAll() {
-        if (exportCart.length === 0) {
-            alert('Giỏ xuất đang trống!');
-            return;
+        // Xóa khỏi giỏ
+        function removeFromCart(id) {
+            exportCart = exportCart.filter(item => item.id !== id);
+            updateCartUI();
+            showNotification('Đã xóa sản phẩm khỏi giỏ xuất.', 'warning');
         }
 
-        if (!confirm(`Bạn có chắc muốn xuất ${exportCart.length} sản phẩm khỏi kho?`)) {
-            return;
+        // Reset form
+        function resetForm() {
+            document.getElementById('selectedProductId').value = '';
+            document.getElementById('productSearchInput').value = '';
+            document.getElementById('productInfo').innerHTML = '';
+            document.getElementById('stockInfo').innerHTML = '';
+            document.getElementById('quantity').value = '1';
+            document.getElementById('exportReason').value = '';
+            document.getElementById('notes').value = '';
+            currentMaxStock = 0;
         }
 
-        // ✅ Lấy Anti-Forgery Token
-        const token = $('input[name="__RequestVerificationToken"]').val();
+        // XÁC NHẬN XUẤT TOÀN BỘ GIỎ
+        function confirmExportAll() {
+            if (exportCart.length === 0) {
+                showNotification('Giỏ xuất đang trống!', 'warning');
+                return;
+            }
 
-        if (!token) {
-            alert('Lỗi bảo mật: Không tìm thấy token. Vui lòng tải lại trang.');
-            location.reload();
-            return;
-        }
+            if (!confirm(`Bạn có chắc muốn xuất ${exportCart.length} sản phẩm khỏi kho?`)) {
+                return;
+            }
 
-        // Vô hiệu hóa nút và hiển thị loading
-        const btnExport = document.getElementById('btnConfirmExport');
-        btnExport.disabled = true;
-        btnExport.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
+            // Lấy Anti-Forgery Token
+            const token = $('input[name="__RequestVerificationToken"]').val();
 
-        // ✅ Chuẩn bị data - chuyển productId thành ProductId (chữ P hoa)
-        const exportData = exportCart.map(item => ({
-            ProductId: parseInt(item.productId),
-            ProductName: item.productName,
-            Quantity: item.quantity,
-            Reason: item.reason,
-            Notes: item.notes || ''
-        }));
+            if (!token) {
+                showNotification('Lỗi bảo mật: Không tìm thấy token. Vui lòng tải lại trang.', 'danger');
+                location.reload();
+                return;
+            }
 
-        console.log('Sending data:', exportData); // Debug
+            // Vô hiệu hóa nút và hiển thị loading
+            const btnExport = document.getElementById('btnConfirmExport');
+            btnExport.disabled = true;
+            btnExport.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
 
-        // ✅ Gửi request
-        $.ajax({
-            url: '@Url.Action("ExportStockBatch", "Warehouse", new { area = "Seller" })',
-            type: 'POST',
-            data: {
-                cartJson: JSON.stringify(exportData),
-                __RequestVerificationToken: token
-            },
-            timeout: 60000, // 60 giây
-            success: function(response) {
-                console.log('Response:', response); // Debug
+            // Chuẩn bị data - ProductId (P hoa)
+            const exportData = exportCart.map(item => ({
+                ProductId: parseInt(item.productId),
+                ProductName: item.productName,
+                Quantity: item.quantity,
+                Reason: item.reason,
+                Notes: item.notes || ''
+            }));
 
-                if (response.success) {
-                    alert(response.message);
-                    exportCart = [];
-                    updateCartUI();
-                    window.location.href = '@Url.Action("Index", "Warehouse", new { area = "Seller" })';
-                } else {
-                    alert('Có lỗi xảy ra:\n' + response.message);
+            $.ajax({
+                url: '@Url.Action("ExportStockBatch", "Warehouse", new { area = "Seller" })',
+                type: 'POST',
+                data: {
+                    cartJson: JSON.stringify(exportData),
+                    __RequestVerificationToken: token
+                },
+                timeout: 60000,
+                success: function (response) {
+                    if (response.success) {
+                        showNotification(response.message || 'Xuất kho thành công.', 'success');
+                        exportCart = [];
+                        updateCartUI();
+                        setTimeout(function () {
+                            window.location.href = '@Url.Action("Index", "Warehouse", new { area = "Seller" })';
+                        }, 800);
+                    } else {
+                        showNotification('Có lỗi xảy ra: ' + (response.message || ''), 'danger');
+                        btnExport.disabled = false;
+                        btnExport.innerHTML = '<i class="bi bi-check-circle me-2"></i>Xác nhận xuất kho';
+                    }
+                },
+                error: function (xhr, status, error) {
+                    let errorMessage = 'Lỗi kết nối server!';
+
+                    if (xhr.status === 404) {
+                        errorMessage = 'Không tìm thấy API xuất kho. Vui lòng kiểm tra lại.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Lỗi server: ' + (xhr.responseJSON?.message || error);
+                    } else if (status === 'timeout') {
+                        errorMessage = 'Yêu cầu quá lâu, vui lòng thử lại.';
+                    } else if (xhr.responseText) {
+                        try {
+                            const errData = JSON.parse(xhr.responseText);
+                            errorMessage = errData.message || errorMessage;
+                        } catch (e) {
+                            errorMessage += '\n' + xhr.responseText.substring(0, 200);
+                        }
+                    }
+
+                    showNotification(errorMessage, 'danger');
                     btnExport.disabled = false;
                     btnExport.innerHTML = '<i class="bi bi-check-circle me-2"></i>Xác nhận xuất kho';
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error details:', {
-                    status: status,
-                    error: error,
-                    response: xhr.responseText
-                });
-
-                let errorMessage = 'Lỗi kết nối server!';
-
-                if (xhr.status === 404) {
-                    errorMessage = 'Không tìm thấy API xuất kho. Vui lòng kiểm tra lại.';
-                } else if (xhr.status === 500) {
-                    errorMessage = 'Lỗi server: ' + (xhr.responseJSON?.message || error);
-                } else if (status === 'timeout') {
-                    errorMessage = 'Yêu cầu quá lâu, vui lòng thử lại.';
-                } else if (xhr.responseText) {
-                    try {
-                        const errData = JSON.parse(xhr.responseText);
-                        errorMessage = errData.message || errorMessage;
-                    } catch(e) {
-                        errorMessage += '\n' + xhr.responseText.substring(0, 200);
-                    }
-                }
-
-                alert(errorMessage);
-                btnExport.disabled = false;
-                btnExport.innerHTML = '<i class="bi bi-check-circle me-2"></i>Xác nhận xuất kho';
-            }
-        });
-    }
-
-    // Toast notification
-    function showToast(message, type = 'info') {
-        const bgClass = type === 'success' ? 'bg-success' :
-                       type === 'warning' ? 'bg-warning' :
-                       type === 'danger' ? 'bg-danger' : 'bg-info';
-
-        const toast = document.createElement('div');
-        toast.className = `alert ${bgClass} text-white alert-dismissible fade show position-fixed top-0 end-0 m-3`;
-        toast.style.zIndex = '9999';
-        toast.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
+            });
+        }
     </script>
 }

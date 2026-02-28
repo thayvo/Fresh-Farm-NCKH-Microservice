@@ -1,124 +1,167 @@
-﻿using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
-using FreshFram.Models;
-using System;
-using System.Data.Entity;
-using System.Linq;
+using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
+using FreshFarm.Web.Bff.Areas.Seller.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace FreshFarm.Web.Bff.Areas.Seller.Controllers
+namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
+
+[Authorize(Roles = "Seller")]
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+[Area("Seller")]
+public class SettingController : LegacySellerControllerBase
 {
-    [Authorize]   // bắt buộc đã đăng nhập
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]          // chống back/đọc từ cache
-    [Microsoft.AspNetCore.Mvc.Area("Seller")]
-    public class SettingController : LegacySellerControllerBase
+    private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        private FreshFarmDBEntities db = new FreshFarmDBEntities();
+        PropertyNameCaseInsensitive = true
+    };
 
-        // GET: Admin/Setting
-        public ActionResult Index()
+    public SettingController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Index()
+    {
+        try
         {
-            try
-            {
-                var setting = db.Settings.FirstOrDefault();
+            var client = CreateAuthorizedClient("Identity");
+            var response = await client.GetAsync("/auth/admin/settings/store");
 
-                if (setting == null)
-                {
-                    // Tạo cài đặt mặc định nếu chưa có
-                    setting = new Setting
-                    {
-                        StoreName = "Fresh Farm",
-                        StoreAddress = "123 Đường ABC, Quận 1, TP.HCM",
-                        StoreEmail = "support@freshfram.vn",
-                        StorePhone = "1900 1234",
-                        IsCODEnabled = true,
-                        BankTransferInstructions = "Vui lòng chuyển khoản với nội dung: TT [Mã đơn hàng]",
-                        BankAccountInfo = "Ngân hàng: Vietcombank...",
-                        DefaultShippingFee = 30000,
-                        FreeShippingThreshold = 500000,
-                        IsEmailNewOrderEnabled = true,
-                        IsEmailDeliveredEnabled = true,
-                        IsEmailCancelledEnabled = true,
-                        AdminNotificationEmail = "admin@freshfram.vn",
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
-                    };
-                    db.Settings.Add(setting);
-                    db.SaveChanges();
-                }
-
-                return View(setting);
-            }
-            catch (Exception ex)
+            if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = "Lỗi khi tải cài đặt: " + ex.Message;
-                return View();
+                ViewBag.Error = await ReadApiErrorAsync(response, "Loi khi tai cai dat cua hang");
+                return View(CreateDefaultSettings());
             }
+
+            var payload = await response.Content.ReadFromJsonAsync<SellerSettingViewModel>(JsonOptions);
+            return View(payload ?? CreateDefaultSettings());
+        }
+        catch (Exception ex)
+        {
+            ViewBag.Error = "Loi khi tai cai dat: " + ex.Message;
+            return View(CreateDefaultSettings());
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Save([FromForm] SellerSettingViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return Json(new { success = false, message = "Du lieu khong hop le" });
         }
 
-        // POST: Admin/Setting/Save
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Save(Setting model)
+        try
         {
-            try
+            model.StoreName = model.StoreName.Trim();
+            model.StoreAddress = model.StoreAddress.Trim();
+            model.StoreEmail = model.StoreEmail.Trim();
+            model.StorePhone = model.StorePhone.Trim();
+            model.AdminNotificationEmail = model.AdminNotificationEmail.Trim();
+            model.BankTransferInstructions = model.BankTransferInstructions?.Trim();
+            model.BankAccountInfo = model.BankAccountInfo?.Trim();
+
+            var client = CreateAuthorizedClient("Identity");
+            var response = await client.PutAsJsonAsync("/auth/admin/settings/store", model);
+            if (!response.IsSuccessStatusCode)
             {
-                if (!ModelState.IsValid)
+                return Json(new
                 {
-                    return Json(new { success = false, message = "Dữ liệu không hợp lệ" });
-                }
-
-                var setting = db.Settings.FirstOrDefault();
-
-                if (setting == null)
-                {
-                    // Tạo mới nếu chưa có
-                    model.CreatedAt = DateTime.Now;
-                    model.UpdatedAt = DateTime.Now;
-                    db.Settings.Add(model);
-                }
-                else
-                {
-                    // Cập nhật cài đặt chung
-                    setting.StoreName = model.StoreName;
-                    setting.StoreAddress = model.StoreAddress;
-                    setting.StoreEmail = model.StoreEmail;
-                    setting.StorePhone = model.StorePhone;
-
-                    // Cập nhật cài đặt thanh toán
-                    setting.IsCODEnabled = model.IsCODEnabled;
-                    setting.BankTransferInstructions = model.BankTransferInstructions;
-                    setting.BankAccountInfo = model.BankAccountInfo;
-
-                    // Cập nhật cài đặt vận chuyển
-                    setting.DefaultShippingFee = model.DefaultShippingFee;
-                    setting.FreeShippingThreshold = model.FreeShippingThreshold;
-
-                    // Cập nhật cài đặt thông báo
-                    setting.IsEmailNewOrderEnabled = model.IsEmailNewOrderEnabled;
-                    setting.IsEmailDeliveredEnabled = model.IsEmailDeliveredEnabled;
-                    setting.IsEmailCancelledEnabled = model.IsEmailCancelledEnabled;
-                    setting.AdminNotificationEmail = model.AdminNotificationEmail;
-
-                    setting.UpdatedAt = DateTime.Now;
-                    db.Entry(setting).State = EntityState.Modified;
-                }
-
-                db.SaveChanges();
-                return Json(new { success = true, message = "Lưu cài đặt thành công!" });
+                    success = false,
+                    message = await ReadApiErrorAsync(response, "Khong the luu cai dat")
+                });
             }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = "Lỗi: " + ex.Message });
-            }
+
+            return Json(new { success = true, message = "Luu cai dat thanh cong!" });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    private HttpClient CreateAuthorizedClient(string clientName)
+    {
+        var client = _httpClientFactory.CreateClient(clientName);
+
+        client.DefaultRequestHeaders.Remove("Authorization");
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
-        protected override void Dispose(bool disposing)
+        return client;
+    }
+
+    private static SellerSettingViewModel CreateDefaultSettings()
+    {
+        return new SellerSettingViewModel
         {
-            if (disposing)
+            StoreName = "Fresh Farm",
+            StoreAddress = "123 Duong ABC, Quan 1, TP.HCM",
+            StoreEmail = "support@freshfarm.vn",
+            StorePhone = "1900 1234",
+            IsCODEnabled = true,
+            BankTransferInstructions = "Vui long chuyen khoan voi noi dung: TT [Ma don hang]",
+            BankAccountInfo = "Ngan hang: Vietcombank...",
+            DefaultShippingFee = 30000,
+            FreeShippingThreshold = 500000,
+            IsEmailNewOrderEnabled = true,
+            IsEmailDeliveredEnabled = true,
+            IsEmailCancelledEnabled = true,
+            AdminNotificationEmail = "admin@freshfarm.vn",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+    }
+
+    private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(json))
             {
-                db.Dispose();
+                return fallback;
             }
-            base.Dispose(disposing);
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("message", out var messageProp) && messageProp.ValueKind == JsonValueKind.String)
+                {
+                    return messageProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("detail", out var detailProp) && detailProp.ValueKind == JsonValueKind.String)
+                {
+                    return detailProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
+                {
+                    return titleProp.GetString() ?? fallback;
+                }
+            }
+
+            return json;
+        }
+        catch
+        {
+            return fallback;
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyConfigVM
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyConfigVM
 @{
     ViewBag.Title = "Cấu hình tích điểm";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
@@ -25,8 +25,8 @@
                     <div class="col-md-4">
                         <label class="form-label">Tính cả phí ship</label>
                         <select class="form-select" name="IncludeShippingFee">
-                            <option value="false" @(Model.IncludeShippingFee ? "" : "selected")>Không</option>
-                            <option value="true" @(Model.IncludeShippingFee ? "selected" : "")>Có</option>
+                            <option value="false" selected="@(Model.IncludeShippingFee  ? null : "selected")">Không</option>
+                            <option value="true" selected="@(Model.IncludeShippingFee  ? "selected" : null)">Có</option>
                         </select>
                     </div>
                     <div class="col-md-4">

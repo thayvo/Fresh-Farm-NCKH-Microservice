@@ -1,4 +1,4 @@
-@model FreshFarm.Web.Bff.Areas.Seller.Models.CreateCustomerViewModel
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.CreateCustomerViewModel
 
 @{
     ViewBag.Title = "Thêm Khách Hàng";
@@ -45,8 +45,8 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label">Số điện thoại *</label>
-                    @Html.TextBoxFor(m => m.Phone, new { @class = "form-control", type = "tel", required = "required", placeholder = "0987654321" })
+                    <label class="form-label">Số điện thoại</label>
+                    @Html.TextBoxFor(m => m.Phone, new { @class = "form-control", type = "tel", placeholder = "0987654321" })
                     @Html.ValidationMessageFor(m => m.Phone, "", new { @class = "text-danger small" })
                 </div>
 

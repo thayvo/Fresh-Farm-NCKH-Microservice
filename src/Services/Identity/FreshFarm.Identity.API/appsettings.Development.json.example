@@ -6,9 +6,12 @@
     }
   },
   "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "IdentityDB": "Server=localhost;Database=FreshFarmIdentityDB;Trusted_Connection=True;TrustServerCertificate=True"
+  },
   "Jwt": {
     "Issuer": "FreshFarm.Identity",
     "Audience": "FreshFarm",
-    "Key": "yourkey(Min: 32characters)"
+    "Key": "yourkey(Min: 32 characters)"
   }
 }

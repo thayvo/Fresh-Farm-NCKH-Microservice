@@ -149,8 +149,13 @@
                         <i class="bi bi-rulers me-1"></i>Đơn vị tính <span class="text-danger">*</span>
                     </label>
                     @Html.DropDownListFor(m => m.UnitID,
-                        (SelectList)ViewBag.Units,
-                        "-- Chọn đơn vị --",
+                        new SelectList(new[] {
+                            new { Value = 1, Text = "Kilogram (kg)" },
+                            new { Value = 2, Text = "Gram (g)" },
+                            new { Value = 3, Text = "Bó" },
+                            new { Value = 4, Text = "Túi" },
+                            new { Value = 5, Text = "Thùng" }
+                        }, "Value", "Text", Model.UnitID),
                         new { @class = "form-select", required = "required" })
                     @Html.ValidationMessageFor(m => m.UnitID, "", new { @class = "text-danger" })
                 </div>

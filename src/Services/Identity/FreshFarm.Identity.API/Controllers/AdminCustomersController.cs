@@ -61,12 +61,9 @@ public sealed class AdminCustomersController : ControllerBase
                 email = u.Email,
                 phone = u.Phone,
                 createdAt = u.CreatedAt,
-                address = u.AddressBooks
-                    .Where(a => a.IsActive)
-                    .OrderByDescending(a => a.IsDefault)
-                    .ThenByDescending(a => a.CreatedAt)
-                    .Select(a => a.AddressDetail)
-                    .FirstOrDefault()
+                address = u.AddressBook != null && u.AddressBook.IsActive
+                    ? u.AddressBook.AddressDetail
+                    : null
             })
             .Take(take)
             .ToListAsync();
@@ -88,12 +85,9 @@ public sealed class AdminCustomersController : ControllerBase
                 email = u.Email,
                 phone = u.Phone,
                 createdAt = u.CreatedAt,
-                address = u.AddressBooks
-                    .Where(a => a.IsActive)
-                    .OrderByDescending(a => a.IsDefault)
-                    .ThenByDescending(a => a.CreatedAt)
-                    .Select(a => a.AddressDetail)
-                    .FirstOrDefault()
+                address = u.AddressBook != null && u.AddressBook.IsActive
+                    ? u.AddressBook.AddressDetail
+                    : null
             })
             .FirstOrDefaultAsync();
 
@@ -226,7 +220,7 @@ public sealed class AdminCustomersController : ControllerBase
 
         var user = await _db.Users
             .Include(u => u.UserAuth)
-            .Include(u => u.AddressBooks)
+            .Include(u => u.AddressBook)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
@@ -289,15 +283,11 @@ public sealed class AdminCustomersController : ControllerBase
                 return BadRequest(new { message = "Vui long nhap so dien thoai khi cap nhat dia chi." });
             }
 
-            var targetAddress = user.AddressBooks
-                .Where(a => a.IsActive)
-                .OrderByDescending(a => a.IsDefault)
-                .ThenByDescending(a => a.CreatedAt)
-                .FirstOrDefault();
+            var targetAddress = user.AddressBook;
 
             if (targetAddress is null)
             {
-                user.AddressBooks.Add(new AddressBook
+                targetAddress = new AddressBook
                 {
                     UserId = user.UserId,
                     RecipientName = user.FullName,
@@ -309,7 +299,10 @@ public sealed class AdminCustomersController : ControllerBase
                     IsDefault = true,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
-                });
+                };
+
+                _db.AddressBooks.Add(targetAddress);
+                user.AddressBook = targetAddress;
             }
             else
             {
@@ -333,7 +326,7 @@ public sealed class AdminCustomersController : ControllerBase
             .Include(u => u.UserAuth)
             .Include(u => u.UserRoles)
             .Include(u => u.UserSessions)
-            .Include(u => u.AddressBooks)
+            .Include(u => u.AddressBook)
             .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
 
         if (user is null)
@@ -344,9 +337,9 @@ public sealed class AdminCustomersController : ControllerBase
         await using var tran = await _db.Database.BeginTransactionAsync();
         try
         {
-            if (user.AddressBooks.Count > 0)
+            if (user.AddressBook is not null)
             {
-                _db.AddressBooks.RemoveRange(user.AddressBooks);
+                _db.AddressBooks.Remove(user.AddressBook);
             }
 
             if (user.UserSessions.Count > 0)

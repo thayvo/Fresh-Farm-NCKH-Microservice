@@ -5,7 +5,7 @@
    "FilterSchemas": false,
    "IncludeConnectionString": false,
    "IrregularWords": null,
-   "MinimumProductVersion": "2.6.1301",
+   "MinimumProductVersion": "2.6.1378",
    "ModelNamespace": null,
    "OutputContextPath": null,
    "OutputPath": "Models",
@@ -28,6 +28,10 @@
       },
       {
          "Name": "[dbo].[CartItem]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ContactMessages]",
          "ObjectType": 0
       },
       {
@@ -99,6 +103,14 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[Review]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ReviewReport]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[SellerOrderItems]",
          "ObjectType": 0
       },
@@ -124,6 +136,18 @@
       },
       {
          "Name": "[dbo].[StatusType]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportConversations]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportMessageReactions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportMessages]",
          "ObjectType": 0
       },
       {
@@ -161,5 +185,6 @@
    "UseSchemaNamespaces": false,
    "UseSpatial": false,
    "UseT4": false,
-   "UseT4Split": false
+   "UseT4Split": false,
+   "UseTypedTvpParameters": true
 }

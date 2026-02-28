@@ -106,6 +106,8 @@
 - DoD:
   - Khong con `FreshFram.*` / `FreshFarmDBEntities` trong 2 controller + views lien quan.
   - Route chinh van hoat dong: `Setting/Index`, `User/ManageUsers`.
+- Trang thai:
+  - [x] Hoan tat migrate service-first cho Setting + User.
 - Cau lenh giao viec mau:
   - `Lam lot 5.1: migrate Setting + User service-first`
 
@@ -117,6 +119,8 @@
 - DoD:
   - Khong con dependency legacy trong SupportChat controller/view.
   - Luong `Conversations -> Messages -> MarkAsRead/Close` chay duoc theo API.
+- Trang thai:
+  - [x] Hoan tat migrate service-first cho SupportChat.
 - Cau lenh giao viec mau:
   - `Lam lot 5.2: migrate SupportChat service-first`
 
@@ -128,6 +132,8 @@
 - DoD:
   - Khong con dependency legacy trong Review controller/views.
   - Action quan trong chay duoc: filter, resolve report, toggle visibility, reply.
+- Trang thai:
+  - [x] Hoan tat migrate service-first cho Review.
 - Cau lenh giao viec mau:
   - `Lam lot 5.3: migrate Review service-first`
 
@@ -139,6 +145,11 @@
 - DoD:
   - 6 page report render duoc bang data service.
   - Khong con `FreshFarmDBEntities` trong report read-path.
+- Trang thai:
+  - [x] Hoan tat migrate service-first cho read-path `Customer/Order/Revenue/Product/Shipping/Review`.
+  - [x] Da bo sung `Ordering API`: `Controllers/ReportsAdminController.cs` (read endpoints + report-review delete).
+  - [x] Da chuyen Report views sang model namespace local `FreshFarm.Web.Bff.Areas.Seller.Models.*`.
+  - [x] Export duoc tach rieng va hoan tat o lot 5.5.
 - Cau lenh giao viec mau:
   - `Lam lot 5.4: migrate Report read pages service-first`
 
@@ -150,6 +161,11 @@
 - DoD:
   - Export action chay thong suot qua service API.
   - Khong con dependency legacy trong toan bo `ReportController`.
+- Trang thai:
+  - [x] Hoan tat migrate export actions qua service API:
+    - BFF `ReportController` export actions da proxy file download tu `Ordering API`.
+    - `Ordering API` da bo sung `api/orders/admin/reports/*/export` (CSV mo duoc bang Excel).
+  - [x] Report review delete da qua service API (`DELETE /api/orders/admin/reports/reviews/{id}`).
 - Cau lenh giao viec mau:
   - `Lam lot 5.5: migrate Report export + remaining actions`
 
@@ -162,40 +178,259 @@
   - Cum 5 khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity`.
   - Auth nhat quan theo role/policy.
   - Co log ket qua quet static + danh sach route smoke test.
+- Trang thai:
+  - [x] Cum 5 dat DoD:
+    - Khong con legacy pattern trong `Setting/User/SupportChat/Review/Report` controllers+views.
+    - Auth nhat quan `Seller` cho BFF cum 5 va `SellerOnly` cho service APIs lien quan.
+  - [x] Da tao log hardening + smoke checklist:
+    - `LOT_5_6_HARDENING_AUDIT.md`
+  - [!] Static audit toan bo Seller area van con legacy o modules ngoai scope lot 5:
+    - `Loyalty/Status` (+ views lien quan).
 - Cau lenh giao viec mau:
   - `Lam lot 5.6: hardening auth + static audit cum 5`
 
-## Phase 4 - Bat dau Admin (song song voi phase 3 sau khi core on)
-- Muc tieu: co Admin area chay duoc o muc MVP.
-- Scope MVP:
-  - Dashboard
-  - Product
-  - Order
-- Nguyen tac:
-  - Dung chung layout/pattern voi Seller da migrate.
-  - Controller Admin moi phai theo service-first (khong EF truc tiep).
+## Re-plan sau system audit (2026-02-26)
+- Ket luan huong:
+  - Khong sai huong: van giu `service-first`.
+  - Can doi thu tu uu tien: dong gap runtime/he thong truoc khi mo module moi (Admin hoac microservice tiep).
 
-## Phase 5 - Tach microservice (sau khi flow on)
-- Tach module nang:
-  - Warehouse
-  - Shipping
-  - Report read model
-- BFF luc nay chi giu API aggregation va UI orchestration.
+## Phase 4 - System Stabilization (uu tien cao nhat)
 
-## Checklist tuan nay (de bat dau ngay)
-1. Chay local build core BFF khong Seller legacy.
-2. Chot line-ending policy (`.gitattributes`) de khong bi churn vendor.
-3. Chon module re-enable dau tien: `Product`.
-4. Tao ticket nho theo cong thuc: `1 module = 1 PR`.
+### Lot 4.1 - Runtime config baseline
+- Ly do:
+  - Config mau dang thieu key quan trong (base url service/JWT/connection string) -> kho boot local on dinh.
+- Scope:
+  - Dong bo `appsettings.Development.json.example` cho BFF/Identity/Catalog/Ordering.
+  - Bo sung file example cho Ordering (`appsettings.Development.json.example`) neu chua co.
+  - Cap nhat `src/README.md` theo config va route hien tai.
+- DoD:
+  - Nguoi moi clone repo co du file mau de set env khong doan.
+  - Khong con chenhlech lon giua docs va code hien tai.
+- Trang thai:
+  - [x] Da chuan hoa config examples:
+    - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json.example` (bo sung `Services:{Identity,Catalog,Ordering}:BaseUrl`).
+    - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json.example` (bo sung `ConnectionStrings:IdentityDB`).
+    - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.Development.json.example` (bo sung `ConnectionStrings:FreshFarmCatalogDB`).
+    - Tao moi `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.Development.json.example`.
+  - [x] Da cap nhat `src/README.md` cho dung key config nested (`Services:Identity:BaseUrl`...) va runtime 4 services.
+- Lenh giao viec:
+  - `Lam lot 4.1: chuan hoa config examples + README runtime`
 
-## Backlog go dep legacy (uu tien ngay)
-1. Product + Category + Unit:
-   - [x] Bo `FreshFarmDBEntities`.
-   - [x] Goi Catalog service qua BFF/HttpClient.
-2. Order:
-   - [x] Bo `FreshFarmDBEntities`.
-   - [x] Goi Ordering service.
-   - [x] Siet role/policy cho admin-order endpoints + Catalog CRUD (`SellerOnly`).
-3. Customer + Coupon:
-   - [x] Bo truy cap DB truc tiep.
-   - [x] Chuyen sang Identity/Ordering APIs.
+### Lot 4.2 - Seller compile gate
+- Ly do:
+  - `EnableLegacySeller=false` dang remove toan bo `Areas/Seller/**` khoi compile mac dinh.
+- Scope:
+  - Chuyen gate tu "tat toan bo Seller" sang "chi tat cum legacy chua migrate".
+  - Dam bao cac cum da migrate (1 -> 5.6) compile duoc mac dinh.
+- DoD:
+  - Build mac dinh co Seller migrated modules.
+  - Cac module chua migrate duoc gate ro rang (khong anh huong module da xong).
+- Trang thai:
+  - [x] Da doi gate theo module trong `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`:
+    - Khong con `Compile Remove="Areas/Seller/**/*.cs"` global.
+    - Chi remove compile/view cho cum legacy chua migrate:
+      - Controllers: `Feedback`, `Delivery`, `Loyalty`, `Status`.
+      - Views folders tuong ung.
+  - [!] UNCONFIRMED runtime/build:
+    - Chua verify build local do environment assistant khong co `dotnet`.
+- Lenh giao viec:
+  - `Lam lot 4.2: doi compile gate Seller theo module`
+
+### Lot 4.3 - Static assets + layout admin
+- Ly do:
+  - `_LayoutAdmin` dang goi script khong co trong workspace:
+    - `~/Scripts/jquery-3.7.0.min.js`
+    - `~/Scripts/jquery.signalR-2.4.3.min.js`
+    - `~/signalr/hubs` (route chua co trong .NET Core stack hien tai)
+- Scope:
+  - Chot huong script:
+    - doi sang `~/lib/jquery/dist/jquery.min.js` (co san), va
+    - tam bo signalr legacy references neu chua co hub core.
+  - Dam bao cac view Seller khong vo JS vi missing static files.
+- DoD:
+  - Khong con 404 tai static scripts o layout admin.
+  - Trang Seller co the render + bind script co ban on dinh.
+- Trang thai:
+  - [x] Da bo script references khong ton tai trong `_LayoutAdmin.cshtml`:
+    - Bo `~/Scripts/jquery-3.7.0.min.js` -> dung `~/lib/jquery/dist/jquery.min.js`.
+    - Bo `~/Scripts/jquery.signalR-2.4.3.min.js` va `~/signalr/hubs`.
+  - [x] Khong con route/script 404 tu layout admin cho cac references tren.
+- Lenh giao viec:
+  - `Lam lot 4.3: fix layout admin scripts + bo signalr legacy reference`
+
+### Lot 4.4 - SupportChat runtime mode
+- Ly do:
+  - `support-chat-admin.js` dang phu thuoc `$.connection.supportChatHub` (legacy SignalR), trong khi backend hien tai chua co hub route tuong ung.
+- Scope:
+  - Chon 1 trong 2:
+    - Polling-only tam thoi (giu read/list/close/mark-read qua REST), hoac
+    - Implement SignalR Core hub day du.
+  - Cap nhat script theo huong da chon (co guard khi khong co hub).
+- DoD:
+  - SupportChat chay on dinh, khong throw JS error do hub undefined.
+- Trang thai:
+  - [x] Da chot huong polling-safe fallback (tam thoi khong real-time push):
+    - `support-chat-admin.js` co guard khi khong co `$.connection`/`supportChatHub`.
+    - Tu dong disable input gui tin nhan khi realtime unavailable.
+    - Giu cac luong REST: conversations/messages/details/close/mark-read.
+  - [!] Realtime hub mode chua bat (se can lot rieng neu muon day du send/typing/reaction qua hub).
+- Lenh giao viec:
+  - `Lam lot 4.4: chot va implement runtime mode cho SupportChat`
+
+### Lot 4.5 - Persistence hardening cho endpoints tam
+- Ly do:
+  - Dang con in-memory state o API admin:
+    - Ordering: support chat/review/report delete marker.
+    - Identity: settings/avatar map.
+- Scope:
+  - Chuyen cac state tam nay ve persistence DB (hoac doc/ghi qua bang phu tro).
+  - Chot migration script DB cho cac bang moi (neu can).
+- DoD:
+  - Khong con `ConcurrentDictionary` cho business state chinh.
+  - Restart service khong mat du lieu nghiep vu quan trong.
+- Trang thai:
+  - [x] Da hoan tat huong file-backed persistence (interim) de chong mat state khi restart:
+    - [x] `Identity API`:
+      - `AdminSettingsController`: persisted `App_Data/identity.admin-store-settings.json`.
+      - `AdminUsersController`: persisted `App_Data/identity.admin-users.avatars.json`.
+    - [x] `Ordering API`:
+      - `ReportsAdminController`: persisted `App_Data/ordering.reports.deleted-review-ids.json`.
+      - `SupportChatAdminController`: persisted `App_Data/ordering.support-chat.store.json`.
+      - `ReviewsAdminController`: persisted `App_Data/ordering.reviews.store.json`.
+  - [x] Dat muc tieu 4.5 interim: restart service khong mat state cho cac endpoint tam da inventory.
+  - [x] Da chot 4.5.4 o muc de xuat schema + migration/rollback drafts:
+    - `docs/LOT_4_5_4_DB_SCHEMA_MIGRATION_ROLLBACK_PLAN.md`
+    - `docs/lot-4.5.4-ordering-up.sql`
+    - `docs/lot-4.5.4-ordering-down.sql`
+    - `docs/lot-4.5.4-identity-up.sql`
+    - `docs/lot-4.5.4-identity-down.sql`
+    - `docs/lot-4.5.4-sql-complete.md`
+  - [x] Da cap nhat code controllers sang DB-backed (local code-level) va da verify schema/delta tren DB that.
+  - [x] Da bo sung va chay hotfix index ContactMessages tren Ordering:
+    - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.4.hotfix-indexes.sql`
+  - [x] Da bo sung bo script triage runtime Seller (orders/revenue/product):
+    - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.seller-runtime-diagnostics.sql`
+    - Da mo rong script triage voi `Sanitized metrics` de doi chieu cung dieu kien loc report API.
+  - [x] Da bo sung script soi outlier quantity:
+    - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`
+  - [x] Da bo sung ke hoach migrate du lieu khach hang tu `final3.sql` sang microservices:
+    - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`
+  - [i] Chi tiet tracking lot:
+    - `LOT_4_5_PERSISTENCE_HARDENING.md`
+    - `docs/LOT_4_5_4_DB_SCHEMA_MIGRATION_ROLLBACK_PLAN.md`
+    - `docs/LOT_4_5_5_RUNTIME_SMOKE_2026-02-28.md`
+- Lenh giao viec:
+  - `Lam lot 4.5.6: migrate customer data tu final3.sql theo plan + verify runtime`
+
+### Lot 4.6 - Refactor Seller View Integration & Controller Mapping [HIGH]
+- Status:
+  - [~] In-Progress
+- Priority:
+  - High
+- Context:
+  - Source code da migrate tu legacy project.
+  - Views Seller hien van co nguy co loi `404` hoac `Binding Error` do sai lech route/controller mapping.
+- Objective:
+  - Re-wiring toan bo ket noi giua Seller Views va controller moi.
+- Constraint:
+  - Tuyet doi khong thay doi UI/UX (giu nguyen HTML/CSS/JS hien tai).
+  - Chi dieu chinh `@model` trong Razor View va endpoint/controller mapping.
+
+#### 4.6.1 Analysis & Route Mapping (Quet + Phan tich)
+- Status:
+  - [x] Hoan tat vong quet baseline sau khi views bi copy lai tu legacy:
+    - Da inventory mismatch `@model` namespace, `area=\"Admin\"`, layout path, `Request/Session` o Razor, va `@page` ambiguity.
+    - Da doi chieu voi Seller controllers/service-first routes hien tai.
+- Scope:
+  - Quet toan bo `Areas/Seller/Views/**/*.cshtml` vua migrate.
+  - Truy vet toan bo:
+    - `<form ...>`
+    - `$.ajax(...)`
+    - `@Url.Action(...)`
+    - `@Html.BeginForm(...)`
+  - Doi chieu `@model` dau file voi DTO/ViewModel hien hanh.
+- DoD:
+  - Co inventory file-by-file cho route target + model target.
+  - Co danh sach mismatch (route/controller/model binding) theo muc uu tien.
+
+#### 4.6.2 Controller Synchronization (Dong bo controller)
+- Status:
+  - [~] Da dong bo tiep theo runtime route/binding:
+    - `User/ManageUsers` da bind lai `searchTerm` qua `ViewBag.SearchTerm + Context.Request.Query`.
+    - Da khoi phuc views thieu phu thuoc action:
+      - `Review/ReportedReviews.cshtml`
+      - `Warehouse/TransactionDetails.cshtml`
+    - Da bo sung action thieu o BFF:
+      - `FeedbackController.GetFeedback(int id)` de modal chi tiet `Feedback/Index` goi duoc endpoint hop le.
+    - Da bo sung endpoint detail ben service:
+      - `Ordering API` `GET /api/orders/admin/feedbacks/{id}` (`FeedbacksAdminController.GetById`).
+    - Da dong bo paging/filter params giua view va controller:
+      - `FeedbackController.Index(int page, int pageSize, string? q, string? status)` da bind query keys va cap `ViewBag` paging (`CurrentPage/PageSize/TotalRecords/TotalPages`).
+- Scope:
+  - Cap nhat action methods de nhan dung tham so ma views cu dang submit.
+  - Dam bao `ViewData`/`ViewBag` cap du du lieu cho UI cu (dropdown/table/filter/paging).
+- DoD:
+  - Khong con action nao mismatch ve query/form keys chinh.
+  - Du lieu phu tro view (nhat la dropdown/filter lists) day du va on dinh.
+
+#### 4.6.3 Endpoint Update & Data Binding (Sua ket noi)
+- Status:
+  - [~] Da apply batch re-wiring lon cho Seller views (giu UI):
+    - Chuan hoa `area=\"Seller\"` va layout path sang `Areas/Seller`.
+    - Chuan hoa `@model` sang `FreshFarm.Web.Bff.Areas.Seller.Models.*`.
+    - Bo helper legacy khong tuong thich Razor Core (`System.Web.Mvc`, `IHtmlString`, `Scripts.Render`, `Styles.Render`).
+    - Sua `@page` ambiguity: `Loyalty/History`, `Report/Review`.
+    - Sua navbar/layout de dung auth context hien tai (`User.Identity`) va partial name.
+    - Sua route sai controller/action gay 404:
+      - `Unit/{Create,Edit,Index}`: breadcrumb `Dashboard` controller cu -> `Home/Dashboard` (`area=Seller`).
+      - `Review/ManageReview`: link `Product/Details` (khong ton tai) -> `Product/Edit` (`area=Seller`).
+    - `Feedback/Index`: link phan trang da giu query `q/status` khi chuyen trang, tranh mat state.
+    - Da xoa artifacts legacy MVC trong Seller views:
+      - `Areas/Seller/Views/web.config`
+      - `Areas/Seller/Views/web.config.copy`
+    - Da bo sung compatibility mapping cho `Order/ManageOrders` (JS render fallback key casing):
+      - Ho tro song song `OrderID/orderId`, `OrderCode/orderCode`, `TotalAmount/totalAmount/total`, `Status/status` de tranh hien thi `0đ`/rong cot khi contract drift.
+    - Da harden `Ordering API` report quantity aggregation sau triage DB:
+      - `ReportsAdminController`: SUM quantity dung `long`, clamp payload int bang `ToSafeNonNegativeInt(long)` de tranh overflow 500 o `Report/Product` va `Report/Revenue`.
+    - Da bo sung report data-quality guard:
+      - Loai cac `OrderDetail` bat thuong khi tinh report (`Quantity <= 0`, `Quantity > 10000`, `UnitPrice <= 0`, `ProductId` khong hop le) de tranh meo thong ke.
+    - Da bo sung request validation guard o `OrdersController.Create`:
+      - Chan tao moi item co `Quantity` ngoai khoang `1..10000` (DTO + server check).
+  - [!] Con buoc verify build/runtime tren may local (assistant environment khong co `dotnet`).
+  - [x] Da bo sung static integrity gate script:
+    - `scripts/seller_static_smoke.sh`
+    - Check legacy patterns + explicit `Url.Action/BeginForm` mapping + `@page` ambiguity.
+- Scope:
+  - Chuan hoa action/controller names trong Razor logic ve route moi.
+  - Mapping lai `name` attributes cua input de khop ASP.NET Core model binding.
+- DoD:
+  - Khong con 404 do route mapping sai o Seller views da migrate.
+  - Khong con binding error do mismatch `name -> action params/view model`.
+
+- Lenh giao viec:
+  - `Lam lot 4.6: refactor seller view integration + controller mapping, giu nguyen UI`
+
+## Phase 5 - Go cum legacy con lai (ngoai scope lot 5)
+- Trang thai:
+  - [x] Module 1 `AdminAccount` da migrate service-first (`Identity API` login + cookie/session bridge).
+  - [x] Module 2 `Home` da migrate service-first (`Ordering API` dashboard + `Identity API` profile/password path).
+  - [x] Module 3 `Feedback` da migrate service-first (`Ordering API` feedback endpoints + BFF bridge).
+  - [x] Module 4 `Delivery` da migrate service-first (`Ordering API` shipping report + order status update bridge).
+  - [x] Module 5 `Loyalty` da migrate service-first (`Ordering API` loyalty dashboard/users/history/config/adjust/sync-award + BFF bridge).
+  - [x] Module 6 `Status` da migrate service-first (`Ordering API` statuses/status-types CRUD + BFF bridge).
+- Scope uu tien tiep theo:
+  1. `Phase 5 complete` (khong con module Seller legacy nao).
+- Muc tieu:
+  - Xoa dut diem `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong toan Seller area.
+- Ket qua static audit hien tai:
+  - [x] `rg -n "FreshFram|FreshFarmDBEntities|System.Data.Entity|System.Web.Mvc|Scripts.Render|Styles.Render" Areas/Seller/{Controllers,Views}` -> khong con match runtime files.
+- Lenh giao viec mau:
+  - `Lam static audit + smoke test toan Seller area sau khi complete phase 5`
+
+## Phase 6 - Admin area MVP + tach service tiep
+- Dieu kien vao phase:
+  - Phase 4 hoan tat (runtime/stability ok).
+  - Phase 5 dat muc "Seller area clean legacy".
+- Scope:
+  - Admin Dashboard/Product/Order theo service-first.
+  - Sau do moi tach service nang (Warehouse/Shipping/Report read model) neu can.

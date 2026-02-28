@@ -1,339 +1,558 @@
-﻿using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
-using FreshFram.Models;
-using System;
-using System.Data.Entity;
-using System.Linq;
+using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
+using FreshFarm.Web.Bff.Areas.Seller.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
 
-namespace FreshFarm.Web.Bff.Areas.Seller.Controllers
+namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
+
+[Authorize(Roles = "Seller")]
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+[Area("Seller")]
+public class ReviewController : LegacySellerControllerBase
 {
-    [Authorize]
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    [Microsoft.AspNetCore.Mvc.Area("Seller")]
-    public class ReviewController : LegacySellerControllerBase
+    private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        private FreshFarmDBEntities db = new FreshFarmDBEntities();
+        PropertyNameCaseInsensitive = true
+    };
 
-        // GET: Admin/Review
-        // Trả về toàn bộ review (gốc + phản hồi) để view tự lọc/nhóm
-        public ActionResult ManageReview()
+    public ReviewController(IHttpClientFactory httpClientFactory)
+    {
+        _httpClientFactory = httpClientFactory;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ManageReview()
+    {
+        var reviews = await GetReviewsAsync(search: null, rating: null, status: null, includeReplies: true);
+        return View(reviews);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> FilterReviews(string? search, int? rating, int? status)
+    {
+        var reviews = await GetReviewsAsync(search, rating, status, includeReplies: true);
+        return View("ManageReview", reviews);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ReportedReviews()
+    {
+        try
         {
-            var reviews = db.Reviews
-                .Include(r => r.Product)
-                .Include(r => r.User)
-                .OrderByDescending(r => r.CreatedAt)
-                .ToList();
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync("/api/orders/admin/reviews/reported");
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the tai danh sach bao cao");
+                return View(new List<SellerReportedReviewRowViewModel>());
+            }
 
-            return View(reviews);
+            var payload = await response.Content.ReadFromJsonAsync<List<ReportedReviewApiDto>>(JsonOptions)
+                ?? new List<ReportedReviewApiDto>();
+
+            var model = payload.Select(x => new SellerReportedReviewRowViewModel
+            {
+                ReviewID = x.reviewID,
+                OpenCount = x.openCount,
+                FirstReportAt = x.firstReportAt,
+                CustomerName = x.customerName ?? "-",
+                ProductName = x.productName ?? "-",
+                ProductImageFileName = x.productImageFileName,
+                Rating = x.rating,
+                Comment = x.comment ?? string.Empty,
+                CreatedAt = x.createdAt
+            }).ToList();
+
+            return View(model);
         }
-
-        // Lọc review theo từ khóa, rating, trạng thái (IsApproved)
-        [HttpGet]
-        public ActionResult FilterReviews(string search, int? rating, int? status)
+        catch (Exception ex)
         {
-            var q = db.Reviews
-                .Include(r => r.Product)
-                .Include(r => r.User)
-                .AsQueryable();
+            TempData["ErrorMessage"] = "Loi: " + ex.Message;
+            return View(new List<SellerReportedReviewRowViewModel>());
+        }
+    }
+
+    [HttpPost]
+    public async Task<JsonResult> ResolveReport(int reviewId, string decision)
+    {
+        try
+        {
+            if (reviewId <= 0)
+            {
+                return Json(new { success = false, message = "ID binh luan khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsJsonAsync($"/api/orders/admin/reviews/{reviewId}/reports/resolve", new { decision });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the xu ly bao cao") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<BasicSuccessResponse>(JsonOptions);
+            return Json(new { success = true, message = payload?.message ?? "Xu ly thanh cong." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> DeleteReview(int reviewId)
+    {
+        try
+        {
+            if (reviewId <= 0)
+            {
+                return Json(new { success = false, message = "ID binh luan khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.DeleteAsync($"/api/orders/admin/reviews/{reviewId}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the xoa binh luan") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<BasicSuccessResponse>(JsonOptions);
+            return Json(new { success = true, message = payload?.message ?? "Da xoa binh luan." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> ApproveReview(int reviewId)
+    {
+        try
+        {
+            if (reviewId <= 0)
+            {
+                return Json(new { success = false, message = "ID danh gia khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsync($"/api/orders/admin/reviews/{reviewId}/approve", content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the duyet danh gia") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<BasicSuccessResponse>(JsonOptions);
+            return Json(new { success = true, message = payload?.message ?? "Da duyet danh gia." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> ToggleVisibility(int reviewId)
+    {
+        try
+        {
+            if (reviewId <= 0)
+            {
+                return Json(new { success = false, message = "ID binh luan khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsync($"/api/orders/admin/reviews/{reviewId}/visibility/toggle", content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the doi trang thai hien thi") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ToggleVisibilityResponse>(JsonOptions);
+            return Json(new
+            {
+                success = true,
+                approved = payload?.approved ?? false,
+                message = payload?.message ?? "Cap nhat thanh cong."
+            });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> ReplyReview(int reviewId, string? content)
+    {
+        try
+        {
+            var normalizedContent = (content ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalizedContent))
+            {
+                return Json(new { success = false, message = "Noi dung phan hoi trong." });
+            }
+
+            var adminIdObj = Session["ADMIN_ID"];
+            var adminId = adminIdObj is int value ? value : 0;
+            var adminName = (Session["ADMIN_NAME"] as string) ?? "Admin";
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsJsonAsync($"/api/orders/admin/reviews/{reviewId}/replies", new
+            {
+                content = normalizedContent,
+                adminUserId = adminId,
+                adminUserName = adminId > 0 ? $"ADMIN_{adminId}" : "ADMIN_SELLER",
+                adminName
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the gui phan hoi") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<BasicSuccessResponse>(JsonOptions);
+            return Json(new { success = true, message = payload?.message ?? "Da gui phan hoi." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> UpdateReview(int id, string? comment, bool? isApproved)
+    {
+        try
+        {
+            if (id <= 0)
+            {
+                return Json(new { success = false, message = "ID binh luan khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), $"/api/orders/admin/reviews/{id}")
+            {
+                Content = JsonContent.Create(new { comment, isApproved })
+            };
+
+            var response = await client.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the cap nhat binh luan") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<BasicSuccessResponse>(JsonOptions);
+            return Json(new { success = true, message = payload?.message ?? "Cap nhat thanh cong." });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetReviewReports(int reviewId, int page = 1)
+    {
+        try
+        {
+            if (reviewId <= 0)
+            {
+                return Json(new { success = false, message = "ID binh luan khong hop le." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/reviews/{reviewId}/reports?page={page}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the tai danh sach bao cao") });
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ReviewReportListResponse>(JsonOptions);
+            return Json(payload ?? new ReviewReportListResponse
+            {
+                success = true,
+                data = new List<ReviewReportRowDto>(),
+                page = 1,
+                totalPages = 1
+            });
+        }
+        catch (Exception ex)
+        {
+            return Json(new { success = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    private async Task<List<SellerReviewViewModel>> GetReviewsAsync(string? search, int? rating, int? status, bool includeReplies)
+    {
+        try
+        {
+            var queryParts = new List<string> { $"includeReplies={includeReplies.ToString().ToLowerInvariant()}" };
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var s = search.Trim().ToLower();
-                q = q.Where(r =>
-                    (r.User != null && ((r.User.FullName ?? r.User.UserName).ToLower().Contains(s))) ||
-                    (r.Product != null && r.Product.ProductName.ToLower().Contains(s)) ||
-                    (r.Comment != null && r.Comment.ToLower().Contains(s))
-                );
+                queryParts.Add("search=" + Uri.EscapeDataString(search.Trim()));
             }
 
-            if (rating.HasValue && rating.Value >= 1 && rating.Value <= 5)
+            if (rating.HasValue)
             {
-                q = q.Where(r => r.Rating == rating.Value || (r.ReplyTo != null && r.Rating == 0));
+                queryParts.Add("rating=" + rating.Value);
             }
 
             if (status.HasValue)
             {
-                if (status.Value == 1) q = q.Where(r => r.IsApproved == true);
-                else if (status.Value == 0) q = q.Where(r => r.IsApproved == false);
+                queryParts.Add("status=" + status.Value);
             }
 
-            var list = q.OrderByDescending(r => r.CreatedAt).ToList();
-            return View("ManageReview", list);
-        }
+            var query = string.Join("&", queryParts);
 
-        public class ReportedReviewRow
-        {
-            public int ReviewID { get; set; }
-            public int OpenCount { get; set; }
-            public DateTime FirstReportAt { get; set; }
-
-            // Thông tin review để hiển thị
-            public string CustomerName { get; set; }
-            public string ProductName { get; set; }
-            public string ProductImageFileName { get; set; }
-            public int Rating { get; set; }
-            public string Comment { get; set; }
-            public DateTime CreatedAt { get; set; }
-        }
-
-        // =============== REPORTED ===============
-        // Danh sách bình luận bị báo cáo (group theo Review)
-        public ActionResult ReportedReviews()
-        {
-            var grouped = db.ReviewReports
-                .Where(rp => rp.Status == 0)
-                .GroupBy(rp => rp.ReviewID)
-                .Select(g => new
-                {
-                    ReviewID = g.Key,
-                    OpenCount = g.Count(),
-                    FirstReportAt = g.Min(x => x.CreatedAt)
-                })
-                .ToList();
-
-            var ids = grouped.Select(g => g.ReviewID).ToList();
-
-            var reviews = db.Reviews
-                .Include(r => r.Product)
-                .Include(r => r.User)
-                .Where(r => ids.Contains(r.ReviewID))
-                .ToList();
-
-            var data = grouped
-                .Join(reviews, g => g.ReviewID, r => r.ReviewID, (g, r) => new ReportedReviewRow
-                {
-                    ReviewID = g.ReviewID,
-                    OpenCount = g.OpenCount,
-                    FirstReportAt = g.FirstReportAt,
-
-                    CustomerName = (r.User != null ? (r.User.FullName ?? r.User.UserName) : "-"),
-                    ProductName = r.Product != null ? r.Product.ProductName : "-",
-                    ProductImageFileName = r.Product != null ? r.Product.ImageFileName : null,
-                    Rating = r.Rating,
-                    Comment = r.Comment,
-                    CreatedAt = r.CreatedAt
-                })
-                .OrderByDescending(x => x.OpenCount)
-                .ThenByDescending(x => x.FirstReportAt)
-                .ToList();
-
-            return View(data); // model IEnumerable<ReportedReviewRow>
-        }
-
-        // Admin quyết định xử lý report
-        [HttpPost]
-        public JsonResult ResolveReport(int reviewId, string decision)
-        {
-            var review = db.Reviews
-                .Include(r => r.Product)
-                .FirstOrDefault(r => r.ReviewID == reviewId);
-
-            if (review == null) return Json(new { success = false, message = "Không tìm thấy bình luận." });
-
-            var openReports = db.ReviewReports.Where(x => x.ReviewID == reviewId && x.Status == 0).ToList();
-
-            try
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/reviews?{query}");
+            if (!response.IsSuccessStatusCode)
             {
-                switch ((decision ?? "").ToLower())
+                return new List<SellerReviewViewModel>();
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<List<ReviewApiDto>>(JsonOptions)
+                ?? new List<ReviewApiDto>();
+
+            return payload.Select(MapReview).ToList();
+        }
+        catch
+        {
+            return new List<SellerReviewViewModel>();
+        }
+    }
+
+    private HttpClient CreateAuthorizedClient(string clientName)
+    {
+        var client = _httpClientFactory.CreateClient(clientName);
+
+        client.DefaultRequestHeaders.Remove("Authorization");
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    private static SellerReviewViewModel MapReview(ReviewApiDto dto)
+    {
+        return new SellerReviewViewModel
+        {
+            ReviewID = dto.reviewID,
+            ReplyTo = dto.replyTo,
+            UserID = dto.userID,
+            ProductID = dto.productID,
+            Rating = dto.rating,
+            Comment = dto.comment ?? string.Empty,
+            CreatedAt = dto.createdAt,
+            IsApproved = dto.isApproved,
+            IsEdited = dto.isEdited,
+            UpdatedAt = dto.updatedAt,
+            User = dto.user is null
+                ? null
+                : new SellerReviewUserViewModel
                 {
-                    case "dismiss":
-                        foreach (var rp in openReports) rp.Status = 1; // Dismissed
-                        db.SaveChanges();
-                        return Json(new { success = true, message = "Đã bỏ qua các báo cáo." });
+                    UserID = dto.user.userID,
+                    UserName = dto.user.userName ?? string.Empty,
+                    FullName = dto.user.fullName
+                },
+            Product = dto.product is null
+                ? null
+                : new SellerReviewProductViewModel
+                {
+                    ProductID = dto.product.productID,
+                    ProductName = dto.product.productName ?? string.Empty,
+                    ImageFileName = dto.product.imageFileName
+                },
+            ReviewReports = dto.reviewReports?.Select(r => new SellerReviewReportViewModel
+            {
+                ReviewReportID = r.reviewReportID,
+                ReviewID = r.reviewID,
+                ReporterUserID = r.reporterUserID,
+                Reason = r.reason ?? string.Empty,
+                Note = r.note,
+                Status = r.status,
+                CreatedAt = r.createdAt
+            }).ToList() ?? new List<SellerReviewReportViewModel>()
+        };
+    }
 
-                    case "hide":
-                        review.IsApproved = false; // ẩn bình luận
-                        foreach (var rp in openReports) rp.Status = 2; // ActionTaken
-                        db.SaveChanges();
-                        return Json(new { success = true, message = "Đã ẩn bình luận và cập nhật báo cáo." });
+    private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return fallback;
+            }
 
-                    case "delete":
-                        var replies = db.Reviews.Where(r => r.ReplyTo == reviewId).ToList();
-                        db.Reviews.RemoveRange(replies);
-                        db.Reviews.Remove(review);
-                        foreach (var rp in openReports) rp.Status = 2; // ActionTaken
-                        db.SaveChanges();
-                        return Json(new { success = true, message = "Đã xóa bình luận và cập nhật báo cáo." });
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
 
-                    default:
-                        return Json(new { success = false, message = "Quyết định không hợp lệ." });
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("message", out var messageProp) && messageProp.ValueKind == JsonValueKind.String)
+                {
+                    return messageProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("detail", out var detailProp) && detailProp.ValueKind == JsonValueKind.String)
+                {
+                    return detailProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
+                {
+                    return titleProp.GetString() ?? fallback;
                 }
             }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = "Lỗi: " + ex.Message });
-            }
-        }
 
-        // =============== DELETE (Admin) ===============
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public JsonResult DeleteReview(int reviewId)
+            return json;
+        }
+        catch
         {
-            var review = db.Reviews.FirstOrDefault(r => r.ReviewID == reviewId);
-            if (review == null) return Json(new { success = false, message = "Không tìm thấy bình luận." });
-
-            try
-            {
-                var replies = db.Reviews.Where(r => r.ReplyTo == reviewId).ToList();
-                if (replies.Any()) db.Reviews.RemoveRange(replies);
-                db.Reviews.Remove(review);
-                db.SaveChanges();
-                return Json(new { success = true, message = "Đã xóa bình luận." });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
-            }
+            return fallback;
         }
+    }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public JsonResult ApproveReview(int reviewId)
-        {
-            var review = db.Reviews.FirstOrDefault(r => r.ReviewID == reviewId);
-            if (review == null) return Json(new { success = false, message = "Không tìm thấy đánh giá." });
+    private sealed class ReviewApiDto
+    {
+        public int reviewID { get; set; }
 
-            review.IsApproved = true;
-            db.SaveChanges();
-            return Json(new { success = true, message = "Đã duyệt đánh giá." });
-        }
+        public int? replyTo { get; set; }
 
-        // Ẩn/Bỏ ẩn bình luận (toggle IsApproved)
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public JsonResult ToggleVisibility(int reviewId)
-        {
-            var review = db.Reviews.FirstOrDefault(r => r.ReviewID == reviewId);
-            if (review == null) return Json(new { success = false, message = "Không tìm thấy bình luận." });
+        public int userID { get; set; }
 
-            review.IsApproved = !review.IsApproved;
-            db.SaveChanges();
+        public int productID { get; set; }
 
-            return Json(new
-            {
-                success = true,
-                approved = review.IsApproved,
-                message = review.IsApproved ? "Đã bỏ ẩn bình luận." : "Đã ẩn bình luận."
-            });
-        }
+        public int rating { get; set; }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public JsonResult ReplyReview(int reviewId, string content)
-        {
-            if (string.IsNullOrWhiteSpace(content))
-                return Json(new { success = false, message = "Nội dung phản hồi trống." });
+        public string? comment { get; set; }
 
-            var parent = db.Reviews.FirstOrDefault(r => r.ReviewID == reviewId);
-            if (parent == null) return Json(new { success = false, message = "Không tìm thấy đánh giá." });
+        public DateTime createdAt { get; set; }
 
-            // Lấy thông tin admin từ Session
-            var adminIdObj = Session["ADMIN_ID"];
-            var adminName = (Session["ADMIN_NAME"] as string) ?? "Admin";
-            if (adminIdObj == null) return Json(new { success = false, message = "Phiên admin hết hạn, vui lòng đăng nhập lại." });
-            var adminId = (int)adminIdObj;
+        public bool isApproved { get; set; }
 
-            // Tìm/tạo user mirror cho admin trong bảng Users
-            var mirrorUserName = "ADMIN_" + adminId;
-            var adminUser = db.Users.FirstOrDefault(u => u.UserName == mirrorUserName);
-            if (adminUser == null)
-            {
-                adminUser = new User
-                {
-                    UserName = mirrorUserName,
-                    FullName = adminName,
-                    Email = $"{mirrorUserName.ToLower()}@local",
-                    Password = "!",
-                    CreatedDate = DateTime.Now
-                };
-                db.Users.Add(adminUser);
-                db.SaveChanges();
-            }
+        public bool isEdited { get; set; }
 
-            var reply = new Review
-            {
-                ProductID = parent.ProductID,
-                UserID = adminUser.UserID,
-                Rating = 0,
-                Comment = content?.Trim(),
-                CreatedAt = DateTime.Now,
-                IsApproved = true,
-                ReplyTo = parent.ReviewID,
-                IsEdited = false,
-                UpdatedAt = null
-            };
-            db.Reviews.Add(reply);
-            db.SaveChanges();
-            return Json(new { success = true, message = "Đã gửi phản hồi." });
-        }
+        public DateTime? updatedAt { get; set; }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        [Authorize]
-        public JsonResult UpdateReview(int id, string comment, bool? isApproved)
-        {
-            var review = db.Reviews.FirstOrDefault(r => r.ReviewID == id);
-            if (review == null) return Json(new { success = false, message = "Không tìm thấy bình luận." });
+        public ReviewUserApiDto? user { get; set; }
 
-            if (!string.IsNullOrWhiteSpace(comment))
-            {
-                review.Comment = comment.Trim();
-                review.IsEdited = true;
-                review.UpdatedAt = DateTime.Now;
-            }
-            if (isApproved.HasValue)
-            {
-                review.IsApproved = isApproved.Value;
-            }
-            db.SaveChanges();
-            return Json(new { success = true, message = "Cập nhật thành công." });
-        }
-        [HttpGet]
-        public JsonResult GetReviewReports(int reviewId, int page = 1)
-        {
-            const int pageSize = 5;
+        public ReviewProductApiDto? product { get; set; }
 
-            var query = db.ReviewReports
-                .Where(rp => rp.ReviewID == reviewId)
-                .OrderByDescending(rp => rp.CreatedAt);
+        public List<ReviewReportApiDto>? reviewReports { get; set; }
+    }
 
-            var total = query.Count();
-            var totalPages = (int)Math.Ceiling((double)total / pageSize);
+    private sealed class ReviewUserApiDto
+    {
+        public int userID { get; set; }
 
-            // ⚠️ Chuyển sang LINQ to Objects để dùng ToString("format")
-            var data = query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .AsEnumerable()
-                .Select(rp => new
-                {
-                    reporter = rp.ReporterUserID,
-                    reason = rp.Reason,
-                    note = rp.Note,
-                    createdAt = rp.CreatedAt.ToString("dd/MM/yyyy HH:mm")
-                })
-                .ToList();
+        public string? userName { get; set; }
 
-            return Json(new
-            {
-                success = true,
-                data,
-                page,
-                totalPages
-            });
-        }
+        public string? fullName { get; set; }
+    }
 
+    private sealed class ReviewProductApiDto
+    {
+        public int productID { get; set; }
 
+        public string? productName { get; set; }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) db.Dispose();
-            base.Dispose(disposing);
-        }
+        public string? imageFileName { get; set; }
+    }
+
+    private sealed class ReviewReportApiDto
+    {
+        public int reviewReportID { get; set; }
+
+        public int reviewID { get; set; }
+
+        public int reporterUserID { get; set; }
+
+        public string? reason { get; set; }
+
+        public string? note { get; set; }
+
+        public int status { get; set; }
+
+        public DateTime createdAt { get; set; }
+    }
+
+    private sealed class ReportedReviewApiDto
+    {
+        public int reviewID { get; set; }
+
+        public int openCount { get; set; }
+
+        public DateTime firstReportAt { get; set; }
+
+        public string? customerName { get; set; }
+
+        public string? productName { get; set; }
+
+        public string? productImageFileName { get; set; }
+
+        public int rating { get; set; }
+
+        public string? comment { get; set; }
+
+        public DateTime createdAt { get; set; }
+    }
+
+    private sealed class ReviewReportListResponse
+    {
+        public bool success { get; set; }
+
+        public List<ReviewReportRowDto> data { get; set; } = new();
+
+        public int page { get; set; }
+
+        public int totalPages { get; set; }
+    }
+
+    private sealed class ReviewReportRowDto
+    {
+        public int reporter { get; set; }
+
+        public string? reason { get; set; }
+
+        public string? note { get; set; }
+
+        public string? createdAt { get; set; }
+    }
+
+    private sealed class BasicSuccessResponse
+    {
+        public bool success { get; set; }
+
+        public string? message { get; set; }
+    }
+
+    private sealed class ToggleVisibilityResponse
+    {
+        public bool success { get; set; }
+
+        public bool approved { get; set; }
+
+        public string? message { get; set; }
     }
 }

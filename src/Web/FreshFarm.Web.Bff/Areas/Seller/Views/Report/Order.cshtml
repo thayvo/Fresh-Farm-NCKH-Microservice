@@ -1,309 +1,976 @@
-﻿@model FreshFram.Areas.Admin.Data.OrderReportViewModel
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.OrderReportViewModel
 @{
     ViewBag.Title = "Báo Cáo Đơn Hàng";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
-<main class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">
-            Báo Cáo Đơn Hàng
-        </h2>
-    </div>
-
-    @if (ViewBag.ErrorMessage != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @ViewBag.ErrorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+<style>
+    /* Import exact color scheme from ManageShipping page */
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
-    <form method="get" action="@Url.Action("Order", "Report")">
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4 col-lg-3">
-                        <label for="fromDate" class="form-label fw-semibold">Từ ngày</label>
-                        <input type="date" id="fromDate" name="fromDate" class="form-control" value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    @@keyframes shimmer {
+        0% {
+            background-position: -1000px 0
+        }
+
+        100% {
+            background-position: 1000px 0
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0)
+        }
+
+        50% {
+            transform: translateY(-10px)
+        }
+    }
+
+    /* Light sweep animation - same as ManageShipping */
+    @@keyframes lightSweep {
+        0% {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+        50% {
+            opacity: 1;
+        }
+        100% {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    /* Enhanced KPI cards with solid colors - NO light sweep */
+    .kpi-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 25px 70px rgba(30, 64, 175, 0.25);
+    }
+
+    /* Gradient backgrounds matching ManageShipping theme */
+    .gradient-orders {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+    }
+
+    .gradient-success {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: white;
+    }
+
+    .gradient-danger {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+        color: white;
+    }
+
+    .gradient-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        color: white;
+    }
+
+    .gradient-pending {
+        background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
+        color: white;
+    }
+
+    .gradient-shipping {
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        color: white;
+    }
+
+    .kpi-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+
+    .kpi-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .kpi-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .kpi-change {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        display: inline-block;
+        margin-top: 0.5rem;
+    }
+
+    .change-positive {
+        color: #86efac;
+    }
+
+    .change-negative {
+        color: #fca5a5;
+    }
+
+    /* Filter card matching ManageShipping */
+    .filter-card {
+        background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    /* Chart card with solid colors - NO light sweep */
+    .chart-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .chart-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        padding: 1.5rem;
+        border-bottom: none;
+    }
+
+    /* Table styling matching ManageShipping */
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .table-modern thead th {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-bottom: 3px solid #3b82f6;
+        font-weight: 600;
+        color: #1e3a8a;
+        text-transform: uppercase;
+        font-size: .75rem;
+        letter-spacing: .5px;
+        padding: 1.25rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .table-modern thead th a {
+        color: #1e3a8a;
+        transition: all .3s ease;
+    }
+
+    .table-modern thead th a:hover {
+        color: #1e40af;
+        text-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+    }
+
+    .table-modern tbody tr {
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        animation: slideIn .4s ease-out backwards;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .table-modern tbody tr:hover {
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 197, 253, 0.08) 100%);
+        transform: translateY(-2px);
+        box-shadow: -5px 0 0 0 #3b82f6;
+    }
+
+    .table-modern tbody td {
+        padding: 1.25rem 1rem;
+        vertical-align: middle;
+    }
+
+    /* Button styling matching ManageShipping */
+    .btn-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border: none;
+        color: white;
+        padding: .75rem 2rem;
+        border-radius: 2rem;
+        font-weight: 600;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px rgba(0,0,0,.2);
+        background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        color: white;
+    }
+
+    /* Form controls matching ManageShipping */
+    .form-select, .form-control {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .875rem 1.25rem;
+        transition: all .3s ease;
+        background: #fff;
+    }
+
+    .form-select:focus, .form-control:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.15);
+        background: #fff;
+    }
+
+    /* Pagination matching ManageShipping */
+    .pagination-modern {
+        display: flex;
+        justify-content: center;
+        gap: 0.375rem;
+        margin-top: 2rem;
+    }
+
+    .pagination-modern .page-link {
+        border-radius: .875rem;
+        margin: 0 .375rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        transition: all .3s ease;
+        font-weight: 600;
+        padding: .75rem 1rem;
+    }
+
+    .pagination-modern .page-link:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        color: #fff;
+        border-color: #3b82f6;
+        transform: translateY(-3px);
+        box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+    }
+
+    .pagination-modern .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: white;
+    }
+
+    /* Header styling with neon blue light sweep effect - ONLY for header */
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+        color: white;
+    }
+
+    /* Neon blue light sweep animation - ONLY for the header */
+    .grad-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(0, 234, 255, 0.6), transparent);
+        animation: lightSweep 3s infinite;
+        z-index: 1;
+    }
+
+    /* Additional neon glow effect */
+    .grad-header::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(0, 234, 255, 0.1) 0%, transparent 70%);
+        animation: rotate 25s linear infinite;
+    }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+    }
+
+    /* Loading spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0)
+        }
+
+        to {
+            transform: rotate(360deg)
+        }
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Text colors matching ManageShipping */
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .bg-primary-blue {
+        background-color: #1e40af !important;
+    }
+
+    @@media (max-width:768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .table-modern {
+            font-size: .875rem;
+        }
+
+        .btn-gradient {
+            padding: .625rem 1.5rem;
+        }
+    }
+</style>
+
+<div class="min-vh-100">
+    <div class="container-fluid py-4">
+        <!-- Header - Exact copy of ManageShipping design -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index: 1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="p-3 rounded-4 icon-gradient">
+                                <i class="bi bi-receipt text-white" style="font-size: 2.5rem;"></i>
+                            </div>
+                            <div>
+                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                                    Báo Cáo Đơn Hàng
+                                </h1>
+                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                    Phân tích chi tiết về đơn hàng và trạng thái giao hàng
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-4 col-lg-3">
-                        <label for="toDate" class="form-label fw-semibold">Đến ngày</label>
-                        <input type="date" id="toDate" name="toDate" class="form-control" value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <label for="orderStatus" class="form-label fw-semibold">Trạng thái</label>
-                        <select id="orderStatus" name="orderStatus" class="form-select">
-                            <option value="all" @(Model.OrderStatus == "all" ? "selected" : "")>Tất cả trạng thái</option>
-                            <option value="Pending" @(Model.OrderStatus == "Pending" ? "selected" : "")>Chờ xử lý</option>
-                            <option value="Shipped" @(Model.OrderStatus == "Shipped" ? "selected" : "")>Đang giao</option>
-                            <option value="Completed" @(Model.OrderStatus == "Completed" ? "selected" : "")>Thành công</option>
-                            <option value="Cancelled" @(Model.OrderStatus == "Cancelled" ? "selected" : "")>Đã hủy</option>
-                        </select>
-                    </div>
-                    <div class="col-md-12 col-lg-3">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                    <div class="d-flex gap-3">
+                        <button type="button" class="btn btn-success btn-pill shadow-lg d-flex align-items-center gap-2 hover-scale" onclick="exportData('csv')" style="font-size: 1.125rem; white-space: nowrap;">
+                            <i class="bi bi-file-earmark-spreadsheet" style="font-size: 1.5rem;"></i>
+                            <span>Xuất CSV</span>
+                        </button>
+                        <button type="button" class="btn btn-primary btn-pill shadow-lg d-flex align-items-center gap-2 hover-scale" onclick="exportData('pdf')" style="font-size: 1.125rem; white-space: nowrap;">
+                            <i class="bi bi-file-earmark-pdf" style="font-size: 1.5rem;"></i>
+                            <span>Xuất PDF</span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
-    </form>
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-primary h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-receipt-cutoff fs-1 text-primary opacity-75"></i>
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @ViewBag.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- Error Message -->
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @ViewBag.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- Filter Card - Matching ManageShipping design -->
+        <div class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <i class="bi bi-funnel text-white" style="font-size: 1.25rem;"></i>
+                </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc thống kê</h5>
+            </div>
+            <form method="get" class="row g-4" id="filterForm">
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-calendar3 me-2"></i> Từ ngày</label>
+                    <input type="date" id="fromDate" name="fromDate" class="form-control"
+                           value="@(Model.FromDate?.ToString("yyyy-MM-dd"))"
+                           onchange="updateReport()" />
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-calendar3 me-2"></i> Đến ngày</label>
+                    <input type="date" id="toDate" name="toDate" class="form-control"
+                           value="@(Model.ToDate?.ToString("yyyy-MM-dd"))"
+                           onchange="updateReport()" />
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-list-check me-2"></i> Trạng thái</label>
+                    <select id="orderStatus" name="orderStatus" class="form-select" onchange="updateReport()">
+                        <option value="all" selected="@(Model.OrderStatus == "all"  ? "selected" : null)">Tất cả trạng thái</option>
+                        <option value="Pending" selected="@(Model.OrderStatus == "Pending"  ? "selected" : null)">⏳ Chờ xử lý</option>
+                        <option value="Shipped" selected="@(Model.OrderStatus == "Shipped"  ? "selected" : null)">🚚 Đang giao</option>
+                        <option value="Completed" selected="@(Model.OrderStatus == "Completed"  ? "selected" : null)">✅ Thành công</option>
+                        <option value="Cancelled" selected="@(Model.OrderStatus == "Cancelled"  ? "selected" : null)">❌ Đã hủy</option>
+                    </select>
+                </div>
+                <div class="col-12 col-lg-3 ms-auto d-grid d-lg-flex justify-content-lg-end align-items-end">
+                    <button type="submit" class="btn btn-primary btn-pill px-5 d-flex align-items-center justify-content-center gap-2 hover-scale">
+                        <i class="bi bi-funnel-fill"></i>
+                        <span>Áp dụng</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- KPI Cards Row -->
+        <div class="row g-4 mb-4">
+            <!-- Total Orders KPI Card -->
+            <div class="col-md-6 col-xl-3">
+                <div class="card kpi-card gradient-orders">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-receipt-cutoff"></i>
                         </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Tổng Đơn Hàng</h6>
-                            <h3 class="fw-bold">@Model.TotalOrders.ToString("N0")</h3>
+                        <div class="kpi-value">@Model.TotalOrders.ToString("N0")</div>
+                        <div class="kpi-label">Tổng Đơn Hàng</div>
+                      
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success Orders KPI Card -->
+            <div class="col-md-6 col-xl-3">
+                <div class="card kpi-card gradient-success">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-cart-check"></i>
+                        </div>
+                        <div class="kpi-value">@Model.SuccessOrders.ToString("N0")</div>
+                        <div class="kpi-label">Đơn Thành Công</div>
+                      
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cancelled Orders KPI Card -->
+            <div class="col-md-6 col-xl-3">
+                <div class="card kpi-card gradient-danger">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-cart-x"></i>
+                        </div>
+                        <div class="kpi-value">@Model.CancelledOrders.ToString("N0")</div>
+                        <div class="kpi-label">Đơn Bị Hủy</div>
+                      
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cancel Rate KPI Card -->
+            <div class="col-md-6 col-xl-3">
+                <div class="card kpi-card gradient-warning">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-pie-chart"></i>
+                        </div>
+                        <div class="kpi-value">@Model.CancelRate.ToString("F2")%</div>
+                        <div class="kpi-label">Tỷ Lệ Hủy</div>
+                       
+                    </div>
+                </div>
+            </div>
+            </div>
+    
+            <!-- Charts Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-8">
+                    <div class="card chart-card h-100">
+                        <div class="chart-header">
+                            <h5 class="card-title fw-bold mb-0">
+                                <i class="bi bi-bar-chart-line-fill me-2"></i>Xu Hướng Đơn Hàng
+                            </h5>
+                            <small class="opacity-75">Theo dõi số lượng đơn hàng theo thời gian</small>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="height: 350px;">
+                                <canvas id="orderTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="card chart-card h-100">
+                        <div class="chart-header">
+                            <h5 class="card-title fw-bold mb-0">
+                                <i class="bi bi-pie-chart-fill me-2"></i>Phân Bổ Trạng Thái
+                            </h5>
+                            <small class="opacity-75">Tỷ lệ đơn hàng theo trạng thái</small>
+                        </div>
+                        <div class="card-body p-4">
+                            <div style="height: 350px;">
+                                <canvas id="orderStatusChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-success h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-cart-check fs-1 text-success opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Đơn Thành Công</h6>
-                            <h3 class="fw-bold">@Model.SuccessOrders.ToString("N0")</h3>
-                        </div>
+    
+            <!-- Data Table with Enhanced Design -->
+            <div class="card chart-card">
+                <div class="chart-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title fw-bold mb-0">
+                            <i class="bi bi-table me-2"></i>Danh Sách Đơn Hàng Gần Đây
+                        </h5>
+                        <small class="opacity-75">Hiển thị 15 đơn hàng mới nhất</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" style="width: auto;" onchange="changePageSize(this.value)">
+                            <option value="15">15 dòng/trang</option>
+                            <option value="30">30 dòng/trang</option>
+                            <option value="50">50 dòng/trang</option>
+                        </select>
+                        <a href="@Url.Action("ExportOrderExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, orderStatus = Model.OrderStatus })"
+                           class="btn btn-light btn-sm">
+                            <i class="bi bi-file-earmark-excel"></i> Excel
+                        </a>
+                        <button class="btn btn-light btn-sm" onclick="exportToPDF()">
+                            <i class="bi bi-file-earmark-pdf"></i> PDF
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table-modern mb-0">
+                            <thead>
+                                <tr>
+                                    <th onclick="sortTable('code')" style="cursor: pointer;">
+                                        Mã ĐH <i class="bi bi-arrow-down-up ms-1"></i>
+                                    </th>
+                                    <th onclick="sortTable('customer')" style="cursor: pointer;">
+                                        Khách Hàng <i class="bi bi-arrow-down-up ms-1"></i>
+                                    </th>
+                                    <th onclick="sortTable('date')" style="cursor: pointer;">
+                                        Ngày Đặt <i class="bi bi-arrow-down-up ms-1"></i>
+                                    </th>
+                                    <th onclick="sortTable('amount')" style="cursor: pointer;">
+                                        Tổng Tiền <i class="bi bi-arrow-down-up ms-1"></i>
+                                    </th>
+                                    <th class="text-center">Trạng Thái</th>
+                                    <th class="text-center">Hành Động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                @if (Model.RecentOrders != null && Model.RecentOrders.Any())
+                                {
+                                    foreach (var order in Model.RecentOrders)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="bi bi-receipt text-primary me-2"></i>
+                                                    <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })"
+                                                       target="_blank"
+                                                       class="text-decoration-none fw-bold">@order.OrderCode</a>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="bi bi-person-circle text-success me-2"></i>
+                                                    <span>@order.CustomerName</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="bi bi-calendar3 text-info me-2"></i>
+                                                    <span>@order.OrderDateFormatted</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong class="text-primary">@order.TotalAmount.ToString("#,##0")₫</strong>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge @order.StatusBadgeClass rounded-pill">@order.StatusText</span>
+                                            </td>
+                                            <td class="text-center">
+                                                <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-primary" title="Xem chi tiết / In hóa đơn">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                                                <h5 class="text-muted">Không có đơn hàng nào</h5>
+                                                <p class="text-muted">Chưa có đơn hàng nào trong khoảng thời gian này</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-danger h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-cart-x fs-1 text-danger opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Đơn Bị Hủy</h6>
-                            <h3 class="fw-bold">@Model.CancelledOrders.ToString("N0")</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-pie-chart fs-1 text-warning opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Tỷ Lệ Hủy</h6>
-                            <h3 class="fw-bold">@Model.CancelRate.ToString("F2")%</h3>
-                        </div>
-                    </div>
-                </div>
+    
+            <!-- Modern Pagination -->
+            <div class="pagination-modern" id="pagination">
+                <!-- Pagination will be generated by JavaScript -->
             </div>
         </div>
     </div>
+</div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-lg-7">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-bar-chart-line-fill"></i> Xu hướng đơn hàng
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="orderTrendChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-pie-chart-fill"></i> Phân bổ trạng thái đơn hàng
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="orderStatusChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
+@section scripts{
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // ===== Dữ liệu JS cho bảng đơn hàng gần đây =====
+        var recentOrdersData = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(
+            Model.RecentOrders.Select(o => new {
+                id = o.OrderID,
+                code = o.OrderCode,
+                customer = o.CustomerName,
+                dateText = o.OrderDateFormatted,
+                amount = o.TotalAmount,
+                statusClass = o.StatusBadgeClass,
+                statusText = o.StatusText
+            })
+        ));
 
-    <div class="card shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title fw-bold mb-0">
-                <i class="bi bi-table"></i> Danh sách đơn hàng gần đây
-            </h5>
-            <a href="@Url.Action("ExportOrderExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, orderStatus = Model.OrderStatus })" class="btn btn-outline-success btn-sm">
-                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
-            </a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-striped mb-0 align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>Mã ĐH</th>
-                        <th>Khách hàng</th>
-                        <th>Ngày đặt</th>
-                        <th>Tổng tiền</th>
-                        <th class="text-center">Trạng thái</th>
-                        <th class="text-center">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model.RecentOrders != null && Model.RecentOrders.Any())
-                    {
-                        foreach (var order in Model.RecentOrders)
-                        {
-                            <tr>
-                                <td><a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })">@order.OrderCode</a></td>
-                                <td>@order.CustomerName</td>
-                                <td>@order.OrderDateFormatted</td>
-                                <td>@order.TotalAmount.ToString("#,##0")₫</td>
-                                <td class="text-center">
-                                    <span class="badge @order.StatusBadgeClass">@order.StatusText</span>
-                                </td>
-                                <td class="text-center">
-                                    <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })" class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                </td>
-                            </tr>
+        var currentPageSize = 15;
+        var currentPageIndex = 1;
+        var currentSortField = "date";
+        var currentSortDir = "desc";
+
+        function updateReport() {
+            var form = document.getElementById("filterForm");
+            if (form) form.submit();
+        }
+
+        function exportData(format) {
+            var from = document.getElementById("fromDate")?.value || "";
+            var to = document.getElementById("toDate")?.value || "";
+            var status = document.getElementById("orderStatus")?.value || "";
+
+            var url = '@Url.Action("ExportOrderExcel", "Report", new { area = "Seller" })';
+            var qs = [];
+            if (from) qs.push("fromDate=" + encodeURIComponent(from));
+            if (to) qs.push("toDate=" + encodeURIComponent(to));
+            if (status && status !== "all") qs.push("orderStatus=" + encodeURIComponent(status));
+            if (qs.length) url += "?" + qs.join("&");
+
+            window.location.href = url;
+        }
+
+        function exportToPDF() {
+            // Tạm thời dùng chung file Excel, admin có thể in ra PDF
+            exportData("pdf");
+        }
+
+        function changePageSize(size) {
+            var n = parseInt(size, 10);
+            if (!n || n <= 0) n = 15;
+            currentPageSize = n;
+            currentPageIndex = 1;
+            renderRecentOrdersTable();
+        }
+
+        function sortTable(field) {
+            if (currentSortField === field) {
+                currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+            } else {
+                currentSortField = field;
+                currentSortDir = field === "date" ? "desc" : "asc";
+            }
+            renderRecentOrdersTable();
+        }
+
+        function compareOrders(a, b) {
+            var v1, v2;
+            switch (currentSortField) {
+                case "code":
+                    v1 = a.code; v2 = b.code; break;
+                case "customer":
+                    v1 = a.customer; v2 = b.customer; break;
+                case "amount":
+                    v1 = a.amount; v2 = b.amount; break;
+                case "date":
+                default:
+                    // dd/MM/yyyy
+                    var p1 = (a.dateText || "").split("/");
+                    var p2 = (b.dateText || "").split("/");
+                    var d1 = new Date(p1[2], p1[1] - 1, p1[0]);
+                    var d2 = new Date(p2[2], p2[1] - 1, p2[0]);
+                    v1 = d1.getTime(); v2 = d2.getTime();
+                    break;
+            }
+            if (v1 < v2) return -1;
+            if (v1 > v2) return 1;
+            return 0;
+        }
+
+        function renderPagination(totalItems) {
+            var container = document.getElementById("pagination");
+            if (!container) return;
+
+            var totalPages = Math.ceil(totalItems / currentPageSize) || 1;
+            if (currentPageIndex > totalPages) currentPageIndex = totalPages;
+
+            if (totalPages <= 1) {
+                container.innerHTML = "";
+                return;
+            }
+
+            var html = "";
+            for (var i = 1; i <= totalPages; i++) {
+                html += '<button type="button" class="btn btn-sm ' +
+                    (i === currentPageIndex ? 'btn-primary' : 'btn-outline-primary') +
+                    ' me-1" onclick="goToPage(' + i + ')">' + i + "</button>";
+            }
+            container.innerHTML = html;
+        }
+
+        function goToPage(p) {
+            currentPageIndex = p;
+            renderRecentOrdersTable();
+        }
+
+        function renderRecentOrdersTable() {
+            var tbody = document.getElementById("tableBody");
+            if (!tbody || !Array.isArray(recentOrdersData)) return;
+
+            var data = recentOrdersData.slice();
+            data.sort(function (a, b) {
+                var res = compareOrders(a, b);
+                return currentSortDir === "asc" ? res : -res;
+            });
+
+            var totalItems = data.length;
+            var start = (currentPageIndex - 1) * currentPageSize;
+            var pageItems = data.slice(start, start + currentPageSize);
+
+            if (!pageItems.length) {
+                tbody.innerHTML =
+                    '<tr><td colspan="6" class="text-center py-5">' +
+                    '<div class="d-flex flex-column align-items-center">' +
+                    '<i class="bi bi-inbox display-1 text-muted mb-3"></i>' +
+                    '<h5 class="text-muted">Không có đơn hàng nào</h5>' +
+                    '<p class="text-muted mb-0">Chưa có đơn hàng nào trong khoảng thời gian này</p>' +
+                    '</div></td></tr>';
+                renderPagination(0);
+                return;
+            }
+
+            var detailBaseUrl = '@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = 0 })';
+            var rowsHtml = "";
+
+            pageItems.forEach(function (o) {
+                var detailUrl = detailBaseUrl.replace("orderId=0", "orderId=" + o.id);
+                rowsHtml +=
+                    '<tr>' +
+                    '<td><div class="d-flex align-items-center">' +
+                    '<i class="bi bi-receipt text-primary me-2"></i>' +
+                    '<a href="' + detailUrl + '" target="_blank" class="text-decoration-none fw-bold">' + o.code + "</a>" +
+                    "</div></td>" +
+                    '<td><div class="d-flex align-items-center">' +
+                    '<i class="bi bi-person-circle text-success me-2"></i>' +
+                    "<span>" + o.customer + "</span>" +
+                    "</div></td>" +
+                    '<td><div class="d-flex align-items-center">' +
+                    '<i class="bi bi-calendar3 text-info me-2"></i>' +
+                    "<span>" + o.dateText + "</span>" +
+                    "</div></td>" +
+                    '<td><strong class="text-primary">' + (o.amount || 0).toLocaleString("vi-VN") + "₫</strong></td>" +
+                    '<td class="text-center"><span class="badge ' + o.statusClass + ' rounded-pill">' +
+                    o.statusText + "</span></td>" +
+                    '<td class="text-center">' +
+                    '<a href="' + detailUrl + '" target="_blank" class="btn btn-sm btn-outline-primary" title="Xem chi tiết / In hóa đơn">' +
+                    '<i class="bi bi-eye"></i></a></td>' +
+                    "</tr>";
+            });
+
+            tbody.innerHTML = rowsHtml;
+            renderPagination(totalItems);
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            // Render bảng & phân trang cho danh sách đơn gần đây
+            renderRecentOrdersTable();
+
+            // --- Biểu đồ từ server ---
+            var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
+            var trendTotalData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendTotalData));
+            var trendSuccessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendSuccessData));
+            var trendCancelledData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendCancelledData));
+
+            var statusSuccessCount = @Model.StatusSuccessCount;
+            var statusShippingCount = @Model.StatusShippingCount;
+            var statusPendingCount = @Model.StatusPendingCount;
+            var statusCancelledCount = @Model.StatusCancelledCount;
+
+            // Biểu đồ Xu hướng đơn hàng (Line)
+            var orderTrendCtx = document.getElementById("orderTrendChart");
+            if (orderTrendCtx) {
+                new Chart(orderTrendCtx, {
+                    type: "line",
+                    data: {
+                        labels: trendLabels,
+                        datasets: [
+                            {
+                                label: "Tổng đơn",
+                                data: trendTotalData,
+                                borderColor: "#0d6efd",
+                                backgroundColor: "rgba(13, 110, 253, 0.1)",
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: "Thành công",
+                                data: trendSuccessData,
+                                borderColor: "#198754",
+                                backgroundColor: "rgba(25, 135, 84, 0.1)",
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: "Đã hủy",
+                                data: trendCancelledData,
+                                borderColor: "#dc3545",
+                                backgroundColor: "rgba(220, 53, 69, 0.1)",
+                                tension: 0.3,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: "top" }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1 }
+                            }
                         }
                     }
-                    else
-                    {
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                Không có đơn hàng nào
-                            </td>
-                        </tr>
+                });
+            }
+
+            // Biểu đồ Phân bổ trạng thái (Doughnut)
+            var orderStatusCtx = document.getElementById("orderStatusChart");
+            if (orderStatusCtx) {
+                new Chart(orderStatusCtx, {
+                    type: "doughnut",
+                    data: {
+                        labels: ["Thành công", "Đang giao", "Chờ xử lý", "Đã hủy"],
+                        datasets: [
+                            {
+                                label: "Số lượng đơn",
+                                data: [statusSuccessCount, statusShippingCount, statusPendingCount, statusCancelledCount],
+                                backgroundColor: [
+                                    "rgba(25, 135, 84, 0.8)",
+                                    "rgba(13, 202, 240, 0.8)",
+                                    "rgba(255, 193, 7, 0.8)",
+                                    "rgba(220, 53, 69, 0.8)"
+                                ],
+                                borderColor: [
+                                    "rgba(25, 135, 84, 1)",
+                                    "rgba(13, 202, 240, 1)",
+                                    "rgba(255, 193, 7, 1)",
+                                    "rgba(220, 53, 69, 1)"
+                                ],
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: "bottom" }
+                        }
                     }
-                </tbody>
-            </table>
-        </div>
-    </div>
-</main>
-
-@section scripts {
-    <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        // Dữ liệu từ server
-        var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
-        var trendTotalData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendTotalData));
-        var trendSuccessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendSuccessData));
-        var trendCancelledData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendCancelledData));
-
-        var statusSuccessCount = @Model.StatusSuccessCount;
-        var statusShippingCount = @Model.StatusShippingCount;
-        var statusPendingCount = @Model.StatusPendingCount;
-        var statusCancelledCount = @Model.StatusCancelledCount;
-
-        // --- Biểu đồ Xu hướng đơn hàng (Line Chart) ---
-        const orderTrendCtx = document.getElementById("orderTrendChart");
-        if (orderTrendCtx) {
-          new Chart(orderTrendCtx, {
-            type: "line",
-            data: {
-              labels: trendLabels,
-              datasets: [
-                {
-                  label: "Tổng đơn",
-                  data: trendTotalData,
-                  borderColor: "#0d6efd",
-                  backgroundColor: "rgba(13, 110, 253, 0.1)",
-                  tension: 0.3,
-                  fill: true
-                },
-                {
-                  label: "Thành công",
-                  data: trendSuccessData,
-                  borderColor: "#198754",
-                  backgroundColor: "rgba(25, 135, 84, 0.1)",
-                  tension: 0.3,
-                  fill: true
-                },
-                {
-                  label: "Đã hủy",
-                  data: trendCancelledData,
-                  borderColor: "#dc3545",
-                  backgroundColor: "rgba(220, 53, 69, 0.1)",
-                  tension: 0.3,
-                  fill: true
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'top',
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    stepSize: 1
-                  }
-                }
-              }
-            },
-          });
-        }
-
-        // --- Biểu đồ Phân bổ trạng thái (Doughnut Chart) ---
-        const orderStatusCtx = document.getElementById("orderStatusChart");
-        if (orderStatusCtx) {
-          new Chart(orderStatusCtx, {
-            type: "doughnut",
-            data: {
-              labels: ["Thành công", "Đang giao", "Chờ xử lý", "Đã hủy"],
-              datasets: [
-                {
-                  label: "Số lượng đơn",
-                  data: [statusSuccessCount, statusShippingCount, statusPendingCount, statusCancelledCount],
-                  backgroundColor: [
-                    "rgba(25, 135, 84, 0.8)", // success
-                    "rgba(13, 202, 240, 0.8)", // info
-                    "rgba(255, 193, 7, 0.8)", // warning
-                    "rgba(220, 53, 69, 0.8)", // danger
-                  ],
-                  borderColor: [
-                    "rgba(25, 135, 84, 1)",
-                    "rgba(13, 202, 240, 1)",
-                    "rgba(255, 193, 7, 1)",
-                    "rgba(220, 53, 69, 1)",
-                  ],
-                  borderWidth: 2,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  position: 'bottom',
-                }
-              }
-            },
-          });
-        }
-      });
+                });
+            }
+        });
     </script>
 }

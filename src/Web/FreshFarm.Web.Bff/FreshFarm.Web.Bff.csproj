@@ -31,12 +31,4 @@
     <Folder Include="Areas\Seller\Views\" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(EnableLegacySeller)' != 'true'">
-    <!-- Keep legacy Seller sources in repo but exclude from default build until migrated -->
-    <Compile Remove="Areas/Seller/**/*.cs" />
-    <Content Remove="Areas/Seller/**/*.cshtml" />
-    <None Remove="Areas/Seller/**/*.cshtml" />
-    <RazorGenerate Remove="Areas/Seller/**/*.cshtml" />
-  </ItemGroup>
-
 </Project>

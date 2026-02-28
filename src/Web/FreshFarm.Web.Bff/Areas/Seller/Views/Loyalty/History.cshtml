@@ -1,4 +1,4 @@
-﻿@model FreshFarm.Web.Bff.Areas.Seller.Controllers.LoyaltyHistoryVM
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyHistoryVM
 @{
     ViewBag.Title = "Lịch sử tích điểm";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
@@ -8,14 +8,14 @@
     var dirVal = Model?.Direction ?? "";
     var startStr = Model?.Start?.ToString("yyyy-MM-dd");
     var endStr = Model?.End?.ToString("yyyy-MM-dd");
-    var page = Model?.Page ?? 1;
+    var currentPage = Model?.Page ?? 1;
     var pageSize = Model?.PageSize ?? 10;
     var total = Model?.Total ?? 0;
     var totalPages = (int)System.Math.Ceiling(total / (double)pageSize);
     if (totalPages < 1) { totalPages = 1; } // để tránh chia cho 0 và UI xấu
 
-    var prev = System.Math.Max(1, page - 1);
-    var next = System.Math.Min(totalPages, page + 1);
+    var prev = System.Math.Max(1, currentPage - 1);
+    var next = System.Math.Min(totalPages, currentPage + 1);
 }
 
 <main class="container-fluid p-4">
@@ -28,9 +28,9 @@
         <div class="col-md-2">
             <select class="form-select" name="direction">
                 <option value="">-- Loại --</option>
-                <option value="EARN" @(dirVal == "EARN" ? "selected" : "")>EARN</option>
-                <option value="REDEEM" @(dirVal == "REDEEM" ? "selected" : "")>REDEEM</option>
-                <option value="ADJUST" @(dirVal == "ADJUST" ? "selected" : "")>ADJUST</option>
+                <option value="EARN" selected="@(dirVal == "EARN"  ? "selected" : null)">EARN</option>
+                <option value="REDEEM" selected="@(dirVal == "REDEEM"  ? "selected" : null)">REDEEM</option>
+                <option value="ADJUST" selected="@(dirVal == "ADJUST"  ? "selected" : null)">ADJUST</option>
             </select>
         </div>
         <div class="col-md-2">
@@ -88,7 +88,7 @@
 
         <div class="card-footer d-flex justify-content-between align-items-center">
             <div>
-                Trang @page / @totalPages - Tổng @total
+                Trang @currentPage / @totalPages - Tổng @total
             </div>
             <div class="btn-group">
                 <a class="btn btn-sm btn-outline-primary"

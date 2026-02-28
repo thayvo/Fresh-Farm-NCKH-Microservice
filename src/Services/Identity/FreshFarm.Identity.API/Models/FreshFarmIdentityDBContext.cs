@@ -12,12 +12,16 @@ public partial class FreshFarmIdentityDBContext : DbContext
         : base(options)
     {
     }
-    public virtual DbSet<AddressBook> AddressBooks { get; set; } // DbSet thao tác bảng AddressBook.
+
+    public virtual DbSet<AddressBook> AddressBooks { get; set; }
+
     public virtual DbSet<Permission> Permissions { get; set; }
 
     public virtual DbSet<Role> Roles { get; set; }
 
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
+
+    public virtual DbSet<StoreSetting> StoreSettings { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
 
@@ -29,51 +33,46 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<AddressBook>(entity => // Mapping cho entity AddressBook.
+        modelBuilder.Entity<AddressBook>(entity =>
         {
-            entity.ToTable("AddressBook"); // Ánh xạ đúng tên bảng DB.
+            entity.HasKey(e => e.AddressId);
 
-            entity.HasKey(e => e.AddressId); // Khai báo PK.
+            entity.ToTable("AddressBook");
 
-            entity.Property(e => e.RecipientName) // Mapping cột RecipientName.
-                .IsRequired() // Bắt buộc.
-                .HasMaxLength(100); // Tối đa 100 ký tự.
+            entity.HasIndex(e => new { e.UserId, e.IsActive, e.IsDefault }, "IX_AddressBook_UserId_IsActive");
 
-            entity.Property(e => e.Phone) // Mapping cột Phone.
-                .IsRequired() // Bắt buộc.
-                .HasMaxLength(10); // Tối đa 10 ký tự.
+            entity.HasIndex(e => e.UserId, "UX_AddressBook_Default_OnePerUser")
+                .IsUnique()
+                .HasFilter("([IsDefault]=(1) AND [IsActive]=(1))");
 
-            entity.Property(e => e.AddressDetail) // Mapping cột AddressDetail.
-                .IsRequired() // Bắt buộc.
-                .HasMaxLength(255); // Tối đa 255 ký tự.
+            entity.Property(e => e.AddressDetail)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AddressBook_CreatedAt");
+            entity.Property(e => e.District).HasMaxLength(100);
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AddressBook_IsActive");
+            entity.Property(e => e.IsDefault).HasAnnotation("Relational:DefaultConstraintName", "DF_AddressBook_IsDefault");
+            entity.Property(e => e.Phone)
+                .IsRequired()
+                .HasMaxLength(10);
+            entity.Property(e => e.Province).HasMaxLength(100);
+            entity.Property(e => e.RecipientName)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.UpdatedAt).HasPrecision(0);
+            entity.Property(e => e.Ward).HasMaxLength(100);
 
-            entity.Property(e => e.Province) // Mapping cột Province.
-                .HasMaxLength(100); // Tối đa 100 ký tự.
-
-            entity.Property(e => e.District) // Mapping cột District.
-                .HasMaxLength(100); // Tối đa 100 ký tự.
-
-            entity.Property(e => e.Ward) // Mapping cột Ward.
-                .HasMaxLength(100); // Tối đa 100 ký tự.
-
-            entity.Property(e => e.IsDefault) // Mapping cột IsDefault.
-                .HasDefaultValue(false); // Mặc định false.
-
-            entity.Property(e => e.IsActive) // Mapping cột IsActive.
-                .HasDefaultValue(true); // Mặc định true.
-
-            entity.Property(e => e.CreatedAt) // Mapping cột CreatedAt.
-                .HasPrecision(0) // Dùng precision(0) đồng bộ các bảng hiện có.
-                .HasDefaultValueSql("(sysutcdatetime())"); // Mặc định UTC now.
-
-            entity.Property(e => e.UpdatedAt) // Mapping cột UpdatedAt.
-                .HasPrecision(0); // Precision(0).
-
-            entity.HasOne(d => d.User) // Khai báo quan hệ many-to-one.
-                .WithMany(p => p.AddressBooks) // 1 user có nhiều address.
-                .HasForeignKey(d => d.UserId) // FK là UserId.
-                .HasConstraintName("FK_AddressBook_Users"); // Tên FK.
+            entity.HasOne(d => d.User).WithOne(p => p.AddressBook)
+                .HasForeignKey<AddressBook>(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_AddressBook_Users");
         });
+
         modelBuilder.Entity<Permission>(entity =>
         {
             entity.HasIndex(e => e.PermissionCode, "UQ_Permissions_Code").IsUnique();
@@ -135,6 +134,39 @@ public partial class FreshFarmIdentityDBContext : DbContext
                 .HasConstraintName("FK_RolePermissions_Roles");
         });
 
+        modelBuilder.Entity<StoreSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId);
+
+            entity.Property(e => e.SettingId).HasColumnName("SettingID");
+            entity.Property(e => e.AdminNotificationEmail)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_StoreSettings_CreatedAt");
+            entity.Property(e => e.DefaultShippingFee).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.FreeShippingThreshold).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.IsCodenabled).HasColumnName("IsCODEnabled");
+            entity.Property(e => e.StoreAddress)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.StoreEmail)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.StoreName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.StorePhone)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(e => e.UpdatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_StoreSettings_UpdatedAt");
+        });
+
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasIndex(e => e.Email, "UQ_Users_Email").IsUnique();
@@ -143,6 +175,7 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
             entity.HasIndex(e => e.UserName, "UQ_Users_UserName").IsUnique();
 
+            entity.Property(e => e.Avatar).HasMaxLength(255);
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())")
@@ -158,7 +191,7 @@ public partial class FreshFarmIdentityDBContext : DbContext
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_IsActive");
             entity.Property(e => e.Phone)
                 .IsRequired()
-                .HasMaxLength(20);
+                .HasMaxLength(10);
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
             entity.Property(e => e.UserName)
                 .IsRequired()

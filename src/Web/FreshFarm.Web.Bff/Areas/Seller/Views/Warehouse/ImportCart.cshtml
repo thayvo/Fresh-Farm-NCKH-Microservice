@@ -5,192 +5,471 @@
 }
 
 <style>
-    .import-cart-card {
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 1.75rem;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, rgba(255,255,255,0.13) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .grad-header-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+        box-shadow: 0 10px 30px rgba(22, 163, 74, 0.5);
+        border-radius: 1.5rem;
+    }
+
+    .card-glass,
+    .import-cart-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.08);
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .form-control,
+    .form-check-input {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .75rem 1rem;
+        transition: all .25s ease;
+    }
+
+        .form-control:focus,
+        .form-check-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+        }
+
     .product-search-box {
-        border-radius: 8px;
-        border: 2px solid #dee2e6;
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
     }
 
     .cart-item {
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid #e5e7eb;
         padding: 1rem 0;
-        transition: background-color 0.2s;
+        transition: all 0.2s ease;
     }
 
         .cart-item:hover {
-            background-color: #f8f9fa;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.06) 0%, rgba(147, 197, 253, 0.06) 100%);
+            transform: translateY(-2px);
         }
 
     .cart-summary {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
         color: white;
-        border-radius: 12px;
-        padding: 1.5rem;
+        border-radius: 1.5rem;
+        padding: 1.5rem 1.75rem;
+        box-shadow: 0 20px 45px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .6s ease-out .15s backwards;
     }
 
+    .btn-pill {
+        border-radius: 999px;
+        padding: .7rem 1.6rem;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+        transition: all .25s cubic-bezier(.4,0,.2,1);
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 32px rgba(0,0,0,0.2);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+        }
+
+    .btn-outline-secondary {
+        border-radius: 999px;
+        border-width: 2px;
+        padding: .6rem 1.4rem;
+        font-weight: 500;
+        background-color: rgba(255,255,255,0.1);
+        color: #1e293b;
+        border-color: #cbd5f5;
+    }
+
+        .btn-outline-secondary:hover {
+            background: linear-gradient(135deg, #e5e7eb 0%, #e0f2fe 100%);
+            border-color: #1e40af;
+            color: #0f172a;
+        }
+
     .btn-add-to-cart {
-        border-radius: 8px;
-        padding: 0.5rem 1.5rem;
+        border-radius: 999px;
+    }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .alert.dynamic-toast {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 320px;
+        max-width: 480px;
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 15px 45px rgba(15,23,42,0.35);
+        animation: slideIn .35s ease-out;
+    }
+
+    .toast-icon {
+        font-size: 1.4rem;
+    }
+
+    .scroll-y-soft {
+        scrollbar-width: thin;
+        scrollbar-color: #93c5fd #eff6ff;
+    }
+
+        .scroll-y-soft::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scroll-y-soft::-webkit-scrollbar-track {
+            background: #eff6ff;
+        }
+
+        .scroll-y-soft::-webkit-scrollbar-thumb {
+            background: #93c5fd;
+            border-radius: 999px;
+        }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 1.75rem 1.5rem !important;
+        }
+
+        .alert.dynamic-toast {
+            left: 12px;
+            right: 12px;
+        }
     }
 </style>
 
-<main class="container-fluid p-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-1">
-                <i class="bi bi-box-arrow-in-down text-success me-2"></i>Nhập Kho
-            </h2>
-            <p class="text-muted mb-0">Thêm nhiều sản phẩm vào giỏ nhập trước khi xác nhận</p>
-        </div>
-        <a href="@Url.Action("Index", "Warehouse", new { area = "Seller" })" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i>Quay lại kho
-        </a>
-    </div>
+<main class="min-vh-100">
+    <div class="container-fluid py-4">
 
-    <div class="row g-4">
-        <!-- Left: Form thêm sản phẩm -->
-        <div class="col-lg-7">
-            <div class="card import-cart-card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Thêm sản phẩm vào giỏ nhập</h5>
-                </div>
-                <div class="card-body">
-                    <form id="addToCartForm">
-                        <div class="row g-3">
-                            <!-- Tìm kiếm sản phẩm -->
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Tìm sản phẩm <span class="text-danger">*</span></label>
-                                <input type="hidden" id="selectedProductId" />
-                                <input type="text"
-                                       id="productSearchInput"
-                                       class="form-control product-search-box"
-                                       list="productDatalist"
-                                       placeholder="Nhập tên hoặc mã SKU sản phẩm..."
-                                       autocomplete="off" />
-                                <datalist id="productDatalist">
-                                    @if (Model.ProductOptions != null)
-                                    {
-                                        foreach (var item in Model.ProductOptions)
-                                        {
-                                            <option value="@item.Text" data-id="@item.Value"></option>
-                                        }
-                                    }
-                                </datalist>
-                                <div id="productInfo" class="mt-2 text-muted small"></div>
-                            </div>
-
-                            <!-- Số lượng -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Số lượng <span class="text-danger">*</span></label>
-                                <input type="number" id="quantity" class="form-control" min="1" value="1" required />
-                            </div>
-
-                            <!-- Giá nhập -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Giá nhập (₫) <span class="text-danger">*</span></label>
-                                <input type="number" id="importPrice" class="form-control" min="0" step="1000" required />
-                            </div>
-
-                            <!-- Giá bán -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Giá bán (₫)</label>
-                                <input type="number" id="sellPrice" class="form-control" min="0" step="1000" />
-                            </div>
-
-                            <!-- Nhà cung cấp -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Nhà cung cấp</label>
-                                <input type="text" id="supplierName" class="form-control" placeholder="Tên nhà cung cấp" />
-                            </div>
-
-                            <!-- Ngày nhập -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Ngày nhập</label>
-                                <input type="date" id="importDate" class="form-control" />
-                            </div>
-
-                            <!-- Hạn sử dụng -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Hạn sử dụng <span class="text-danger">*</span></label>
-                                <input type="date" id="expiryDate" class="form-control" required />
-                            </div>
-
-                            <!-- Cảnh báo hết hạn -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">Cảnh báo sắp hết hạn (ngày)</label>
-                                <input type="number" id="nearExpiryDays" class="form-control" min="1" placeholder="VD: 7" />
-                            </div>
-
-                            <!-- Ghi chú -->
-                            <div class="col-12">
-                                <label class="form-label fw-bold">Ghi chú</label>
-                                <textarea id="notes" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
-                            </div>
-
-                            <!-- Checkbox giữ trạng thái tắt -->
-                            <div class="col-12">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="keepDisabled" />
-                                    <label class="form-check-label" for="keepDisabled">
-                                        Giữ sản phẩm ở trạng thái <strong>tạm dừng bán</strong> sau khi nhập
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Nút thêm vào giỏ -->
-                            <div class="col-12">
-                                <button type="button" class="btn btn-success btn-add-to-cart w-100" onclick="addToImportCart()">
-                                    <i class="bi bi-cart-plus me-2"></i>Thêm vào giỏ nhập
-                                </button>
-                            </div>
+        <!-- HEADER GRADIENT VỚI HIỆU ỨNG QUÉT ÁNH SÁNG -->
+        <div class="grad-header p-4 p-md-5">
+            <div class="grad-header-inner">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="p-3 icon-gradient d-flex align-items-center justify-content-center">
+                            <i class="bi bi-box-arrow-in-down text-white" style="font-size: 2.5rem;"></i>
                         </div>
-                    </form>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size: 2.4rem; text-shadow: 0 4px 10px rgba(0,0,0,.35);">
+                                Nhập Kho
+                            </h1>
+                            <p class="mb-0 text-white opacity-90" style="font-size: 1.05rem;">
+                                Thêm nhiều sản phẩm vào giỏ nhập, kiểm tra lại trước khi xác nhận nhập kho
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-md-end">
+                        <a href="@Url.Action("Index", "Warehouse", new { area = "Seller" })"
+                           class="btn btn-outline-light btn-pill d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-left"></i>
+                            <span>Quay lại kho</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right: Giỏ nhập -->
-        <div class="col-lg-5">
-            <div class="card import-cart-card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="bi bi-cart3 me-2"></i>Giỏ nhập
-                        <span class="badge bg-light text-dark" id="cartCount">0</span>
-                    </h5>
-                </div>
-                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                    <div id="importCartItems">
-                        <div class="text-center text-muted py-5">
-                            <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-                            <p>Giỏ nhập đang trống</p>
+        <div class="row g-4">
+            <!-- Left: Form thêm sản phẩm -->
+            <div class="col-lg-7">
+                <div class="import-cart-card mb-3">
+                    <div class="px-4 pt-4 pb-2 border-bottom d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="p-3 rounded-4 d-flex align-items-center justify-content-center"
+                                 style="background: linear-gradient(135deg,#16a34a 0%,#22c55e 100%);">
+                                <i class="bi bi-plus-circle text-white" style="font-size: 1.6rem;"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1 fw-bold text-primary-blue">Thêm sản phẩm vào giỏ nhập</h5>
+                                <p class="mb-0 text-muted small">
+                                    Chọn sản phẩm, nhập số lượng, giá và thông tin liên quan
+                                </p>
+                            </div>
                         </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <form id="addToCartForm">
+                            <div class="row g-3">
+                                <!-- Tìm kiếm sản phẩm -->
+                                <div class="col-12">
+                                    <label class="form-label fw-bold text-primary-blue">
+                                        Tìm sản phẩm <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="hidden" id="selectedProductId" />
+                                    <input type="text"
+                                           id="productSearchInput"
+                                           class="form-control product-search-box"
+                                           list="productDatalist"
+                                           placeholder="Nhập tên hoặc mã SKU sản phẩm..."
+                                           autocomplete="off" />
+                                    <datalist id="productDatalist">
+                                        @if (Model.ProductOptions != null)
+                                        {
+                                            foreach (var item in Model.ProductOptions)
+                                            {
+                                                <option value="@item.Text" data-id="@item.Value"></option>
+                                            }
+                                        }
+                                    </datalist>
+                                    <div id="productInfo" class="mt-2 text-muted small"></div>
+                                </div>
+
+                                <!-- Số lượng -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">
+                                        Số lượng <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" id="quantity" class="form-control" min="1" value="1" required />
+                                </div>
+
+                                <!-- Giá nhập -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">
+                                        Giá nhập (₫) <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="number" id="importPrice" class="form-control" min="0" step="1000" required />
+                                </div>
+
+                                <!-- Giá bán -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">Giá bán (₫)</label>
+                                    <input type="number" id="sellPrice" class="form-control" min="0" step="1000" />
+                                </div>
+
+                                <!-- Nhà cung cấp -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">Nhà cung cấp</label>
+                                    <input type="text" id="supplierName" class="form-control" placeholder="Tên nhà cung cấp" />
+                                </div>
+
+                                <!-- Ngày nhập -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">Ngày nhập</label>
+                                    <input type="date" id="importDate" class="form-control" />
+                                </div>
+
+                                <!-- Hạn sử dụng -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">
+                                        Hạn sử dụng <span class="text-danger">*</span>
+                                    </label>
+                                    <input type="date" id="expiryDate" class="form-control" required />
+                                </div>
+
+                                <!-- Cảnh báo hết hạn -->
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-primary-blue">
+                                        Cảnh báo sắp hết hạn (ngày)
+                                    </label>
+                                    <input type="number" id="nearExpiryDays" class="form-control" min="1" placeholder="VD: 7" />
+                                </div>
+
+                                <!-- Ghi chú -->
+                                <div class="col-12">
+                                    <label class="form-label fw-bold text-primary-blue">Ghi chú</label>
+                                    <textarea id="notes" class="form-control" rows="2" placeholder="Ghi chú thêm..."></textarea>
+                                </div>
+
+                                <!-- Checkbox giữ trạng thái tắt -->
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="keepDisabled" />
+                                        <label class="form-check-label" for="keepDisabled">
+                                            Giữ sản phẩm ở trạng thái <strong>tạm dừng bán</strong> sau khi nhập
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Nút thêm vào giỏ -->
+                                <div class="col-12">
+                                    <button type="button"
+                                            class="btn btn-success btn-add-to-cart btn-pill w-100 d-flex align-items-center justify-content-center gap-2"
+                                            onclick="addToImportCart()">
+                                        <i class="bi bi-cart-plus"></i>
+                                        <span>Thêm vào giỏ nhập</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
 
-            <!-- Summary -->
-            <div class="cart-summary mt-3">
-                <h6 class="mb-3"><i class="bi bi-receipt me-2"></i>Tổng kết</h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Tổng số sản phẩm:</span>
-                    <strong id="totalProducts">0</strong>
+            <!-- Right: Giỏ nhập -->
+            <div class="col-lg-5">
+                <div class="import-cart-card mb-3">
+                    <div class="px-4 pt-4 pb-2 border-bottom">
+                        <h5 class="mb-0 fw-bold text-primary-blue d-flex align-items-center justify-content-between">
+                            <span>
+                                <i class="bi bi-cart3 me-2"></i>Giỏ nhập
+                            </span>
+                            <span class="badge rounded-pill bg-primary text-white" id="cartCount">0</span>
+                        </h5>
+                    </div>
+                    <div class="card-body scroll-y-soft" style="max-height: 500px; overflow-y: auto;">
+                        <div id="importCartItems">
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                                <p>Giỏ nhập đang trống</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span>Tổng số lượng:</span>
-                    <strong id="totalQuantity">0</strong>
+
+                <!-- Summary -->
+                <div class="cart-summary mt-3">
+                    <h6 class="mb-3 fw-bold">
+                        <i class="bi bi-receipt me-2"></i>Tổng kết giỏ nhập
+                    </h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tổng số sản phẩm:</span>
+                        <strong id="totalProducts">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tổng số lượng:</span>
+                        <strong id="totalQuantity">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 pb-3 border-bottom border-white/20">
+                        <span>Tổng giá trị:</span>
+                        <strong id="totalValue">0 ₫</strong>
+                    </div>
+                    <button class="btn btn-light btn-pill w-100 fw-bold d-flex align-items-center justify-content-center gap-2"
+                            onclick="confirmImportAll()" id="btnConfirmImport" disabled>
+                        <i class="bi bi-check-circle"></i>
+                        <span>Xác nhận nhập kho</span>
+                    </button>
                 </div>
-                <div class="d-flex justify-content-between mb-3 pb-3 border-bottom">
-                    <span>Tổng giá trị:</span>
-                    <strong id="totalValue">0 ₫</strong>
-                </div>
-                <button class="btn btn-light w-100 fw-bold" onclick="confirmImportAll()" id="btnConfirmImport" disabled>
-                    <i class="bi bi-check-circle me-2"></i>Xác nhận nhập kho
-                </button>
             </div>
         </div>
     </div>
@@ -204,7 +483,10 @@
     // Load ngày hiện tại
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('importDate').value = today;
+        const importDate = document.getElementById('importDate');
+        if (importDate) {
+            importDate.value = today;
+        }
     });
 
     // Xử lý chọn sản phẩm từ datalist
@@ -303,7 +585,7 @@
                     <div class="cart-item">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
-                                <h6 class="mb-1">${item.productName}</h6>
+                                <h6 class="mb-1 text-primary-blue">${item.productName}</h6>
                                 <div class="small text-muted">
                                     <div>SL: <strong>${item.quantity}</strong> |
                                          Giá nhập: <strong>${item.importPrice.toLocaleString()} ₫</strong></div>
@@ -311,7 +593,7 @@
                                     ${item.supplierName ? `<div>NCC: ${item.supplierName}</div>` : ''}
                                 </div>
                             </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeFromCart(${item.id})">
+                            <button class="btn btn-sm btn-outline-danger rounded-3" onclick="removeFromCart(${item.id})">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -330,7 +612,7 @@
         document.getElementById('totalQuantity').textContent = totalQty;
 
         const totalVal = importCart.reduce((sum, item) => sum + (item.quantity * item.importPrice), 0);
-        document.getElementById('totalValue').textContent = totalVal.toLocaleString() + ' ₫';
+        document.getElementById('totalValue').textContent = totalVal.toLocaleString('vi-VN') + ' ₫';
     }
 
     // Xóa khỏi giỏ
@@ -356,7 +638,6 @@
     }
 
     // Xác nhận nhập toàn bộ giỏ
-    // Xác nhận nhập toàn bộ giỏ
     function confirmImportAll() {
         if (importCart.length === 0) {
             alert('Giỏ nhập đang trống!');
@@ -367,8 +648,9 @@
             return;
         }
 
-        document.getElementById('btnConfirmImport').disabled = true;
-        document.getElementById('btnConfirmImport').innerHTML =
+        const btn = document.getElementById('btnConfirmImport');
+        btn.disabled = true;
+        btn.innerHTML =
             '<span class="spinner-border spinner-border-sm me-2"></span>Đang xử lý...';
 
         // ✅ Gọi API nhập hàng loạt (1 lần duy nhất)
@@ -387,15 +669,15 @@
                     window.location.href = '@Url.Action("Index", "Warehouse", new { area = "Seller" })';
                 } else {
                     alert('Có lỗi xảy ra:\n' + response.message);
-                    document.getElementById('btnConfirmImport').disabled = false;
-                    document.getElementById('btnConfirmImport').innerHTML =
+                    btn.disabled = false;
+                    btn.innerHTML =
                         '<i class="bi bi-check-circle me-2"></i>Xác nhận nhập kho';
                 }
             },
             error: function() {
                 alert('Lỗi kết nối server!');
-                document.getElementById('btnConfirmImport').disabled = false;
-                document.getElementById('btnConfirmImport').innerHTML =
+                btn.disabled = false;
+                btn.innerHTML =
                     '<i class="bi bi-check-circle me-2"></i>Xác nhận nhập kho';
             }
         });
@@ -409,19 +691,34 @@
     }
 
     function showToast(message, type = 'info') {
-        const bgClass = type === 'success' ? 'bg-success' :
-                       type === 'warning' ? 'bg-warning' :
-                       type === 'danger' ? 'bg-danger' : 'bg-info';
+        const iconMap = {
+            success: 'check-circle-fill',
+            warning: 'exclamation-triangle-fill',
+            danger: 'x-octagon-fill',
+            info: 'info-circle-fill'
+        };
+        const bgMap = {
+            success: 'bg-success',
+            warning: 'bg-warning text-dark',
+            danger: 'bg-danger',
+            info: 'bg-info'
+        };
 
         const toast = document.createElement('div');
-        toast.className = `alert ${bgClass} text-white alert-dismissible fade show position-fixed top-0 end-0 m-3`;
-        toast.style.zIndex = '9999';
+        toast.className = `alert dynamic-toast ${bgMap[type] || bgMap.info} text-white alert-dismissible fade show`;
         toast.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-${iconMap[type] || iconMap.info} toast-icon"></i>
+                <div class="flex-grow-1">${message}</div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+            </div>
         `;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+
+        setTimeout(() => {
+            toast.style.animation = 'slideOut .3s ease-out forwards';
+            setTimeout(() => toast.remove(), 320);
+        }, 2500);
     }
     </script>
 }

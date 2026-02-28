@@ -16,17 +16,17 @@ Mục tiêu: bạn tự tay dựng kiến trúc microservices trong **cùng repo
   - ---------=====================ĐÃ HOÀN THÀNH==========-------
 - [x] Tạo `FreshFarm.Web.Bff` (MVC) + add vào solution
   - ---------=====================ĐÃ HOÀN THÀNH==========-------
-- [x] Add `ProjectReference` tới `FreshFarm.Contracts` cho Identity/Catalog/BFF
+- [x] Add `ProjectReference` tới `FreshFarm.Contracts` cho Identity/Catalog/Ordering/BFF
   - ---------=====================ĐÃ HOÀN THÀNH==========-------
-- [x] Set port cố định cho 3 app (launchSettings hoặc env vars)
+- [x] Set port cố định cho 4 app (launchSettings hoặc env vars)
   - ---------=====================ĐÃ HOÀN THÀNH==========-------
-- [ ] Thêm endpoint `/health` cho Identity/Catalog/BFF
-- [ ] Implement login/register + JWT ở Identity
+- [x] Thêm endpoint `/health` cho Identity/Catalog/Ordering/BFF
+- [x] Implement login/register + JWT ở Identity
   - [x] Thêm `Jwt` section vào `Identity/appsettings.json`
     - ---------=====================ĐÃ HOÀN THÀNH==========-------
-- [ ] Protect Catalog bằng JWT role/claims (Seller)
-- [ ] BFF gọi Identity/Catalog bằng typed `HttpClient` và có trang login (Admin/Seller/Customer)
-- [ ] Dockerfile + `src/docker-compose.yml` để chạy 3 app (tuỳ chọn)
+- [x] Protect Catalog bằng JWT role/claims (Seller)
+- [x] BFF gọi Identity/Catalog/Ordering bằng typed `HttpClient` và có trang login (Admin/Seller/Customer)
+- [ ] Dockerfile + `src/docker-compose.yml` để chạy 4 app (tuỳ chọn)
 
 ## 0) Yêu cầu môi trường
 
@@ -168,13 +168,13 @@ Gợi ý bạn nên tạo trong `FreshFarm.Contracts`:
 - `Auth/AppRole.cs` (enum Admin/Seller/Customer) *nếu thật sự cần dùng chung*
 - Request/Response DTO (LoginRequest, LoginResponse, ProductDto, ListingDto…)
 
-## 4) Tạo 2 microservice đầu tiên (Identity + Catalog)
+## 4) Tạo 3 microservice đầu tiên (Identity + Catalog + Ordering)
 
 ### 4.1) Identity service (JWT)
 
-1. `dotnet new webapi -n FreshFarm.Identity.Api -o src/Services/Identity/FreshFarm.Identity.Api`
-2. `dotnet sln src/FreshFarm.sln add src/Services/Identity/FreshFarm.Identity.Api/FreshFarm.Identity.Api.csproj`
-3. `dotnet add src/Services/Identity/FreshFarm.Identity.Api/FreshFarm.Identity.Api.csproj reference src/BuildingBlocks/FreshFarm.Contracts/FreshFarm.Contracts.csproj`
+1. `dotnet new webapi -n FreshFarm.Identity.Api -o src/Services/Identity/FreshFarm.Identity.API`
+2. `dotnet sln src/FreshFarm.sln add src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj`
+3. `dotnet add src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj reference src/BuildingBlocks/FreshFarm.Contracts/FreshFarm.Contracts.csproj`
 
 Việc bạn làm tiếp trong Identity (tự code):
 - `POST /auth/register` (tạo user + role)
@@ -195,6 +195,18 @@ Việc bạn làm tiếp trong Catalog (tự code):
 - `GET /products`
 - `POST /seller/listings` (yêu cầu role Seller)
 - `GET /seller/listings` (seller xem listing của mình)
+- `GET /health`
+
+### 4.3) Ordering service
+
+1. `dotnet new webapi -n FreshFarm.Ordering.Api -o src/Services/Ordering/FreshFarm.Ordering.Api`
+2. `dotnet sln src/FreshFarm.sln add src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj`
+3. `dotnet add src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj reference src/BuildingBlocks/FreshFarm.Contracts/FreshFarm.Contracts.csproj`
+
+Việc bạn làm tiếp trong Ordering (tự code):
+- `GET /api/orders/my`
+- `GET /api/orders/{id}`
+- Nhóm admin route `api/orders/admin/*` cho Seller portal
 - `GET /health`
 
 ## 5) Tạo Web/BFF để show UI (MVC + Areas Admin/Seller)
@@ -219,6 +231,7 @@ Bạn có 2 cách (chọn 1):
 - Cách A (nhanh): chạy với `ASPNETCORE_URLS`
   - Identity: `ASPNETCORE_URLS=http://localhost:5101`
   - Catalog: `ASPNETCORE_URLS=http://localhost:5102`
+  - Ordering: `ASPNETCORE_URLS=http://localhost:5136`
   - BFF: `ASPNETCORE_URLS=http://localhost:5100`
 - Cách B (đúng kiểu VS): chỉnh `Properties/launchSettings.json` của từng project
 
@@ -227,22 +240,25 @@ Bạn có 2 cách (chọn 1):
 Mỗi project sẽ có file:
 - `src/Services/Identity/FreshFarm.Identity.API/Properties/launchSettings.json`
 - `src/Services/Catalog/FreshFarm.Catalog.Api/Properties/launchSettings.json`
+- `src/Services/Ordering/FreshFarm.Ordering.Api/Properties/launchSettings.json`
 - `src/Web/FreshFarm.Web.Bff/Properties/launchSettings.json`
 
 Trong mỗi file, tìm profile `http` (hoặc tạo mới) và set `applicationUrl`:
 - Identity: `http://localhost:5101`
 - Catalog: `http://localhost:5102`
+- Ordering: `http://localhost:5136`
 - BFF: `http://localhost:5100`
 
 Nếu có profile `https` thì giữ cũng được, nhưng khi làm Docker bạn nên ưu tiên chạy HTTP.
 
-## 7) Run local (3 terminal)
+## 7) Run local (4 terminal)
 
 - `dotnet run --project src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj`
 - `dotnet run --project src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj`
+- `dotnet run --project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj`
 - `dotnet run --project src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
 
-## 7.1) Thêm endpoint `/health` cho Identity/Catalog/BFF
+## 7.1) Thêm endpoint `/health` cho Identity/Catalog/Ordering/BFF
 
 Trong `Program.cs` của từng project, thêm 1 endpoint đơn giản:
 
@@ -253,11 +269,13 @@ app.MapGet("/health", () => Results.Ok("ok"));
 Files:
 - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
 - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
+- `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
 - `src/Web/FreshFarm.Web.Bff/Program.cs`
 
 Test nhanh trên trình duyệt:
 - `http://localhost:5101/health`
 - `http://localhost:5102/health`
+- `http://localhost:5136/health`
 - `http://localhost:5100/health`
 
 ## 7.2) Implement login/register + JWT ở Identity (gợi ý làm nhanh)
@@ -310,18 +328,19 @@ Nếu bạn dùng minimal API:
 - Gọi `/auth/login` ở Identity lấy token
 - Call Catalog endpoint với header: `Authorization: Bearer <token>`
 
-## 7.4) BFF gọi Identity/Catalog bằng typed `HttpClient` + trang login
+## 7.4) BFF gọi Identity/Catalog/Ordering bằng typed `HttpClient` + trang login
 
 ### Bước 1 — Cấu hình base URL
 
 Trong `src/Web/FreshFarm.Web.Bff/appsettings.json`, thêm:
-- `Services:IdentityBaseUrl` = `http://localhost:5101`
-- `Services:CatalogBaseUrl` = `http://localhost:5102`
+- `Services:Identity:BaseUrl` = `https://localhost:7140`
+- `Services:Catalog:BaseUrl` = `https://localhost:7245`
+- `Services:Ordering:BaseUrl` = `https://localhost:7018`
 
 ### Bước 2 — Đăng ký typed HttpClient trong `Program.cs`
 
 Trong `src/Web/FreshFarm.Web.Bff/Program.cs`:
-- `builder.Services.AddHttpClient(...)` cho Identity/Catalog (BaseAddress đọc từ config)
+- `builder.Services.AddHttpClient(...)` cho Identity/Catalog/Ordering (BaseAddress đọc từ config)
 
 ### Bước 3 — Tạo trang login (1 backend login, phân quyền theo role)
 
@@ -342,7 +361,10 @@ Tạo `Controllers/AccountController`:
 
 Bạn đã có hướng dẫn ở mục `## 10)`. Khi làm Docker, nhớ:
 - BFF không gọi `localhost:5101` trong container → phải gọi `http://identity-api:8080` theo tên service trong compose.
-- Set base URL bằng env vars trong compose (`Services__IdentityBaseUrl`, `Services__CatalogBaseUrl`).
+- Set base URL bằng env vars nested key trong compose:
+  - `Services__Identity__BaseUrl`
+  - `Services__Catalog__BaseUrl`
+  - `Services__Ordering__BaseUrl`
 
 ## 8) DB: bạn có 1 CSDL thì sao?
 
@@ -378,7 +400,7 @@ Lưu ý quan trọng:
 
 ## 9) Checklist để người khác nhìn vào biết là microservices
 
-- [ ] Có nhiều executable độc lập: `FreshFarm.Identity.Api`, `FreshFarm.Catalog.Api`, `FreshFarm.Web.Bff`
+- [ ] Có nhiều executable độc lập: `FreshFarm.Identity.Api`, `FreshFarm.Catalog.Api`, `FreshFarm.Ordering.Api`, `FreshFarm.Web.Bff`
 - [ ] Mỗi service có `/health` và chạy port riêng
 - [ ] Identity cấp JWT; Catalog authorize theo role/claims
 - [ ] BFF gọi services qua HTTP (không reference trực tiếp code domain của services)
@@ -386,13 +408,14 @@ Lưu ý quan trọng:
 
 ## 10) Docker/Docker Compose (chưa có file sẵn, bạn tự tạo)
 
-Hiện repo **chưa có** `Dockerfile` hoặc `docker-compose.yml`. Nếu bạn muốn demo “microservices đúng bài” khi xin việc, bạn nên thêm Compose để chạy 3 app + (tuỳ chọn) SQL Server.
+Hiện repo **chưa có** `Dockerfile` hoặc `docker-compose.yml`. Nếu bạn muốn demo “microservices đúng bài” khi xin việc, bạn nên thêm Compose để chạy 4 app + (tuỳ chọn) SQL Server.
 
 ### 10.1) Dockerfile cho từng service (mẫu hướng dẫn)
 
 Đặt `Dockerfile` ngay trong mỗi project:
 - `src/Services/Identity/FreshFarm.Identity.API/Dockerfile`
 - `src/Services/Catalog/FreshFarm.Catalog.Api/Dockerfile`
+- `src/Services/Ordering/FreshFarm.Ordering.Api/Dockerfile`
 - `src/Web/FreshFarm.Web.Bff/Dockerfile`
 
 Gợi ý nội dung (multi-stage):
@@ -401,31 +424,35 @@ Gợi ý nội dung (multi-stage):
 
 Lưu ý:
 - Trong container ưu tiên chạy **HTTP** (không cần HTTPS dev cert).
-- Mỗi app expose port nội bộ 8080 (hoặc 80) và map ra host port 5100/5101/5102.
+- Mỗi app expose port nội bộ 8080 (hoặc 80) và map ra host port 5100/5101/5102/5103.
 
-### 10.2) `docker-compose.yml` (chạy 3 app)
+### 10.2) `docker-compose.yml` (chạy 4 app)
 
 Tạo file: `src/docker-compose.yml`
 
-Compose nên có 3 service:
+Compose nên có 4 service:
 - `identity-api` → build từ `src/Services/Identity/FreshFarm.Identity.API`
 - `catalog-api` → build từ `src/Services/Catalog/FreshFarm.Catalog.Api`
+- `ordering-api` → build từ `src/Services/Ordering/FreshFarm.Ordering.Api`
 - `web-bff` → build từ `src/Web/FreshFarm.Web.Bff`
 
 Ports gợi ý:
 - `web-bff`: `5100:8080`
 - `identity-api`: `5101:8080`
 - `catalog-api`: `5102:8080`
+- `ordering-api`: `5103:8080`
 
 ### 10.3) “Kết nối” giữa các container (quan trọng)
 
 Trong Docker network, BFF không gọi `http://localhost:5101` được. BFF phải gọi theo **tên service**:
 - Identity base URL: `http://identity-api:8080`
 - Catalog base URL: `http://catalog-api:8080`
+- Ordering base URL: `http://ordering-api:8080`
 
 Vì vậy bạn nên cấu hình URL bằng `appsettings.json` hoặc env vars trong BFF, ví dụ:
-- `Services__IdentityBaseUrl=http://identity-api:8080`
-- `Services__CatalogBaseUrl=http://catalog-api:8080`
+- `Services__Identity__BaseUrl=http://identity-api:8080`
+- `Services__Catalog__BaseUrl=http://catalog-api:8080`
+- `Services__Ordering__BaseUrl=http://ordering-api:8080`
 
 ### 10.4) (Tuỳ chọn) Thêm SQL Server vào compose
 

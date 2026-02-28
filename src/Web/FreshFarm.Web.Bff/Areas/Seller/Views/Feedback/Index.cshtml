@@ -1,36 +1,560 @@
-﻿@model IEnumerable<FreshFarm.Areas.Admin.Data.FeedbackViewModel>
+﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.SellerFeedbackViewModel>
 @{
     ViewBag.Title = "Quản lý phản hồi người dùng";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+
+    int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
+    int pageSize = ViewBag.PageSize is int ps ? ps : 10;
+    int totalRecords = ViewBag.TotalRecords is int tr ? tr : (Model?.Count() ?? 0);
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    string currentQuery = ViewBag.Query as string ?? string.Empty;
+    string currentStatus = ViewBag.Status as string ?? string.Empty;
 }
 
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="fw-bold text-primary mb-0">
-            <i class="bi bi-chat-dots"></i> Quản lý phản hồi người dùng
-        </h4>
-        <div class="d-flex">
-            <input type="text" id="searchBox" class="form-control me-2" placeholder="Tìm theo tên, email hoặc chủ đề..." style="width: 250px;" />
-            <button class="btn btn-outline-primary" onclick="filterFeedbacks()">
-                <i class="bi bi-search"></i> Tìm kiếm
-            </button>
-        </div>
-    </div>
+@using (Html.BeginForm(null, null, FormMethod.Post, new { id = "__ajaxAntiForgeryForm" }))
+{
+    @Html.AntiForgeryToken()
+}
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
+<style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+        --border-blue: #bfdbfe;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0)
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px)
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0)
+        }
+
+        50% {
+            transform: translateY(-10px)
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0)
+        }
+
+        to {
+            transform: rotate(360deg)
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    .feedback-main {
+        min-height: 100vh;
+    }
+
+    /* HEADER FEEDBACK + ÁNH SÁNG QUÉT */
+    .grad-header {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.5rem;
+        padding: 3rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        color: #eff6ff;
+    }
+
+        /* dải ánh sáng quét chéo */
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -60%;
+            left: -60%;
+            width: 220%;
+            height: 220%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 40%, transparent 70%);
+            animation: sweep 8s linear infinite;
+            mix-blend-mode: screen;
+        }
+
+        /* spotlight góc phải */
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            bottom: -120px;
+            right: -120px;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(56,189,248,0.5), transparent 70%);
+            border-radius: 999px;
+            filter: blur(4px);
+            opacity: .9;
+            animation: floating 6s ease-in-out infinite alternate;
+        }
+
+    @@keyframes sweep {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes floating {
+        from {
+            transform: translateY(0) scale(1);
+        }
+
+        to {
+            transform: translateY(-25px) scale(1.05);
+        }
+    }
+    /* HEADER FEEDBACK + ÁNH SÁNG QUÉT */
+    .grad-header {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.5rem;
+        padding: 3rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        color: #eff6ff;
+    }
+
+        /* dải ánh sáng quét chéo */
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -60%;
+            left: -60%;
+            width: 220%;
+            height: 220%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 40%, transparent 70%);
+            animation: sweep 8s linear infinite;
+            mix-blend-mode: screen;
+        }
+
+        /* spotlight góc phải */
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            bottom: -120px;
+            right: -120px;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(56,189,248,0.5), transparent 70%);
+            border-radius: 999px;
+            filter: blur(4px);
+            opacity: .9;
+            animation: floating 6s ease-in-out infinite alternate;
+        }
+
+    @@keyframes sweep {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes floating {
+        from {
+            transform: translateY(0) scale(1);
+        }
+
+        to {
+            transform: translateY(-25px) scale(1.05);
+        }
+    }
+
+
+    .icon-gradient {
+        padding: 0.85rem;
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, .45);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .page-header-title {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin-bottom: .35rem;
+    }
+
+    .page-header-subtitle {
+        opacity: .9;
+        font-size: 1rem;
+    }
+
+    .page-header-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .7rem;
+        font-size: .8rem;
+        opacity: .95;
+    }
+
+    .page-header-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .35rem .9rem;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, .18);
+        backdrop-filter: blur(10px);
+    }
+
+    /* Card glass + filter card giống Shipping */
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        overflow: hidden;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .filter-card-icon {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        padding: .75rem;
+        border-radius: 1rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .filter-label {
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+        margin-bottom: .25rem;
+        font-weight: 600;
+    }
+
+    .form-select,
+    .form-control {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .7rem 1rem;
+        transition: all .3s ease;
+        background: #fff;
+    }
+
+        .form-select:focus,
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+    .search-icon-wrapper {
+        position: relative;
+    }
+
+        .search-icon-wrapper i {
+            position: absolute;
+            left: 1.1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #60a5fa;
+            font-size: 1.1rem;
+        }
+
+        .search-icon-wrapper input {
+            padding-left: 3rem;
+        }
+
+    /* Table modern đồng bộ Shipping */
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1rem .9rem;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            border-bottom: 1px solid #e5e7eb;
+            animation: slideIn .4s ease-out backwards;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59, 130, 246, 0.07) 0%, rgba(147, 197, 253, 0.07) 100%);
+                transform: translateY(-2px);
+                box-shadow: -4px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: .9rem .9rem;
+            vertical-align: middle;
+        }
+
+    .badge-pill-status {
+        border-radius: 999px;
+        padding: .35rem .9rem;
+        font-weight: 600;
+        font-size: .8rem;
+    }
+
+    .btn-pill {
+        border-radius: 2rem !important;
+        padding: .45rem 1.2rem;
+        font-weight: 600;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        border-width: 2px;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(0,0,0,.18);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            border-color: #1e3a8a;
+        }
+
+    .btn-outline-primary {
+        border-color: #3b82f6;
+        color: #1e40af;
+    }
+
+        .btn-outline-primary:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+        }
+
+    .btn-outline-success:hover {
+        color: #fff;
+    }
+
+    .btn-outline-danger:hover {
+        color: #fff;
+    }
+
+    .btn-action {
+        border-radius: .875rem !important;
+    }
+
+    /* Modal đồng bộ */
+    .modal-content {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        border-radius: 1.5rem 1.5rem 0 0;
+        padding: 1rem 1.5rem;
+    }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+    /* Toast notification */
+    .dynamic-alert {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 320px;
+        max-width: 500px;
+        box-shadow: 0 15px 50px rgba(0,0,0,.25);
+        border-radius: 1.25rem;
+        animation: slideIn .4s ease-out;
+    }
+
+    .page-link {
+        border-radius: .875rem !important;
+        margin: 0 .25rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        transition: all .3s ease;
+        font-weight: 600;
+    }
+
+        .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 1.75rem 1.5rem !important;
+        }
+    }
+</style>
+
+<div class="min-vh-100">
+    <div class="container-fluid feedback-main py-4">
+
+        <!-- Header gradient -->
+        <div class="grad-header p-4 p-md-5 mb-4">
+            <div class="grad-header-inner">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                    <div>
+                        <div class="page-header-title">
+                            <div class="icon-gradient">
+                                <i class="bi bi-chat-dots text-white fs-3"></i>
+                            </div>
+                            <h2 class="fw-bold mb-0 text-white" style="text-shadow:0 4px 12px rgba(0,0,0,0.35);">
+                                Quản lý phản hồi người dùng
+                            </h2>
+                        </div>
+                        <p class="page-header-subtitle mb-0 mt-2 text-white" style="text-shadow:0 2px 8px rgba(0,0,0,0.25);">
+                            Xem, tìm kiếm, xử lý và lưu trữ phản hồi từ khách hàng.
+                        </p>
+                    </div>
+                    <div class="page-header-meta">
+                        <div class="page-header-pill">
+                            <i class="bi bi-funnel"></i>
+                            <span>Tìm kiếm theo từ khóa</span>
+                        </div>
+                        <div class="page-header-pill">
+                            <i class="bi bi-check2-circle"></i>
+                            <span>Cập nhật trạng thái xử lý</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter card -->
+        <section class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="filter-card-icon">
+                    <i class="bi bi-search text-white" style="font-size:1.25rem;"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 fw-bold text-primary-emphasis">Bộ lọc phản hồi</h5>
+                    <small class="text-muted">Nhập từ khóa để lọc theo tên, email hoặc chủ đề</small>
+                </div>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="filter-label">Tìm kiếm</label>
+                    <div class="search-icon-wrapper">
+                        <i class="bi bi-search"></i>
+                        <input type="text" id="searchBox" class="form-control" placeholder="Tìm theo tên, email hoặc chủ đề..." value="@currentQuery" />
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-end d-grid d-md-flex">
+                    <button type="button" class="btn btn-primary btn-pill px-4 mt-3 mt-md-0 ms-md-auto" onclick="filterFeedbacks()">
+                        <i class="bi bi-funnel-fill me-1"></i> Áp dụng bộ lọc
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bảng phản hồi -->
+        <div class="card-glass">
+            <div class="p-3 pb-0 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2 text-muted small">
+                    <i class="bi bi-chat-left-text"></i>
+                    <span>Danh sách phản hồi</span>
+                </div>
+            </div>
+            <div class="table-responsive mt-2">
+                <table class="table table-hover align-middle mb-0 table-modern">
+                    <thead>
                         <tr>
-                            <th style="width: 200px;">Người gửi</th>
-                            <th style="width: 220px;">Email</th>
-                            <th style="width: 120px;">SĐT</th>
-                            <th>Chủ đề</th>
+                            <th style="min-width: 180px;">Người gửi</th>
+                            <th style="min-width: 200px;">Email</th>
+                            <th style="min-width: 120px;">SĐT</th>
+                            <th style="min-width: 160px;">Chủ đề</th>
                             <th>Nội dung</th>
-                            <th class="text-center" style="width: 130px;">Ngày gửi</th>
-                            <th class="text-center" style="width: 120px;">Trạng thái</th>
-                            <th class="text-center" style="width: 180px;">Thao tác</th>
+                            <th class="text-center" style="min-width: 130px;">Ngày gửi</th>
+                            <th class="text-center" style="min-width: 130px;">Trạng thái</th>
+                            <th class="text-center" style="min-width: 190px;">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody id="feedbackTable">
@@ -38,31 +562,44 @@
                         {
                             foreach (var item in Model)
                             {
-                                var statusClass = item.StatusDisplay == "Đã xử lý" ? "text-success fw-bold" : "text-warning fw-bold";
+                                var isProcessed = item.StatusDisplay == "Đã xử lý";
+                                var statusBg = isProcessed
+                                    ? "bg-success-subtle text-success-emphasis border-success-subtle"
+                                    : "bg-warning-subtle text-warning-emphasis border-warning-subtle";
 
-                                <tr id="row-@item.Id">
+                                <tr id="row-@item.Id" data-status="@item.StatusDisplay">
                                     <td>
-                                        <div>@item.SenderName</div>
+                                        <div class="fw-semibold">@item.SenderName</div>
                                     </td>
                                     <td>@item.SenderEmail</td>
                                     <td>@item.SenderPhone</td>
                                     <td>@item.Subject</td>
                                     <td>@item.ShortMessage</td>
                                     <td class="text-center">@item.CreatedAtFormatted</td>
-                                    <td class="text-center @statusClass">@item.StatusDisplay</td>
                                     <td class="text-center">
-                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="showDetail(@item.Id)">
-                                            <i class="bi bi-eye"></i> Xem
-                                        </button>
-                                        @if (item.StatusDisplay != "Đã xử lý")
-                                        {
-                                            <button class="btn btn-sm btn-outline-success me-1" onclick="updateStatus(@item.Id)">
-                                                <i class="bi bi-check2-circle"></i> Xử lý
+                                        <span class="badge badge-pill-status @statusBg">@item.StatusDisplay</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary btn-action me-1"
+                                                    onclick="showDetail(@item.Id)"
+                                                    title="Xem chi tiết">
+                                                <i class="bi bi-eye"></i>
                                             </button>
-                                        }
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteFeedback(@item.Id)">
-                                            <i class="bi bi-trash"></i> Xóa
-                                        </button>
+                                            @if (!isProcessed)
+                                            {
+                                                <button class="btn btn-sm btn-outline-success btn-action me-1"
+                                                        onclick="openStatusConfirm(@item.Id)"
+                                                        title="Đánh dấu đã xử lý">
+                                                    <i class="bi bi-check2-circle"></i>
+                                                </button>
+                                            }
+                                            <button class="btn btn-sm btn-outline-danger btn-action"
+                                                    onclick="openDeleteConfirm(@item.Id)"
+                                                    title="Xóa phản hồi">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -70,14 +607,57 @@
                         else
                         {
                             <tr>
-                                <td colspan="8" class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    Không có phản hồi nào.
+                                <td colspan="8" class="text-center py-5">
+                                    <div class="d-flex flex-column align-items-center gap-3">
+                                        <div class="p-4 rounded-circle" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                                            <i class="bi bi-inbox" style="font-size: 3rem; color: #3b82f6;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="fw-bold mb-1 text-primary">Chưa có phản hồi</h5>
+                                            <p class="text-muted mb-0">Hiện tại chưa có phản hồi nào từ người dùng.</p>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         }
                     </tbody>
                 </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top" style="background: linear-gradient(90deg, #f0f9ff 0%, #dbeafe 100%);">
+                <span class="text-muted small" id="feedback-count"></span>
+                @if (totalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination mb-0">
+                            <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("Index", "Feedback", new { area = "Seller", page = currentPage - 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+
+                            @{
+                                var start = Math.Max(1, currentPage - 2);
+                                var end = Math.Min(totalPages, currentPage + 2);
+                                for (var p = start; p <= end; p++)
+                                {
+                                    <li class="page-item @(p == currentPage ? "active" : "")">
+                                        <a class="page-link"
+                                           href="@Url.Action("Index", "Feedback", new { area = "Seller", page = p, pageSize = pageSize, q = currentQuery, status = currentStatus })">@p</a>
+                                    </li>
+                                }
+                            }
+
+                            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                                <a class="page-link"
+                                   href="@Url.Action("Index", "Feedback", new { area = "Seller", page = currentPage + 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                }
             </div>
         </div>
     </div>
@@ -85,11 +665,13 @@
 
 <!-- Modal xem chi tiết -->
 <div class="modal fade" id="feedbackDetailModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-chat-dots"></i> Chi tiết phản hồi</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-chat-dots"></i>Chi tiết phản hồi
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
             </div>
             <div class="modal-body">
                 <dl class="row mb-0">
@@ -112,8 +694,60 @@
                     <dd class="col-sm-9" id="detailCreated"></dd>
 
                     <dt class="col-sm-3">Ghi chú admin:</dt>
-                    <dd class="col-sm-9" id="detailNote"></dd>
+                    <dd class="col-sm-9" id="detailNote">(Chưa có)</dd>
                 </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận cập nhật trạng thái -->
+<div class="modal fade" id="statusConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2 text-white">
+                    <i class="bi bi-check2-circle"></i>Xác nhận xử lý
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p class="mb-2 fw-semibold">Đánh dấu phản hồi này là <span class="text-success">Đã xử lý</span>?</p>
+                <p class="text-muted mb-0">Hành động này giúp bạn quản lý trạng thái phản hồi tốt hơn.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-success btn-pill" id="btnConfirmStatus">
+                    <i class="bi bi-check2-circle me-1"></i>Xác nhận
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal xác nhận xóa -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2 text-white">
+                    <i class="bi bi-exclamation-triangle"></i>Xác nhận xóa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p class="mb-2 fw-semibold">Bạn có chắc chắn muốn xóa phản hồi này?</p>
+                <p class="text-muted mb-0">Hành động này không thể hoàn tác. Dữ liệu sẽ bị xóa vĩnh viễn.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Hủy
+                </button>
+                <button type="button" class="btn btn-danger btn-pill" id="btnConfirmDelete">
+                    <i class="bi bi-trash me-1"></i>Xóa ngay
+                </button>
             </div>
         </div>
     </div>
@@ -121,47 +755,234 @@
 
 @section scripts {
     <script>
-    function filterFeedbacks() {
-        const keyword = $('#searchBox').val().toLowerCase().trim();
-        $('#feedbackTable tr').each(function () {
-            const text = $(this).text().toLowerCase();
-            $(this).toggle(text.includes(keyword));
-        });
-    }
+        // ===== Helper chung =====
+        function getToken() {
+            const f = document.getElementById('__ajaxAntiForgeryForm');
+            if (!f) return '';
+            const t = f.querySelector('input[name="__RequestVerificationToken"]');
+            return t ? t.value : '';
+        }
 
-    function updateStatus(id) {
-        $.post('@Url.Action("UpdateStatus", "Feedback", new { area = "Seller" })',
-            { id: id, status: "processed" },
-            function (res) {
-                alert(res.message);
-                if (res.success) {
-                    const row = $('#row-' + id);
-                    row.find('td:nth-child(7)').text("Đã xử lý").removeClass("text-warning").addClass("text-success fw-bold");
-                    row.find('button.btn-outline-success').remove(); // ẩn nút xử lý
+        function showNotification(message, type = 'info') {
+            const old = document.querySelector('.dynamic-alert');
+            if (old) old.remove();
+
+            const iconMap = {
+                success: 'check-circle-fill',
+                danger: 'exclamation-triangle-fill',
+                info: 'info-circle-fill',
+                warning: 'exclamation-circle-fill'
+            };
+
+            const div = document.createElement('div');
+            div.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            div.innerHTML = `
+                <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-${iconMap[type] || iconMap.info} fs-4"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+
+            document.body.appendChild(div);
+            setTimeout(() => {
+                div.style.animation = 'slideOut .3s ease-out';
+                setTimeout(() => div.remove(), 300);
+            }, 4500);
+        }
+
+        // ===== Filter client-side =====
+        function filterFeedbacks() {
+            const q = (document.getElementById('searchBox')?.value || '').toLowerCase().trim();
+            const tbody = document.getElementById('feedbackTable');
+            if (!tbody) return;
+
+            let total = 0;
+            let visible = 0;
+
+            [...tbody.querySelectorAll('tr')].forEach(tr => {
+                const emptyRow = tr.querySelector('.bi-inbox');
+                if (emptyRow) {
+                    // Ẩn dòng "Chưa có phản hồi" khi có keyword
+                    tr.style.display = q ? 'none' : '';
+                    return;
                 }
-            });
-    }
 
-    function deleteFeedback(id) {
-        if (!confirm('Bạn có chắc muốn xóa phản hồi này?')) return;
-        $.post('@Url.Action("Delete", "Feedback", new { area = "Seller" })',
-            { id: id },
-            function (res) {
-                alert(res.message);
-                if (res.success) $('#row-' + id).fadeOut();
+                total++;
+                const tds = tr.querySelectorAll('td');
+                const text = [...tds].map(td => td.innerText || '').join(' ').toLowerCase();
+                const match = !q || text.indexOf(q) !== -1;
+                tr.style.display = match ? '' : 'none';
+                if (match) visible++;
             });
-    }
 
-    function showDetail(id) {
-        const row = $('#row-' + id);
-        $('#detailName').text(row.find('td:nth-child(1)').text());
-        $('#detailEmail').text(row.find('td:nth-child(2)').text());
-        $('#detailPhone').text(row.find('td:nth-child(3)').text());
-        $('#detailSubject').text(row.find('td:nth-child(4)').text());
-        $('#detailMessage').text(row.find('td:nth-child(5)').text());
-        $('#detailCreated').text(row.find('td:nth-child(6)').text());
-        $('#detailNote').text(row.find('td:nth-child(8)').text() || "(Chưa có)");
-        $('#feedbackDetailModal').modal('show');
-    }
+            const label = document.getElementById('feedback-count');
+            if (label) {
+                const globalTotal = @totalRecords;
+                if (globalTotal === 0) {
+                    label.textContent = 'Không có phản hồi nào.';
+                } else if (!q) {
+                    label.textContent = `Đang xem trang @currentPage / @totalPages • Tổng ${globalTotal} phản hồi.`;
+                } else {
+                    label.textContent = `Đang hiển thị ${visible} phản hồi (trong tổng ${globalTotal} phản hồi).`;
+                }
+            }
+        }
+
+        // ===== API endpoints (chỉnh lại tên action/controller nếu cần) =====
+        const detailUrl = '@Url.Action("GetFeedback", "Feedback", new { area = "Seller" })';
+        const statusUrl = '@Url.Action("UpdateStatus", "Feedback", new { area = "Seller" })';
+        const deleteUrl = '@Url.Action("Delete", "Feedback", new { area = "Seller" })';
+
+        let currentStatusId = 0;
+        let currentDeleteId = 0;
+
+        // ===== Xem chi tiết =====
+        function showDetail(id) {
+            const modalEl = document.getElementById('feedbackDetailModal');
+            if (!modalEl) return;
+
+            const bodyBackup = modalEl.querySelector('.modal-body').innerHTML;
+            modalEl.querySelector('.modal-body').innerHTML =
+                '<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">Đang tải dữ liệu...</p></div>';
+
+            try { bootstrap.Modal.getOrCreateInstance(modalEl).show(); } catch { }
+
+            fetch(`${detailUrl}?id=${id}`, { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(d => {
+                    const body = modalEl.querySelector('.modal-body');
+                    body.innerHTML = '';
+                    if (!d || d.success === false) {
+                        body.innerHTML = '<p class="text-danger mb-0">Không tải được chi tiết phản hồi.</p>';
+                        showNotification(d && d.message ? d.message : 'Không tải được chi tiết phản hồi.', 'danger');
+                        return;
+                    }
+
+                    // Map dữ liệu (chỉnh tên property nếu API khác)
+                    document.getElementById('detailName').textContent = d.SenderName || '';
+                    document.getElementById('detailEmail').textContent = d.SenderEmail || '';
+                    document.getElementById('detailPhone').textContent = d.SenderPhone || '';
+                    document.getElementById('detailSubject').textContent = d.Subject || '';
+                    document.getElementById('detailMessage').textContent = d.Message || d.ShortMessage || '';
+                    document.getElementById('detailCreated').textContent = d.CreatedAtFormatted || '';
+                    document.getElementById('detailNote').textContent = d.AdminNote || '(Chưa có)';
+                })
+                .catch(() => {
+                    modalEl.querySelector('.modal-body').innerHTML = bodyBackup;
+                    showNotification('Có lỗi xảy ra khi tải chi tiết phản hồi.', 'danger');
+                });
+        }
+
+        // ===== Cập nhật trạng thái =====
+        function openStatusConfirm(id) {
+            currentStatusId = id;
+            const modalEl = document.getElementById('statusConfirmModal');
+            if (!modalEl) return;
+            try { bootstrap.Modal.getOrCreateInstance(modalEl).show(); } catch { }
+        }
+
+        document.getElementById('btnConfirmStatus')?.addEventListener('click', function () {
+            if (!currentStatusId) return;
+            const token = getToken();
+            const btn = this;
+            const old = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang cập nhật...';
+
+            fetch(statusUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'RequestVerificationToken': token
+                },
+                body: new URLSearchParams({
+                    id: currentStatusId,
+                    __RequestVerificationToken: token
+                })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    showNotification(d.message || 'Đã cập nhật trạng thái.', d.success ? 'success' : 'danger');
+                    if (d.success) {
+                        try {
+                            bootstrap.Modal.getInstance(document.getElementById('statusConfirmModal')).hide();
+                        } catch { }
+                        setTimeout(() => location.reload(), 700);
+                    }
+                })
+                .catch(() => showNotification('Có lỗi xảy ra khi cập nhật trạng thái.', 'danger'))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = old;
+                });
+        });
+
+        // ===== Xóa phản hồi =====
+        function openDeleteConfirm(id) {
+            currentDeleteId = id;
+            const modalEl = document.getElementById('deleteConfirmModal');
+            if (!modalEl) return;
+            try { bootstrap.Modal.getOrCreateInstance(modalEl).show(); } catch { }
+        }
+
+        document.getElementById('btnConfirmDelete')?.addEventListener('click', function () {
+            if (!currentDeleteId) return;
+            const token = getToken();
+            const btn = this;
+            const old = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang xóa...';
+
+            fetch(deleteUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                    'RequestVerificationToken': token
+                },
+                body: new URLSearchParams({
+                    id: currentDeleteId,
+                    __RequestVerificationToken: token
+                })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    showNotification(d.message || 'Đã xóa phản hồi.', d.success ? 'success' : 'danger');
+                    if (d.success) {
+                        try {
+                            bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+                        } catch { }
+                        setTimeout(() => location.reload(), 700);
+                    }
+                })
+                .catch(() => showNotification('Có lỗi xảy ra khi xóa phản hồi.', 'danger'))
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = old;
+                });
+        });
+
+        // ===== Khởi tạo ban đầu =====
+        document.addEventListener('DOMContentLoaded', function () {
+            filterFeedbacks(); // tính số lượng initial
+
+            // Enter trong searchBox => filter
+            document.getElementById('searchBox')?.addEventListener('keyup', function (e) {
+                if (e.key === 'Enter') filterFeedbacks();
+            });
+
+            // Tooltip cho các nút thao tác (nếu bootstrap sẵn)
+            if (typeof bootstrap !== 'undefined') {
+                [...document.querySelectorAll('[title]')].forEach(el => {
+                    el.setAttribute('data-bs-toggle', 'tooltip');
+                    el.setAttribute('data-bs-placement', 'top');
+                });
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+            }
+        });
     </script>
 }

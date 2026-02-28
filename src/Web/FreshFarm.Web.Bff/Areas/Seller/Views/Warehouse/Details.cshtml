@@ -1,4 +1,5 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.WarehouseViewModel
+@using FreshFarm.Web.Bff.Areas.Seller.Models
 @{
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     ViewBag.Title = "Chi tiết kho";
@@ -28,7 +29,7 @@
         <h2 class="fw-bold mb-0">
             <i class="bi bi-box-seam text-primary me-2"></i>Chi tiết sản phẩm trong kho
         </h2>
-        <a class="btn btn-outline-secondary" href="@Url.Action("Index","Warehouse", new { area="Seller" })">
+        <a class="btn btn-outline-secondary" href="@Url.Action("Index","Warehouse", new { area = "Seller" })">
             <i class="bi bi-arrow-left me-2"></i>Quay lại
         </a>
     </div>

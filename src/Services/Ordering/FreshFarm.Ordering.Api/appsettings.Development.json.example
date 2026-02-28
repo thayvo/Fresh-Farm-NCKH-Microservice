@@ -1,0 +1,17 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "FreshFarmOrderingDB": "Server=localhost;Database=FreshFarmOrderingDB;Trusted_Connection=True;TrustServerCertificate=True"
+  },
+  "Jwt": {
+    "Issuer": "FreshFarm.Identity",
+    "Audience": "FreshFarm",
+    "Key": "yourkey(Min: 32 characters)"
+  }
+}

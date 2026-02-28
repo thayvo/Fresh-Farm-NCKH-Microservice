@@ -5,5 +5,16 @@
       "Microsoft.AspNetCore": "Warning"
     }
   },
-  "AllowedHosts": "*"
+  "AllowedHosts": "*",
+  "Services": {
+    "Identity": {
+      "BaseUrl": "https://localhost:7140"
+    },
+    "Catalog": {
+      "BaseUrl": "https://localhost:7245"
+    },
+    "Ordering": {
+      "BaseUrl": "https://localhost:7018"
+    }
+  }
 }

@@ -1,310 +1,1311 @@
-﻿@model FreshFram.Areas.Admin.Data.RevenueReportViewModel
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.RevenueReportViewModel
 @{
     ViewBag.Title = "Báo Cáo Doanh Thu";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
-<main class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">
-            Báo Cáo Doanh Thu
-        </h2>
-    </div>
-
-    @if (ViewBag.ErrorMessage != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @ViewBag.ErrorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+<style>
+    /* Import exact color scheme from ManageShipping page */
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
-    <div class="card shadow-sm mb-4">
-        <div class="card-body">
-            <form method="get" action="@Url.Action("Revenue", "Report")">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-4 col-lg-3">
-                        <label for="fromDate" class="form-label fw-semibold">Từ ngày</label>
-                        <input type="date" id="fromDate" name="fromDate" class="form-control"
-                               value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    @@keyframes shimmer {
+        0% {
+            background-position: -1000px 0
+        }
+
+        100% {
+            background-position: 1000px 0
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0)
+        }
+
+        50% {
+            transform: translateY(-10px)
+        }
+    }
+
+    /* Light sweep animation - same as ManageShipping */
+    @@keyframes lightSweep {
+        0% {
+            transform: translateX(-100%);
+            opacity: 0;
+        }
+
+        50% {
+            opacity: 1;
+        }
+
+        100% {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0)
+        }
+
+        to {
+            transform: rotate(360deg)
+        }
+    }
+
+    @@keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    .min-vh-100 {
+        min-height: 100vh;
+    }
+
+    /* Utility button styles from ManageShipping */
+    .btn-pill {
+        border-radius: 999px !important;
+    }
+
+    .hover-scale {
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+        .hover-scale:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 12px 25px rgba(15, 23, 42, .25);
+        }
+
+    /* Enhanced KPI cards with solid colors - NO light sweep */
+    .kpi-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+    }
+
+        .kpi-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 25px 70px rgba(30, 64, 175, 0.25);
+        }
+
+    /* Gradient backgrounds for KPI cards - each with unique theme */
+    .gradient-revenue {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+    }
+
+    .gradient-orders {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: white;
+    }
+
+    .gradient-customers {
+        background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
+        color: white;
+    }
+
+    .gradient-products {
+        background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+        color: white;
+    }
+
+    .gradient-shipping {
+        background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        color: white;
+    }
+
+    .gradient-reviews {
+        background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+        color: white;
+    }
+
+    .gradient-feedback {
+        background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
+        color: white;
+    }
+
+    .kpi-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+
+    .kpi-value {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .kpi-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .kpi-change {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.2);
+        display: inline-block;
+        margin-top: 0.5rem;
+    }
+
+    .change-positive {
+        color: #86efac;
+    }
+
+    .change-negative {
+        color: #fca5a5;
+    }
+
+    /* Filter card matching ManageShipping */
+    .filter-card {
+        background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    /* Chart card with solid colors - NO light sweep */
+    .chart-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .chart-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        padding: 1.5rem;
+        border-bottom: none;
+    }
+
+    /* Table styling matching ManageShipping */
+    .table-modern {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.25rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+            .table-modern thead th a {
+                color: #1e3a8a;
+                transition: all .3s ease;
+            }
+
+                .table-modern thead th a:hover {
+                    color: #1e40af;
+                    text-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+                }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            animation: slideIn .4s ease-out backwards;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 197, 253, 0.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -5px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1.25rem 1rem;
+            vertical-align: middle;
+        }
+
+    /* Button styling matching ManageShipping */
+    .btn-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border: none;
+        color: white;
+        padding: .75rem 2rem;
+        border-radius: 2rem;
+        font-weight: 600;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+
+        .btn-gradient:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.2);
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            color: white;
+        }
+
+    /* Form controls matching ManageShipping */
+    .form-select, .form-control {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .875rem 1.25rem;
+        transition: all .3s ease;
+        background: #fff;
+    }
+
+        .form-select:focus, .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+    /* Pagination matching ManageShipping */
+    .pagination-modern {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.375rem;
+        margin-top: 2rem;
+        flex-wrap: wrap;
+    }
+
+        .pagination-modern .page-link {
+            border-radius: .875rem;
+            margin: 0 .125rem;
+            border: 2px solid #bfdbfe;
+            color: #1e40af;
+            background: #fff;
+            transition: all .3s ease;
+            font-weight: 600;
+            padding: .5rem .9rem;
+            cursor: pointer;
+            min-width: 40px;
+            text-align: center;
+        }
+
+            .pagination-modern .page-link:hover:not(.disabled) {
+                background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+                color: #fff;
+                border-color: #3b82f6;
+                transform: translateY(-3px);
+                box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+            }
+
+            .pagination-modern .page-link.active {
+                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+                border-color: #1e40af;
+                color: white;
+            }
+
+            .pagination-modern .page-link.disabled {
+                opacity: 0.6;
+                cursor: default;
+                pointer-events: none;
+            }
+
+    /* Header styling with neon blue light sweep effect - ONLY for header */
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+        color: white;
+    }
+
+        /* Neon blue light sweep animation - ONLY for the header */
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 234, 255, 0.6), transparent);
+            animation: lightSweep 3s infinite;
+            z-index: 1;
+        }
+
+        /* Additional neon glow effect */
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0, 234, 255, 0.1) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+            z-index: 0;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+    }
+
+    /* Loading spinner */
+    .loading-spinner {
+        display: inline-block;
+        width: 36px;
+        height: 36px;
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    /* Text colors matching ManageShipping */
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .bg-primary-blue {
+        background-color: #1e40af !important;
+    }
+
+    .reports-loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+        backdrop-filter: blur(2px);
+    }
+
+    @@media (max-width:768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .table-modern {
+            font-size: .875rem;
+        }
+
+        .btn-gradient {
+            padding: .625rem 1.5rem;
+        }
+    }
+</style>
+
+<div class="reports-container min-vh-100">
+    <div class="container-fluid py-4">
+        <!-- Header - Exact copy of ManageShipping design -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index: 1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="p-3 rounded-4 icon-gradient">
+                                <i class="bi bi-graph-up-arrow text-white" style="font-size: 2.5rem;"></i>
+                            </div>
+                            <div>
+                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                                    Báo Cáo Doanh Thu
+                                </h1>
+                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                    Phân tích chi tiết doanh thu và hiệu suất kinh doanh
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-4 col-lg-3">
-                        <label for="toDate" class="form-label fw-semibold">Đến ngày</label>
-                        <input type="date" id="toDate" name="toDate" class="form-control"
-                               value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
-                    </div>
-                    <div class="col-md-4 col-lg-3">
-                        <label for="viewBy" class="form-label fw-semibold">Xem theo</label>
-                        <select id="viewBy" name="viewBy" class="form-select">
-                            <option value="day" @(Model.ViewBy == "day" ? "selected" : "")>Ngày</option>
-                            <option value="week" @(Model.ViewBy == "week" ? "selected" : "")>Tuần</option>
-                            <option value="month" @(Model.ViewBy == "month" ? "selected" : "")>Tháng</option>
-                            <option value="year" @(Model.ViewBy == "year" ? "selected" : "")>Năm</option>
-                        </select>
-                    </div>
-                    <div class="col-md-12 col-lg-3">
-                        <button type="submit" class="btn btn-success w-100">
-                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                    <div class="d-flex flex-wrap gap-3 justify-content-md-end">
+                        <button type="button"
+                                class="btn btn-success btn-pill shadow-lg d-flex align-items-center gap-2 hover-scale"
+                                onclick="exportData('csv')"
+                                style="font-size: 1.05rem; white-space: nowrap;">
+                            <i class="bi bi-file-earmark-spreadsheet" style="font-size: 1.4rem;"></i>
+                            <span>Xuất CSV</span>
+                        </button>
+                        <button type="button"
+                                class="btn btn-primary btn-pill shadow-lg d-flex align-items-center gap-2 hover-scale"
+                                onclick="exportData('pdf')"
+                                style="font-size: 1.05rem; white-space: nowrap;">
+                            <i class="bi bi-file-earmark-pdf" style="font-size: 1.4rem;"></i>
+                            <span>Xuất PDF</span>
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @ViewBag.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <!-- Filter Card - Matching ManageShipping design -->
+        <div class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <i class="bi bi-funnel text-white" style="font-size: 1.25rem;"></i>
+                </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc thống kê</h5>
+            </div>
+            <form method="get" class="row g-4" id="filterForm">
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        <i class="bi bi-calendar3 me-2"></i> Từ ngày
+                    </label>
+                    <input type="date"
+                           id="fromDate"
+                           name="fromDate"
+                           class="form-control"
+                           value="@(Model.FromDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        <i class="bi bi-calendar3 me-2"></i> Đến ngày
+                    </label>
+                    <input type="date"
+                           id="toDate"
+                           name="toDate"
+                           class="form-control"
+                           value="@(Model.ToDate?.ToString("yyyy-MM-dd"))" />
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        <i class="bi bi-bar-chart me-2"></i> Xem theo
+                    </label>
+                    <select id="viewBy" name="viewBy" class="form-select">
+                        <option value="day" selected="@(Model.ViewBy == "day"  ? "selected" : null)">📅 Ngày</option>
+                        <option value="week" selected="@(Model.ViewBy == "week"  ? "selected" : null)">📆 Tuần</option>
+                        <option value="month" selected="@(Model.ViewBy == "month"  ? "selected" : null)">🗓️ Tháng</option>
+                        <option value="year" selected="@(Model.ViewBy == "year"  ? "selected" : null)">📊 Năm</option>
+                    </select>
+                </div>
+                <div class="col-12 col-lg-3 ms-auto d-grid d-lg-flex justify-content-lg-end align-items-end">
+                    <button type="submit"
+                            class="btn btn-primary btn-pill px-5 d-flex align-items-center justify-content-center gap-2 hover-scale">
+                        <i class="bi bi-funnel-fill"></i>
+                        <span>Áp dụng</span>
+                    </button>
+                </div>
             </form>
         </div>
+
+        <!-- KPI Cards Row - Updated with 6 dynamic cards -->
+        <!-- KPI Cards Row -->
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-4 mb-4">
+            <!-- Revenue KPI Card -->
+            <div class="col">
+                <div class="card kpi-card gradient-revenue">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-currency-dollar"></i>
+                        </div>
+                        <div class="kpi-value">@Model.TotalRevenue.ToString("#,##0")₫</div>
+                        <div class="kpi-label">Tổng Doanh Thu</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders KPI Card -->
+            <div class="col">
+                <div class="card kpi-card gradient-orders">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-receipt-cutoff"></i>
+                        </div>
+                        <div class="kpi-value">@Model.TotalOrders.ToString("#,##0")</div>
+                        <div class="kpi-label">Tổng Đơn Hàng</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customers KPI Card -->
+            <div class="col">
+                <div class="card kpi-card gradient-customers">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <div class="kpi-value">@Model.TotalCustomers.ToString("#,##0")</div>
+                        <div class="kpi-label">Khách Hàng Đã Mua</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Giá trị đơn TB -->
+            <div class="col">
+                <div class="card kpi-card gradient-customers">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-basket"></i>
+                        </div>
+                        <div class="kpi-value">@Model.AverageOrderValue.ToString("#,##0")₫</div>
+                        <div class="kpi-label">Giá Trị Đơn TB</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tỷ lệ hoàn trả -->
+            <div class="col">
+                <div class="card kpi-card gradient-shipping">
+                    <div class="card-body p-4">
+                        <div class="kpi-icon">
+                            <i class="bi bi-arrow-return-left"></i>
+                        </div>
+                        <div class="kpi-value">@Model.ReturnRate.ToString("F1")%</div>
+                        <div class="kpi-label">Tỷ Lệ Hoàn Trả</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-success h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-cash-coin fs-1 text-success opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Tổng Doanh Thu</h6>
-                            <h3 class="fw-bold">@Model.TotalRevenue.ToString("#,##0")₫</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-primary h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-receipt-cutoff fs-1 text-primary opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">Tổng Đơn Hàng</h6>
-                            <h3 class="fw-bold">@Model.TotalOrders.ToString("#,##0")</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-info h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-basket fs-1 text-info opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">
-                                Giá Trị Đơn Trung Bình
-                            </h6>
-                            <h3 class="fw-bold">@Model.AverageOrderValue.ToString("#,##0")₫</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-graph-up fs-1 text-warning opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase">
-                                Lợi Nhuận Ước Tính
-                            </h6>
-                            <h3 class="fw-bold">@Model.EstimatedProfit.ToString("#,##0")₫</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+        <!-- Second Row for more KPI Cards -->
+        <div class="row g-4 mb-4">
+           
 
-    <div class="row g-4 mb-4">
-        <div class="col-lg-7">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
+        <!-- Charts Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card chart-card h-100">
+                    <div class="chart-header">
+                        <h5 class="card-title fw-bold mb-0">
+                            <i class="bi bi-bar-chart-line-fill me-2"></i>Xu Hướng Doanh Thu
+                        </h5>
+                        <small class="opacity-75">Theo dõi biến động doanh thu theo thời gian</small>
+                    </div>
+                    <div class="card-body p-4">
+                        <div style="height: 350px;">
+                            <canvas id="revenueTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card chart-card h-100">
+                    <div class="chart-header">
+                        <h5 class="card-title fw-bold mb-0">
+                            <i class="bi bi-trophy-fill me-2"></i>Top Sản Phẩm
+                        </h5>
+                        <small class="opacity-75">Theo doanh thu</small>
+                    </div>
+                    <div class="card-body p-4">
+                        <div style="height: 350px;">
+                            <canvas id="topProductsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table with Pagination -->
+        <div class="card chart-card">
+            <div class="chart-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
                     <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-bar-chart-line-fill"></i> Xu hướng doanh thu
+                        <i class="bi bi-table me-2"></i>Chi Tiết Doanh Thu
                     </h5>
+                    <small class="opacity-75">Theo ngày - Hiển thị 10 dòng mỗi trang</small>
                 </div>
-                <div class="card-body">
-                    <canvas id="revenueTrendChart"></canvas>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <a href="@Url.Action("ExportRevenueExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, viewBy = Model.ViewBy })"
+                       class="btn btn-light btn-sm">
+                        <i class="bi bi-file-earmark-excel"></i> Excel
+                    </a>
+                    <button class="btn btn-light btn-sm" type="button" onclick="exportToPDF()">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    </button>
                 </div>
             </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="card shadow-sm h-100">
-                <div class="card-header">
-                    <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-trophy-fill"></i> Top 5 sản phẩm theo doanh thu
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="topProductsChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title fw-bold mb-0">
-                <i class="bi bi-table"></i> Chi tiết doanh thu theo ngày
-            </h5>
-            <a href="@Url.Action("ExportRevenueExcel", "Report", new { fromDate = Model.FromDate, toDate = Model.ToDate, viewBy = Model.ViewBy })"
-               class="btn btn-outline-success btn-sm">
-                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
-            </a>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-striped mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Ngày</th>
-                        <th>Tổng đơn</th>
-                        <th>Sản phẩm bán ra</th>
-                        <th>Doanh thu</th>
-                        <th>Lợi nhuận</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model.DailyRevenues != null && Model.DailyRevenues.Any())
-                    {
-                        <p>Có @Model.DailyRevenues.Count bản ghi</p>
-                        foreach (var daily in Model.DailyRevenues)
-                        {
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table-modern mb-0">
+                        <thead>
                             <tr>
-                                <td>@daily.DateFormatted</td>
-                                <td>@daily.TotalOrders</td>
-                                <td>@daily.TotalProducts</td>
-                                <td>@daily.Revenue.ToString("#,##0")₫</td>
-                                <td class="text-success">@daily.Profit.ToString("#,##0")₫</td>
+                                <th onclick="sortTable('date')" style="cursor: pointer;">
+                                    Ngày <i class="bi bi-arrow-down-up ms-1"></i>
+                                </th>
+                                <th onclick="sortTable('orders')" style="cursor: pointer;">
+                                    Tổng Đơn <i class="bi bi-arrow-down-up ms-1"></i>
+                                </th>
+                                <th onclick="sortTable('products')" style="cursor: pointer;">
+                                    Sản Phẩm <i class="bi bi-arrow-down-up ms-1"></i>
+                                </th>
+                                <th onclick="sortTable('revenue')" style="cursor: pointer;">
+                                    Doanh Thu <i class="bi bi-arrow-down-up ms-1"></i>
+                                </th>
                             </tr>
-                        }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="5" class="text-center">
-                                Không có dữ liệu. Model.DailyRevenues = @(Model.DailyRevenues == null ? "null" : "empty list")
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                        </thead>
+                        <tbody id="tableBody">
+                            @if (Model.DailyRevenues != null && Model.DailyRevenues.Any())
+                            {
+                                foreach (var daily in Model.DailyRevenues)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-calendar3 text-primary me-2"></i>
+                                                @daily.DateFormatted
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info rounded-pill">@daily.TotalOrders</span>
+                                        </td>
+                                        <td>
+                                            <strong class="text-primary">@daily.Revenue.ToString("#,##0")₫</strong>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-center py-5">
+                                        <div class="d-flex flex-column align-items-center">
+                                            <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                                            <h5 class="text-muted">Không có dữ liệu</h5>
+                                            <p class="text-muted">Chưa có dữ liệu doanh thu trong khoảng thời gian này</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modern Pagination -->
+        <div class="pagination-modern" id="pagination">
+            <!-- Pagination will be generated by JavaScript -->
         </div>
     </div>
-</main>
+</div>
 
 @section scripts {
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        // Dữ liệu từ Model
-        var trendLabels = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendLabels));
-        var trendData = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendData));
+        // Global variables for pagination and sorting
+        let currentPage = 1;
+        let pageSize = 10; // Cố định 10 dòng/trang
+        let sortColumn = 'date';
+        let sortDirection = 'desc';
+        let tableData = [];
 
-        var topProductNames = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.ProductName).ToList()));
-        var topProductRevenues = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.TotalRevenue / 1000000).ToList()));
+        document.addEventListener("DOMContentLoaded", function () {
+            // Initialize table data
+            initializeTableData();
 
-        // --- Biểu đồ Xu hướng doanh thu (Line Chart) ---
-        const revenueTrendCtx = document.getElementById("revenueTrendChart");
-        if (revenueTrendCtx) {
-          new Chart(revenueTrendCtx, {
-            type: "line",
-            data: {
-              labels: trendLabels,
-              datasets: [
-                {
-                  label: "Doanh thu (triệu ₫)",
-                  data: trendData,
-                  borderColor: "#008a4f",
-                  backgroundColor: "rgba(0, 138, 79, 0.1)",
-                  fill: true,
-                  tension: 0.4,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  display: true,
-                  position: 'top'
-                },
-                tooltip: {
-                  callbacks: {
-                    label: function(context) {
-                      return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' triệu ₫';
-                    }
-                  }
-                }
-              },
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: function(value) {
-                      return value.toFixed(1) + ' triệu';
-                    }
-                  }
-                }
-              }
-            },
-          });
+            // Setup event listeners
+            setupEventListeners();
+
+            // Render initial table & pagination
+            renderTable();
+            renderPagination();
+
+            // Initialize charts
+            initializeCharts();
+        });
+
+        function initializeTableData() {
+            // Get data from Model and convert to JavaScript array
+            var dailyRevenues = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.DailyRevenues));
+            tableData = (dailyRevenues || []).map(function (d) {
+                return {
+                    Date: d.Date,
+                    DateFormatted: d.DateFormatted,
+                    TotalOrders: d.TotalOrders,
+                    Revenue: d.Revenue
+                };
+            });
         }
 
-        // --- Biểu đồ Top Sản phẩm (Bar Chart) ---
-        const topProductsCtx = document.getElementById("topProductsChart");
-        if (topProductsCtx) {
-          new Chart(topProductsCtx, {
-            type: "bar",
-            data: {
-              labels: topProductNames,
-              datasets: [
-                {
-                  label: "Doanh thu (triệu ₫)",
-                  data: topProductRevenues,
-                  backgroundColor: [
-                    "rgba(0, 138, 79, 0.8)",
-                    "rgba(0, 138, 79, 0.7)",
-                    "rgba(0, 138, 79, 0.6)",
-                    "rgba(0, 138, 79, 0.5)",
-                    "rgba(0, 138, 79, 0.4)",
-                  ],
-                  borderRadius: 5,
-                },
-              ],
-            },
-            options: {
-              indexAxis: "y",
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {
-                  display: false,
-                },
-                tooltip: {
-                  callbacks: {
-                    label: function(context) {
-                      return 'Doanh thu: ' + context.parsed.x.toFixed(2) + ' triệu ₫';
-                    }
-                  }
-                }
-              },
-              scales: {
-                x: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: function(value) {
-                      return value.toFixed(1) + ' triệu';
-                    }
-                  }
-                }
-              }
-            },
-          });
+        function setupEventListeners() {
+            const fromDateEl = document.getElementById('fromDate');
+            const toDateEl = document.getElementById('toDate');
+            const viewByEl = document.getElementById('viewBy');
+
+            if (fromDateEl) {
+                fromDateEl.removeEventListener('change', fromDateChangeHandler);
+                fromDateEl.addEventListener('change', fromDateChangeHandler);
+            }
+            if (toDateEl) {
+                toDateEl.removeEventListener('change', toDateChangeHandler);
+                toDateEl.addEventListener('change', toDateChangeHandler);
+            }
+            if (viewByEl) {
+                viewByEl.removeEventListener('change', viewByChangeHandler);
+                viewByEl.addEventListener('change', viewByChangeHandler);
+            }
         }
-      });
+
+        function fromDateChangeHandler() {
+            debounceUpdateReport();
+        }
+        function toDateChangeHandler() {
+            debounceUpdateReport();
+        }
+        function viewByChangeHandler() {
+            debounceUpdateReport();
+        }
+
+        const debounceUpdateReport = debounce(updateReport, 500);
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function updateReport() {
+            // Show loading state
+            showLoadingState();
+
+            // Submit form with AJAX for smooth update
+            const form = document.getElementById('filterForm');
+            const formData = new FormData(form);
+            const params = new URLSearchParams(formData);
+
+            const url = '@Url.Action("Revenue", "Report")' + '?' + params.toString();
+
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContainer = doc.querySelector('.reports-container');
+                    const currentContainer = document.querySelector('.reports-container');
+
+                    if (newContainer && currentContainer) {
+                        currentContainer.innerHTML = newContainer.innerHTML;
+                    }
+
+                    // Re-init data and events after DOM updated
+                    initializeTableData();
+                    renderTable();
+                    renderPagination();
+                    initializeCharts();
+                    setupEventListeners();
+
+                    hideLoadingState();
+                })
+                .catch(error => {
+                    console.error('Error updating report:', error);
+                    hideLoadingState();
+                });
+        }
+
+        function showLoadingState() {
+            const existing = document.getElementById('loadingOverlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'loadingOverlay';
+            overlay.className = 'reports-loading-overlay';
+            overlay.innerHTML = '<div class="loading-spinner"></div>';
+            document.body.appendChild(overlay);
+        }
+
+        function hideLoadingState() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            if (loadingOverlay) {
+                loadingOverlay.remove();
+            }
+        }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+
+            renderTable();
+            renderPagination();
+        }
+
+        // Không cho chọn số dòng/trang nữa, chỉ dùng pageSize cố định
+
+        function renderTable() {
+            // Sort data
+            let sortedData = [...tableData].sort((a, b) => {
+                let aVal, bVal;
+                switch (sortColumn) {
+                    case 'date':
+                        aVal = new Date(a.Date);
+                        bVal = new Date(b.Date);
+                        break;
+                    case 'orders':
+                        aVal = a.TotalOrders;
+                        bVal = b.TotalOrders;
+                        break;
+                    case 'revenue':
+                        aVal = a.Revenue;
+                        bVal = b.Revenue;
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+
+            // Paginate
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedData = sortedData.slice(startIndex, endIndex);
+
+            // Render table body
+            const tbody = document.getElementById('tableBody');
+            if (!tbody) return;
+
+            if (paginatedData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center">
+                                <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">Không có dữ liệu</h5>
+                                <p class="text-muted">Chưa có dữ liệu doanh thu trong khoảng thời gian này</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = paginatedData.map(daily => `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-calendar3 text-primary me-2"></i>
+                            ${daily.DateFormatted}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-info rounded-pill">${daily.TotalOrders}</span>
+                    </td>
+                    <td>
+                        <strong class="text-primary">${formatCurrency(daily.Revenue)}</strong>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(tableData.length / pageSize);
+            const pagination = document.getElementById('pagination');
+            if (!pagination) return;
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+
+            // Previous button
+            if (currentPage > 1) {
+                html += `<button class="page-link" onclick="goToPage(${currentPage - 1})">
+                    <i class="bi bi-chevron-left"></i>
+                </button>`;
+            }
+
+            // Page numbers
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="page-link" onclick="goToPage(1)">1</button>`;
+                if (startPage > 2) {
+                    html += `<span class="page-link disabled">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const activeClass = i === currentPage ? 'active' : '';
+                html += `<button class="page-link ${activeClass}" onclick="goToPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span class="page-link disabled">...</span>`;
+                }
+                html += `<button class="page-link" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                html += `<button class="page-link" onclick="goToPage(${currentPage + 1})">
+                    <i class="bi bi-chevron-right"></i>
+                </button>`;
+            }
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            renderTable();
+            renderPagination();
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND'
+            }).format(amount);
+        }
+
+        function exportData(format) {
+            if (format === 'csv') {
+                exportToCSV();
+            } else if (format === 'pdf') {
+                exportToPDF();
+            }
+        }
+
+        function exportToCSV() {
+            const headers = ['Ngày', 'Tổng đơn', 'Doanh thu'];
+            const csvContent = [
+                headers.join(','),
+                ...tableData.map(row => [
+                    row.DateFormatted,
+                    row.TotalOrders,
+                    row.Revenue
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `BaoCaoDoanhThu_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportToPDF() {
+            const fromDateVal = document.getElementById('fromDate') ? document.getElementById('fromDate').value : '';
+            const toDateVal = document.getElementById('toDate') ? document.getElementById('toDate').value : '';
+
+            const printWindow = window.open('', '_blank');
+            const printContent = `
+                <html>
+                <head>
+                    <title>Báo Cáo Doanh Thu</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .kpi-summary { display: flex; justify-content: space-around; margin-bottom: 30px; flex-wrap: wrap; gap: 1rem; }
+                        .kpi-item { text-align: center; min-width: 150px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Báo Cáo Doanh Thu</h1>
+                        <p>Từ ngày: ${fromDateVal || '-'} đến ${toDateVal || '-'}</p>
+                    </div>
+                    <div class="kpi-summary">
+                        <div class="kpi-item">
+                            <h3>${formatCurrency(@Model.TotalRevenue)}</h3>
+                            <p>Tổng Doanh Thu</p>
+                        </div>
+                        <div class="kpi-item">
+                            <h3>@Model.TotalOrders</h3>
+                            <p>Tổng Đơn Hàng</p>
+                        </div>
+                        <div class="kpi-item">
+                            <h3>${formatCurrency(@Model.AverageOrderValue)}</h3>
+                            <p>Giá Trị Đơn TB</p>
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ngày</th>
+                                <th>Tổng đơn</th>
+                                <th>Doanh thu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableData.map(row => `
+                                <tr>
+                                    <td>${row.DateFormatted}</td>
+                                    <td>${row.TotalOrders}</td>
+                                    <td>${formatCurrency(row.Revenue)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function initializeCharts() {
+            // Dữ liệu từ Model
+            var trendLabels = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendLabels));
+            var trendData = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TrendData));
+
+            var topProductNames = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.ProductName).ToList()));
+            var topProductRevenues = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.TopProducts.Select(p => p.TotalRevenue / 1000000).ToList()));
+
+            // Biểu đồ Xu hướng doanh thu (Line Chart)
+            const revenueTrendCtx = document.getElementById("revenueTrendChart");
+            if (revenueTrendCtx) {
+                new Chart(revenueTrendCtx, {
+                    type: "line",
+                    data: {
+                        labels: trendLabels,
+                        datasets: [{
+                            label: "Doanh thu (triệu ₫)",
+                            data: trendData,
+                            borderColor: "#3b82f6",
+                            backgroundColor: "rgba(59, 130, 246, 0.12)",
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: "#1e40af",
+                            pointBorderColor: "#fff",
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 20,
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                titleColor: '#fff',
+                                bodyColor: '#e5e7eb',
+                                borderColor: '#3b82f6',
+                                borderWidth: 1,
+                                cornerRadius: 8,
+                                displayColors: false,
+                                callbacks: {
+                                    label: function (context) {
+                                        return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' triệu ₫';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.3)'
+                                },
+                                ticks: {
+                                    callback: function (value) {
+                                        return value.toFixed(1) + ' triệu';
+                                    },
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 2000,
+                            easing: 'easeInOutQuart'
+                        }
+                    },
+                });
+            }
+
+            // Biểu đồ Top Sản phẩm (Bar Chart)
+            const topProductsCtx = document.getElementById("topProductsChart");
+            if (topProductsCtx) {
+                new Chart(topProductsCtx, {
+                    type: "bar",
+                    data: {
+                        labels: topProductNames,
+                        datasets: [{
+                            label: "Doanh thu (triệu ₫)",
+                            data: topProductRevenues,
+                            backgroundColor: [
+                                "rgba(59, 130, 246, 0.9)",
+                                "rgba(37, 99, 235, 0.9)",
+                                "rgba(96, 165, 250, 0.9)",
+                                "rgba(129, 140, 248, 0.9)",
+                                "rgba(147, 197, 253, 0.9)",
+                            ],
+                            borderRadius: 8,
+                            borderSkipped: false,
+                        }],
+                    },
+                    options: {
+                        indexAxis: "y",
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false,
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                titleColor: '#fff',
+                                bodyColor: '#e5e7eb',
+                                borderColor: '#3b82f6',
+                                borderWidth: 1,
+                                cornerRadius: 8,
+                                displayColors: false,
+                                callbacks: {
+                                    label: function (context) {
+                                        return 'Doanh thu: ' + context.parsed.x.toFixed(2) + ' triệu ₫';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(148, 163, 184, 0.3)'
+                                },
+                                ticks: {
+                                    callback: function (value) {
+                                        return value.toFixed(1) + ' triệu';
+                                    },
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            },
+                            y: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            duration: 2000,
+                            easing: 'easeInOutQuart'
+                        }
+                    },
+                });
+            }
+        }
     </script>
 }
+

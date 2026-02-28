@@ -19,6 +19,8 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<CartItem> CartItems { get; set; }
 
+    public virtual DbSet<ContactMessage> ContactMessages { get; set; }
+
     public virtual DbSet<Coupon> Coupons { get; set; }
 
     public virtual DbSet<CouponDistribution> CouponDistributions { get; set; }
@@ -53,6 +55,10 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<ReturnRequest> ReturnRequests { get; set; }
 
+    public virtual DbSet<Review> Reviews { get; set; }
+
+    public virtual DbSet<ReviewReport> ReviewReports { get; set; }
+
     public virtual DbSet<SellerOrder> SellerOrders { get; set; }
 
     public virtual DbSet<SellerOrderItem> SellerOrderItems { get; set; }
@@ -66,6 +72,12 @@ public partial class FreshFarmOrderingDBContext : DbContext
     public virtual DbSet<Status> Statuses { get; set; }
 
     public virtual DbSet<StatusType> StatusTypes { get; set; }
+
+    public virtual DbSet<SupportConversation> SupportConversations { get; set; }
+
+    public virtual DbSet<SupportMessage> SupportMessages { get; set; }
+
+    public virtual DbSet<SupportMessageReaction> SupportMessageReactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -118,6 +130,34 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasForeignKey(d => d.CartId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__CartItem__CartID__2EDAF651");
+        });
+
+        modelBuilder.Entity<ContactMessage>(entity =>
+        {
+            entity.Property(e => e.AdminNote).HasMaxLength(1000);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ContactMessages_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DeletedAt).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasAnnotation("Relational:DefaultConstraintName", "DF_ContactMessages_IsDeleted");
+            entity.Property(e => e.Message).IsRequired();
+            entity.Property(e => e.ProcessedAt).HasColumnType("datetime");
+            entity.Property(e => e.SenderEmail)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.SenderName)
+                .IsRequired()
+                .HasMaxLength(150);
+            entity.Property(e => e.SenderPhone).HasMaxLength(30);
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValue("new")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ContactMessages_Status");
+            entity.Property(e => e.Subject)
+                .IsRequired()
+                .HasMaxLength(300);
         });
 
         modelBuilder.Entity<Coupon>(entity =>
@@ -617,6 +657,54 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasConstraintName("FK_ReturnRequests_SOI");
         });
 
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.ToTable("Review");
+
+            entity.HasIndex(e => new { e.IsDeleted, e.CreatedAt }, "IX_Review_IsDeleted_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.ProductId, e.CreatedAt }, "IX_Review_Product_CreatedAt").IsDescending(false, true);
+
+            entity.Property(e => e.ReviewId).HasColumnName("ReviewID");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Review_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.IsApproved).HasAnnotation("Relational:DefaultConstraintName", "DF_Review_IsApproved");
+            entity.Property(e => e.IsDeleted).HasAnnotation("Relational:DefaultConstraintName", "DF_Review_IsDeleted");
+            entity.Property(e => e.IsEdited).HasAnnotation("Relational:DefaultConstraintName", "DF_Review_IsEdited");
+            entity.Property(e => e.ProductId).HasColumnName("ProductID");
+            entity.Property(e => e.UserId).HasColumnName("UserID");
+
+            entity.HasOne(d => d.ReplyToNavigation).WithMany(p => p.InverseReplyToNavigation)
+                .HasForeignKey(d => d.ReplyTo)
+                .HasConstraintName("FK_Review_ReplyTo");
+        });
+
+        modelBuilder.Entity<ReviewReport>(entity =>
+        {
+            entity.HasKey(e => e.ReportId);
+
+            entity.ToTable("ReviewReport");
+
+            entity.HasIndex(e => new { e.ReviewId, e.Status, e.CreatedAt }, "IX_ReviewReport_Review").IsDescending(false, false, true);
+
+            entity.Property(e => e.ReportId).HasColumnName("ReportID");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ReviewReport_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Note).HasMaxLength(1000);
+            entity.Property(e => e.Reason).HasMaxLength(500);
+            entity.Property(e => e.ReporterUserId).HasColumnName("ReporterUserID");
+            entity.Property(e => e.ReviewId).HasColumnName("ReviewID");
+
+            entity.HasOne(d => d.Review).WithMany(p => p.ReviewReports)
+                .HasForeignKey(d => d.ReviewId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ReviewReport_Review");
+        });
+
         modelBuilder.Entity<SellerOrder>(entity =>
         {
             entity.HasKey(e => e.SellerOrderId).HasName("PK__SellerOr__EE1F8CF4BF4B2300");
@@ -751,6 +839,7 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.ShippingType)
                 .IsRequired()
                 .HasMaxLength(50);
+            entity.Property(e => e.StoreAddress).HasMaxLength(255);
 
             entity.HasOne(d => d.Order).WithMany(p => p.Shippings)
                 .HasForeignKey(d => d.OrderId)
@@ -806,6 +895,68 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.StatusTypeName)
                 .IsRequired()
                 .HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<SupportConversation>(entity =>
+        {
+            entity.HasKey(e => e.ConversationId);
+
+            entity.HasIndex(e => new { e.Status, e.StartedAt }, "IX_SupportConv_Status_Started").IsDescending(false, true);
+
+            entity.Property(e => e.ClosedAt).HasColumnType("datetime");
+            entity.Property(e => e.GuestId).HasMaxLength(100);
+            entity.Property(e => e.StartedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SupportConversations_StartedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("Open")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SupportConversations_Status");
+        });
+
+        modelBuilder.Entity<SupportMessage>(entity =>
+        {
+            entity.HasKey(e => e.MessageId);
+
+            entity.HasIndex(e => new { e.ConversationId, e.CreatedAt }, "IX_SupportMsg_Conv_Created");
+
+            entity.Property(e => e.Content).IsRequired();
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SupportMessages_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DeletedAt).HasColumnType("datetime");
+            entity.Property(e => e.IsDeleted).HasAnnotation("Relational:DefaultConstraintName", "DF_SupportMessages_IsDeleted");
+            entity.Property(e => e.IsRead).HasAnnotation("Relational:DefaultConstraintName", "DF_SupportMessages_IsRead");
+
+            entity.HasOne(d => d.Conversation).WithMany(p => p.SupportMessages)
+                .HasForeignKey(d => d.ConversationId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SupportMsg_Conv");
+
+            entity.HasOne(d => d.ReplyToMessage).WithMany(p => p.InverseReplyToMessage)
+                .HasForeignKey(d => d.ReplyToMessageId)
+                .HasConstraintName("FK_SupportMessages_ReplyTo");
+        });
+
+        modelBuilder.Entity<SupportMessageReaction>(entity =>
+        {
+            entity.HasKey(e => e.ReactionId);
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SupportMessageReactions_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ReactionType)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.HasOne(d => d.Message).WithMany(p => p.SupportMessageReactions)
+                .HasForeignKey(d => d.MessageId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SupportReactions_Message");
         });
 
         OnModelCreatingGeneratedFunctions(modelBuilder);

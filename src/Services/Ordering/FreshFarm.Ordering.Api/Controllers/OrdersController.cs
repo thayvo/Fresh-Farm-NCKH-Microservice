@@ -157,10 +157,14 @@ public sealed class OrdersController : ControllerBase
             return BadRequest("Order phai co it nhat 1 item.");
         }
 
-        var invalidItem = request.Items.Any(item => item.Quantity <= 0 || item.UnitPrice < 0 || item.ProductId <= 0);
+        var invalidItem = request.Items.Any(item =>
+            item.Quantity <= 0 ||
+            item.Quantity > 10_000 ||
+            item.UnitPrice < 0 ||
+            item.ProductId <= 0);
         if (invalidItem)
         {
-            return BadRequest("Co item khong hop le (ProductId/Quantity/UnitPrice).");
+            return BadRequest("Co item khong hop le (ProductId/Quantity/UnitPrice). Quantity phai trong khoang 1..10000.");
         }
 
         var itemsAmount = request.Items.Sum(item => item.UnitPrice * item.Quantity);

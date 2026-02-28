@@ -1,9 +1,7 @@
-﻿@using Microsoft.AspNetCore.Http
-@{
-    var adminId = Context.Session.GetInt32("ADMIN_ID");
-    var isLoggedIn = adminId.HasValue;
-    var adminName = Context.Session.GetString("ADMIN_NAME") ?? "Admin";
-    var returnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+﻿@{
+    var isLoggedIn = User?.Identity?.IsAuthenticated ?? false;
+    var adminName = User?.Identity?.Name ?? "Seller";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
 }
 
 <nav class="navbar navbar-expand-lg bg-white shadow-sm">
@@ -26,7 +24,7 @@
                             </li>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
-                                @using (Html.BeginForm("Logout", "AdminAccount", new { area = "Seller" }, FormMethod.Post, new { @class = "px-3 m-0" }))
+                                @using (Html.BeginForm("Logout", "AdminAccount", new { area = "Seller" }, FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "px-3 m-0" }))
                                 {
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="dropdown-item">Đăng xuất</button>

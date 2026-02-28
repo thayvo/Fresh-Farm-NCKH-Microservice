@@ -1,61 +1,111 @@
-@using System.Linq
-@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Controllers.ReviewController.ReportedReviewRow>
+@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.SellerReportedReviewRowViewModel>
 @{
-    ViewBag.Title = "Bình luận bị báo cáo";
+    ViewBag.Title = "Danh gia bi bao cao";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
-    var rows = Model ?? Enumerable.Empty<FreshFarm.Web.Bff.Areas.Seller.Controllers.ReviewController.ReportedReviewRow>();
 }
 
-<div class="container-fluid px-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0 fw-bold text-primary">
-            <i class="bi bi-flag"></i> Bình luận bị báo cáo
-        </h4>
-        <a class="btn btn-outline-primary" href="@Url.Action("ManageReview", "Review", new { area = "Seller" })">
-            <i class="bi bi-arrow-left"></i> Về quản lý đánh giá
-        </a>
+@Html.AntiForgeryToken()
+
+<div class="container-fluid py-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">Danh gia bi bao cao</h4>
+        <a class="btn btn-outline-primary" href="@Url.Action("ManageReview", "Review", new { area = "Seller" })">Quay lai</a>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
-            @if (rows.Any())
-            {
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Mã review</th>
-                                <th>Khách hàng</th>
-                                <th>Sản phẩm</th>
-                                <th>Điểm</th>
-                                <th>Số lượt báo cáo</th>
-                                <th>Bị báo cáo từ</th>
-                                <th>Nội dung</th>
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ReviewID</th>
+                        <th>Khach hang</th>
+                        <th>San pham</th>
+                        <th>Sao</th>
+                        <th>So bao cao mo</th>
+                        <th>Bao cao dau tien</th>
+                        <th>Noi dung</th>
+                        <th class="text-end">Hanh dong</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any())
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">Khong co du lieu.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var row in Model)
+                        {
+                            <tr id="review-row-@row.ReviewID">
+                                <td>#@row.ReviewID</td>
+                                <td>@row.CustomerName</td>
+                                <td>@row.ProductName</td>
+                                <td>@row.Rating</td>
+                                <td>@row.OpenCount</td>
+                                <td>@row.FirstReportAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@row.Comment</td>
+                                <td class="text-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-success btn-resolve"
+                                            data-id="@row.ReviewID"
+                                            data-decision="approve">
+                                        Duyet
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-sm btn-danger btn-resolve"
+                                            data-id="@row.ReviewID"
+                                            data-decision="delete">
+                                        Xoa
+                                    </button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var item in rows)
-                            {
-                                <tr>
-                                    <td>#@item.ReviewID</td>
-                                    <td>@item.CustomerName</td>
-                                    <td>@item.ProductName</td>
-                                    <td>@item.Rating</td>
-                                    <td><span class="badge bg-danger">@item.OpenCount</span></td>
-                                    <td>@item.FirstReportAt.ToString("dd/MM/yyyy HH:mm")</td>
-                                    <td>@item.Comment</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-success mb-0">
-                    Hiện không có bình luận nào đang bị báo cáo.
-                </div>
-            }
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
+
+@section scripts {
+<script>
+(function () {
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    document.querySelectorAll('.btn-resolve').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const reviewId = btn.dataset.id;
+            const decision = btn.dataset.decision;
+            if (!reviewId || !decision) return;
+
+            const body = new URLSearchParams();
+            body.append('reviewId', reviewId);
+            body.append('decision', decision);
+            body.append('__RequestVerificationToken', token);
+
+            const res = await fetch('@Url.Action("ResolveReport", "Review", new { area = "Seller" })', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            });
+
+            const data = await res.json();
+            if (!data.success) {
+                alert(data.message || 'Khong the xu ly bao cao');
+                return;
+            }
+
+            const row = document.getElementById('review-row-' + reviewId);
+            if (row) row.remove();
+        });
+    });
+})();
+</script>
+}

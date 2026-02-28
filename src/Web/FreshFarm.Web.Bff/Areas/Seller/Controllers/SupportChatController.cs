@@ -1,121 +1,232 @@
-﻿using System;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
-using System.Linq;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using FreshFram.Models;
-using FreshFram.Services;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
-namespace FreshFarm.Web.Bff.Areas.Seller.Controllers
+namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
+
+[Authorize(Roles = "Seller")]
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+[Area("Seller")]
+public class SupportChatController : LegacySellerControllerBase
 {
-    [Authorize]
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    [Microsoft.AspNetCore.Mvc.Area("Seller")]
-    public class SupportChatController : LegacySellerControllerBase
+    private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public SupportChatController(IHttpClientFactory httpClientFactory)
     {
-        private readonly FreshFarmDBEntities db = new FreshFarmDBEntities();
-        private readonly ChatService _chatService;
+        _httpClientFactory = httpClientFactory;
+    }
 
-        public SupportChatController()
+    [HttpGet]
+    public IActionResult Index()
+    {
+        return View();
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Conversations()
+    {
+        try
         {
-            _chatService = new ChatService();
-        }
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync("/api/orders/admin/support-chat/conversations");
+            var body = await response.Content.ReadAsStringAsync();
 
-        [HttpGet]
-        public ActionResult Index()
-        {
-            return View();
-        }
-
-        [HttpGet]
-        public ActionResult Conversations()
-        {
-            var conversations = _chatService.GetConversationsForAdmin();
-            return Json(new { ok = true, conversations });
-        }
-
-        [HttpGet]
-        public ActionResult Messages(int conversationId, int take = 100)
-        {
-            var messages = _chatService.GetMessages(conversationId, take);
-            return Json(new { ok = true, messages });
-        }
-
-        [HttpGet]
-        public ActionResult ConversationDetails(int conversationId)
-        {
-            var conv = db.SupportConversations
-                         .Include("User.RankLevel")
-                         .FirstOrDefault(c => c.ConversationId == conversationId);
-
-            if (conv == null)
+            if (!response.IsSuccessStatusCode)
             {
-                return Json(new { ok = false, message = "Không tìm thấy hội thoại." });
-            }
-
-            var user = conv.User;
-            object profile = null;
-
-            if (user != null)
-            {
-                profile = new
+                return Json(new
                 {
-                    userId = user.UserID,
-                    fullName = string.IsNullOrWhiteSpace(user.FullName) ? user.UserName : user.FullName,
-                    email = user.Email,
-                    phone = user.Phone,
-                    avatarUrl = Url.Action("AvatarById", "Account", new { id = user.UserID, area = "" }),
-                    totalPoints = user.TotalPoints,
-                    rankName = user.RankLevel != null
-                        ? (string.IsNullOrWhiteSpace(user.RankLevel.LevelName)
-                            ? (user.RankLevel.RankType != null ? user.RankLevel.RankType.RankTypeName : null)
-                            : user.RankLevel.LevelName)
-                        : null
-                };
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the tai danh sach hoi thoai")
+                });
             }
 
-            var orders = new System.Collections.Generic.List<object>();
-            if (user != null)
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Messages(int conversationId, int take = 100)
+    {
+        try
+        {
+            if (conversationId <= 0)
             {
-                orders = db.Orders
-                           .Where(o => o.UserID == user.UserID)
-                           .OrderByDescending(o => o.OrderDate)
-                           .Take(5)
-                           .ToList()
-                           .Select(o => new
-                           {
-                               orderId = o.OrderID,
-                               orderCode = "#" + o.OrderID.ToString("D6"),
-                               orderDate = o.OrderDate.ToString("yyyy-MM-ddTHH:mm:ss"),
-                               totalAmount = o.TotalAmount,
-                               status = o.Status
-                           }).ToList<object>();
+                return Json(new { ok = false, message = "conversationId khong hop le" });
             }
 
-            return Json(new { ok = true, profile, orders });
-        }
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/support-chat/conversations/{conversationId}/messages?take={take}");
+            var body = await response.Content.ReadAsStringAsync();
 
-        [HttpPost]
-        public ActionResult Close(int conversationId)
-        {
-            _chatService.CloseConversation(conversationId);
-            return Json(new { ok = true });
-        }
-
-        [HttpPost]
-        public ActionResult MarkAsRead(int conversationId)
-        {
-            _chatService.MarkAsRead(conversationId, true); // true = admin is reading
-            return Json(new { ok = true });
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
+            if (!response.IsSuccessStatusCode)
             {
-                db.Dispose();
-                _chatService.Dispose();
+                return Json(new
+                {
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the tai tin nhan")
+                });
             }
-            base.Dispose(disposing);
+
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ConversationDetails(int conversationId)
+    {
+        try
+        {
+            if (conversationId <= 0)
+            {
+                return Json(new { ok = false, message = "conversationId khong hop le" });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/support-chat/conversations/{conversationId}/details");
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new
+                {
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the tai chi tiet hoi thoai")
+                });
+            }
+
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Close(int conversationId)
+    {
+        try
+        {
+            if (conversationId <= 0)
+            {
+                return Json(new { ok = false, message = "conversationId khong hop le" });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsync($"/api/orders/admin/support-chat/conversations/{conversationId}/close", content: null);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new
+                {
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the ket thuc hoi thoai")
+                });
+            }
+
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> MarkAsRead(int conversationId)
+    {
+        try
+        {
+            if (conversationId <= 0)
+            {
+                return Json(new { ok = false, message = "conversationId khong hop le" });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsync($"/api/orders/admin/support-chat/conversations/{conversationId}/mark-read", content: null);
+            var body = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new
+                {
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the cap nhat trang thai da doc")
+                });
+            }
+
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    private HttpClient CreateAuthorizedClient(string clientName)
+    {
+        var client = _httpClientFactory.CreateClient(clientName);
+
+        client.DefaultRequestHeaders.Remove("Authorization");
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            var json = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return fallback;
+            }
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("message", out var messageProp) && messageProp.ValueKind == JsonValueKind.String)
+                {
+                    return messageProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("detail", out var detailProp) && detailProp.ValueKind == JsonValueKind.String)
+                {
+                    return detailProp.GetString() ?? fallback;
+                }
+
+                if (root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String)
+                {
+                    return titleProp.GetString() ?? fallback;
+                }
+            }
+
+            return json;
+        }
+        catch
+        {
+            return fallback;
         }
     }
 }

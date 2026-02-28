@@ -1,81 +1,70 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Migrate dan Seller/Admin sang .NET 8 theo phase, uu tien go dependency legacy tung cum.
-  - Success hien tai: cum `Product + Category + Unit + Order + Customer + Coupon + Warehouse + Shipping` da chay service-first, khong con phu thuoc `FreshFram.*` va `FreshFarmDBEntities` trong cac module nay.
+  - Hoan tat Seller area service-first on dinh runtime tren .NET 8 (khong con EF legacy trong BFF Seller).
+  - Success criteria hien tai: Seller pages chay dung data, khong 404/binding error, report/export on dinh, DB schema khop microservices.
 - **Constraints/Assumptions**:
-  - Giu tuong thich views hien co, han che doi UI lon.
-  - Khong dung lenh pha huy git; khong revert thay doi unrelated cua user.
-  - Moi truong assistant chua co `dotnet` nen khong build/test runtime duoc.
+  - Giu UI/UX hien co cua views Seller (chi sua model/route/binding/controller mapping).
+  - Khong dung lenh git/destructive.
+  - Moi truong assistant khong co `dotnet`, khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
-  - Giu chien luoc migrate theo module (khong big-bang).
-  - Product/Category/Unit, Order, Customer, Coupon deu chuyen qua `IHttpClientFactory` + API service, bo EF truc tiep trong BFF.
-  - Bo sung endpoint admin-order trong Ordering API de giu tuong thich views Seller.
-  - Da siet auth role `Seller` cho Catalog CRUD endpoints va admin-order endpoints thong qua policy `SellerOnly`.
-  - Bo sung endpoint admin-customer (Identity API) va admin-coupon + customer-order-metrics (Ordering API) de phuc vu Seller views.
-  - Warehouse + Shipping migrate theo huong service-first MVP:
-    - Warehouse qua `Catalog API` endpoint admin.
-    - Shipping qua `Ordering API` endpoint admin.
-    - Chap nhan gioi han tam thoi o transaction warehouse (in-memory) va delivery assignment shipping (chua mo rong schema service).
-  - Cum phase 5 (`Report + Review + SupportChat + Setting + User`) se thuc hien theo lot nho 5.0 -> 5.6 trong `ROADMAP_SELLER_ADMIN_MIGRATION.md`.
+  - Service-first: BFF goi `Identity/Catalog/Ordering API`, khong truy cap DB truc tiep.
+  - Lot 4.5 da chot DB-backed (khong file-backed cho business state).
+  - Lot 4.6 tiep tuc theo huong re-wire views -> controller/action/model binding.
 - **State**:
   - *Done*:
-    - Hoan tat phase `Product + Category + Unit` service-first (controllers + views + Catalog API endpoints/DTOs).
-    - Hoan tat phase `Order` service-first:
-      - Viet lai `Areas/Seller/Controllers/OrderController.cs` theo goi Ordering API.
-      - Tao model local `Areas/Seller/Models/OrderSellerModels.cs`.
-      - Cap nhat `Areas/Seller/Views/Order/PrintInvoice.cshtml` sang model moi.
-      - Mo rong `Services/Ordering/.../OrdersController.cs` cho paged/search/detail/status/delete/statistics.
-    - Hoan tat buoc siet auth:
-      - `Catalog API`: POST/PUT/DELETE/toggle cho Product/Category/Unit da yeu cau `SellerOnly`.
-      - `Ordering API`: toan bo `api/orders/admin/*` da yeu cau `SellerOnly`.
-      - `BFF Seller`: Product/Category/Unit/Order controller da dat `[Authorize(Roles = \"Seller\")]`.
-    - Hoan tat phase `Customer + Coupon` service-first:
-      - Viet lai `Areas/Seller/Controllers/CustomerController.cs` theo goi `Identity` + `Ordering`.
-      - Viet lai `Areas/Seller/Controllers/CouponController.cs` theo goi `Ordering` + `Identity`.
-      - Tao model local `Areas/Seller/Models/CustomerCouponSellerModels.cs`.
-      - Cap nhat views `Areas/Seller/Views/Customer/*` va `Areas/Seller/Views/Coupon/ManageCoupons.cshtml` sang model namespace moi.
-      - Them `Identity API`: `Controllers/AdminCustomersController.cs`.
-      - Them `Ordering API`: `Controllers/AdminCustomersController.cs`, `Controllers/CouponsAdminController.cs`.
-      - Da siet policy `SellerOnly` cho endpoint moi o Identity/Ordering.
-    - Hoan tat phase `Warehouse + Shipping` service-first (MVP):
-      - Viet lai `Areas/Seller/Controllers/WarehouseController.cs` theo goi `Catalog API`.
-      - Viet lai `Areas/Seller/Controllers/ShippingController.cs` theo goi `Ordering API`.
-      - Tao model local `Areas/Seller/Models/WarehouseShippingSellerModels.cs`.
-      - Cap nhat views `Areas/Seller/Views/Warehouse/*` va `Areas/Seller/Views/Shipping/ManageShipping.cshtml` sang model namespace moi.
-      - Them `Catalog API`: `Controllers/WarehouseAdminController.cs`.
-      - Them `Ordering API`: `Controllers/ShippingAdminController.cs`.
-      - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong cum `Seller/Warehouse` va `Seller/Shipping`.
-      - UNCONFIRMED runtime limitation:
-        - Warehouse transaction log hien la in-memory.
-        - Shipping delivery assignment chi o muc placeholder (khong co data assignment tu service schema hien tai).
-    - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `AdminAuthorize`, `NoCache` trong cum Seller Order.
-    - Ra soat static: khong con `FreshFram.*`, `FreshFarmDBEntities`, `System.Data.Entity` trong cum Seller Customer/Coupon.
-    - Ra soat lai namespace/model-view phase `Customer + Coupon`: khop namespace `FreshFarm.Web.Bff.Areas.Seller.Models.*`, khong thay `using` legacy trong cum nay.
-    - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md`: danh dau xong phase Customer + Coupon.
-    - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md`: chia nho cum phase 5 thanh lot 5.0 -> 5.6 (scope + DoD + cau lenh giao viec mau).
-    - Da truy xuat line-number cho section Phase 3.5 de user ra lenh tung lot chinh xac theo dong.
-    - Hoan tat lot 5.0 (inventory + mapping, khong sua logic):
-      - Tao `LOT_5_0_INVENTORY_MAPPING.md` gom:
-        - action inventory 5 controller,
-        - mapping action -> API endpoint de xuat,
-        - mapping field toi thieu cho toan bo views cum 5,
-        - ket qua static audit legacy dependencies.
-      - Cap nhat `ROADMAP_SELLER_ADMIN_MIGRATION.md` danh dau lot 5.0 da xong.
+    - Hoan tat lot 5.1 -> 5.6 cho cum Seller (Setting/User/SupportChat/Review/Report read+export) theo service-first.
+    - Da execute/verify schema lot 4.5.4 tren DB that (Identity + Ordering), co hotfix index ContactMessages.
+    - Da cutover controllers sang DB-backed (Identity + Ordering admin endpoints).
+    - Da fix nhieu compile/runtime mismatch views Seller sau khi copy legacy (route/model/binding).
+    - Da bo sung fix data contract cho Seller:
+      - `OrderController` normalize payload keys cho ManageOrders.
+      - `ReportsAdminController` bo sung `TotalCustomers`, `ReturnRate` cho Revenue.
+      - `ReportsAdminController` category compare normalize cho Product filter.
+      - `ReportController` show HTTP status trong `ViewBag.ErrorMessage` khi API fail.
+    - Da them script triage runtime Seller:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.seller-runtime-diagnostics.sql`.
+      - Da sua overflow-safe SUM/cast (bigint + decimal(38,*)) sau loi `Arithmetic overflow converting expression to data type int` tren SQL Server.
+      - Da bo sung section `Sanitized metrics` khop dieu kien loc du lieu report tren API.
+    - User da chay triage script va nhan `PASS` (2026-02-28), xac nhan:
+      - `Orders` co du lieu that (`TotalOrders=92`, `OrdersWithBuyerName=92`, `OrdersWithPositiveTotal=91`).
+      - Tong doanh thu query khop (`GrossRevenueAllStatuses=18,222,140`; `RevenueSuccessOnly=5,473,500`).
+      - Tong so luong tu `OrderDetail` dat `2,147,484,193` (can tranh overflow trong code report).
+    - Da patch tiep source runtime:
+      - `ReportsAdminController`: doi SUM quantity sang `long`, bo sung clamp `ToSafeNonNegativeInt(long)` cho payload int (Revenue/Product/export).
+      - `ManageOrders.cshtml`: bo sung fallback key map cho payload (`OrderID/orderId`, `TotalAmount/totalAmount/total`, ...) de tranh render `0đ` khi doi casing/contract.
+      - `ReportsAdminController`: bo loc `OrderDetail` bat thuong khi tinh report (quantity/unitprice/productId) de tranh meo thong ke.
+      - `OrdersController.Create` + DTO: chan quantity ngoai khoang `1..10000` de ngan outlier moi.
+    - Da bo sung script doc-only de soi outlier so luong OrderDetail:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`.
+    - Da them plan migrate customer data tu monolith:
+      - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`.
   - *Now*:
-    - San sang thuc thi lot 5.1 (Setting + User) theo service-first.
+    - Cho user restart services va retest lai report sau data-quality guard.
+    - Doi chieu lai thong ke UI voi output triage SQL (luong da bo outlier).
   - *Next*:
-    - Cho lenh cua user de chay lot 5.1.
+    - Neu `Report/Product` van fail: lay HTTP status/message tu alert `ViewBag.ErrorMessage` + log API de khoanh vung tiep.
+    - Neu ManageOrders van 0đ: dump JSON endpoint `/Seller/Order/GetOrdersPaged` de bat contract drift con lai.
+    - Khi runtime on dinh: tiep tuc lot 4.5.6 migrate customer/orders tu `final3.sql` theo roadmap da tao.
 - **Open questions** (UNCONFIRMED if needed):
-  - Khong co.
+  - UNCONFIRMED ket qua UI sau patch moi nhat (can user retest va gui screenshot).
+  - UNCONFIRMED co outlier du lieu `OrderDetail.Quantity` can cleanup o DB goc hay khong.
 - **Working set** (files/ids/commands):
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
+  - `LOT_4_5_PERSISTENCE_HARDENING.md`
   - `CONTINUITY.md`
-  - `LOT_5_0_INVENTORY_MAPPING.md`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{ReportController.cs,ReviewController.cs,SupportChatController.cs,SettingController.cs,UserController.cs}`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/{Report/*,Review/*,SupportChat/*,Setting/*,User/*}`
-  - Commands da dung chinh:
-    - `rg -n "FreshFram|FreshFarmDBEntities|AdminAuthorize|NoCache" ...`
-    - `sed -n ...` de doi chieu controller/view/API
-    - `nl -ba ROADMAP_SELLER_ADMIN_MIGRATION.md | sed -n '70,220p'`
-    - `dotnet --version` (khong co trong moi truong)
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.seller-runtime-diagnostics.sql`
+  - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-27.4.5.4.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.4.hotfix-indexes.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-27.4.5.4.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-27.4.5.4.verify.sql`
+  - `docs/final3.sql`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{OrderController,ReportController}.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ReportsAdminController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Order/ManageOrders.cshtml`
+  - Commands:
+    - `rg -n "INSERT \[dbo\]\.\[Orders\]|INSERT \[dbo\]\.\[Users\]" docs/final3.sql`
+    - `rg -n "GetAdminOrdersPaged|Revenue|Products" ...`
+    - `sed -n ...` de doi chieu mapping/controller/view.

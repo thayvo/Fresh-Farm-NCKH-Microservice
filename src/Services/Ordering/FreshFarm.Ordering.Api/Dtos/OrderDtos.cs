@@ -23,7 +23,7 @@ public sealed class CreateOrderItemRequest // Tung dong san pham trong don.
     [Range(1, int.MaxValue, ErrorMessage = "ProductId phai > 0.")] // ProductId phai hop le.
     public int ProductId { get; init; } // Map vao `OrderDetail.ProductId`.
 
-    [Range(1, int.MaxValue, ErrorMessage = "Quantity phai > 0.")] // So luong phai duong.
+    [Range(1, 10000, ErrorMessage = "Quantity phai trong khoang 1..10000.")] // Chan outlier quantity de bao ve report/runtime.
     public int Quantity { get; init; } // Map vao `OrderDetail.Quantity`.
 
     [Range(0, double.MaxValue, ErrorMessage = "UnitPrice phai >= 0.")] // Khong cho gia am.

@@ -25,5 +25,9 @@ public partial class Shipping
 
     public int? CommuneId { get; set; }
 
+    public bool IsStorePickup { get; set; }
+
+    public string StoreAddress { get; set; }
+
     public virtual Order Order { get; set; }
 }

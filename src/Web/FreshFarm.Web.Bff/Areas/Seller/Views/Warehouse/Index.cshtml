@@ -11,58 +11,292 @@
     var currentPage = ViewBag.CurrentPage ?? 1;
     var totalPages = ViewBag.TotalPages ?? 1;
     var totalItems = ViewBag.TotalItems ?? 0;
+    var pageSize = ViewBag.PageSize ?? 10;
+
+    var startIndex = totalItems == 0 ? 0 : ((currentPage - 1) * pageSize + 1);
+    var endIndex = Math.Min(currentPage * pageSize, totalItems);
 }
 
 <style type="text/css">
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0)
+        }
+
+        50% {
+            transform: translateY(-10px)
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0)
+        }
+
+        to {
+            transform: rotate(360deg)
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+    }
+
+    .btn-pill {
+        border-radius: 2rem;
+        padding: .7rem 1.9rem;
+        font-weight: 600;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+        border: none;
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.2);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-outline-light-pill {
+        border-radius: 2rem;
+        border: 1.5px solid rgba(255,255,255,0.7);
+        color: white;
+        background: transparent;
+        padding: .55rem 1.4rem;
+        font-weight: 500;
+        backdrop-filter: blur(6px);
+    }
+
+        .btn-outline-light-pill:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+    .btn-danger-pill {
+        border-radius: 2rem;
+        padding: .7rem 1.8rem;
+        font-weight: 600;
+        border: none;
+        background: linear-gradient(135deg, #dc2626 0%, #f97373 100%);
+        color: #fff;
+        box-shadow: 0 10px 25px rgba(220,38,38,0.45);
+        transition: all .3s ease;
+        white-space: nowrap;
+    }
+
+        .btn-danger-pill:hover {
+            background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+            transform: translateY(-3px);
+        }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .form-select, .form-control {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .75rem 1.1rem;
+        transition: all .3s ease;
+        background: #fff;
+    }
+
+        .form-select:focus, .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+    .search-icon-wrapper {
+        position: relative;
+    }
+
+        .search-icon-wrapper i {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #60a5fa;
+            font-size: 1.1rem;
+        }
+
+        .search-icon-wrapper input {
+            padding-left: 3.25rem;
+        }
+
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.1rem .9rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            animation: slideIn .4s ease-out backwards;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 197, 253, 0.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -4px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1rem .9rem;
+            vertical-align: middle;
+        }
+
     .stats-card {
         border: none;
-        border-radius: 12px;
+        border-radius: 1.25rem;
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         background: linear-gradient(135deg, var(--card-bg) 0%, var(--card-bg-light) 100%);
+        color: #fff;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
     }
 
         .stats-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-6px);
+            box-shadow: 0 24px 55px rgba(15, 23, 42, 0.3);
         }
 
         .stats-card.primary {
-            --card-bg: #28a745;
-            --card-bg-light: #5cb85c;
-            color: white;
+            --card-bg: #22c55e;
+            --card-bg-light: #4ade80;
         }
 
         .stats-card.warning {
-            --card-bg: #ffc107;
-            --card-bg-light: #ffcd39;
-            color: #212529;
+            --card-bg: #f59e0b;
+            --card-bg-light: #fbbf24;
+            color: #1f2933;
         }
 
         .stats-card.danger {
-            --card-bg: #dc3545;
-            --card-bg-light: #e4606d;
-            color: white;
+            --card-bg: #ef4444;
+            --card-bg-light: #f97373;
         }
 
         .stats-card.info {
-            --card-bg: #17a2b8;
-            --card-bg-light: #3ab4c5;
-            color: white;
+            --card-bg: #0ea5e9;
+            --card-bg-light: #38bdf8;
         }
 
     .stats-icon {
-        font-size: 3rem;
-        opacity: 0.8;
+        font-size: 2.5rem;
+        opacity: 0.85;
     }
 
-    .table-card {
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    }
-
-    .search-box {
-        border-radius: 25px;
-        border: 2px solid #dee2e6;
+    .legend-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        margin-right: 4px;
     }
 
     .stock-bar {
@@ -84,182 +318,278 @@
     }
 
     .expired-row {
-        background-color: #fff5f5;
+        background: linear-gradient(90deg, rgba(248,113,113,0.05) 0%, rgba(248,113,113,0.08) 100%);
     }
 
     .near-expiry-row {
-        background-color: #fff9e6;
+        background: linear-gradient(90deg, rgba(252,211,77,0.05) 0%, rgba(252,211,77,0.09) 100%);
     }
 
-    .filter-btn {
-        border-radius: 999px;
+    .page-link {
+        border-radius: .875rem;
+        margin: 0 .375rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        transition: all .3s ease;
+        font-weight: 600;
     }
 
-    .legend-dot {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        margin-right: 4px;
+        .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
     }
 
-    .pagination {
-        margin-top: 1.5rem;
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0)
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px)
+        }
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 4px rgba(220,53,69,.1) !important
+    }
+
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 4px rgba(25,135,84,.1) !important
+    }
+
+    .table-modern tbody td:nth-child(3) {
+        max-width: 260px;
+    }
+
+    .product-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @@media (max-width:768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .table-modern {
+            font-size: .875rem;
+        }
+
+        .btn-pill, .btn-danger-pill {
+            padding: .55rem 1.3rem;
+        }
     }
 </style>
 
-<main class="container-fluid p-4">
-    <!-- Page Header -->
-    <div class="page-header mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="fw-bold mb-1">
-                    <i class="bi bi-boxes text-primary me-2"></i>Quản Lý Kho
-                </h2>
-                <div class="text-muted small">
-                    <span class="legend-dot" style="background-color:#fff5f5;border:1px solid #dc3545;"></span> Hàng đã hết hạn
-                    <span class="ms-3 legend-dot" style="background-color:#fff9e6;border:1px solid #ffc107;"></span> Hàng sắp hết hạn (≤ @nearDays ngày)
-                </div>
-            </div>
-            <div>
-                <a href="@Url.Action("TransactionHistory", "Warehouse")" class="btn btn-primary btn-lg">
-                    <i class="bi bi-plus-circle me-2"></i>Lịch sử
-                </a>
-                <a href="@Url.Action("ImportCart", "Warehouse")" class="btn btn-primary btn-lg">
-                    <i class="bi bi-plus-circle me-2"></i>Nhập kho
-                </a>
-                <a href="@Url.Action("ExportCart", "Warehouse")" class="btn btn-outline-primary btn-lg ms-2">
-                    <i class="bi bi-box-arrow-right me-2"></i>Xuất kho
-                </a>
+<div class="min-vh-100">
+    <div class="container-fluid py-4">
 
-                <button class="btn btn-danger btn-lg filter-btn ms-2"
-                        onclick="exportAllExpired()">
-                    <i class="bi bi-trash me-2"></i>Xuất toàn bộ hết hạn
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="row g-4 mb-4">
-        <div class="col-md-3">
-            <div class="card stats-card primary">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1 opacity-75">Tổng sản phẩm</p>
-                            <h2 class="fw-bold mb-0">@Model.TotalProducts</h2>
-                            <small class="opacity-75">
-                                <i class="bi bi-arrow-up"></i> Đang quản lý
-                            </small>
+        <!-- Header với hiệu ứng quét ánh sáng -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index: 1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div>
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="p-3 rounded-4 icon-gradient">
+                                <i class="bi bi-boxes text-white" style="font-size: 2.4rem;"></i>
+                            </div>
+                            <div>
+                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.3rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                                    Quản Lý Kho
+                                </h1>
+                                <p class="mb-2 text-white opacity-90" style="font-size: 1.05rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                    Theo dõi tồn kho, hạn sử dụng và giá trị kho theo thời gian thực
+                                </p>
+                                <div class="small text-white-50">
+                                    <span class="legend-dot" style="background-color:#fff5f5;border:1px solid #fecaca;"></span> Hàng đã hết hạn
+                                    <span class="ms-3 legend-dot" style="background-color:#fff9e6;border:1px solid #facc15;"></span> Hàng sắp hết hạn (≤ @nearDays ngày)
+                                </div>
+                            </div>
                         </div>
-                        <i class="bi bi-box-seam stats-icon"></i>
+                    </div>
+
+                    <div class="d-flex flex-column flex-md-row gap-2 gap-md-3 align-items-md-center">
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <a href="@Url.Action("TransactionHistory", "Warehouse")"
+                               class="btn-outline-light-pill d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-clock-history"></i>
+                                <span>Lịch sử</span>
+                            </a>
+                            <a href="@Url.Action("ExportCart", "Warehouse")"
+                               class="btn-outline-light-pill d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-box-arrow-right"></i>
+                                <span>Xuất kho</span>
+                            </a>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 justify-content-end">
+                            <a href="@Url.Action("ImportCart", "Warehouse")"
+                               class="btn btn-success btn-pill d-inline-flex align-items-center gap-2">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>Nhập kho</span>
+                            </a>
+                            <button class="btn-danger-pill d-inline-flex align-items-center gap-2"
+                                    type="button"
+                                    onclick="exportAllExpired()">
+                                <i class="bi bi-trash"></i>
+                                <span>Xuất toàn bộ hết hạn</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card stats-card warning">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1 opacity-75">Sắp hết hàng</p>
-                            <h2 class="fw-bold mb-0">@Model.LowStockCount</h2>
-                            <small class="opacity-75">
-                                <i class="bi bi-exclamation-triangle"></i> Cần nhập thêm
-                            </small>
+        <!-- Thống kê nhanh -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-75">Tổng sản phẩm</p>
+                                <h2 class="fw-bold mb-0">@Model.TotalProducts</h2>
+                                <small class="opacity-80">
+                                    <i class="bi bi-arrow-up"></i> Đang quản lý trong kho
+                                </small>
+                            </div>
+                            <i class="bi bi-box-seam stats-icon"></i>
                         </div>
-                        <i class="bi bi-exclamation-triangle stats-icon"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card stats-card warning">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-80">Sắp hết hàng</p>
+                                <h2 class="fw-bold mb-0">@Model.LowStockCount</h2>
+                                <small class="opacity-85">
+                                    <i class="bi bi-exclamation-triangle"></i> Cần nhập thêm
+                                </small>
+                            </div>
+                            <i class="bi bi-exclamation-triangle stats-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card stats-card danger">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-80">Hết hàng</p>
+                                <h2 class="fw-bold mb-0">@Model.OutOfStockCount</h2>
+                                <small class="opacity-85">
+                                    <i class="bi bi-x-circle"></i> Cần xử lý ngay
+                                </small>
+                            </div>
+                            <i class="bi bi-x-octagon stats-icon"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="card stats-card info">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="mb-1 opacity-80">Giá trị kho</p>
+                                <h2 class="fw-bold mb-0">@string.Format("{0:N0}", Model.TotalWarehouseValue)</h2>
+                                <small class="opacity-85">
+                                    <i class="bi bi-currency-dollar"></i> VNĐ
+                                </small>
+                            </div>
+                            <i class="bi bi-cash-stack stats-icon"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-3">
-            <div class="card stats-card danger">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1 opacity-75">Hết hàng</p>
-                            <h2 class="fw-bold mb-0">@Model.OutOfStockCount</h2>
-                            <small class="opacity-75"><i class="bi bi-x-circle"></i> Cần xử lý ngay</small>
-                        </div>
-                        <i class="bi bi-x-octagon stats-icon"></i>
-                    </div>
+        <!-- Bộ lọc -->
+        <div class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <i class="bi bi-funnel text-white" style="font-size: 1.25rem;"></i>
                 </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc kho & tìm kiếm</h5>
             </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card stats-card info">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <p class="mb-1 opacity-75">Giá trị kho</p>
-                            <h2 class="fw-bold mb-0">@string.Format("{0:N0}", Model.TotalWarehouseValue)</h2>
-                            <small class="opacity-75"><i class="bi bi-currency-dollar"></i> VNĐ</small>
-                        </div>
-                        <i class="bi bi-cash-stack stats-icon"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters + Table -->
-    <div class="card table-card">
-        <div class="card-body">
-            <!-- Filters -->
-            <div class="row mb-4">
+            <div class="row g-3">
                 <div class="col-md-6">
-                    <form method="get" class="d-flex">
-                        <div class="input-group">
-                            <span class="input-group-text bg-white border-end-0">
-                                <i class="bi bi-search"></i>
-                            </span>
+                    <form method="get">
+                        <div class="search-icon-wrapper">
+                            <i class="bi bi-search"></i>
                             <input type="text"
-                                   class="form-control search-box border-start-0"
-                                   placeholder="Tìm kiếm sản phẩm, mã SKU..."
+                                   class="form-control"
+                                   placeholder="Tìm sản phẩm, mã SKU..."
                                    id="searchInput"
                                    name="searchTerm"
                                    value="@ViewBag.SearchTerm" />
-                            <button type="submit" class="btn btn-outline-secondary">Tìm</button>
                         </div>
                     </form>
                 </div>
-                <div class="col-md-6 text-end">
-                    <form method="get" class="d-flex justify-content-end gap-2">
+                <div class="col-md-6">
+                    <form method="get" class="d-flex flex-wrap justify-content-md-end gap-2">
                         <input type="hidden" name="searchTerm" value="@ViewBag.SearchTerm" />
-                        <select class="form-select d-inline-block w-auto filter-btn me-2"
+                        <select class="form-select w-auto"
                                 name="categoryFilter"
                                 onchange="this.form.submit()">
                             <option value="">Tất cả danh mục</option>
-                            <option value="Rau lá" @(ViewBag.CategoryFilter == "Rau lá" ? "selected" : "")>Rau lá</option>
-                            <option value="Rau ăn hoa / thân / mầm" @(ViewBag.CategoryFilter == "Rau ăn hoa / thân / mầm" ? "selected" : "")>Rau ăn hoa/thân/mầm</option>
-                            <option value="Rau ăn quả" @(ViewBag.CategoryFilter == "Rau ăn quả" ? "selected" : "")>Rau ăn quả</option>
-                            <option value="Củ & rễ" @(ViewBag.CategoryFilter == "Củ & rễ" ? "selected" : "")>Củ & rễ</option>
-                            <option value="Nấm" @(ViewBag.CategoryFilter == "Nấm" ? "selected" : "")>Nấm</option>
-                            <option value="Rau thơm & gia vị" @(ViewBag.CategoryFilter == "Rau thơm & gia vị" ? "selected" : "")>Rau thơm & gia vị</option>
-                            <option value="Trái cây" @(ViewBag.CategoryFilter == "Trái cây" ? "selected" : "")>Trái cây</option>
+                            <option value="Rau lá" selected="@(ViewBag.CategoryFilter == "Rau lá"  ? "selected" : null)">Rau lá</option>
+                            <option value="Rau ăn hoa / thân / mầm" selected="@(ViewBag.CategoryFilter == "Rau ăn hoa / thân / mầm"  ? "selected" : null)">Rau ăn hoa / thân / mầm</option>
+                            <option value="Rau ăn quả" selected="@(ViewBag.CategoryFilter == "Rau ăn quả"  ? "selected" : null)">Rau ăn quả</option>
+                            <option value="Củ & rễ" selected="@(ViewBag.CategoryFilter == "Củ & rễ"  ? "selected" : null)">Củ & rễ</option>
+                            <option value="Nấm" selected="@(ViewBag.CategoryFilter == "Nấm"  ? "selected" : null)">Nấm</option>
+                            <option value="Rau thơm & gia vị" selected="@(ViewBag.CategoryFilter == "Rau thơm & gia vị"  ? "selected" : null)">Rau thơm & gia vị</option>
+                            <option value="Trái cây" selected="@(ViewBag.CategoryFilter == "Trái cây"  ? "selected" : null)">Trái cây</option>
                         </select>
 
-                        <select class="form-select d-inline-block w-auto filter-btn me-2"
+                        <select class="form-select w-auto"
                                 name="stockStatusFilter"
                                 onchange="this.form.submit()">
                             <option value="">Trạng thái kho</option>
-                            <option value="in-stock" @(ViewBag.StockStatusFilter == "in-stock" ? "selected" : "")>Còn hàng</option>
-                            <option value="low-stock" @(ViewBag.StockStatusFilter == "low-stock" ? "selected" : "")>Sắp hết</option>
-                            <option value="out-of-stock" @(ViewBag.StockStatusFilter == "out-of-stock" ? "selected" : "")>Hết hàng</option>
+                            <option value="in-stock" selected="@(ViewBag.StockStatusFilter == "in-stock"  ? "selected" : null)">Còn hàng</option>
+                            <option value="low-stock" selected="@(ViewBag.StockStatusFilter == "low-stock"  ? "selected" : null)">Sắp hết</option>
+                            <option value="out-of-stock" selected="@(ViewBag.StockStatusFilter == "out-of-stock"  ? "selected" : null)">Hết hàng</option>
                         </select>
                     </form>
                 </div>
             </div>
+        </div>
 
-            <!-- Table -->
+        <!-- Bảng dữ liệu -->
+        <div class="card-glass overflow-hidden">
             <div class="table-responsive">
-                <table class="table table-striped align-middle">
-                    <thead class="table-light">
+                <table class="table table-hover align-middle mb-0 table-modern">
+                    <thead>
                         <tr>
                             <th class="text-center">Ảnh</th>
                             <th>Mã SP</th>
@@ -295,10 +625,12 @@
                                     <td class="text-center">
                                         <img src="~/Images/@item.ImageFileName"
                                              alt="@item.ProductName"
-                                             style="width:48px;height:48px;object-fit:cover;border-radius:6px;" />
+                                             style="width:48px;height:48px;object-fit:cover;border-radius:10px;box-shadow:0 4px 12px rgba(15,23,42,0.3);" />
                                     </td>
-                                    <td>@item.SKU</td>
-                                    <td class="fw-semibold">@item.ProductName</td>
+                                    <td class="text-muted">@item.SKU</td>
+                                    <td class="fw-semibold">
+                                        <div class="product-name">@item.ProductName</div>
+                                    </td>
                                     <td>@item.CategoryName</td>
                                     <td class="text-center">
                                         @if (item.ExpiryDate.HasValue)
@@ -344,7 +676,7 @@
                                     </td>
                                     <td class="text-center">
                                         <a href="@Url.Action("Details", "Warehouse", new { id = item.ProductID })"
-                                           class="btn btn-sm btn-outline-primary">
+                                           class="btn btn-sm btn-outline-primary rounded-pill px-3">
                                             <i class="bi bi-eye"></i> Chi tiết
                                         </a>
                                     </td>
@@ -354,9 +686,16 @@
                         else
                         {
                             <tr>
-                                <td colspan="13" class="text-center text-muted py-4">
-                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-                                    Không có sản phẩm nào.
+                                <td colspan="13" class="text-center py-5">
+                                    <div class="d-flex flex-column align-items-center gap-3">
+                                        <div class="p-4 rounded-circle" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                                            <i class="bi bi-inbox" style="font-size: 3rem; color: #3b82f6;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="fw-bold mb-1 text-primary-blue">Chưa có sản phẩm</h5>
+                                            <p class="text-muted mb-0">Không tìm thấy dữ liệu tương ứng điều kiện lọc hiện tại.</p>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -367,62 +706,77 @@
             <!-- Pagination -->
             @if (totalPages > 1)
             {
-                <nav aria-label="Phân trang">
-                    <ul class="pagination justify-content-center">
-                        <!-- Previous -->
-                        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("Index", new {
-                                searchTerm = ViewBag.SearchTerm,
-                                categoryFilter = ViewBag.CategoryFilter,
-                                stockStatusFilter = ViewBag.StockStatusFilter,
-                                page = currentPage - 1
-                            })">
-                                <i class="bi bi-chevron-left"></i>
-                            </a>
-                        </li>
+                <div class="d-flex flex-column flex-md-row align-items-center justify-content-between px-4 py-4 border-top" style="background: linear-gradient(90deg, #f0f9ff 0%, #dbeafe 100%);">
+                    <div class="text-muted mb-3 mb-md-0 small">
+                        <i class="bi bi-journals me-2 text-primary"></i>
+                        Trang <span class="fw-bold text-primary-blue">@currentPage</span> / <span class="fw-bold text-primary-blue">@totalPages</span>
+                        <span class="mx-2">•</span>
+                        Tổng <span class="fw-bold text-primary-blue">@totalItems</span> sản phẩm
+                    </div>
 
-                        <!-- Page numbers -->
-                        @for (int i = 1; i <= totalPages; i++)
-                        {
-                            if (i == 1 || i == totalPages || (i >= currentPage - 2 && i <= currentPage + 2))
-                            {
-                                <li class="page-item @(i == currentPage ? "active" : "")">
-                                    <a class="page-link" href="@Url.Action("Index", new {
+                    <nav aria-label="Phân trang">
+                        <ul class="pagination mb-0">
+                            <!-- Previous -->
+                            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("Index", new {
                                         searchTerm = ViewBag.SearchTerm,
                                         categoryFilter = ViewBag.CategoryFilter,
                                         stockStatusFilter = ViewBag.StockStatusFilter,
-                                        page = i
-                                    })">@i</a>
-                                </li>
-                            }
-                            else if (i == currentPage - 3 || i == currentPage + 3)
-                            {
-                                <li class="page-item disabled">
-                                    <span class="page-link">...</span>
-                                </li>
-                            }
-                        }
+                                        page = currentPage - 1
+                                    })">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
 
-                        <!-- Next -->
-                        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("Index", new {
-                                searchTerm = ViewBag.SearchTerm,
-                                categoryFilter = ViewBag.CategoryFilter,
-                                stockStatusFilter = ViewBag.StockStatusFilter,
-                                page = currentPage + 1
-                            })">
-                                <i class="bi bi-chevron-right"></i>
-                            </a>
-                        </li>
-                    </ul>
-                </nav>
+                            <!-- Page numbers -->
+                            @for (int i = 1; i <= totalPages; i++)
+                            {
+                                if (i == 1 || i == totalPages || (i >= currentPage - 2 && i <= currentPage + 2))
+                                {
+                                    <li class="page-item @(i == currentPage ? "active" : "")">
+                                        <a class="page-link" href="@Url.Action("Index", new {
+                                                searchTerm = ViewBag.SearchTerm,
+                                                categoryFilter = ViewBag.CategoryFilter,
+                                                stockStatusFilter = ViewBag.StockStatusFilter,
+                                                page = i
+                                            })">@i</a>
+                                        </li>
+                                    }
+                                    else if (i == currentPage - 3 || i == currentPage + 3)
+                                    {
+                                        <li class="page-item disabled">
+                                            <span class="page-link">...</span>
+                                        </li>
+                                    }
+                                }
+
+                            <!-- Next -->
+                            <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                                <a class="page-link" href="@Url.Action("Index", new {
+                                        searchTerm = ViewBag.SearchTerm,
+                                        categoryFilter = ViewBag.CategoryFilter,
+                                        stockStatusFilter = ViewBag.StockStatusFilter,
+                                        page = currentPage + 1
+                                    })">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
             }
 
             <!-- Summary -->
-            <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="d-flex justify-content-between align-items-center px-4 pb-4">
                 <div class="text-muted small">
-                    Hiển thị @((currentPage - 1) * 10 + 1) - @Math.Min(currentPage * 10, totalItems)
-                    trong tổng số <strong>@totalItems</strong> sản phẩm.
+                    @if (totalItems > 0)
+                    {
+                        @:Hiển thị @startIndex - @endIndex trong tổng số <strong>@totalItems</strong> sản phẩm.
+                    }
+                    else
+                    {
+                        @:Không có sản phẩm nào để hiển thị.
+                    }
                     <span class="ms-3">
                         Ngưỡng sắp hết hạn: ≤ @nearDays ngày.
                     </span>
@@ -430,24 +784,67 @@
             </div>
         </div>
     </div>
-</main>
+</div>
 
 @section scripts{
     <script>
+        function showNotification(message, type = 'info') {
+            const old = document.querySelector('.dynamic-alert');
+            if (old) old.remove();
+
+            const iconMap = {
+                'success': 'check-circle-fill',
+                'danger': 'exclamation-triangle-fill',
+                'info': 'info-circle-fill',
+                'warning': 'exclamation-circle-fill'
+            };
+
+            const div = document.createElement('div');
+            div.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            div.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 15px 50px rgba(0,0,0,.25);border-radius:1.25rem;animation:slideIn .4s ease-out';
+            div.innerHTML = `<div class="d-flex align-items-center gap-3">
+                                <i class="bi bi-${iconMap[type]} fs-4"></i>
+                                <span class="flex-grow-1">${message}</span>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                             </div>`;
+            document.body.appendChild(div);
+
+            setTimeout(() => {
+                div.style.animation = 'slideOut .3s ease-out';
+                setTimeout(() => div.remove(), 300);
+            }, 5000);
+        }
+
+        function getToken() {
+            const t = document.querySelector('input[name="__RequestVerificationToken"]');
+            return t ? t.value : '';
+        }
+
         function exportAllExpired() {
             if (!confirm("Bạn có chắc muốn xuất TẤT CẢ sản phẩm hết hạn?")) return;
 
-            $.post('@Url.Action("ExportAllExpired", "Warehouse", new { area = "Seller" })',
-                { __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
-                function (res) {
+            const token = getToken();
+
+            fetch('@Url.Action("ExportAllExpired", "Warehouse", new { area = "Seller" })', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'RequestVerificationToken': token,
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: new URLSearchParams({ __RequestVerificationToken: token })
+            })
+                .then(r => r.json())
+                .then(res => {
+                    showNotification(res.message || (res.success ? 'Thao tác thành công.' : 'Có lỗi xảy ra.'), res.success ? 'success' : 'danger');
                     if (res.success) {
-                        alert("Đã xuất toàn bộ sản phẩm hết hạn");
                         setTimeout(() => location.reload(), 1500);
-                    } else {
-                        alert(res.message);
                     }
-                }
-            );
+                })
+                .catch(() => {
+                    showNotification('Có lỗi xảy ra!', 'danger');
+                });
         }
     </script>
 }

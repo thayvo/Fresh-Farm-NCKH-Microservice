@@ -1,67 +1,406 @@
-﻿@model IEnumerable<FreshFram.Models.StatusType>
+﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.SellerStatusTypeViewModel>
 @{
     ViewBag.Title = "Quản Lý Loại Trạng Thái";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
-<main class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">Quản Lý Loại Trạng Thái</h2>
-        <button class="btn btn-success"
-                data-bs-toggle="modal"
-                data-bs-target="#modalAddLoai"
-                id="btnAddNewType">
-            <i class="bi bi-plus-circle"></i> Thêm loại trạng thái
-        </button>
-    </div>
+@Html.AntiForgeryToken()
 
-    @if (TempData["SuccessMessage"] != null)
-    {
-        <div class="alert alert-success alert-dismissible fade show">
-            @TempData["SuccessMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-    @if (TempData["ErrorMessage"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show">
-            @TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+<style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
-    <!-- Bộ lọc tìm kiếm -->
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0)
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0)
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(80px)
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0)
+        }
+
+        50% {
+            transform: translateY(-10px)
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0)
+        }
+
+        to {
+            transform: rotate(360deg)
+        }
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .form-control, .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .8rem 1.1rem;
+        background: #fff;
+        transition: all .25s ease;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59,130,246,.15);
+        }
+
+    .search-icon-wrapper {
+        position: relative;
+    }
+
+        .search-icon-wrapper i {
+            position: absolute;
+            left: 1.1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #60a5fa;
+            font-size: 1.05rem;
+        }
+
+        .search-icon-wrapper input {
+            padding-left: 3rem;
+        }
+
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.1rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            border-bottom: 1px solid #e5e7eb;
+            animation: fadeInUp .35s ease-out backwards;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59,130,246,.06) 0%, rgba(147,197,253,.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -4px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1rem 1rem;
+            vertical-align: middle;
+        }
+
+    .btn-pill {
+        border-radius: 999px;
+        padding: .7rem 1.7rem;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        transition: all .25s cubic-bezier(.4,0,.2,1);
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.18);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+    .btn-outline-primary,
+    .btn-outline-danger {
+        border-radius: .875rem;
+        border-width: 2px;
+    }
+
+    .hover-scale {
+        transition: transform .25s ease;
+    }
+
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+
+    .page-link {
+        border-radius: .875rem !important;
+        margin: 0 .25rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        font-weight: 600;
+        transition: all .25s ease;
+    }
+
+        .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            box-shadow: 0 8px 16px rgba(59,130,246,.3);
+            transform: translateY(-2px);
+        }
+
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.12);
+    }
+
+    .dynamic-alert {
+        animation: slideIn .35s ease-out;
+    }
+
+    .modal-content {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%) !important;
+        color: #fff !important;
+        border-radius: 1.5rem 1.5rem 0 0;
+        padding: 1.2rem 1.6rem;
+    }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .table-modern {
+            font-size: .9rem;
+        }
+    }
+</style>
+
+<div class="min-vh-100">
+    <div class="container-fluid py-4">
+
+        <!-- HEADER GRADIENT -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index:1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3 mb-3 mb-md-0">
+                        <div class="p-3 rounded-4 icon-gradient">
+                            <i class="bi bi-sliders2 text-white" style="font-size:2.2rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size:2.3rem; text-shadow:0 4px 12px rgba(0,0,0,.3);">
+                                Quản Lý Loại Trạng Thái
+                            </h1>
+                            <p class="mb-0 text-white opacity-90" style="font-size:1.05rem;">
+                                Cấu hình & quản lý các loại trạng thái hệ thống
+                            </p>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success btn-pill d-inline-flex align-items-center gap-2 hover-scale"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalAddLoai"
+                            id="btnAddNewType">
+                        <i class="bi bi-plus-circle" style="font-size:1.3rem;"></i>
+                        <span>Thêm loại trạng thái</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALERT SERVER -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show mb-3">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-3">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <!-- BỘ LỌC TÌM KIẾM -->
+        <div class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="p-3 rounded-3" style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                    <i class="bi bi-search text-white"></i>
+                </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc tìm kiếm</h5>
+            </div>
             <form method="get" class="row g-3">
                 <input type="hidden" name="page" value="1" />
-                <div class="col-md-6">
-                    <input type="text"
-                           name="searchTerm"
-                           value="@ViewBag.SearchTerm"
-                           class="form-control"
-                           placeholder="Tìm theo tên hoặc mô tả..." />
+                <div class="col-md-8 col-lg-6">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        Tên / mô tả
+                    </label>
+                    <div class="search-icon-wrapper">
+                        <i class="bi bi-search"></i>
+                        <input type="text"
+                               name="searchTerm"
+                               value="@ViewBag.SearchTerm"
+                               class="form-control"
+                               placeholder="Tìm theo tên hoặc mô tả..." />
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-search"></i> Tìm kiếm
+                <div class="col-md-4 col-lg-3 d-flex align-items-end">
+                    <button type="submit"
+                            class="btn btn-primary btn-pill w-100 d-flex align-items-center justify-content-center gap-2 hover-scale">
+                        <i class="bi bi-funnel-fill"></i>
+                        <span>Tìm kiếm</span>
                     </button>
                 </div>
             </form>
         </div>
-    </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body">
+        <!-- BẢNG DANH SÁCH -->
+        <div class="card-glass overflow-hidden">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-success">
+                <table class="table table-hover align-middle mb-0 table-modern">
+                    <thead>
                         <tr>
-                            <th>#</th>
-                            <th>Tên loại trạng thái</th>
-                            <th>Mô tả</th>
-                            <th>Ngày tạo</th>
-                            <th class="text-end">Hành động</th>
+                            <th class="px-4" style="width:70px;">#</th>
+                            <th class="px-4">Tên loại trạng thái</th>
+                            <th class="px-4">Mô tả</th>
+                            <th class="px-4" style="width:190px;">Ngày tạo</th>
+                            <th class="px-4 text-end" style="width:150px;">Hành động</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -71,36 +410,49 @@
                             foreach (var item in Model)
                             {
                                 <tr>
-                                    <td>@index</td>
-                                    <td><strong>@item.StatusTypeName</strong></td>
-                                    <td>
+                                    <td class="px-4">
+                                        <span class="badge bg-primary text-white rounded-pill px-3 py-2"
+                                              style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                                            @index
+                                        </span>
+                                    </td>
+                                    <td class="px-4">
+                                        <div class="d-flex flex-column">
+                                            <span class="fw-bold text-primary-blue">@item.StatusTypeName</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-4">
                                         @if (!string.IsNullOrEmpty(item.Description))
                                         {
-                                            @item.Description
+                                            <span>@item.Description</span>
                                         }
                                         else
                                         {
-                                            <span class="text-muted">--</span>
+                                            <span class="text-muted fst-italic">Chưa có mô tả</span>
                                         }
                                     </td>
-                                    <td>
+                                    <td class="px-4">
                                         <small class="text-muted">
                                             @item.CreatedDate.ToString("dd/MM/yyyy HH:mm")
                                         </small>
                                     </td>
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-primary me-1 btn-edit-type"
-                                                data-id="@item.StatusTypeID"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#modalEditLoai">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger btn-delete-type"
-                                                data-id="@item.StatusTypeID"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#modalDeleteLoai">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
+                                    <td class="px-4 text-end">
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary me-1 btn-edit-type"
+                                                    data-id="@item.StatusTypeID"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalEditLoai"
+                                                    title="Chỉnh sửa">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger btn-delete-type"
+                                                    data-id="@item.StatusTypeID"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalDeleteLoai"
+                                                    title="Xóa">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 index++;
@@ -109,8 +461,17 @@
                         else
                         {
                             <tr>
-                                <td colspan="5" class="text-center text-muted py-4">
-                                    Chưa có loại trạng thái nào
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="d-flex flex-column align-items-center gap-3">
+                                        <div class="p-4 rounded-circle"
+                                             style="background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);">
+                                            <i class="bi bi-inbox" style="font-size:2.7rem; color:#3b82f6;"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="fw-bold mb-1 text-primary-blue">Chưa có loại trạng thái nào</h5>
+                                            <p class="text-muted mb-0">Hãy thêm loại trạng thái mới để bắt đầu.</p>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         }
@@ -118,17 +479,26 @@
                 </table>
             </div>
 
-            <!-- Phân trang -->
+            <!-- PHÂN TRANG -->
             @if (ViewBag.TotalPages > 1)
             {
-                <nav aria-label="Phân trang" class="mt-4">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-muted">
-                            Hiển thị <strong>@((ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1)</strong>
-                            đến <strong>@Math.Min(ViewBag.CurrentPage * ViewBag.PageSize, ViewBag.TotalItems)</strong>
-                            trong tổng số <strong>@ViewBag.TotalItems</strong> mục
-                        </div>
+                <div class="d-flex flex-column flex-md-row align-items-center justify-content-between px-4 py-3 border-top"
+                     style="background:linear-gradient(90deg,#f0f9ff 0%,#dbeafe 100%);">
+                    <div class="text-muted mb-3 mb-md-0">
+                        <i class="bi bi-journals me-2 text-primary"></i>
+                        Hiển thị
+                        <strong class="text-primary-blue">
+                            @((ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1)
+                        </strong>
+                        đến
+                        <strong class="text-primary-blue">
+                            @Math.Min(ViewBag.CurrentPage * ViewBag.PageSize, ViewBag.TotalItems)
+                        </strong>
+                        trong tổng số
+                        <strong class="text-primary-blue">@ViewBag.TotalItems</strong> mục
+                    </div>
 
+                    <nav aria-label="Phân trang" class="mb-0">
                         <ul class="pagination mb-0">
                             <li class="page-item @(ViewBag.CurrentPage == 1 ? "disabled" : "")">
                                 <a class="page-link"
@@ -180,35 +550,41 @@
                                 </a>
                             </li>
                         </ul>
-                    </div>
-                </nav>
+                    </nav>
+                </div>
             }
         </div>
     </div>
-</main>
+</div>
 
 @section modal {
     <!-- Modal thêm loại trạng thái -->
     <div class="modal fade" id="modalAddLoai" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Thêm loại trạng thái mới</h5>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-plus-circle me-2"></i>Thêm loại trạng thái mới
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="formAddType">
+                <div class="modal-body p-4">
+                    <form id="formAddType" class="row g-3">
                         @Html.AntiForgeryToken()
-                        <div class="mb-3">
-                            <label class="form-label">Tên loại trạng thái <span class="text-danger">*</span></label>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Tên loại trạng thái <span class="text-danger">*</span>
+                            </label>
                             <input type="text"
                                    name="StatusTypeName"
                                    class="form-control"
                                    placeholder="Nhập tên loại trạng thái..."
                                    required />
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Mô tả</label>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Mô tả
+                            </label>
                             <textarea name="Description"
                                       class="form-control"
                                       rows="3"
@@ -216,9 +592,13 @@
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button class="btn btn-success" id="btnSaveAddType">Lưu</button>
+                <div class="modal-footer p-4 border-top">
+                    <button class="btn btn-light btn-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Hủy
+                    </button>
+                    <button class="btn btn-success btn-pill px-4 hover-scale" id="btnSaveAddType">
+                        <i class="bi bi-check-circle me-2"></i>Lưu
+                    </button>
                 </div>
             </div>
         </div>
@@ -226,26 +606,32 @@
 
     <!-- Modal sửa loại trạng thái -->
     <div class="modal fade" id="modalEditLoai" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Chỉnh sửa loại trạng thái</h5>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-pencil-square me-2"></i>Chỉnh sửa loại trạng thái
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="formEditType">
+                <div class="modal-body p-4">
+                    <form id="formEditType" class="row g-3">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="StatusTypeID" id="EditStatusTypeID" />
-                        <div class="mb-3">
-                            <label class="form-label">Tên loại trạng thái <span class="text-danger">*</span></label>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Tên loại trạng thái <span class="text-danger">*</span>
+                            </label>
                             <input type="text"
                                    name="StatusTypeName"
                                    id="EditStatusTypeName"
                                    class="form-control"
                                    required />
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Mô tả</label>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Mô tả
+                            </label>
                             <textarea name="Description"
                                       id="EditDescription"
                                       class="form-control"
@@ -253,9 +639,13 @@
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button class="btn btn-primary" id="btnSaveEditType">Cập nhật</button>
+                <div class="modal-footer p-4 border-top">
+                    <button class="btn btn-light btn-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Hủy
+                    </button>
+                    <button class="btn btn-primary btn-pill px-4 hover-scale" id="btnSaveEditType">
+                        <i class="bi bi-check-circle me-2"></i>Cập nhật
+                    </button>
                 </div>
             </div>
         </div>
@@ -263,19 +653,33 @@
 
     <!-- Modal xóa -->
     <div class="modal fade" id="modalDeleteLoai" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">Xác nhận xóa</h5>
+                <div class="modal-header" style="background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%) !important;">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Xác nhận xóa
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <p>Bạn có chắc chắn muốn xóa loại trạng thái này không?</p>
-                    <p class="text-danger"><small><i class="bi bi-exclamation-triangle"></i> Lưu ý: Không thể xóa nếu loại này đang được sử dụng.</small></p>
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3">
+                        <div class="p-4 rounded-circle d-inline-flex"
+                             style="background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);">
+                            <i class="bi bi-trash" style="font-size:2.7rem; color:#dc2626;"></i>
+                        </div>
+                    </div>
+                    <p class="mb-1">Bạn có chắc chắn muốn xóa loại trạng thái này không?</p>
+                    <p class="text-danger mb-0">
+                        <small><i class="bi bi-info-circle me-1"></i>Lưu ý: Không thể xóa nếu loại này đang được sử dụng.</small>
+                    </p>
                 </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button class="btn btn-danger" id="btnConfirmDeleteType">Xóa</button>
+                <div class="modal-footer p-4 border-top justify-content-center">
+                    <button class="btn btn-light btn-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Hủy
+                    </button>
+                    <button class="btn btn-danger btn-pill px-4" id="btnConfirmDeleteType">
+                        <i class="bi bi-trash3 me-2"></i>Xóa
+                    </button>
                 </div>
             </div>
         </div>
@@ -290,29 +694,39 @@
             const oldAlert = document.querySelector('.dynamic-alert');
             if (oldAlert) oldAlert.remove();
 
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
-            alertDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 500px;';
-
             const iconMap = {
-                'success': 'bi-check-circle-fill',
-                'danger': 'bi-x-circle-fill',
-                'warning': 'bi-exclamation-triangle-fill',
-                'info': 'bi-info-circle-fill'
+                'success': 'check-circle-fill',
+                'danger': 'exclamation-triangle-fill',
+                'warning': 'exclamation-circle-fill',
+                'info': 'info-circle-fill'
             };
 
-            alertDiv.innerHTML = `<i class="bi ${iconMap[type]} me-2"></i><span>${message}</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            alertDiv.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:480px;box-shadow:0 15px 45px rgba(0,0,0,.25);border-radius:1.25rem;';
+
+            alertDiv.innerHTML =
+                `<div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-${iconMap[type]} fs-4"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+
             document.body.appendChild(alertDiv);
-            setTimeout(() => { alertDiv.classList.remove('show'); setTimeout(() => alertDiv.remove(), 150); }, 5000);
+
+            setTimeout(() => {
+                alertDiv.style.animation = 'slideOut .3s ease-out forwards';
+                setTimeout(() => alertDiv.remove(), 320);
+            }, 5000);
         }
 
         // Reset form khi mở modal thêm mới
-        document.getElementById('btnAddNewType').addEventListener('click', function() {
-            document.getElementById('formAddType').reset();
+        document.getElementById('btnAddNewType')?.addEventListener('click', function () {
+            document.getElementById('formAddType')?.reset();
         });
 
         // Xử lý thêm mới loại trạng thái
-        document.getElementById('btnSaveAddType').addEventListener('click', function() {
+        document.getElementById('btnSaveAddType')?.addEventListener('click', function () {
             const form = document.getElementById('formAddType');
             if (!form.checkValidity()) {
                 form.reportValidity();
@@ -329,29 +743,29 @@
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(data.message, 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('modalAddLoai')).hide();
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showNotification(data.message, 'danger');
-                }
-            })
-            .catch(err => {
-                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
-                console.error(err);
-            })
-            .finally(() => {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalText;
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalAddLoai')).hide();
+                        setTimeout(() => location.reload(), 900);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                });
         });
 
         // Xử lý sửa - Load dữ liệu loại trạng thái
         document.querySelectorAll('.btn-edit-type').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 const id = this.dataset.id;
 
                 fetch('@Url.Action("GetStatusTypeDetail", "Status")?id=' + id)
@@ -374,7 +788,7 @@
         });
 
         // Xử lý cập nhật loại trạng thái
-        document.getElementById('btnSaveEditType').addEventListener('click', function() {
+        document.getElementById('btnSaveEditType')?.addEventListener('click', function () {
             const form = document.getElementById('formEditType');
             if (!form.checkValidity()) {
                 form.reportValidity();
@@ -391,65 +805,67 @@
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(data.message, 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('modalEditLoai')).hide();
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showNotification(data.message, 'danger');
-                }
-            })
-            .catch(err => {
-                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
-                console.error(err);
-            })
-            .finally(() => {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalText;
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalEditLoai')).hide();
+                        setTimeout(() => location.reload(), 900);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                });
         });
 
         // Xử lý xóa loại trạng thái
         document.querySelectorAll('.btn-delete-type').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function () {
                 currentDeleteId = this.dataset.id;
             });
         });
 
-        document.getElementById('btnConfirmDeleteType').addEventListener('click', function() {
-            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        document.getElementById('btnConfirmDeleteType')?.addEventListener('click', function () {
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
             const deleteBtn = this;
             const originalText = deleteBtn.innerHTML;
+
             deleteBtn.disabled = true;
             deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
 
             fetch('@Url.Action("DeleteStatusType", "Status")?id=' + currentDeleteId, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
                 },
                 body: '__RequestVerificationToken=' + encodeURIComponent(token)
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification(data.message, 'success');
-                    bootstrap.Modal.getInstance(document.getElementById('modalDeleteLoai')).hide();
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showNotification(data.message, 'danger');
-                }
-            })
-            .catch(err => {
-                showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
-                console.error(err);
-            })
-            .finally(() => {
-                deleteBtn.disabled = false;
-                deleteBtn.innerHTML = originalText;
-            });
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalDeleteLoai')).hide();
+                        setTimeout(() => location.reload(), 900);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalText;
+                });
         });
     </script>
 }

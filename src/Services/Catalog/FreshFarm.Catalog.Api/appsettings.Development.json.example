@@ -6,9 +6,12 @@
     }
   },
   "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "FreshFarmCatalogDB": "Server=localhost;Database=FreshFarmCatalogDB;Trusted_Connection=True;TrustServerCertificate=True"
+  },
   "Jwt": {
-     "Issuer": "FreshFarm.Identity",
-     "Audience": "FreshFarm",
-     "Key": "yourkey(Min: 32characters)"
-    }
+    "Issuer": "FreshFarm.Identity",
+    "Audience": "FreshFarm",
+    "Key": "yourkey(Min: 32 characters)"
+  }
 }

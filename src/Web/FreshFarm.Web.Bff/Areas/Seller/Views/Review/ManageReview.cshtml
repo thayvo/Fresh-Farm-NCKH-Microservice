@@ -1,5 +1,4 @@
-﻿@using Microsoft.AspNetCore.Http
-@model List<FreshFram.Models.Review>
+﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.SellerReviewViewModel>
 
 @{
     ViewBag.Title = "Quản lý đánh giá";
@@ -8,264 +7,662 @@
 }
 
 <style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-8px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        padding: 2.25rem 2rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.45);
+        position: relative;
+        overflow: hidden;
+        color: #fff;
+        animation: fadeInUp .5s ease-out;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, transparent 70%);
+            animation: rotate 26s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            bottom: -40px;
+            right: -40px;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(191, 219, 254, 0.35) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .grad-header-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .grad-header .icon-circle {
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 30% 0, rgba(248, 250, 252, 0.95), rgba(191, 219, 254, 0.5));
+        box-shadow: 0 10px 28px rgba(15, 23, 42, .5);
+        color: #1e3a8a;
+    }
+
+    .header-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .35rem .8rem;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, .22);
+        backdrop-filter: blur(10px);
+        font-size: .8rem;
+        opacity: .95;
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: 1.5rem;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        box-shadow: 0 18px 55px rgba(30, 64, 175, 0.18);
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .card-glass-header {
+        padding: .85rem 1.25rem;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: .75rem;
+        font-weight: 600;
+        font-size: .9rem;
+    }
+
+    .card-glass-body {
+        padding: 1rem 1.25rem 1.25rem;
+    }
+
+    .card-glass-footer {
+        padding: .7rem 1.25rem;
+        border-top: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(248, 250, 252, .9);
+    }
+
+    .btn-pill {
+        border-radius: 999px;
+        padding: .65rem 1.6rem;
+        font-weight: 600;
+        border: none;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, .18);
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, .25);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-outline-primary,
+    .btn-outline-secondary,
+    .btn-outline-danger {
+        border-radius: .9rem;
+    }
+
+    .form-control,
+    .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .7rem 1rem;
+        transition: all .2s ease;
+        background: #fff;
+    }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+
+    .filter-label {
+        font-size: .78rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+        margin-bottom: .25rem;
+        font-weight: 600;
+    }
+
+    /* Review card */
+    .review-card {
+        position: relative;
+        border-radius: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: linear-gradient(135deg, rgba(248, 250, 252, 0.97), rgba(239, 246, 255, 0.94));
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        overflow: hidden;
+        transition: all .2s ease-out;
+        animation: slideIn .35s ease-out;
+    }
+
+        .review-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 22px 50px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(191, 219, 254, 0.7);
+        }
+
+    .review-card-header {
+        background: linear-gradient(180deg, rgba(248, 250, 252, .95), rgba(241, 245, 249, .98));
+        border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+        padding: .7rem 1rem;
+    }
+
+    .review-card-body {
+        padding: 1rem 1rem .8rem;
+    }
+
+    .review-card-footer {
+        padding: .6rem 1rem;
+        border-top: 1px solid rgba(226, 232, 240, 0.9);
+        background: rgba(248, 250, 252, 0.96);
+    }
+
     .customer-avatar {
-        width: 40px;
-        height: 40px;
-        object-fit: cover
+        width: 42px;
+        height: 42px;
+        object-fit: cover;
     }
 
     .product-thumb {
-        width: 50px;
-        height: 50px;
-        object-fit: cover
+        width: 52px;
+        height: 52px;
+        object-fit: cover;
     }
 
-    .star-rating .bi-star-fill {
-        color: #ffc107
+    .star-rating i {
+        font-size: .95rem;
+        margin-right: 2px;
+    }
+
+    .star-rating .bi-star-fill,
+    .star-rating .bi-star-half {
+        color: #fbbf24;
+    }
+
+    .star-rating .bi-star {
+        color: #e5e7eb;
+    }
+
+    .badge-status {
+        border-radius: 999px;
+        padding: .3rem .7rem;
+        font-size: .75rem;
+        font-weight: 600;
+    }
+
+    .btn-action {
+        border-radius: .9rem;
     }
 
     .reply-section {
-        background: #f8f9fa;
-        border-left: 4px solid #0d6efd;
-        margin-top: 15px;
-        padding: 10px 15px;
-        border-radius: 4px
+        background: linear-gradient(135deg, rgba(239, 246, 255, .95), rgba(219, 234, 254, .9));
+        border-left: 4px solid #1d4ed8;
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(148, 163, 184, .35);
+        font-size: .9rem;
     }
 
     .reply-author {
         font-weight: 600;
-        color: #0d6efd;
-        font-size: .95rem
+        color: #1d4ed8;
+        font-size: .93rem;
     }
 
     .reply-date {
-        font-size: .85rem;
-        color: #6c757d
+        font-size: .8rem;
+        color: #6b7280;
+    }
+
+    .report-detail-container {
+        border-radius: 12px;
+        border: 1px dashed rgba(148, 163, 184, .7);
+        background: rgba(248, 250, 252, .9);
+        padding: .6rem .75rem;
+        font-size: .86rem;
+    }
+
+        .report-detail-container .list-group-item {
+            border-color: rgba(226, 232, 240, .9);
+            font-size: .86rem;
+        }
+
+    .reviews-pagination-footer {
+        font-size: .8rem;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 4px rgba(220,53,69,.1) !important;
+    }
+
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 4px rgba(25,135,84,.1) !important;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 1.8rem 1.4rem;
+        }
+
+        .card-glass-body {
+            padding: .9rem .95rem 1rem;
+        }
+
+        .review-card-body {
+            padding: .85rem .85rem .7rem;
+        }
     }
 </style>
 
-<main class="container-fluid p-4">
-    <h2 class="fw-bold mb-4">Quản lý đánh giá</h2>
+<div class="min-vh-100">
+    <main class="container-fluid py-4">
 
-    @using (Html.BeginForm(null, null, FormMethod.Post, new { id = "__ajaxAntiForgeryForm" }))
-    {
-        @Html.AntiForgeryToken()
-    }
-
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-5">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Tìm theo tên khách hàng, sản phẩm..." />
-                </div>
-                <div class="col-md-3">
-                    <select id="ratingFilter" class="form-select">
-                        <option value="">Lọc theo xếp hạng</option>
-                        <option value="5">5 sao</option>
-                        <option value="4">4 sao</option>
-                        <option value="3">3 sao</option>
-                        <option value="2">2 sao</option>
-                        <option value="1">1 sao</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <select id="statusFilter" class="form-select">
-                        <option value="">Lọc theo trạng thái</option>
-                        <option value="1">Đã duyệt</option>
-                        <option value="0">Chờ duyệt</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button class="btn btn-primary w-100" id="filterBtn">Lọc</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm border-0">
-        <div class="card-body" id="reviews-list">
-            @if (Model != null && Model.Count > 0)
-            {
-
-                foreach (var review in Model.Where(r => r.ReplyTo == null))
-                {
-                    var productImg = imgUrl(review.Product != null ? review.Product.ImageFileName : null);
-
-                    <div class="card shadow-sm border-0 mb-3 review-item" data-review-id="@review.ReviewID">
-                        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center">
-                                <img src="@Url.Action("AvatarById","Account", new { area = "", id = review.UserID })" class="customer-avatar rounded-circle me-2" alt="avatar" />
-                                <div class="fw-bold">@(review.User != null ? review.User.FullName : "—")</div>
+        <!-- HEADER -->
+        <section class="grad-header mb-4">
+            <div class="grad-header-content">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-3 mb-1">
+                            <span class="icon-circle">
+                                <i class="bi bi-chat-square-text fs-5"></i>
+                            </span>
+                            <div>
+                                <h1 class="fw-bold mb-1" style="font-size: 2.1rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+                                    Quản lý đánh giá
+                                </h1>
+                                <p class="mb-0 opacity-90" style="font-size: .95rem;">
+                                    Theo dõi đánh giá của khách hàng, phản hồi và xử lý báo cáo vi phạm.
+                                </p>
                             </div>
-                            <div class="text-end">
-                                @if (review.IsApproved)
-                                {
-                                    <span class="badge bg-success">Đang hiển thị</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary">Đã ẩn</span>
-                                }
-                                <small class="text-muted ms-2">@review.CreatedAt.ToString("dd/MM/yyyy")</small>
-                            </div>
-                        </div>
-
-                        <div class="card-body">
-                            <div class="d-flex mb-2">
-                                <img src="@productImg" class="product-thumb rounded me-3" alt="product" />
-                                <div>
-                                    <h6 class="mb-0">
-                                        Đánh giá cho sản phẩm:
-                                        <a href="@Url.Action("Edit","Product", new { id = review.ProductID })" class="text-decoration-none">
-                                            @(review.Product != null ? review.Product.ProductName : "—")
-                                        </a>
-                                    </h6>
-                                    <div class="star-rating">
-                                        @for (int i = 1; i <= 5; i++)
-                                        {
-                                            if (i <= review.Rating)
-                                            {<i class="bi bi-star-fill"></i> }
-                                            else if (i - 0.5 <= review.Rating)
-                                            { <i class="bi bi-star-half"></i> }
-                                            else
-                                            { <i class="bi bi-star"></i>}
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-
-                            <p class="mb-0">@review.Comment</p>
-
-                            <!-- ✅ Thêm phần hiển thị báo cáo -->
-                            @{
-
-                                var reports = (review.ReviewReports as IEnumerable<FreshFram.Models.ReviewReport> ?? new List<FreshFram.Models.ReviewReport>())
-                                    .Where(rp => rp.Status == 0)
-                                    .ToList();
-
-                                var reportCount = reports.Count;
-                            }
-                            @if (reportCount > 0)
-                            {
-                                <div class="mt-2">
-                                    <span class="badge bg-warning text-dark">
-                                        🚨 Có @reportCount báo cáo
-                                    </span>
-                                    <a href="javascript:void(0)"
-                                       class="text-primary ms-2 toggle-report-detail"
-                                       data-review-id="@review.ReviewID"
-                                       data-expanded="false">
-                                        Xem chi tiết
-                                    </a>
-                                </div>
-
-                                <!-- Khối chứa chi tiết báo cáo -->
-                                <div class="report-detail-container mt-2 d-none" id="report-detail-@review.ReviewID">
-                                    <div class="text-muted">Đang tải báo cáo...</div>
-                                </div>
-                            }
-                            <!-- ✅ Kết thúc phần hiển thị báo cáo -->
-
-                            @{
-                                var replies = Model.Where(r => r.ReplyTo == review.ReviewID).ToList();
-                                var replyCount = replies.Count;
-                            }
-                            @if (replyCount > 0)
-                            {
-                                <button type="button" class="btn btn-link btn-sm p-0 btn-admin-toggle-replies" data-id="@review.ReviewID">
-                                    <i class="bi bi-chat-dots"></i> Xem @replyCount phản hồi
-                                </button>
-                                <div class="admin-replies d-none" data-for="@review.ReviewID">
-                                    @foreach (var reply in replies)
-                                    {
-                                        var isAdminMirror = reply.User != null && reply.User.UserName != null && reply.User.UserName.StartsWith("ADMIN_");
-                                        var displayName = reply.User != null
-                                            ? (reply.User.FullName ?? reply.User.UserName)
-                                            : (isAdminMirror ? (Context.Session.GetString("ADMIN_NAME") ?? "Admin") : "-");
-                                        <div class="reply-section">
-                                            <img src="@Url.Action("AvatarById","Account", new { area = "", id = reply.UserID })" class="customer-avatar rounded-circle me-2" alt="avatar" style="float:left;margin-right:.5rem;width:40px;height:40px;object-fit:cover" />
-                                            <div class="reply-author">
-                                                <i class="bi bi-reply-all me-1"></i>@displayName
-                                                @if (isAdminMirror)
-                                                {
-                                                    <span class="badge bg-primary ms-1">Quản trị viên</span>
-                                                }
-                                            </div>
-                                            <div class="reply-date">@reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
-                                            <p class="mb-0 mt-2">@reply.Comment</p>
-                                        </div>
-                                    }
-                                </div>
-                            }
-                        </div>
-
-                        <div class="card-footer bg-light text-end">
-                            <button class="btn btn-sm btn-outline-secondary btn-toggle-visibility me-1" data-review-id="@review.ReviewID">
-                                <i class="bi bi-eye-slash me-1"></i> @(review.IsApproved ? "Ẩn bình luận" : "Bỏ ẩn")
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary me-1"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#replyModal"
-                                    data-review-id="@review.ReviewID">
-                                <i class="bi bi-reply-fill me-1"></i> Phản hồi
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger btn-delete me-1"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#deleteModal"
-                                    data-review-id="@review.ReviewID">
-                                <i class="bi bi-trash me-1"></i> Xóa
-                            </button>
                         </div>
                     </div>
+                    <div class="d-flex flex-column flex-md-row gap-2">
+                        <span class="header-pill">
+                            <i class="bi bi-funnel"></i>
+                            <span>Bộ lọc linh hoạt</span>
+                        </span>
+                        <span class="header-pill">
+                            <i class="bi bi-bell"></i>
+                            <span>Quản lý báo cáo đánh giá</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        @using (Html.BeginForm(null, null, FormMethod.Post, new { id = "__ajaxAntiForgeryForm" }))
+        {
+            @Html.AntiForgeryToken()
+        }
+
+        <!-- FILTER PANEL -->
+        <section class="card-glass mb-4">
+            <div class="card-glass-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-5">
+                        <div class="filter-label">Tìm kiếm</div>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Tìm theo tên khách hàng, sản phẩm..." />
+                    </div>
+                    <div class="col-md-3">
+                        <div class="filter-label">Xếp hạng</div>
+                        <select id="ratingFilter" class="form-select">
+                            <option value="">Lọc theo xếp hạng</option>
+                            <option value="5">5 sao</option>
+                            <option value="4">4 sao</option>
+                            <option value="3">3 sao</option>
+                            <option value="2">2 sao</option>
+                            <option value="1">1 sao</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="filter-label">Trạng thái</div>
+                        <select id="statusFilter" class="form-select">
+                            <option value="">Lọc theo trạng thái</option>
+                            <option value="1">Đã duyệt</option>
+                            <option value="0">Chờ duyệt</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-primary btn-pill w-100" id="filterBtn">
+                            <i class="bi bi-sliders me-1"></i> Lọc
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- REVIEW LIST -->
+        <section class="card-glass">
+            <div class="card-glass-body" id="reviews-list">
+                @if (Model != null && Model.Count > 0)
+                {
+                    foreach (var review in Model.Where(r => r.ReplyTo == null))
+                    {
+                        var productImg = imgUrl(review.Product != null ? review.Product.ImageFileName : null);
+
+                        <div class="review-card mb-3 review-item" data-review-id="@review.ReviewID">
+                            <div class="review-card-header d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <img src="@Url.Action("AvatarById","Account", new { area = "", id = review.UserID })"
+                                         class="customer-avatar rounded-circle me-2"
+                                         alt="avatar" />
+                                    <div>
+                                        <div class="fw-bold">
+                                            @(review.User != null ? review.User.FullName : "—")
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    @if (review.IsApproved)
+                                    {
+                                        <span class="badge badge-status bg-success text-white">Đang hiển thị</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge badge-status bg-secondary text-white">Đã ẩn</span>
+                                    }
+                                    <small class="text-muted ms-2">@review.CreatedAt.ToString("dd/MM/yyyy")</small>
+                                </div>
+                            </div>
+
+                            <div class="review-card-body">
+                                <div class="d-flex mb-2">
+                                    <img src="@productImg" class="product-thumb rounded me-3" alt="product" />
+                                    <div>
+                                        <h6 class="mb-1">
+                                            Đánh giá cho sản phẩm:
+                                            <a href="@Url.Action("Edit","Product", new { area = "Seller", id = review.ProductID })"
+                                               class="text-decoration-none text-primary fw-semibold">
+                                                @(review.Product != null ? review.Product.ProductName : "—")
+                                            </a>
+                                        </h6>
+                                        <div class="star-rating">
+                                            @for (int i = 1; i <= 5; i++)
+                                            {
+                                                if (i <= review.Rating)
+                                                {<i class="bi bi-star-fill"></i>}
+                                                else if (i - 0.5 <= review.Rating)
+                                                {<i class="bi bi-star-half"></i>}
+                                                else
+                                                {<i class="bi bi-star"></i>}
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <p class="mb-0">@review.Comment</p>
+
+                                @* Báo cáo *@
+                                @{
+                                    var reports = (review.ReviewReports as IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.SellerReviewReportViewModel> ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.SellerReviewReportViewModel>())
+                                        .Where(rp => rp.Status == 0)
+                                        .ToList();
+                                    var reportCount = reports.Count;
+                                }
+
+                                @if (reportCount > 0)
+                                {
+                                    <div class="mt-2">
+                                        <span class="badge bg-warning text-dark">
+                                            🚨 Có @reportCount báo cáo
+                                        </span>
+                                        <a href="javascript:void(0)"
+                                           class="text-primary ms-2 toggle-report-detail"
+                                           data-review-id="@review.ReviewID"
+                                           data-expanded="false">
+                                            Xem chi tiết
+                                        </a>
+                                    </div>
+
+                                    <div class="report-detail-container mt-2 d-none"
+                                         id="report-detail-@review.ReviewID">
+                                        <div class="text-muted">Đang tải báo cáo...</div>
+                                    </div>
+                                }
+
+                                @* Phản hồi *@
+                                @{
+                                    var replies = Model.Where(r => r.ReplyTo == review.ReviewID).ToList();
+                                    var replyCount = replies.Count;
+                                }
+                                @if (replyCount > 0)
+                                {
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0 btn-admin-toggle-replies"
+                                            data-id="@review.ReviewID">
+                                        <i class="bi bi-chat-dots"></i> Xem @replyCount phản hồi
+                                    </button>
+                                    <div class="admin-replies d-none" data-for="@review.ReviewID">
+                                        @foreach (var reply in replies)
+                                        {
+                                            var isAdminMirror = reply.User != null && reply.User.UserName != null && reply.User.UserName.StartsWith("ADMIN_");
+                                            var displayName = reply.User != null ? (reply.User.FullName ?? reply.User.UserName) : (isAdminMirror ? (User?.Identity?.Name ?? "Admin") : "-");
+                                            <div class="reply-section">
+                                                <img src="@Url.Action("AvatarById","Account", new { area = "", id = reply.UserID })"
+                                                     class="customer-avatar rounded-circle me-2"
+                                                     alt="avatar"
+                                                     style="float:left;margin-right:.5rem;width:40px;height:40px;object-fit:cover" />
+                                                <div class="reply-author">
+                                                    <i class="bi bi-reply-all me-1"></i>@displayName
+                                                    @if (isAdminMirror)
+                                                    {
+                                                        <span class="badge bg-primary ms-1">Quản trị viên</span>
+                                                    }
+                                                </div>
+                                                <div class="reply-date">@reply.CreatedAt.ToString("dd/MM/yyyy HH:mm")</div>
+                                                <p class="mb-0 mt-2">@reply.Comment</p>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="review-card-footer text-end">
+                                <button class="btn btn-sm btn-outline-secondary btn-action btn-toggle-visibility me-1"
+                                        data-review-id="@review.ReviewID">
+                                    <i class="bi bi-eye-slash me-1"></i> @(review.IsApproved ? "Ẩn bình luận" : "Bỏ ẩn")
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary btn-action me-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#replyModal"
+                                        data-review-id="@review.ReviewID">
+                                    <i class="bi bi-reply-fill me-1"></i> Phản hồi
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger btn-action btn-delete me-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#deleteModal"
+                                        data-review-id="@review.ReviewID">
+                                    <i class="bi bi-trash me-1"></i> Xóa
+                                </button>
+                            </div>
+                        </div>
+                    }
                 }
+                else
+                {
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="bi bi-inbox me-2"></i>
+                        <span>Không có đánh giá nào.</span>
+                    </div>
+                }
+            </div>
 
-            }
-            else
-            {
-                <div class="alert alert-info">Không có đánh giá nào</div>
-            }
-        </div>
-
-        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
-            <span class="text-muted small" id="pagination-info"></span>
-            <nav><ul class="pagination justify-content-end mb-0" id="pagination-wrapper"></ul></nav>
-        </div>
-    </div>
-</main>
+            <div class="card-glass-footer d-flex justify-content-between align-items-center reviews-pagination-footer">
+                <span class="text-muted small" id="pagination-info"></span>
+                <nav>
+                    <ul class="pagination pagination-sm justify-content-end mb-0" id="pagination-wrapper"></ul>
+                </nav>
+            </div>
+        </section>
+    </main>
+</div>
 
 @section modal {
     <div class="modal fade" id="replyModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Phản hồi đánh giá</h5>
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi bi-reply-all"></i> Phản hồi đánh giá
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Nội dung phản hồi</label>
+                        <label class="form-label fw-semibold text-primary">Nội dung phản hồi</label>
                         <textarea id="replyContent" class="form-control" rows="4" placeholder="Viết câu trả lời của bạn..."></textarea>
+                        <div class="invalid-feedback" id="replyError" style="display:none;">Vui lòng nhập nội dung phản hồi</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="button" class="btn btn-primary" id="submitReplyBtn">Gửi phản hồi</button>
+                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button type="button" class="btn btn-primary btn-pill px-4" id="submitReplyBtn">
+                        <i class="bi bi-send-fill me-1"></i>Gửi phản hồi
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Xác nhận xóa</h5>
+                <div class="modal-header bg-danger">
+                    <h5 class="modal-title text-white d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle"></i>Xác nhận xóa
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body"><p>Bạn có chắc chắn muốn xóa đánh giá này không?</p></div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Xóa</button>
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        <div class="p-4 rounded-circle d-inline-flex"
+                             style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                            <i class="bi bi-trash3" style="font-size: 2.5rem; color: #dc2626;"></i>
+                        </div>
+                    </div>
+                    <p class="mb-0">Bạn có chắc chắn muốn xóa đánh giá này không?</p>
+                </div>
+                <div class="modal-footer justify-content-center p-4 border-top">
+                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy
+                    </button>
+                    <button type="button" class="btn btn-danger btn-pill px-4" id="confirmDeleteBtn">
+                        <i class="bi bi-trash3 me-1"></i>Xóa
+                    </button>
                 </div>
             </div>
         </div>
@@ -274,320 +671,346 @@
 
 @section scripts {
     <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const reviewsList = document.getElementById("reviews-list");
-    let allItems = Array.from(reviewsList.querySelectorAll(".review-item"));
-    const paginationWrapper = document.getElementById("pagination-wrapper");
-    const paginationInfo = document.getElementById("pagination-info");
-    const itemsPerPage = 10; let currentPage = 1;
-
-    const token = document.querySelector("#__ajaxAntiForgeryForm input[name='__RequestVerificationToken']").value;
-
-    function setupPagination(items){
-        paginationWrapper.innerHTML = "";
-        const pageCount = Math.ceil(items.length / itemsPerPage) || 1;
-
-        const prevLi = document.createElement("li");
-        prevLi.className = `page-item ${currentPage===1 ? "disabled":""}`;
-        prevLi.innerHTML = `<a class="page-link" href="#" data-page="prev">Trước</a>`;
-        paginationWrapper.appendChild(prevLi);
-
-        for(let i=1;i<=pageCount;i++){
-            const li = document.createElement("li");
-            li.className = `page-item ${i===currentPage?"active":""}`;
-            li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
-            paginationWrapper.appendChild(li);
+        // Toast mini thống nhất với các view khác
+        function showNotification(message, type = 'info') {
+            const old = document.querySelector('.dynamic-alert');
+            if (old) old.remove();
+            const iconMap = {
+                'success': 'check-circle-fill',
+                'danger': 'exclamation-triangle-fill',
+                'info': 'info-circle-fill',
+                'warning': 'exclamation-circle-fill'
+            };
+            const div = document.createElement('div');
+            div.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            div.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:480px;box-shadow:0 15px 50px rgba(0,0,0,.25);border-radius:1.25rem;animation:slideIn .4s ease-out';
+            div.innerHTML =
+                `<div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-${iconMap[type]} fs-4"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                 </div>`;
+            document.body.appendChild(div);
+            setTimeout(() => {
+                div.style.animation = 'slideOut .3s ease-out';
+                setTimeout(() => div.remove(), 300);
+            }, 5000);
         }
 
-        const nextLi = document.createElement("li");
-        nextLi.className = `page-item ${currentPage===pageCount ? "disabled":""}`;
-        nextLi.innerHTML = `<a class="page-link" href="#" data-page="next">Sau</a>`;
-        paginationWrapper.appendChild(nextLi);
-    }
-    function displayPage(items, page){
-        const start=(page-1)*itemsPerPage, end=start+itemsPerPage;
-        items.forEach((el, idx)=> el.style.display = (idx>=start && idx<end) ? "" : "none");
-        if(items.length===0) paginationInfo.textContent = "Không có đánh giá.";
-        else paginationInfo.textContent = `Hiển thị ${start+1}-${Math.min(end, items.length)} / ${items.length} đánh giá`;
-    }
-    function refresh(){
-        if((currentPage-1)*itemsPerPage >= allItems.length && currentPage>1) currentPage--;
-        setupPagination(allItems); displayPage(allItems, currentPage);
-    }
-    paginationWrapper.addEventListener("click", e=>{
-        e.preventDefault(); const a=e.target.closest("a"); if(!a) return;
-        const page=a.dataset.page, pageCount=Math.ceil(allItems.length/itemsPerPage)||1;
-        if(page==="prev" && currentPage>1) currentPage--;
-        else if(page==="next" && currentPage<pageCount) currentPage++;
-        else if(!isNaN(page)) currentPage=parseInt(page);
-        refresh();
-    });
+        document.addEventListener("DOMContentLoaded", function () {
+            const reviewsList       = document.getElementById("reviews-list");
+            let allItems            = Array.from(reviewsList.querySelectorAll(".review-item"));
+            const paginationWrapper = document.getElementById("pagination-wrapper");
+            const paginationInfo    = document.getElementById("pagination-info");
+            const itemsPerPage      = 10;
+            let currentPage         = 1;
 
-    let currentReviewId = null;
-    const deleteModalEl = document.getElementById("deleteModal");
-    const replyModalEl = document.getElementById("replyModal");
+            const token = document.querySelector("#__ajaxAntiForgeryForm input[name='__RequestVerificationToken']").value;
 
-    reviewsList.addEventListener("click", function (ev){
-        const btn = ev.target.closest(".btn-approve"); if(!btn) return;
-        const reviewId = btn.dataset.reviewId;
+            function setupPagination(items) {
+                paginationWrapper.innerHTML = "";
+                const pageCount = Math.ceil(items.length / itemsPerPage) || 1;
 
-        $.ajax({
-            url: '@Url.Action("ApproveReview","Review", new { area="Seller"})',
-            type: 'POST',
-            data: { __RequestVerificationToken: token, reviewId: reviewId },
-            success: function(res){
-                if(res.success){
-                    const card = btn.closest(".review-item");
-                    const badge = card.querySelector(".badge");
-                    badge.classList.remove("bg-warning","text-dark");
-                    badge.classList.add("bg-success"); badge.textContent="Đã duyệt";
-                    btn.remove();
-                    if ($.notify) $.notify(res.message, "success");
-                }else{
-                    if ($.notify) $.notify(res.message || "Duyệt không thành công", "error");
+                const prevLi = document.createElement("li");
+                prevLi.className = `page-item ${currentPage === 1 ? "disabled" : ""}`;
+                prevLi.innerHTML = `<a class="page-link" href="#" data-page="prev"><i class="bi bi-chevron-left"></i></a>`;
+                paginationWrapper.appendChild(prevLi);
+
+                for (let i = 1; i <= pageCount; i++) {
+                    const li = document.createElement("li");
+                    li.className = `page-item ${i === currentPage ? "active" : ""}`;
+                    li.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+                    paginationWrapper.appendChild(li);
                 }
-            },
-            error: function(){ if ($.notify) $.notify("Lỗi khi duyệt đánh giá","error"); }
-        });
-    });
 
-    document.querySelectorAll("[data-bs-target='#replyModal']").forEach(btn=>{
-        btn.addEventListener("click", function(){ currentReviewId = this.dataset.reviewId; });
-    });
+                const nextLi = document.createElement("li");
+                nextLi.className = `page-item ${currentPage === pageCount ? "disabled" : ""}`;
+                nextLi.innerHTML = `<a class="page-link" href="#" data-page="next"><i class="bi bi-chevron-right"></i></a>`;
+                paginationWrapper.appendChild(nextLi);
+            }
 
-    document.getElementById("submitReplyBtn").addEventListener("click", function(){
-        const content = document.getElementById("replyContent").value.trim();
-        if(!content){ if ($.notify) $.notify("Vui lòng nhập nội dung phản hồi","warning"); return; }
+            function displayPage(items, page) {
+                const start = (page - 1) * itemsPerPage;
+                const end   = start + itemsPerPage;
+                items.forEach((el, idx) => el.style.display = (idx >= start && idx < end) ? "" : "none");
 
-        $.ajax({
-            url: '@Url.Action("ReplyReview","Review", new { area="Seller"})',
-            type: 'POST',
-            data: { __RequestVerificationToken: token, reviewId: currentReviewId, content: content },
-            success: function(res){
-                if(res.success){
-                    document.getElementById("replyContent").value = "";
-                    bootstrap.Modal.getInstance(replyModalEl).hide();
-                    if ($.notify) $.notify(res.message,"success");
-                    setTimeout(()=> location.reload(), 600);
-                }else{
-                    if ($.notify) $.notify(res.message || "Phản hồi thất bại","error");
-                }
-            },
-            error: function(){ if ($.notify) $.notify("Lỗi khi gửi phản hồi","error"); }
-        });
-    });
-
-    document.querySelectorAll("[data-bs-target='#deleteModal']").forEach(btn=>{
-        btn.addEventListener("click", function(){ currentReviewId = this.dataset.reviewId; });
-    });
-    document.getElementById("confirmDeleteBtn").addEventListener("click", function(){
-        $.ajax({
-            url: '@Url.Action("DeleteReview","Review", new { area="Seller"})',
-            type: 'POST',
-            data: { __RequestVerificationToken: token, reviewId: currentReviewId },
-            success: function(res){
-                if(res.success){
-                    bootstrap.Modal.getInstance(deleteModalEl).hide();
-                    const card = document.querySelector(`.review-item[data-review-id='${currentReviewId}']`);
-                    if(card){ card.remove(); allItems = Array.from(reviewsList.querySelectorAll(".review-item")); refresh(); }
-                    if ($.notify) $.notify(res.message,"success");
-                }else{
-                    if ($.notify) $.notify(res.message || "Xóa thất bại","error");
-                }
-            },
-            error: function(){ if ($.notify) $.notify("Lỗi khi xóa đánh giá","error"); }
-        });
-    });
-
-    document.getElementById("filterBtn").addEventListener("click", function(){
-        const search = document.getElementById("searchInput").value;
-        const rating = document.getElementById("ratingFilter").value;
-        const status = document.getElementById("statusFilter").value;
-
-        window.location.href = '@Url.Action("FilterReviews","Review", new { area="Seller"})'
-            + '?search=' + encodeURIComponent(search)
-            + '&rating=' + rating + '&status=' + status;
-    });
-
-    // Toggle hide/unhide comment
-    reviewsList.addEventListener("click", function (ev){
-        const btn = ev.target.closest(".btn-toggle-visibility"); if(!btn) return;
-        const reviewId = btn.dataset.reviewId;
-        $.ajax({
-            url: '@Url.Action("ToggleVisibility","Review", new { area="Seller"})',
-            type: 'POST',
-            data: { __RequestVerificationToken: token, reviewId: reviewId },
-            success: function(res){
-                if(res && res.success){
-                    const card = btn.closest(".review-item");
-                    const badge = card.querySelector(".badge");
-                    if(res.approved){
-                        badge.classList.remove("bg-secondary");
-                        badge.classList.add("bg-success");
-                        badge.textContent = "Đang hiển thị";
-                        btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i> Ẩn bình luận';
-                    } else {
-                        badge.classList.remove("bg-success");
-                        badge.classList.add("bg-secondary");
-                        badge.textContent = "Đã ẩn";
-                        btn.innerHTML = '<i class="bi bi-eye me-1"></i> Bỏ ẩn';
-                    }
-                    if ($.notify) $.notify(res.message, "success");
+                if (items.length === 0) {
+                    paginationInfo.textContent = "Không có đánh giá.";
                 } else {
-                    if ($.notify) $.notify((res && res.message) || "Thao tác thất bại", "error");
+                    paginationInfo.textContent = `Hiển thị ${start + 1}-${Math.min(end, items.length)} / ${items.length} đánh giá`;
                 }
-            },
-            error: function(){ if ($.notify) $.notify("Lỗi khi thay đổi trạng thái bình luận","error"); }
-        });
-    });
-
-        // Toggle replies visibility
-    reviewsList.addEventListener("click", function(ev){
-        const t = ev.target.closest('.btn-admin-toggle-replies');
-        if (!t) return;
-        ev.preventDefault();
-        const rid = t.getAttribute('data-id');
-        const box = reviewsList.querySelector('.admin-replies[data-for="' + rid + '"]');
-        if (box){
-            const hidden = box.classList.contains('d-none');
-            box.classList.toggle('d-none');
-            t.innerHTML = hidden ? '<i class="bi bi-chat-dots"></i> Ẩn phản hồi' : '<i class="bi bi-chat-dots"></i> Xem ' + box.children.length + ' phản hồi';
-        }
-    });refresh();
-});
-    $(document).on('click', '.view-report-detail', function () {
-    var btn = $(this);
-    var reviewId = btn.data('review-id');
-    var container = $('#report-detail-' + reviewId);
-    container.removeClass('d-none').html('<div class="text-muted">Đang tải báo cáo...</div>');
-
-    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })',
-        { reviewId: reviewId, page: 1 },
-        function (res) {
-            if (res.success) {
-                var html = '<ul class="list-group">';
-                res.data.forEach(function (rp) {
-                    html += `<li class="list-group-item">
-                        <b>Người báo cáo:</b> ${rp.reporter} <br/>
-                        <b>Lý do:</b> ${rp.reason} <br/>
-                        <b>Ngày:</b> ${rp.createdAt}
-                        ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
-                    </li>`;
-                });
-                html += '</ul>';
-
-                if (res.totalPages > 1) {
-                    html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
-                    for (var i = 1; i <= res.totalPages; i++) {
-                        html += `<li class="page-item ${i === res.page ? 'active' : ''}">
-                                    <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
-                                 </li>`;
-                    }
-                    html += '</ul></nav>';
-                }
-
-                container.html(html);
-            } else {
-                container.html('<div class="text-danger">' + res.message + '</div>');
             }
-        });
-});
 
-// Xử lý phân trang
-$(document).on('click', '.report-page', function (e) {
-    e.preventDefault();
-    var reviewId = $(this).data('id');
-    var page = $(this).data('page');
-    var container = $('#report-detail-' + reviewId);
-
-    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })',
-        { reviewId: reviewId, page: page },
-        function (res) {
-            if (res.success) {
-                var html = '<ul class="list-group">';
-                res.data.forEach(function (rp) {
-                    html += `<li class="list-group-item">
-                        <b>Người báo cáo:</b> ${rp.reporter} <br/>
-                        <b>Lý do:</b> ${rp.reason} <br/>
-                        <b>Ngày:</b> ${rp.createdAt}
-                        ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
-                    </li>`;
-                });
-                html += '</ul>';
-
-                if (res.totalPages > 1) {
-                    html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
-                    for (var i = 1; i <= res.totalPages; i++) {
-                        html += `<li class="page-item ${i === res.page ? 'active' : ''}">
-                                    <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
-                                 </li>`;
-                    }
-                    html += '</ul></nav>';
-                }
-
-                container.html(html);
+            function refresh() {
+                if ((currentPage - 1) * itemsPerPage >= allItems.length && currentPage > 1) currentPage--;
+                setupPagination(allItems);
+                displayPage(allItems, currentPage);
             }
-        });
-});
-        $(document).on('click', '.toggle-report-detail', function () {
-    var btn = $(this);
-    var reviewId = btn.data('review-id');
-    var container = $('#report-detail-' + reviewId);
-    var expanded = btn.data('expanded');
 
-    if (!expanded) {
-        // Mở chi tiết
-        btn.text('Ẩn chi tiết').data('expanded', true);
-        container.removeClass('d-none').html('<div class="text-muted">Đang tải báo cáo...</div>');
+            paginationWrapper.addEventListener("click", e => {
+                e.preventDefault();
+                const a = e.target.closest("a");
+                if (!a) return;
+                const page = a.dataset.page;
+                const pageCount = Math.ceil(allItems.length / itemsPerPage) || 1;
 
-        loadReportPage(reviewId, 1);
-    } else {
-        // Ẩn chi tiết
-        btn.text('Xem chi tiết').data('expanded', false);
-        container.addClass('d-none');
-    }
-});
+                if (page === "prev" && currentPage > 1) currentPage--;
+                else if (page === "next" && currentPage < pageCount) currentPage++;
+                else if (!isNaN(page)) currentPage = parseInt(page);
 
-// Hàm tải báo cáo theo trang
-function loadReportPage(reviewId, page) {
-    var container = $('#report-detail-' + reviewId);
-    $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })', { reviewId: reviewId, page: page }, function (res) {
-        if (res.success) {
-            var html = '<ul class="list-group">';
-            res.data.forEach(function (rp) {
-                html += `<li class="list-group-item">
-                    <b>Người báo cáo:</b> ${rp.reporter} <br/>
-                    <b>Lý do:</b> ${rp.reason} <br/>
-                    <b>Ngày:</b> ${rp.createdAt}
-                    ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
-                </li>`;
+                refresh();
             });
-            html += '</ul>';
 
-            // Phân trang
-            if (res.totalPages > 1) {
-                html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
-                for (var i = 1; i <= res.totalPages; i++) {
-                    html += `<li class="page-item ${i === res.page ? 'active' : ''}">
-                                <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
-                             </li>`;
+            let currentReviewId = null;
+            const deleteModalEl = document.getElementById("deleteModal");
+            const replyModalEl  = document.getElementById("replyModal");
+
+            // Approve (nếu còn dùng .btn-approve)
+            reviewsList.addEventListener("click", function (ev) {
+                const btn = ev.target.closest(".btn-approve");
+                if (!btn) return;
+                const reviewId = btn.dataset.reviewId;
+
+                $.ajax({
+                    url: '@Url.Action("ApproveReview","Review", new { area = "Seller"})',
+                    type: 'POST',
+                    data: { __RequestVerificationToken: token, reviewId: reviewId },
+                    success: function (res) {
+                        if (res.success) {
+                            const card = btn.closest(".review-item");
+                            const badge = card.querySelector(".badge-status");
+                            badge.classList.remove("bg-warning", "text-dark");
+                            badge.classList.add("bg-success", "text-white");
+                            badge.textContent = "Đang hiển thị";
+                            btn.remove();
+                            showNotification(res.message || "Duyệt thành công", 'success');
+                        } else {
+                            showNotification(res.message || "Duyệt không thành công", 'danger');
+                        }
+                    },
+                    error: function () {
+                        showNotification("Lỗi khi duyệt đánh giá", 'danger');
+                    }
+                });
+            });
+
+            // Mở modal trả lời
+            document.querySelectorAll("[data-bs-target='#replyModal']").forEach(btn => {
+                btn.addEventListener("click", function () {
+                    currentReviewId = this.dataset.reviewId;
+                    document.getElementById("replyError").style.display = "none";
+                    document.getElementById("replyContent").classList.remove("is-invalid");
+                });
+            });
+
+            // Gửi phản hồi
+            document.getElementById("submitReplyBtn").addEventListener("click", function () {
+                const txt = document.getElementById("replyContent");
+                const content = txt.value.trim();
+                if (!content) {
+                    txt.classList.add("is-invalid");
+                    document.getElementById("replyError").style.display = "block";
+                    return;
                 }
-                html += '</ul></nav>';
+                txt.classList.remove("is-invalid");
+                document.getElementById("replyError").style.display = "none";
+
+                $.ajax({
+                    url: '@Url.Action("ReplyReview","Review", new { area = "Seller"})',
+                    type: 'POST',
+                    data: { __RequestVerificationToken: token, reviewId: currentReviewId, content: content },
+                    success: function (res) {
+                        if (res.success) {
+                            document.getElementById("replyContent").value = "";
+                            bootstrap.Modal.getInstance(replyModalEl).hide();
+                            showNotification(res.message || "Phản hồi thành công", 'success');
+                            setTimeout(() => location.reload(), 600);
+                        } else {
+                            showNotification(res.message || "Phản hồi thất bại", 'danger');
+                        }
+                    },
+                    error: function () {
+                        showNotification("Lỗi khi gửi phản hồi", 'danger');
+                    }
+                });
+            });
+
+            // Mở modal xóa
+            document.querySelectorAll("[data-bs-target='#deleteModal']").forEach(btn => {
+                btn.addEventListener("click", function () {
+                    currentReviewId = this.dataset.reviewId;
+                });
+            });
+
+            // Xác nhận xóa
+            document.getElementById("confirmDeleteBtn").addEventListener("click", function () {
+                const btn = this;
+                const old = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
+
+                $.ajax({
+                    url: '@Url.Action("DeleteReview","Review", new { area = "Seller"})',
+                    type: 'POST',
+                    data: { __RequestVerificationToken: token, reviewId: currentReviewId },
+                    success: function (res) {
+                        if (res.success) {
+                            bootstrap.Modal.getInstance(deleteModalEl).hide();
+                            const card = document.querySelector(`.review-item[data-review-id='${currentReviewId}']`);
+                            if (card) {
+                                card.remove();
+                                allItems = Array.from(reviewsList.querySelectorAll(".review-item"));
+                                refresh();
+                            }
+                            showNotification(res.message || "Xóa thành công", 'success');
+                        } else {
+                            showNotification(res.message || "Xóa thất bại", 'danger');
+                        }
+                    },
+                    error: function () {
+                        showNotification("Lỗi khi xóa đánh giá", 'danger');
+                    },
+                    complete: function () {
+                        btn.disabled = false;
+                        btn.innerHTML = old;
+                    }
+                });
+            });
+
+            // Lọc (redirect sang action FilterReviews)
+            document.getElementById("filterBtn").addEventListener("click", function () {
+                const search = document.getElementById("searchInput").value;
+                const rating = document.getElementById("ratingFilter").value;
+                const status = document.getElementById("statusFilter").value;
+
+                window.location.href = '@Url.Action("FilterReviews","Review", new { area = "Seller"})'
+                    + '?search=' + encodeURIComponent(search)
+                    + '&rating=' + rating
+                    + '&status=' + status;
+            });
+
+            // Toggle hide/unhide comment
+            reviewsList.addEventListener("click", function (ev) {
+                const btn = ev.target.closest(".btn-toggle-visibility");
+                if (!btn) return;
+                const reviewId = btn.dataset.reviewId;
+
+                $.ajax({
+                    url: '@Url.Action("ToggleVisibility","Review", new { area = "Seller"})',
+                    type: 'POST',
+                    data: { __RequestVerificationToken: token, reviewId: reviewId },
+                    success: function (res) {
+                        if (res && res.success) {
+                            const card  = btn.closest(".review-item");
+                            const badge = card.querySelector(".badge-status");
+                            if (res.approved) {
+                                badge.classList.remove("bg-secondary");
+                                badge.classList.add("bg-success", "text-white");
+                                badge.textContent = "Đang hiển thị";
+                                btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i> Ẩn bình luận';
+                            } else {
+                                badge.classList.remove("bg-success");
+                                badge.classList.add("bg-secondary", "text-white");
+                                badge.textContent = "Đã ẩn";
+                                btn.innerHTML = '<i class="bi bi-eye me-1"></i> Bỏ ẩn';
+                            }
+                            showNotification(res.message || "Cập nhật trạng thái thành công", 'success');
+                        } else {
+                            showNotification((res && res.message) || "Thao tác thất bại", 'danger');
+                        }
+                    },
+                    error: function () {
+                        showNotification("Lỗi khi thay đổi trạng thái bình luận", 'danger');
+                    }
+                });
+            });
+
+            // Toggle hiển thị phản hồi
+            reviewsList.addEventListener("click", function (ev) {
+                const t = ev.target.closest('.btn-admin-toggle-replies');
+                if (!t) return;
+                ev.preventDefault();
+                const rid = t.getAttribute('data-id');
+                const box = reviewsList.querySelector('.admin-replies[data-for="' + rid + '"]');
+                if (box) {
+                    const hidden = box.classList.contains('d-none');
+                    box.classList.toggle('d-none');
+                    t.innerHTML = hidden
+                        ? '<i class="bi bi-chat-dots"></i> Ẩn phản hồi'
+                        : '<i class="bi bi-chat-dots"></i> Xem ' + box.children.length + ' phản hồi';
+                }
+            });
+
+            // Tooltip cho các nút có title (nếu có)
+            if (typeof bootstrap !== 'undefined') {
+                [...document.querySelectorAll('[title]')].forEach(el => {
+                    el.setAttribute('data-bs-toggle', 'tooltip');
+                    el.setAttribute('data-bs-placement', 'top');
+                });
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
             }
 
-            container.html(html);
-        } else {
-            container.html('<div class="text-danger">' + res.message + '</div>');
-        }
-    });
-}
+            refresh();
+        });
 
-// Xử lý click phân trang
-$(document).on('click', '.report-page', function (e) {
-    e.preventDefault();
-    var reviewId = $(this).data('id');
-    var page = $(this).data('page');
-    loadReportPage(reviewId, page);
-});
+        // Toggle chi tiết báo cáo
+        $(document).on('click', '.toggle-report-detail', function () {
+            var btn = $(this);
+            var reviewId = btn.data('review-id');
+            var container = $('#report-detail-' + reviewId);
+            var expanded = btn.data('expanded');
+
+            if (!expanded) {
+                btn.text('Ẩn chi tiết').data('expanded', true);
+                container.removeClass('d-none').html('<div class="text-muted">Đang tải báo cáo...</div>');
+                loadReportPage(reviewId, 1);
+            } else {
+                btn.text('Xem chi tiết').data('expanded', false);
+                container.addClass('d-none');
+            }
+        });
+
+        function loadReportPage(reviewId, page) {
+            var container = $('#report-detail-' + reviewId);
+            $.get('@Url.Action("GetReviewReports", "Review", new { area = "Seller" })',
+                { reviewId: reviewId, page: page },
+                function (res) {
+                    if (res.success) {
+                        var html = '<ul class="list-group">';
+                        res.data.forEach(function (rp) {
+                            html += `<li class="list-group-item">
+                                <b>Người báo cáo:</b> ${rp.reporter} <br/>
+                                <b>Lý do:</b> ${rp.reason} <br/>
+                                <b>Ngày:</b> ${rp.createdAt}
+                                ${rp.note ? `<br/><b>Ghi chú:</b> ${rp.note}` : ""}
+                            </li>`;
+                        });
+                        html += '</ul>';
+
+                        if (res.totalPages > 1) {
+                            html += '<nav class="mt-2"><ul class="pagination pagination-sm justify-content-end">';
+                            for (var i = 1; i <= res.totalPages; i++) {
+                                html += `<li class="page-item ${i === res.page ? 'active' : ''}">
+                                            <a class="page-link report-page" href="#" data-id="${reviewId}" data-page="${i}">${i}</a>
+                                         </li>`;
+                            }
+                            html += '</ul></nav>';
+                        }
+
+                        container.html(html);
+                    } else {
+                        container.html('<div class="text-danger">' + res.message + '</div>');
+                    }
+                });
+        }
+
+        // Phân trang trong khối báo cáo
+        $(document).on('click', '.report-page', function (e) {
+            e.preventDefault();
+            var reviewId = $(this).data('id');
+            var page = $(this).data('page');
+            loadReportPage(reviewId, page);
+        });
     </script>
 }

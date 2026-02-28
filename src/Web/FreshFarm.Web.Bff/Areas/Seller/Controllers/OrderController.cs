@@ -66,7 +66,8 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
         }
 
-        return Json(new { success = true, data = response.data });
+        var rows = NormalizeOrderRows(response.data);
+        return Json(new { success = true, data = rows });
     }
 
     [HttpGet]
@@ -164,10 +165,11 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
         }
 
+        var rows = NormalizeOrderRows(response.data);
         return Json(new
         {
             success = true,
-            data = response.data,
+            data = rows,
             page = response.page,
             pageSize = response.pageSize,
             total = response.total
@@ -183,7 +185,8 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
         }
 
-        return Json(new { success = true, data = response.data });
+        var rows = NormalizeOrderRows(response.data);
+        return Json(new { success = true, data = rows });
     }
 
     [HttpGet]
@@ -195,10 +198,11 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
         }
 
+        var rows = NormalizeOrderRows(response.data);
         return Json(new
         {
             success = true,
-            data = response.data,
+            data = rows,
             page = response.page,
             pageSize = response.pageSize,
             total = response.total
@@ -455,6 +459,89 @@ public class OrderController : LegacySellerControllerBase
             JsonValueKind.Null => null,
             _ => element.GetRawText()
         };
+    }
+
+    private static List<Dictionary<string, object?>> NormalizeOrderRows(IEnumerable<Dictionary<string, object?>> rows)
+    {
+        var normalized = new List<Dictionary<string, object?>>();
+        foreach (var row in rows)
+        {
+            var orderId = GetRowValue(row, "OrderID", "orderID", "orderId", "id");
+            var orderCode = GetRowValue(row, "OrderCode", "orderCode");
+            var status = GetRowValue(row, "Status", "status");
+
+            var normalizedRow = new Dictionary<string, object?>
+            {
+                ["OrderID"] = orderId,
+                ["OrderCode"] = orderCode ?? BuildOrderCodeFromId(orderId),
+                ["CustomerName"] = GetRowValue(row, "CustomerName", "customerName", "buyerFullName"),
+                ["OrderDate"] = GetRowValue(row, "OrderDate", "orderDate"),
+                ["TotalAmount"] = GetRowValue(row, "TotalAmount", "totalAmount", "total"),
+                ["Status"] = status,
+                ["StatusBadgeClass"] = GetRowValue(row, "StatusBadgeClass", "statusBadgeClass"),
+                ["StatusText"] = GetRowValue(row, "StatusText", "statusText") ?? status
+            };
+
+            normalized.Add(normalizedRow);
+        }
+
+        return normalized;
+    }
+
+    private static object? GetRowValue(IReadOnlyDictionary<string, object?> row, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (TryGetRowValueIgnoreCase(row, key, out var value))
+            {
+                return NormalizeRowValue(value);
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryGetRowValueIgnoreCase(IReadOnlyDictionary<string, object?> row, string key, out object? value)
+    {
+        if (row.TryGetValue(key, out value))
+        {
+            return true;
+        }
+
+        foreach (var kvp in row)
+        {
+            if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase))
+            {
+                value = kvp.Value;
+                return true;
+            }
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static object? NormalizeRowValue(object? value)
+    {
+        if (value is JsonElement element)
+        {
+            return JsonElementToObject(element);
+        }
+
+        return value;
+    }
+
+    private static string? BuildOrderCodeFromId(object? orderId)
+    {
+        try
+        {
+            var id = Convert.ToInt32(orderId);
+            return id > 0 ? $"#{id:D6}" : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private sealed class PagedOrdersResponse

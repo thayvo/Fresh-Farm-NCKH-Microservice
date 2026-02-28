@@ -23,10 +23,13 @@ public partial class User
 
     public DateTime? UpdatedAt { get; set; }
 
+    public string Avatar { get; set; }
+
+    public virtual AddressBook AddressBook { get; set; }
+
     public virtual UserAuth UserAuth { get; set; }
 
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public virtual ICollection<UserSession> UserSessions { get; set; } = new List<UserSession>();
-    public virtual ICollection<AddressBook> AddressBooks { get; set; } = new List<AddressBook>(); // Danh sách địa chỉ của user.
 }

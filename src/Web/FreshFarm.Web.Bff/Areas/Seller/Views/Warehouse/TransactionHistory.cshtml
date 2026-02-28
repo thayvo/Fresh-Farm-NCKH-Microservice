@@ -9,210 +9,516 @@
 }
 
 <style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-8px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(80px);
+        }
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+        border-radius: 1.25rem;
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+        animation: fadeInUp .6s ease-out .05s backwards;
+    }
+
+    .form-control,
+    .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .8rem 1.1rem;
+        background: #fff;
+        transition: all .25s ease;
+    }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+    .btn-pill {
+        border-radius: 999px;
+        padding: .7rem 1.7rem;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        transition: all .25s cubic-bezier(.4,0,.2,1);
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.18);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border: none;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-outline-secondary {
+        border-radius: 999px;
+        border-width: 2px;
+        background: rgba(255,255,255,0.15);
+        color: #e5e7eb;
+        border-color: rgba(226,232,240,0.8);
+    }
+
+        .btn-outline-secondary:hover {
+            background: #ffffff;
+            color: #1e40af;
+            border-color: #e5e7eb;
+        }
+
+    .stats-card {
+        border-radius: 1.5rem;
+        padding: 1.3rem 1.4rem;
+        background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+        box-shadow: 0 12px 35px rgba(15, 23, 42, .08);
+        border: none;
+        animation: fadeInUp .55s ease-out;
+    }
+
+    .stats-card-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 22px rgba(30, 64, 175, 0.35);
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: #fff;
+    }
+
     .transaction-card {
-        border-radius: 12px;
-        transition: transform 0.2s, box-shadow 0.2s;
+        border-radius: 1.3rem;
+        background: linear-gradient(135deg, #ffffff 0%, #f3f4ff 100%);
+        border: 1px solid rgba(148, 163, 184, .25);
+        box-shadow: 0 12px 28px rgba(15, 23, 42, .12);
+        transition: transform 0.25s cubic-bezier(.4,0,.2,1), box-shadow 0.25s cubic-bezier(.4,0,.2,1), border-color .25s ease;
         cursor: pointer;
+        animation: fadeInUp .4s ease-out;
     }
 
         .transaction-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, .18);
+            border-color: #3b82f6;
         }
 
     .badge-import {
-        background: linear-gradient(135deg, #28a745, #5cb85c);
+        background: linear-gradient(135deg, #16a34a, #22c55e);
+        border-radius: 999px;
+        padding: .35rem .8rem;
+        font-size: .8rem;
     }
 
     .badge-export {
-        background: linear-gradient(135deg, #dc3545, #e4606d);
+        background: linear-gradient(135deg, #dc2626, #f97316);
+        border-radius: 999px;
+        padding: .35rem .8rem;
+        font-size: .8rem;
     }
 
-    .stats-card {
-        border-radius: 10px;
-        padding: 1.5rem;
-        background: white;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    .page-link {
+        border-radius: .875rem;
+        margin: 0 .25rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        transition: all .3s ease;
+        font-weight: 600;
+        padding: .35rem .75rem;
+        background: #ffffff;
+    }
+
+        .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
+    }
+
+    .page-item.disabled .page-link {
+        opacity: .6;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    .modal-content {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
+    }
+
+    .modal-header {
+        border-radius: 1.5rem 1.5rem 0 0;
+    }
+
+    .modal-footer {
+        border-radius: 0 0 1.5rem 1.5rem;
+    }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
     }
 </style>
 
-<main class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="fw-bold mb-1">
-                <i class="bi bi-journal-text text-primary me-2"></i>Lịch Sử Nhập Xuất Kho
-            </h2>
-            <p class="text-muted mb-0">Danh sách tất cả phiếu nhập/xuất kho</p>
-        </div>
-        <div>
-            <a href="@Url.Action("Index", "Warehouse")" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Quay lại kho
-            </a>
-        </div>
-    </div>
+<div class="min-vh-100">
+    <div class="container-fluid py-4">
 
-    <!-- Thống kê nhanh -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small">Tổng phiếu</div>
-                        <h4 class="mb-0">@totalItems</h4>
+        <!-- HEADER GRADIENT -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index:1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="icon-gradient">
+                            <i class="bi bi-journal-text text-white" style="font-size:2rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size:2.3rem; text-shadow:0 4px 12px rgba(0,0,0,.3);">
+                                Lịch Sử Nhập Xuất Kho
+                            </h1>
+                            <p class="mb-0 text-white opacity-90" style="font-size:1.02rem;">
+                                Nhật ký chi tiết các phiếu nhập – xuất kho theo thời gian
+                            </p>
+                        </div>
                     </div>
-                    <i class="bi bi-file-earmark-text fs-1 text-primary opacity-25"></i>
+                    <div class="text-md-end">
+                        <a href="@Url.Action("Index", "Warehouse")"
+                           class="btn btn-outline-secondary btn-pill d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-left"></i>
+                            <span>Quay lại kho</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small">Phiếu nhập</div>
-                        <h4 class="mb-0 text-success">@(Model?.Count(t => t.TransactionType == "Import") ?? 0)</h4>
-                    </div>
-                    <i class="bi bi-box-arrow-in-down fs-1 text-success opacity-25"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small">Phiếu xuất</div>
-                        <h4 class="mb-0 text-danger">@(Model?.Count(t => t.TransactionType == "Export") ?? 0)</h4>
-                    </div>
-                    <i class="bi bi-box-arrow-up fs-1 text-danger opacity-25"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="stats-card">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="text-muted small">Tổng giá trị</div>
-                        <h4 class="mb-0 text-primary">@((Model?.Sum(t => t.TotalAmount) ?? 0).ToString("N0")) ₫</h4>
-                    </div>
-                    <i class="bi bi-cash-stack fs-1 text-primary opacity-25"></i>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Filters -->
-    <div class="card mb-4">
-        <div class="card-body">
+        <!-- THỐNG KÊ NHANH -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase mb-1">Tổng phiếu</div>
+                            <h4 class="mb-0 text-primary-blue">@totalItems</h4>
+                        </div>
+                        <div class="stats-card-icon">
+                            <i class="bi bi-file-earmark-text fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase mb-1">Phiếu nhập</div>
+                            <h4 class="mb-0 text-success">@(Model?.Count(t => t.TransactionType == "Import") ?? 0)</h4>
+                        </div>
+                        <div class="stats-card-icon" style="background:linear-gradient(135deg,#16a34a,#22c55e);">
+                            <i class="bi bi-box-arrow-in-down fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase mb-1">Phiếu xuất</div>
+                            <h4 class="mb-0 text-danger">@(Model?.Count(t => t.TransactionType == "Export") ?? 0)</h4>
+                        </div>
+                        <div class="stats-card-icon" style="background:linear-gradient(135deg,#dc2626,#f97316);">
+                            <i class="bi bi-box-arrow-up fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase mb-1">Tổng giá trị</div>
+                            <h4 class="mb-0 text-primary">@((Model?.Sum(t => t.TotalAmount) ?? 0).ToString("N0")) ₫</h4>
+                        </div>
+                        <div class="stats-card-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);">
+                            <i class="bi bi-cash-stack fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTERS -->
+        <div class="filter-card mb-4 p-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="p-3 rounded-3" style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                    <i class="bi bi-funnel text-white"></i>
+                </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc lịch sử nhập – xuất kho</h5>
+            </div>
+
             <form method="get" class="row g-3">
                 <div class="col-md-3">
-                    <label class="form-label">Loại phiếu</label>
+                    <label class="form-label fw-semibold text-primary-blue">Loại phiếu</label>
                     <select name="transactionType" class="form-select" onchange="this.form.submit()">
                         <option value="">Tất cả</option>
-                        <option value="Import" @(ViewBag.TransactionType == "Import" ? "selected" : "")>Phiếu nhập</option>
-                        <option value="Export" @(ViewBag.TransactionType == "Export" ? "selected" : "")>Phiếu xuất</option>
+                        <option value="Import" selected="@(ViewBag.TransactionType == "Import"  ? "selected" : null)">Phiếu nhập</option>
+                        <option value="Export" selected="@(ViewBag.TransactionType == "Export"  ? "selected" : null)">Phiếu xuất</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Từ ngày</label>
-                    <input type="date" name="fromDate" class="form-select" value="@ViewBag.FromDate" />
+                    <label class="form-label fw-semibold text-primary-blue">Từ ngày</label>
+                    <input type="date" name="fromDate" class="form-control" value="@ViewBag.FromDate" />
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Đến ngày</label>
-                    <input type="date" name="toDate" class="form-select" value="@ViewBag.ToDate" />
+                    <label class="form-label fw-semibold text-primary-blue">Đến ngày</label>
+                    <input type="date" name="toDate" class="form-control" value="@ViewBag.ToDate" />
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-funnel me-2"></i>Lọc
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit"
+                            class="btn btn-primary btn-pill w-100 d-flex align-items-center justify-content-center gap-2">
+                        <i class="bi bi-funnel"></i>
+                        <span>Lọc</span>
                     </button>
                 </div>
             </form>
         </div>
-    </div>
 
-    <!-- Transaction List -->
-    <div class="row g-4">
-        @if (Model != null && Model.Any())
-        {
-            foreach (var item in Model)
+        <!-- DANH SÁCH PHIẾU -->
+        <div class="row g-4">
+            @if (Model != null && Model.Any())
             {
-                var badgeClass = item.TransactionType == "Import" ? "badge-import" : "badge-export";
-                var iconClass = item.TransactionType == "Import" ? "bi-box-arrow-in-down" : "bi-box-arrow-up";
-                var typeText = item.TransactionType == "Import" ? "Nhập kho" : "Xuất kho";
+                foreach (var item in Model)
+                {
+                    var badgeClass = item.TransactionType == "Import" ? "badge-import" : "badge-export";
+                    var iconClass = item.TransactionType == "Import" ? "bi-box-arrow-in-down" : "bi-box-arrow-up";
+                    var typeText = item.TransactionType == "Import" ? "Nhập kho" : "Xuất kho";
 
-                <div class="col-md-6 col-lg-4">
-                    <div class="card transaction-card" onclick="viewTransactionDetails(@item.TransactionID)">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <h5 class="mb-0">@item.TransactionCode</h5>
-                                <span class="badge @badgeClass text-white">
-                                    <i class="bi @iconClass me-1"></i>@typeText
-                                </span>
-                            </div>
-                            <div class="small text-muted mb-2">
-                                <i class="bi bi-calendar3 me-1"></i>
-                                @item.TransactionDate.ToString("dd/MM/yyyy HH:mm")
-                            </div>
-                            <div class="mb-2">
-                                <strong>Tổng SL:</strong> @item.TotalQuantity sản phẩm
-                            </div>
-                            <div class="mb-2">
-                                <strong>Tổng tiền:</strong> @item.TotalAmount.ToString("N0") ₫
-                            </div>
-                            <div class="small text-muted">
-                                <i class="bi bi-person me-1"></i>@item.CreatedByName
-                            </div>
-                            @if (!string.IsNullOrEmpty(item.Notes))
-                            {
-                                <div class="small text-muted mt-2">
-                                    <i class="bi bi-sticky me-1"></i>
-                                    @(item.Notes.Length > 50 ? item.Notes.Substring(0, 50) + "..." : item.Notes)
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card-glass transaction-card" onclick="viewTransactionDetails(@item.TransactionID)">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="mb-0 text-primary-blue">
+                                        <i class="bi bi-receipt-cutoff me-1 text-muted"></i>@item.TransactionCode
+                                    </h5>
+                                    <span class="badge @badgeClass text-white">
+                                        <i class="bi @iconClass me-1"></i>@typeText
+                                    </span>
                                 </div>
-                            }
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    @item.TransactionDate.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                                <div class="mb-1">
+                                    <strong>Tổng SL:</strong> @item.TotalQuantity sản phẩm
+                                </div>
+                                <div class="mb-1">
+                                    <strong>Tổng tiền:</strong>
+                                    <span class="fw-semibold text-success">@item.TotalAmount.ToString("N0") ₫</span>
+                                </div>
+                                <div class="small text-muted">
+                                    <i class="bi bi-person me-1"></i>@item.CreatedByName
+                                </div>
+                                @if (!string.IsNullOrEmpty(item.Notes))
+                                {
+                                    <div class="small text-muted mt-2">
+                                        <i class="bi bi-sticky me-1"></i>
+                                        @(item.Notes.Length > 70 ? item.Notes.Substring(0, 70) + "..." : item.Notes)
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-12">
+                    <div class="card-glass">
+                        <div class="card-body text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+                            <p class="text-muted mb-0">Chưa có phiếu nào</p>
                         </div>
                     </div>
                 </div>
             }
-        }
-        else
+        </div>
+
+        <!-- PHÂN TRANG -->
+        @if (totalPages > 1)
         {
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
-                        <p class="text-muted">Chưa có phiếu nào</p>
-                    </div>
-                </div>
-            </div>
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                        <a class="page-link"
+                           href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage - 1 })">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+
+                    @for (int i = 1; i <= totalPages; i++)
+                    {
+                        <li class="page-item @(i == currentPage ? "active" : "")">
+                            <a class="page-link"
+                               href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = i })">
+                                @i
+                            </a>
+                        </li>
+                    }
+
+                    <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+                        <a class="page-link"
+                           href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage + 1 })">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
         }
     </div>
+</div>
 
-    <!-- Pagination -->
-    @if (totalPages > 1)
-    {
-        <nav class="mt-4">
-            <ul class="pagination justify-content-center">
-                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                    <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage - 1 })">
-                        <i class="bi bi-chevron-left"></i>
-                    </a>
-                </li>
-                @for (int i = 1; i <= totalPages; i++)
-                {
-                    <li class="page-item @(i == currentPage ? "active" : "")">
-                        <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = i })">@i</a>
-                    </li>
-                }
-                <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                    <a class="page-link" href="@Url.Action("TransactionHistory", new { transactionType = ViewBag.TransactionType, page = currentPage + 1 })">
-                        <i class="bi bi-chevron-right"></i>
-                    </a>
-                </li>
-            </ul>
-        </nav>
-    }
-</main>
-
-<!-- ✅ MODAL XEM CHI TIẾT PHIẾU -->
+<!-- MODAL XEM CHI TIẾT PHIẾU (giữ nguyên logic) -->
 <div class="modal fade" id="transactionModal" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -229,8 +535,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
-                <button type="button" class="btn btn-primary" onclick="printTransaction()">
+                <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary btn-pill" onclick="printTransaction()">
                     <i class="bi bi-printer me-2"></i>In phiếu
                 </button>
             </div>
@@ -244,47 +550,40 @@
             $('#transactionModal').modal('show');
             $('#transactionDetailsContent').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Đang tải...</p></div>');
 
-            $.get('@Url.Action("GetTransactionDetails", "Warehouse")', { id: id }, function(response) {
+            $.get('@Url.Action("GetTransactionDetails", "Warehouse")', { id: id }, function (response) {
                 if (response.success) {
                     const data = response.data;
-                    const transactionCode = data.TransactionCode ?? data.transactionCode ?? '';
-                    const transactionType = data.TransactionType ?? data.transactionType ?? '';
-                    const transactionDate = data.TransactionDate ?? data.transactionDate;
-                    const createdByName = data.CreatedByName ?? data.createdByName ?? '';
-                    const totalQuantity = Number(data.TotalQuantity ?? data.totalQuantity ?? 0);
-                    const totalAmount = Number(data.TotalAmount ?? data.totalAmount ?? 0);
-                    const notes = data.Notes ?? data.notes;
-                    const details = data.Details ?? data.details ?? [];
+                    $('#modalTransactionCode').text(data.TransactionCode);
 
-                    $('#modalTransactionCode').text(transactionCode);
-
-                    // Đổi màu header theo loại phiếu
-                    const headerClass = transactionType === 'Import' ? 'bg-success text-white' : 'bg-danger text-white';
+                    // Đổi màu header theo loại phiếu (giữ nguyên logic cũ)
+                    const headerClass = data.TransactionType === 'Import'
+                        ? 'bg-success text-white'
+                        : 'bg-danger text-white';
                     $('#modalHeader').attr('class', 'modal-header ' + headerClass);
 
                     let html = `
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <h6>Thông tin phiếu</h6>
-                                <table class="table table-sm">
-                                    <tr><th>Mã phiếu:</th><td>${transactionCode}</td></tr>
-                                    <tr><th>Loại:</th><td><span class="badge ${transactionType === 'Import' ? 'bg-success' : 'bg-danger'}">${transactionType === 'Import' ? 'Nhập kho' : 'Xuất kho'}</span></td></tr>
-                                    <tr><th>Ngày:</th><td>${formatDateTime(transactionDate)}</td></tr>
-                                    <tr><th>Người tạo:</th><td>${createdByName}</td></tr>
+                                <h6 class="fw-bold text-primary-blue">Thông tin phiếu</h6>
+                                <table class="table table-sm align-middle mb-0">
+                                    <tr><th style="width:120px;">Mã phiếu:</th><td>${data.TransactionCode}</td></tr>
+                                    <tr><th>Loại:</th><td><span class="badge ${data.TransactionType === 'Import' ? 'bg-success' : 'bg-danger'}">${data.TransactionType === 'Import' ? 'Nhập kho' : 'Xuất kho'}</span></td></tr>
+                                    <tr><th>Ngày:</th><td>${formatDateTime(data.TransactionDate)}</td></tr>
+                                    <tr><th>Người tạo:</th><td>${data.CreatedByName}</td></tr>
                                 </table>
                             </div>
                             <div class="col-md-6">
-                                <h6>Tổng kết</h6>
-                                <table class="table table-sm">
-                                    <tr><th>Tổng SL:</th><td>${totalQuantity} sản phẩm</td></tr>
-                                    <tr><th>Tổng tiền:</th><td class="text-primary fw-bold">${totalAmount.toLocaleString('vi-VN')} ₫</td></tr>
-                                    <tr><th>Ghi chú:</th><td>${notes || '—'}</td></tr>
+                                <h6 class="fw-bold text-primary-blue">Tổng kết</h6>
+                                <table class="table table-sm align-middle mb-0">
+                                    <tr><th style="width:120px;">Tổng SL:</th><td>${data.TotalQuantity} sản phẩm</td></tr>
+                                    <tr><th>Tổng tiền:</th><td class="text-primary fw-bold">${data.TotalAmount.toLocaleString('vi-VN')} ₫</td></tr>
+                                    <tr><th>Ghi chú:</th><td>${data.Notes || '—'}</td></tr>
                                 </table>
                             </div>
                         </div>
-                        <h6>Chi tiết sản phẩm</h6>
+                        <h6 class="fw-bold text-primary-blue mb-2">Chi tiết sản phẩm</h6>
                         <div class="table-responsive">
-                            <table class="table table-bordered">
+                            <table class="table table-bordered align-middle">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Ảnh</th>
@@ -300,28 +599,20 @@
                                 <tbody>
                     `;
 
-                    details.forEach(item => {
-                        const imageFileName = item.ImageFileName ?? item.imageFileName ?? 'no-image.png';
-                        const sku = item.SKU ?? item.sku ?? '';
-                        const productName = item.ProductName ?? item.productName ?? '';
-                        const quantity = Number(item.Quantity ?? item.quantity ?? 0);
-                        const unitPrice = Number(item.UnitPrice ?? item.unitPrice ?? 0);
-                        const amount = Number(item.Amount ?? item.amount ?? 0);
-                        const batchCode = item.BatchCode ?? item.batchCode;
-                        const expiryDate = item.ExpiryDate ?? item.expiryDate;
+                    data.Details.forEach(item => {
                         html += `
                             <tr>
                                 <td class="text-center">
-                                    <img src="/Images/${imageFileName}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"
+                                    <img src="/Images/${item.ImageFileName}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"
                                          onerror="this.src='/Images/no-image.png'">
                                 </td>
-                                <td>${sku}</td>
-                                <td>${productName}</td>
-                                <td class="text-end">${quantity}</td>
-                                <td class="text-end">${unitPrice.toLocaleString('vi-VN')} ₫</td>
-                                <td class="text-end fw-bold">${amount.toLocaleString('vi-VN')} ₫</td>
-                                <td>${batchCode || '—'}</td>
-                                <td>${formatDate(expiryDate)}</td>
+                                <td>${item.SKU}</td>
+                                <td>${item.ProductName}</td>
+                                <td class="text-end">${item.Quantity}</td>
+                                <td class="text-end">${item.UnitPrice.toLocaleString('vi-VN')} ₫</td>
+                                <td class="text-end fw-bold">${item.Amount.toLocaleString('vi-VN')} ₫</td>
+                                <td>${item.BatchCode || '—'}</td>
+                                <td>${formatDate(item.ExpiryDate)}</td>
                             </tr>
                         `;
                     });

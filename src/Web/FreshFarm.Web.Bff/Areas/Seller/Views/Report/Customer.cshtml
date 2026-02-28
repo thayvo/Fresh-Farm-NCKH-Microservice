@@ -1,40 +1,351 @@
-﻿@model FreshFram.Areas.Admin.Data.CustomerReportViewModel
+﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.CustomerReportViewModel
 
 @{
     ViewBag.Title = "Báo Cáo Khách Hàng";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
-<main class="container-fluid p-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0">Báo Cáo Khách Hàng</h2>
-    </div>
+@Html.AntiForgeryToken()
 
-    @if (ViewBag.ErrorMessage != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            @ViewBag.ErrorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+<style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
     }
 
-    @if (TempData["ErrorMessage"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            @TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
     }
 
-    @using (Html.BeginForm("Customer", "Report", FormMethod.Get, new { area = "Seller", id = "filterForm" }))
-    {
-        <div class="card shadow-sm mb-4">
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(80px);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .form-control, .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .8rem 1.1rem;
+        background: #fff;
+        transition: all .25s ease;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59,130,246,.15);
+        }
+
+    .btn-pill {
+        border-radius: 999px;
+        padding: .7rem 1.7rem;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        transition: all .25s cubic-bezier(.4,0,.2,1);
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.18);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-info {
+        background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+        border: none;
+    }
+
+        .btn-info:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+        }
+
+    .btn-outline-success {
+        border-radius: 999px;
+        border-width: 2px;
+    }
+
+    .hover-scale {
+        transition: transform .25s ease;
+    }
+
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.1rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            border-bottom: 1px solid #e5e7eb;
+            animation: fadeInUp .35s ease-out backwards;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59,130,246,.06) 0%, rgba(147,197,253,.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -4px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1rem 1rem;
+            vertical-align: middle;
+        }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.12);
+    }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .stat-card {
+        border-radius: 1.5rem;
+        border: none;
+        background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+        box-shadow: 0 12px 35px rgba(15, 23, 42, .12);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, .18);
+        }
+
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 25px rgba(30,64,175,.35);
+    }
+
+        .stat-icon.total {
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+        }
+
+        .stat-icon.new {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+
+        .stat-icon.return {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+
+        .stat-icon.avg {
+            background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+        }
+
+    .card-section-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        background: linear-gradient(90deg, #eff6ff 0%, #e0f2fe 100%);
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+    }
+</style>
+
+<div class="min-vh-100">
+    <div class="container-fluid py-4">
+
+        <!-- HEADER GRADIENT -->
+        <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+            <div class="position-relative" style="z-index:1;">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3 mb-3 mb-md-0">
+                        <div class="p-3 rounded-4 icon-gradient">
+                            <i class="bi bi-people-fill text-white" style="font-size:2.3rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size:2.4rem; text-shadow:0 4px 12px rgba(0,0,0,.3);">
+                                Báo Cáo Khách Hàng
+                            </h1>
+                            <p class="mb-0 text-white opacity-90" style="font-size:1.05rem;">
+                                Phân tích hành vi, phân khúc và giá trị khách hàng
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALERTS -->
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                @ViewBag.ErrorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <!-- BỘ LỌC -->
+        @using (Html.BeginForm("Customer", "Report", FormMethod.Get, new { area = "Seller", id = "filterForm" }))
+        {
+            <div class="filter-card p-4 mb-4">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="p-3 rounded-3" style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                        <i class="bi bi-funnel text-white"></i>
+                    </div>
+                    <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc báo cáo khách hàng</h5>
+                </div>
+                <div class="row g-3">
                     <div class="col-md-4 col-lg-3">
-                        <label for="registerFromDate" class="form-label fw-semibold">Ngày đăng ký (Từ)</label>
+                        <label for="registerFromDate" class="form-label fw-semibold text-primary-blue">
+                            Ngày đăng ký (Từ)
+                        </label>
                         <input type="date"
                                id="registerFromDate"
                                name="registerFromDate"
@@ -42,7 +353,9 @@
                                class="form-control" />
                     </div>
                     <div class="col-md-4 col-lg-3">
-                        <label for="registerToDate" class="form-label fw-semibold">Ngày đăng ký (Đến)</label>
+                        <label for="registerToDate" class="form-label fw-semibold text-primary-blue">
+                            Ngày đăng ký (Đến)
+                        </label>
                         <input type="date"
                                id="registerToDate"
                                name="registerToDate"
@@ -50,182 +363,204 @@
                                class="form-control" />
                     </div>
                     <div class="col-md-4 col-lg-3">
-                        <label for="customerSegment" class="form-label fw-semibold">Phân khúc</label>
+                        <label for="customerSegment" class="form-label fw-semibold text-primary-blue">
+                            Phân khúc
+                        </label>
                         <select id="customerSegment" name="customerSegment" class="form-select">
-                            <option value="all" @(Model.CustomerSegment == "all" ? "selected" : "")>Tất cả khách hàng</option>
-                            <option value="new" @(Model.CustomerSegment == "new" ? "selected" : "")>Khách hàng mới</option>
-                            <option value="returning" @(Model.CustomerSegment == "returning" ? "selected" : "")>Khách hàng quay lại</option>
-                            <option value="vip" @(Model.CustomerSegment == "vip" ? "selected" : "")>Khách hàng VIP</option>
+                            <option value="all" selected="@(Model.CustomerSegment == "all"  ? "selected" : null)">Tất cả khách hàng</option>
+                            <option value="new" selected="@(Model.CustomerSegment == "new"  ? "selected" : null)">Khách hàng mới</option>
+                            <option value="returning" selected="@(Model.CustomerSegment == "returning"  ? "selected" : null)">Khách hàng quay lại</option>
+                            <option value="vip" selected="@(Model.CustomerSegment == "vip"  ? "selected" : null)">Khách hàng VIP</option>
                         </select>
                     </div>
-                    <div class="col-md-12 col-lg-3">
-                        <button type="submit" class="btn btn-info w-100 text-white">
-                            <i class="bi bi-funnel-fill"></i> Lọc dữ liệu
+                    <div class="col-md-12 col-lg-3 d-flex align-items-end">
+                        <button type="submit"
+                                class="btn btn-info btn-pill w-100 d-flex align-items-center justify-content-center gap-2 hover-scale">
+                            <i class="bi bi-funnel-fill"></i>
+                            <span>Lọc dữ liệu</span>
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
-    }
+        }
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-info h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-people-fill fs-1 text-info opacity-75"></i>
+        <!-- THỐNG KÊ TỔNG QUAN -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="stat-card h-100">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon total">
+                                <i class="bi bi-people-fill text-white fs-4"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="text-muted text-uppercase mb-1" style="letter-spacing:.05em;">Tổng khách hàng</h6>
+                                <h3 class="fw-bold mb-0 text-primary-blue">@Model.TotalCustomers.ToString("N0")</h3>
+                            </div>
                         </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase mb-1">Tổng Khách Hàng</h6>
-                            <h3 class="fw-bold mb-0">@Model.TotalCustomers.ToString("N0")</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="stat-card h-100">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon new">
+                                <i class="bi bi-person-plus-fill text-white fs-4"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="text-muted text-uppercase mb-1" style="letter-spacing:.05em;">Khách hàng mới</h6>
+                                <h3 class="fw-bold mb-0 text-primary-blue">@Model.NewCustomers</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="stat-card h-100">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon return">
+                                <i class="bi bi-cart-check-fill text-white fs-4"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="text-muted text-uppercase mb-1" style="letter-spacing:.05em;">Khách đã từng mua</h6>
+                                <h3 class="fw-bold mb-0 text-primary-blue">@Model.TotalCustomersWithPurchasesFormatted</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
+                <div class="stat-card h-100">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon avg">
+                                <i class="bi bi-wallet2 text-white fs-4"></i>
+                            </div>
+                            <div class="ms-3">
+                                <h6 class="text-muted text-uppercase mb-1" style="letter-spacing:.05em;">Chi tiêu TB/khách</h6>
+                                <h3 class="fw-bold mb-0 text-primary-blue">@Model.AverageSpendingFormatted</h3>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-success h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-person-plus-fill fs-1 text-success opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase mb-1">Khách Hàng Mới</h6>
-                            <h3 class="fw-bold mb-0">@Model.NewCustomers</h3>
-                        </div>
+
+        <!-- BIỂU ĐỒ -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-7">
+                <div class="card-glass h-100">
+                    <div class="card-section-header d-flex align-items-center gap-2">
+                        <i class="bi bi-graph-up text-primary-blue"></i>
+                        <h5 class="card-title fw-bold mb-0 text-primary-blue">
+                            Tăng trưởng khách hàng mới
+                        </h5>
+                    </div>
+                    <div class="card-body" style="height:320px;">
+                        <canvas id="customerGrowthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card-glass h-100">
+                    <div class="card-section-header d-flex align-items-center gap-2">
+                        <i class="bi bi-pie-chart-fill text-primary-blue"></i>
+                        <h5 class="card-title fw-bold mb-0 text-primary-blue">
+                            Phân khúc khách hàng
+                        </h5>
+                    </div>
+                    <div class="card-body" style="height:320px;">
+                        <canvas id="customerSegmentChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-primary h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-arrow-repeat fs-1 text-primary opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase mb-1">Tỷ Lệ Quay Lại</h6>
-                            <h3 class="fw-bold mb-0">@Model.ReturnRateFormatted</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card shadow-sm stat-card border-warning h-100">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-wallet2 fs-1 text-warning opacity-75"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h6 class="text-muted text-uppercase mb-1">Chi Tiêu TB/Khách</h6>
-                            <h3 class="fw-bold mb-0">@Model.AverageSpendingFormatted</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-lg-7">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-graph-up"></i> Tăng trưởng khách hàng mới
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="customerGrowthChart" style="height: 300px;"></canvas>
-                </div>
+        <!-- BẢNG TOP KHÁCH HÀNG -->
+        <div class="card-glass">
+            <div class="card-section-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title fw-bold mb-0 text-primary-blue">
+                    <i class="bi bi-trophy-fill me-1"></i> Top khách hàng chi tiêu nhiều nhất
+                </h5>
+                <button class="btn btn-outline-success btn-sm d-flex align-items-center gap-1 hover-scale"
+                        type="button"
+                        onclick="exportToExcelAjax(this)">
+                    <i class="bi bi-file-earmark-excel"></i>
+                    <span>Xuất Excel</span>
+                </button>
             </div>
-        </div>
-        <div class="col-lg-5">
-            <div class="card shadow-sm h-100">
-                <div class="card-header bg-white">
-                    <h5 class="card-title fw-bold mb-0">
-                        <i class="bi bi-pie-chart-fill"></i> Phân khúc khách hàng
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="customerSegmentChart" style="height: 300px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="card shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 class="card-title fw-bold mb-0">
-                <i class="bi bi-trophy-fill"></i> Top khách hàng chi tiêu nhiều nhất
-            </h5>
-            <!-- Nút xuất dùng fetch + Blob (không rời trang) -->
-            <button class="btn btn-outline-success btn-sm" type="button" onclick="exportToExcelAjax(this)">
-                <i class="bi bi-file-earmark-excel"></i> Xuất Excel
-            </button>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-hover table-striped mb-0 align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th class="text-center">Hạng</th>
-                        <th>Khách hàng</th>
-                        <th>Ngày đăng ký</th>
-                        <th class="text-center">Tổng đơn hàng</th>
-                        <th>Tổng chi tiêu</th>
-                        <th class="text-center">Hành động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (Model.TopCustomers != null && Model.TopCustomers.Any())
-                    {
-                        foreach (var customer in Model.TopCustomers)
+            <div class="table-responsive">
+                <table class="table mb-0 align-middle table-modern">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width:80px;">Hạng</th>
+                            <th>Khách hàng</th>
+                            <th>Ngày đăng ký</th>
+                            <th class="text-center">Tổng đơn hàng</th>
+                            <th>Tổng chi tiêu</th>
+                            <th class="text-center" style="width:120px;">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.TopCustomers != null && Model.TopCustomers.Any())
+                        {
+                            foreach (var customer in Model.TopCustomers)
+                            {
+                                <tr>
+                                    <td class="text-center">
+                                        <span class="badge rounded-pill px-3 py-2"
+                                              style="background:linear-gradient(135deg,#f97316 0%,#facc15 100%);color:#fff;">
+                                            @customer.Rank
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="@customer.AvatarUrl"
+                                                 alt="Avatar"
+                                                 class="rounded-circle me-2"
+                                                 width="40"
+                                                 height="40"
+                                                 style="object-fit:cover;"
+                                                 onerror="this.src='https://via.placeholder.com/40?text=KH'" />
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-semibold text-primary-blue">@customer.FullName</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@customer.CreatedDateFormatted</td>
+                                    <td class="text-center">@customer.TotalOrders</td>
+                                    <td class="fw-bold text-success">@customer.TotalSpentFormatted</td>
+                                    <td class="text-center">
+                                        <a href="@Url.Action("Edit", "Customer", new { area = "Seller", id = customer.UserID })"
+                                           class="btn btn-sm btn-outline-primary rounded-3"
+                                           title="Chỉnh sửa thông tin khách hàng">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
                         {
                             <tr>
-                                <td class="text-center fw-bold">@customer.Rank</td>
-                                <td>
-                                    <div class="d-flex align-items-center">
-                                        <img src="@customer.AvatarUrl"
-                                             alt="Avatar"
-                                             class="rounded-circle me-2"
-                                             width="32"
-                                             height="32"
-                                             onerror="this.src='https://via.placeholder.com/32'" />
-                                        <span>@customer.FullName</span>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="d-flex flex-column align-items-center gap-2">
+                                        <i class="bi bi-inbox fs-1 text-muted"></i>
+                                        <span class="text-muted">Không có dữ liệu khách hàng</span>
                                     </div>
-                                </td>
-                                <td>@customer.CreatedDateFormatted</td>
-                                <td class="text-center">@customer.TotalOrders</td>
-                                <td class="fw-bold text-success">@customer.TotalSpentFormatted</td>
-                                <td class="text-center">
-                                    <a href="@Url.Action("Edit", "Customer", new { area = "Seller", id = customer.UserID })"
-                                       class="btn btn-sm btn-outline-primary"
-                                       title="Chỉnh sửa thông tin khách hàng">
-                                        <i class="bi bi-pencil-square"></i>
-                                    </a>
                                 </td>
                             </tr>
                         }
-                    }
-                    else
-                    {
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <i class="bi bi-inbox fs-1 text-muted d-block mb-2"></i>
-                                <span class="text-muted">Không có dữ liệu khách hàng</span>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
+
     </div>
-</main>
+</div>
 
 @section scripts{
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -245,47 +580,59 @@
                         datasets: [{
                             label: "Khách hàng mới",
                             data: growthData,
-                            borderColor: "#0dcaf0",
-                            backgroundColor: "rgba(13, 202, 240, 0.1)",
+                            borderColor: "#3b82f6",
+                            backgroundColor: "rgba(59, 130, 246, 0.12)",
                             fill: true,
                             tension: 0.4,
                             pointRadius: 4,
-                            pointHoverRadius: 6
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: "#1e40af",
+                            pointBorderColor: "#fff",
+                            pointBorderWidth: 2
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: true, position: 'top' } },
-                        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                        plugins: {
+                            legend: { display: true, position: 'top' }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1 }
+                            }
+                        }
                     }
                 });
             }
 
-            // Biểu đồ Doughnut - phân khúc KH
+            // Biểu đồ Doughnut - phân hạng khách hàng (Bronze / Silver / Gold / VIP)
             var customerSegmentCtx = document.getElementById("customerSegmentChart");
             if (customerSegmentCtx) {
                 new Chart(customerSegmentCtx, {
                     type: "doughnut",
                     data: {
-                        labels: ["Khách hàng mới", "Khách quay lại", "Khách VIP", "Khác"],
+                        labels: ["Bronze", "Silver", "Gold", "VIP"],
                         datasets: [{
-                            label: "Số lượng khách hàng",
-                            data: [@Model.NewCustomerCount, @Model.ReturningCustomerCount, @Model.VIPCustomerCount, @Model.OtherCustomerCount],
+                            label: "Số lượng khách hàng theo hạng",
+                            data: [@Model.BronzeCustomerCount, @Model.SilverCustomerCount, @Model.GoldCustomerCount, @Model.VIPCustomerCount],
                             backgroundColor: [
-                                "rgba(25, 135, 84, 0.8)",
-                                "rgba(13, 110, 253, 0.8)",
-                                "rgba(255, 193, 7, 0.8)",
-                                "rgba(108, 117, 125, 0.7)"
+                                "rgba(148, 163, 184, 0.9)",   // Bronze
+                                "rgba(96, 165, 250, 0.9)",    // Silver
+                                "rgba(250, 204, 21, 0.9)",    // Gold
+                                "rgba(248, 113, 113, 0.9)"    // VIP
                             ],
-                            borderColor: "#fff",
+                            borderColor: "#ffffff",
                             borderWidth: 2
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: true, position: 'right' } }
+                        plugins: {
+                            legend: { display: true, position: 'right' }
+                        }
                     }
                 });
             }
@@ -311,7 +658,6 @@
 
                 const res = await fetch(url, { method: 'GET', credentials: 'include' });
 
-                // Kiểm tra đúng content-type Excel (phòng trường hợp bị redirect HTML)
                 const ct = (res.headers.get('Content-Type') || '').toLowerCase();
                 if (!res.ok || ct.indexOf('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') === -1) {
                     const text = await res.text();
@@ -320,7 +666,6 @@
 
                 const blob = await res.blob();
 
-                // Lấy tên file từ Content-Disposition
                 let fileName = `BaoCaoKhachHang_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.xlsx`;
                 const cd = res.headers.get('Content-Disposition') || '';
                 const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^"]+)"?/i);
@@ -328,7 +673,6 @@
                     try { fileName = decodeURIComponent(m[1] || m[2]); } catch (e) { fileName = m[1] || m[2]; }
                 }
 
-                // Tạo link ảo để tải file
                 const objectUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = objectUrl;
@@ -345,14 +689,4 @@
             }
         }
     </script>
-
-    <style>
-        .stat-card {
-            transition: transform 0.2s;
-        }
-
-            .stat-card:hover {
-                transform: translateY(-5px);
-            }
-    </style>
 }
