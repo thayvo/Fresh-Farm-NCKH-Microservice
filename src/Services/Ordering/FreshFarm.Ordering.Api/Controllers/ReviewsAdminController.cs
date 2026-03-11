@@ -1,4 +1,6 @@
 using FreshFarm.Ordering.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,11 +27,23 @@ public sealed class ReviewsAdminController : ControllerBase
         [FromQuery] bool includeReplies = true,
         CancellationToken cancellationToken = default)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return Ok(new List<object>());
+        }
 
         var reviews = await _db.Reviews
             .AsNoTracking()
             .Where(r => !r.IsDeleted)
+            .Where(r => sellerProductIds.Contains(r.ProductId))
             .Where(r => includeReplies || !r.ReplyTo.HasValue)
             .ToListAsync(cancellationToken);
 
@@ -39,7 +53,7 @@ public sealed class ReviewsAdminController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var userIds = reviews.Select(r => r.UserId).Distinct().ToList();
-        var latestOrdersByUser = await _db.Orders
+        var latestOrdersByUser = await ApplySellerScopeToOrders(_db.Orders, sellerId.Value)
             .AsNoTracking()
             .Where(o => userIds.Contains(o.UserId))
             .GroupBy(o => o.UserId)
@@ -81,7 +95,18 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpGet("reported")]
     public async Task<IActionResult> Reported(CancellationToken cancellationToken = default)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return Ok(new List<object>());
+        }
 
         var openReports = await _db.ReviewReports
             .AsNoTracking()
@@ -92,10 +117,11 @@ public sealed class ReviewsAdminController : ControllerBase
         var reviews = await _db.Reviews
             .AsNoTracking()
             .Where(r => !r.IsDeleted && reviewIds.Contains(r.ReviewId))
+            .Where(r => sellerProductIds.Contains(r.ProductId))
             .ToDictionaryAsync(x => x.ReviewId, cancellationToken);
 
         var userIds = reviews.Values.Select(x => x.UserId).Distinct().ToList();
-        var latestOrdersByUser = await _db.Orders
+        var latestOrdersByUser = await ApplySellerScopeToOrders(_db.Orders, sellerId.Value)
             .AsNoTracking()
             .Where(o => userIds.Contains(o.UserId))
             .GroupBy(o => o.UserId)
@@ -132,7 +158,18 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpPost("{reviewId:int}/reports/resolve")]
     public async Task<IActionResult> ResolveReport([FromRoute] int reviewId, [FromBody] ResolveReportRequest? request, CancellationToken cancellationToken = default)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
 
         var decision = (request?.Decision ?? string.Empty).Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(decision))
@@ -140,7 +177,8 @@ public sealed class ReviewsAdminController : ControllerBase
             return BadRequest(new { message = "Quyet dinh khong hop le." });
         }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+        var review = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay binh luan." });
@@ -210,9 +248,21 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpDelete("{reviewId:int}")]
     public async Task<IActionResult> Delete([FromRoute] int reviewId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+        await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
+
+        var review = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay binh luan." });
@@ -243,9 +293,21 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpPost("{reviewId:int}/approve")]
     public async Task<IActionResult> Approve([FromRoute] int reviewId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+        await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay danh gia." });
+        }
+
+        var review = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay danh gia." });
@@ -261,9 +323,21 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpPost("{reviewId:int}/visibility/toggle")]
     public async Task<IActionResult> ToggleVisibility([FromRoute] int reviewId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+        await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
+
+        var review = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay binh luan." });
@@ -284,7 +358,18 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpPost("{reviewId:int}/replies")]
     public async Task<IActionResult> Reply([FromRoute] int reviewId, [FromBody] ReplyRequest? request, CancellationToken cancellationToken = default)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay danh gia." });
+        }
 
         var content = (request?.Content ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(content))
@@ -294,7 +379,7 @@ public sealed class ReviewsAdminController : ControllerBase
 
         var parent = await _db.Reviews
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
 
         if (parent is null)
         {
@@ -323,9 +408,21 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpPatch("{reviewId:int}")]
     public async Task<IActionResult> Update([FromRoute] int reviewId, [FromBody] UpdateReviewRequest? request, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted, cancellationToken);
+        await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
+
+        var review = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay binh luan." });
@@ -352,7 +449,26 @@ public sealed class ReviewsAdminController : ControllerBase
     [HttpGet("{reviewId:int}/reports")]
     public async Task<IActionResult> GetReports([FromRoute] int reviewId, [FromQuery] int page = 1, CancellationToken cancellationToken = default)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         await EnsureSeedDataAsync(cancellationToken);
+        var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
+        if (sellerProductIds.Count == 0)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
+
+        var canAccess = await _db.Reviews
+            .AsNoTracking()
+            .AnyAsync(r => r.ReviewId == reviewId && !r.IsDeleted && sellerProductIds.Contains(r.ProductId), cancellationToken);
+        if (!canAccess)
+        {
+            return NotFound(new { message = "Khong tim thay binh luan." });
+        }
 
         const int pageSize = 5;
         if (page < 1)
@@ -525,6 +641,34 @@ public sealed class ReviewsAdminController : ControllerBase
                 createdAt = r.CreatedAt
             }).ToList()
         };
+    }
+
+    private int? TryGetSellerIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var sellerId) ? sellerId : null;
+    }
+
+    private async Task<HashSet<int>> GetSellerProductIdsAsync(int sellerId, CancellationToken cancellationToken)
+    {
+        var productIds = await _db.SellerOrderItems
+            .AsNoTracking()
+            .Where(x => x.SellerOrder.SellerId == sellerId)
+            .Select(x => x.ProductId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return productIds.ToHashSet();
+    }
+
+    private IQueryable<Order> ApplySellerScopeToOrders(IQueryable<Order> query, int sellerId)
+    {
+        return query.Where(o => o.SellerOrders.Any(so =>
+            so.SellerId == sellerId &&
+            so.SellerOrderItems.Any()));
     }
 
     public sealed class ResolveReportRequest

@@ -1,7 +1,7 @@
 ﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.Category>
 @{
     ViewBag.Title = "Quản Lý Danh Mục";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 
     int currentPage = ViewBag.CurrentPage ?? 1;
     int totalPages = ViewBag.TotalPages ?? 1;
@@ -152,7 +152,7 @@
                                     <span class="badge bg-primary-blue text-white border">@item.CategoryID</span>
                                 </td>
                                 <td class="px-4">
-                                    <img src="@catImg(item.ImageCategoriesName)"
+                                    <img src="@catImg(item.ImageCategoriesName ?? string.Empty)"
                                          alt="@item.CategoryName"
                                          class="rounded-3"
                                          style="width:56px;height:56px;object-fit:cover;box-shadow:0 8px 18px rgba(15,23,42,0.25);" />

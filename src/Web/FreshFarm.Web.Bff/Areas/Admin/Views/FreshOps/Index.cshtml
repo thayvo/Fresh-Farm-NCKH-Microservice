@@ -1,0 +1,335 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.FreshOpsPageViewModel
+
+<section class="fresh-ops-shell">
+    <div class="hero-card mb-4">
+        <div>
+            <p class="eyebrow text-uppercase mb-2">7.7A Fresh-goods MVP</p>
+            <h1 class="fw-bold mb-2">Fresh ops center</h1>
+            <p class="mb-0 opacity-75">Theo doi lot, HSD, trace code, FEFO queue va quality recall cho nong san/thuc pham tuoi.</p>
+        </div>
+        <div class="hero-chip">Lot + Recall</div>
+    </div>
+
+    @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
+    {
+        <div class="alert alert-warning">@pageError</div>
+    }
+    @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Lots</span><strong>@Model.Stats.TotalLots</strong><small>dang theo doi</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Soon</span><strong>@Model.Stats.ExpiringSoonLots</strong><small>sap het han</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Expired</span><strong>@Model.Stats.ExpiredLots</strong><small>can xu ly</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Recall</span><strong>@Model.Stats.OpenRecalls</strong><small>case dang mo</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Trace</span><strong>@Model.Stats.TraceCoverage%</strong><small>lot co trace code</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">FEFO</span><strong>@Model.FefoQueue.Count</strong><small>queue uu tien xuat</small></div></div>
+    </div>
+
+    <div class="panel-card mb-4">
+        <div class="panel-head">
+            <h2 class="h5 mb-1">Bo loc van hanh</h2>
+            <p class="text-muted mb-0">Tap trung vao seller, lot status va keyword de triage nhanh data freshness.</p>
+        </div>
+        <form method="get" asp-action="Index" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
+            <div class="col-lg-5">
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo product, SKU, lot, trace code..." />
+            </div>
+            <div class="col-lg-3">
+                <select class="form-select" name="sellerId">
+                    @if (!Model.SellerId.HasValue)
+                    {
+                        <option value="" selected>Tat ca seller</option>
+                    }
+                    else
+                    {
+                        <option value="">Tat ca seller</option>
+                    }
+                    @foreach (var option in Model.SellerOptions)
+                    {
+                        if (int.TryParse(option.Value, out var optionId) && optionId == Model.SellerId)
+                        {
+                            <option value="@option.Value" selected>@option.Text</option>
+                        }
+                        else
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <select class="form-select" name="status">
+                    @foreach (var option in Model.StatusOptions)
+                    {
+                        if (option.Value == Model.Status)
+                        {
+                            <option value="@option.Value" selected>@option.Text</option>
+                        }
+                        else
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button class="btn btn-primary" type="submit">Loc queue</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <div class="panel-card mb-4">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">FEFO queue</h2>
+                    <p class="text-muted mb-0">Danh sach lot sap den HSD de uu tien xuat truoc trong MVP nay.</p>
+                </div>
+                <div class="detail-stack">
+                    @if (Model.FefoQueue.Count == 0)
+                    {
+                        <div class="text-muted">Chua co lot nao trong FEFO queue.</div>
+                    }
+                    else
+                    {
+                        @foreach (var row in Model.FefoQueue)
+                        {
+                            var queueClass = row.DaysToExpiry < 0 ? "queue-pill queue-expired" : row.DaysToExpiry <= 3 ? "queue-pill queue-warning" : "queue-pill queue-ok";
+                            <div class="detail-item">
+                                <div>
+                                    <strong>@row.ProductName</strong>
+                                    <div class="small text-muted">Seller #@row.SellerId | Lot @row.LotCode | SKU @row.Sku</div>
+                                    <div class="small text-muted">Con @row.RemainingQuantity sp | Quality @row.QualityStatus</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="@queueClass">@row.DaysToExpiry ngay</div>
+                                    <div class="small text-muted">@row.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="panel-card mb-4">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Fresh lots</h2>
+                    <p class="text-muted mb-0">Lo hang co HSD, farm/origin, trace code va ton con lai de admin theo doi.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle ops-table">
+                        <thead>
+                            <tr>
+                                <th>Lot</th>
+                                <th>Traceability</th>
+                                <th>Qty</th>
+                                <th>HSD</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Lots.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-4">Chua co lot nao.</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var row in Model.Lots)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@row.ProductName</div>
+                                            <div class="small text-muted">Seller #@row.SellerId | Lot @row.LotCode</div>
+                                            <div class="small text-muted">SKU @row.Sku</div>
+                                        </td>
+                                        <td>
+                                            <div class="small">Trace: @(string.IsNullOrWhiteSpace(row.TraceCode) ? "-" : row.TraceCode)</div>
+                                            <div class="small text-muted">Farm: @(string.IsNullOrWhiteSpace(row.FarmName) ? "-" : row.FarmName)</div>
+                                            <div class="small text-muted">Origin: @(string.IsNullOrWhiteSpace(row.OriginRegion) ? "-" : row.OriginRegion)</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@row.RemainingQuantity / @row.InitialQuantity</div>
+                                            <div class="small text-muted">Cost: @((row.UnitCost ?? 0m).ToString("N0")) đ</div>
+                                        </td>
+                                        <td>
+                                            <div>@(row.ExpiresAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</div>
+                                            <div class="small text-muted">@(row.DaysToExpiry?.ToString() ?? "-") ngay</div>
+                                        </td>
+                                        <td>
+                                            <span class="status-chip">@row.Status</span>
+                                            <div class="small text-muted mt-1">Quality: @row.QualityStatus</div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Quality recalls</h2>
+                    <p class="text-muted mb-0">Case recall de boi loi quality issue, contamination hoac source mismatch.</p>
+                </div>
+                <div class="detail-stack">
+                    @if (Model.Recalls.Count == 0)
+                    {
+                        <div class="text-muted">Chua co recall case.</div>
+                    }
+                    else
+                    {
+                        @foreach (var row in Model.Recalls)
+                        {
+                            <div class="detail-item">
+                                <div>
+                                    <strong>@row.Title</strong>
+                                    <div class="small text-muted">@row.RecallCode | @row.RecallType | @row.Severity</div>
+                                    <div class="small text-muted">Seller #@(row.SellerId?.ToString() ?? "-") | Product @(row.ProductName ?? "-") | Lot @(row.LotCode ?? "-")</div>
+                                    <div class="small">@row.Reason</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="status-chip">@row.Status</div>
+                                    <div class="small text-muted mt-2">@row.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                    @if (!string.Equals(row.Status, "resolved", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <form method="post" asp-action="ResolveRecall" asp-controller="FreshOps" asp-area="Admin" asp-route-id="@row.FreshQualityRecallId" class="mt-2">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="q" value="@Model.Query" />
+                                            <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                                            <input type="hidden" name="status" value="@Model.Status" />
+                                            <button class="btn btn-sm btn-outline-primary" type="submit">Resolve</button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="panel-card mb-4 sticky-panel">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Tao fresh lot</h2>
+                    <p class="text-muted mb-0">Nhap lot co HSD, trace code va ton kho de bat dau theo doi FEFO.</p>
+                </div>
+                <form method="post" asp-action="CreateLot" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="q" value="@Model.Query" />
+                    <input type="hidden" name="status" value="@Model.Status" />
+                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                    <div class="col-md-6"><label class="form-label">Product ID</label><input class="form-control" type="number" name="ProductId" min="1" required /></div>
+                    <div class="col-md-6"><label class="form-label">Seller ID</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.NewLot.SellerId" required /></div>
+                    <div class="col-md-6"><label class="form-label">Lot code</label><input class="form-control" type="text" name="LotCode" required /></div>
+                    <div class="col-md-6"><label class="form-label">Trace code</label><input class="form-control" type="text" name="TraceCode" /></div>
+                    <div class="col-md-6"><label class="form-label">Farm</label><input class="form-control" type="text" name="FarmName" /></div>
+                    <div class="col-md-6"><label class="form-label">Origin</label><input class="form-control" type="text" name="OriginRegion" /></div>
+                    <div class="col-md-6"><label class="form-label">Harvested</label><input class="form-control" type="datetime-local" name="HarvestedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Packed</label><input class="form-control" type="datetime-local" name="PackedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Received</label><input class="form-control" type="datetime-local" name="ReceivedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Expires</label><input class="form-control" type="datetime-local" name="ExpiresAt" /></div>
+                    <div class="col-md-4"><label class="form-label">Initial qty</label><input class="form-control" type="number" name="InitialQuantity" min="1" required /></div>
+                    <div class="col-md-4"><label class="form-label">Remaining qty</label><input class="form-control" type="number" name="RemainingQuantity" min="0" /></div>
+                    <div class="col-md-4"><label class="form-label">Unit cost</label><input class="form-control" type="number" step="0.01" name="UnitCost" min="0" /></div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="Status">
+                            <option value="active">active</option>
+                            <option value="held">held</option>
+                            <option value="expired">expired</option>
+                            <option value="recalled">recalled</option>
+                            <option value="depleted">depleted</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Quality</label>
+                        <select class="form-select" name="QualityStatus">
+                            <option value="ok">ok</option>
+                            <option value="watch">watch</option>
+                            <option value="blocked">blocked</option>
+                        </select>
+                    </div>
+                    <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="Notes"></textarea></div>
+                    <div class="col-12 d-grid"><button class="btn btn-primary" type="submit">Tao lot</button></div>
+                </form>
+            </div>
+
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Tao recall case</h2>
+                    <p class="text-muted mb-0">Mo quality recall theo product hoac lot khi can thu hoi/giu hang.</p>
+                </div>
+                <form method="post" asp-action="CreateRecall" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="q" value="@Model.Query" />
+                    <input type="hidden" name="status" value="@Model.Status" />
+                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                    <div class="col-md-6"><label class="form-label">Recall code</label><input class="form-control" type="text" name="RecallCode" /></div>
+                    <div class="col-md-6"><label class="form-label">Seller ID</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.SellerId" /></div>
+                    <div class="col-md-6"><label class="form-label">Product ID</label><input class="form-control" type="number" name="ProductId" min="1" /></div>
+                    <div class="col-md-6"><label class="form-label">Lot ID</label><input class="form-control" type="number" name="FreshInventoryLotId" min="1" /></div>
+                    <div class="col-md-6">
+                        <label class="form-label">Recall type</label>
+                        <select class="form-select" name="RecallType">
+                            <option value="quality_issue">quality_issue</option>
+                            <option value="contamination">contamination</option>
+                            <option value="source_mismatch">source_mismatch</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Severity</label>
+                        <select class="form-select" name="Severity">
+                            <option value="low">low</option>
+                            <option value="medium">medium</option>
+                            <option value="high">high</option>
+                            <option value="critical">critical</option>
+                        </select>
+                    </div>
+                    <div class="col-12"><label class="form-label">Title</label><input class="form-control" type="text" name="Title" required /></div>
+                    <div class="col-12"><label class="form-label">Reason</label><textarea class="form-control" rows="3" name="Reason"></textarea></div>
+                    <div class="col-12"><label class="form-label">Action required</label><textarea class="form-control" rows="3" name="ActionRequired"></textarea></div>
+                    <div class="col-md-6"><label class="form-label">Started at</label><input class="form-control" type="datetime-local" name="StartedAt" /></div>
+                    <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="Status">
+                            <option value="open">open</option>
+                            <option value="investigating">investigating</option>
+                            <option value="resolved">resolved</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-grid"><button class="btn btn-outline-danger" type="submit">Tao recall</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .fresh-ops-shell .hero-card { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.75rem; border-radius:1.5rem; background:linear-gradient(135deg,#14532d 0%,#0f766e 45%,#f59e0b 100%); color:#fff; box-shadow:0 24px 50px rgba(20,83,45,.22); }
+    .fresh-ops-shell .hero-chip { padding:.5rem .85rem; border-radius:999px; background:rgba(255,255,255,.14); font-weight:700; }
+    .fresh-ops-shell .eyebrow, .fresh-ops-shell .metric-label { letter-spacing:.14em; font-weight:700; }
+    .fresh-ops-shell .metric-card, .fresh-ops-shell .panel-card { background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.96)); border:1px solid rgba(15,23,42,.08); border-radius:1.25rem; box-shadow:0 18px 40px rgba(15,23,42,.08); }
+    .fresh-ops-shell .metric-card { padding:1.2rem; min-height:132px; }
+    .fresh-ops-shell .metric-card strong { display:block; font-size:1.9rem; color:#0f172a; line-height:1.1; }
+    .fresh-ops-shell .panel-card { padding:1.5rem; }
+    .fresh-ops-shell .panel-head { margin-bottom:1rem; }
+    .fresh-ops-shell .detail-stack { display:grid; gap:1rem; }
+    .fresh-ops-shell .detail-item { display:flex; justify-content:space-between; gap:1rem; padding:1rem; border-radius:1rem; background:rgba(15,23,42,.03); }
+    .fresh-ops-shell .ops-table th { font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:#6b7280; }
+    .fresh-ops-shell .queue-pill, .fresh-ops-shell .status-chip { display:inline-flex; align-items:center; justify-content:center; padding:.35rem .7rem; border-radius:999px; font-weight:700; }
+    .fresh-ops-shell .queue-ok { background:#dcfce7; color:#166534; }
+    .fresh-ops-shell .queue-warning { background:#fef3c7; color:#b45309; }
+    .fresh-ops-shell .queue-expired { background:#fee2e2; color:#b91c1c; }
+    .fresh-ops-shell .status-chip { background:rgba(15,23,42,.08); color:#0f172a; }
+    .fresh-ops-shell .sticky-panel { position:sticky; top:1rem; }
+    @@media (max-width:1199.98px) { .fresh-ops-shell .sticky-panel { position:static; } }
+</style>

@@ -1,4 +1,7 @@
 using FreshFarm.Ordering.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +10,7 @@ namespace FreshFarm.Ordering.Api.Controllers;
 
 [ApiController]
 [Route("api/orders/admin/support-chat")]
-[Authorize(Policy = "SellerOnly")]
+[Authorize(Policy = "SellerOrAdmin")]
 public sealed class SupportChatAdminController : ControllerBase
 {
     private readonly FreshFarmOrderingDBContext _db;
@@ -20,10 +23,21 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpGet("conversations")]
     public async Task<IActionResult> Conversations(CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var scopedOrders = BuildScopedOrdersQuery();
+        if (scopedOrders is null)
+        {
+            return Unauthorized(new { ok = false, message = "Không xác định được phạm vi hội thoại." });
+        }
+
+        var sellerUserIds = await scopedOrders
+            .AsNoTracking()
+            .Select(o => o.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
 
         var conversations = await _db.SupportConversations
             .AsNoTracking()
+            .Where(x => x.UserId.HasValue && sellerUserIds.Contains(x.UserId.Value))
             .OrderByDescending(x => x.StartedAt)
             .ToListAsync(cancellationToken);
 
@@ -39,7 +53,7 @@ public sealed class SupportChatAdminController : ControllerBase
             .Distinct()
             .ToList();
 
-        var latestOrdersByUser = await _db.Orders
+        var latestOrdersByUser = await scopedOrders
             .AsNoTracking()
             .Where(o => userIds.Contains(o.UserId))
             .GroupBy(o => o.UserId)
@@ -83,8 +97,6 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpGet("conversations/{conversationId:int}/messages")]
     public async Task<IActionResult> Messages([FromRoute] int conversationId, [FromQuery] int take = 100, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
-
         if (take <= 0)
         {
             take = 100;
@@ -95,9 +107,7 @@ public sealed class SupportChatAdminController : ControllerBase
             take = 500;
         }
 
-        var exists = await _db.SupportConversations
-            .AsNoTracking()
-            .AnyAsync(x => x.ConversationId == conversationId, cancellationToken);
+        var exists = await CanAccessConversationAsync(conversationId, cancellationToken);
 
         if (!exists)
         {
@@ -144,25 +154,29 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpGet("conversations/{conversationId:int}/details")]
     public async Task<IActionResult> ConversationDetails([FromRoute] int conversationId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
+        var scopedOrders = BuildScopedOrdersQuery();
+        if (scopedOrders is null)
+        {
+            return Unauthorized(new { ok = false, message = "Không xác định được phạm vi hội thoại." });
+        }
 
         var conversation = await _db.SupportConversations
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
 
-        if (conversation is null)
+        if (conversation is null || !await CanAccessConversationAsync(conversationId, cancellationToken))
         {
             return NotFound(new { ok = false, message = "Khong tim thay hoi thoai." });
         }
 
         var userId = conversation.UserId ?? 0;
-        var latestOrder = await _db.Orders
+        var latestOrder = await scopedOrders
             .AsNoTracking()
             .Where(o => o.UserId == userId)
             .OrderByDescending(o => o.OrderDate)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var orders = await _db.Orders
+        var orders = await scopedOrders
             .AsNoTracking()
             .Where(o => o.UserId == userId)
             .OrderByDescending(o => o.OrderDate)
@@ -194,12 +208,10 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpPost("conversations/{conversationId:int}/close")]
     public async Task<IActionResult> Close([FromRoute] int conversationId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
-
         var conversation = await _db.SupportConversations
             .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
 
-        if (conversation is null)
+        if (conversation is null || !await CanAccessConversationAsync(conversationId, cancellationToken))
         {
             return NotFound(new { ok = false, message = "Khong tim thay hoi thoai." });
         }
@@ -214,11 +226,7 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpPost("conversations/{conversationId:int}/mark-read")]
     public async Task<IActionResult> MarkAsRead([FromRoute] int conversationId, CancellationToken cancellationToken = default)
     {
-        await EnsureSeedDataAsync(cancellationToken);
-
-        var conversationExists = await _db.SupportConversations
-            .AsNoTracking()
-            .AnyAsync(x => x.ConversationId == conversationId, cancellationToken);
+        var conversationExists = await CanAccessConversationAsync(conversationId, cancellationToken);
 
         if (!conversationExists)
         {
@@ -242,71 +250,168 @@ public sealed class SupportChatAdminController : ControllerBase
         return Ok(new { ok = true });
     }
 
-    private async Task EnsureSeedDataAsync(CancellationToken cancellationToken)
+    [HttpPost("conversations/{conversationId:int}/messages")]
+    public async Task<IActionResult> SendMessage(
+        [FromRoute] int conversationId,
+        [FromBody] SendSupportMessageRequest? request,
+        CancellationToken cancellationToken = default)
     {
-        var hasAnyConversation = await _db.SupportConversations
-            .AsNoTracking()
-            .AnyAsync(cancellationToken);
-
-        if (hasAnyConversation)
+        var actorId = TryGetActorIdFromToken();
+        if (!actorId.HasValue)
         {
-            return;
+            return Unauthorized(new { ok = false, message = "Không xác định được người gửi." });
         }
 
-        var recentOrders = await _db.Orders
-            .AsNoTracking()
-            .OrderByDescending(o => o.OrderDate)
-            .Take(200)
-            .ToListAsync(cancellationToken);
-
-        var conversationByUser = new Dictionary<int, SupportConversation>();
-
-        foreach (var group in recentOrders.GroupBy(o => o.UserId))
+        if (!await CanAccessConversationAsync(conversationId, cancellationToken))
         {
-            var userId = group.Key;
-            if (userId <= 0)
+            return NotFound(new { ok = false, message = "Khong tim thay hoi thoai." });
+        }
+
+        var content = (request?.Content ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return BadRequest(new { ok = false, message = "Noi dung tin nhan khong duoc de trong." });
+        }
+
+        if (content.Length > 4000)
+        {
+            return BadRequest(new { ok = false, message = "Noi dung tin nhan qua dai (toi da 4000 ky tu)." });
+        }
+
+        var conversation = await _db.SupportConversations
+            .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
+
+        if (conversation is null)
+        {
+            return NotFound(new { ok = false, message = "Khong tim thay hoi thoai." });
+        }
+
+        if (string.Equals(conversation.Status, "Closed", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { ok = false, message = "Hoi thoai da ket thuc. Khong the gui tin nhan moi." });
+        }
+
+        SupportMessage? replyMessage = null;
+        if (request?.ReplyToMessageId is int replyToMessageId && replyToMessageId > 0)
+        {
+            replyMessage = await _db.SupportMessages
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.MessageId == replyToMessageId && x.ConversationId == conversationId,
+                    cancellationToken);
+
+            if (replyMessage is null)
             {
-                continue;
+                return BadRequest(new { ok = false, message = "Khong tim thay tin nhan goc de tra loi." });
             }
-
-            var latestOrder = group.OrderByDescending(x => x.OrderDate).First();
-            var conversation = new SupportConversation
-            {
-                UserId = userId,
-                Status = "Open",
-                StartedAt = latestOrder.OrderDate
-            };
-
-            _db.SupportConversations.Add(conversation);
-            conversationByUser[userId] = conversation;
         }
 
-        if (conversationByUser.Count == 0)
+        if (!conversation.AdminId.HasValue || conversation.AdminId.Value <= 0)
         {
-            return;
+            conversation.AdminId = actorId.Value;
         }
 
+        var now = DateTime.UtcNow;
+        var message = new SupportMessage
+        {
+            ConversationId = conversationId,
+            SenderType = 1, // admin/seller
+            SenderAdminId = actorId.Value,
+            Content = content,
+            CreatedAt = now,
+            IsRead = false,
+            ReplyToMessageId = replyMessage?.MessageId,
+            IsDeleted = false
+        };
+
+        _db.SupportMessages.Add(message);
         await _db.SaveChangesAsync(cancellationToken);
 
-        foreach (var item in conversationByUser)
+        return Ok(new
         {
-            var latestOrder = recentOrders
-                .Where(x => x.UserId == item.Key)
-                .OrderByDescending(x => x.OrderDate)
-                .First();
-
-            _db.SupportMessages.Add(new SupportMessage
+            ok = true,
+            message = new
             {
-                ConversationId = item.Value.ConversationId,
-                SenderType = 0,
-                SenderUserId = item.Key,
-                Content = $"Xin chao shop, toi can ho tro don #{latestOrder.OrderId:D6}.",
-                CreatedAt = latestOrder.OrderDate.AddMinutes(1),
-                IsRead = false,
-                IsDeleted = false
-            });
+                messageId = message.MessageId,
+                from = "admin",
+                content = message.Content,
+                createdAt = message.CreatedAt,
+                isDeleted = false,
+                reactionType = (string?)null,
+                replyTo = replyMessage is null
+                    ? null
+                    : new
+                    {
+                        messageId = replyMessage.MessageId,
+                        from = replyMessage.SenderType == 0 ? "user" : "admin",
+                        content = replyMessage.Content
+                    }
+            }
+        });
+    }
+
+    private int? TryGetActorIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var actorId) ? actorId : null;
+    }
+
+    private IQueryable<Order> ApplySellerScopeToOrders(IQueryable<Order> query, int sellerId)
+    {
+        return query.Where(o => o.SellerOrders.Any(so =>
+            so.SellerId == sellerId &&
+            so.SellerOrderItems.Any()));
+    }
+
+    private IQueryable<Order>? BuildScopedOrdersQuery()
+    {
+        if (User.IsInRole("Admin"))
+        {
+            return _db.Orders.AsQueryable();
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        var sellerId = TryGetActorIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return null;
+        }
+
+        return ApplySellerScopeToOrders(_db.Orders.AsQueryable(), sellerId.Value);
+    }
+
+    private async Task<bool> CanAccessConversationAsync(int conversationId, CancellationToken cancellationToken)
+    {
+        var userId = await _db.SupportConversations
+            .AsNoTracking()
+            .Where(x => x.ConversationId == conversationId)
+            .Select(x => x.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!userId.HasValue || userId.Value <= 0)
+        {
+            return false;
+        }
+
+        var scopedOrders = BuildScopedOrdersQuery();
+        if (scopedOrders is null)
+        {
+            return false;
+        }
+
+        return await scopedOrders
+            .AsNoTracking()
+            .AnyAsync(o => o.UserId == userId.Value, cancellationToken);
+    }
+
+    public sealed class SendSupportMessageRequest
+    {
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+
+        [JsonPropertyName("replyToMessageId")]
+        public int? ReplyToMessageId { get; set; }
     }
 }

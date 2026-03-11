@@ -1,0 +1,104 @@
+namespace FreshFarm.Web.Bff.Areas.Admin.Models;
+
+public sealed class MerchantManagementPageViewModel
+{
+    public string Query { get; set; } = string.Empty;
+
+    public string Status { get; set; } = "all";
+
+    public int Page { get; set; } = 1;
+
+    public int PageSize { get; set; } = 20;
+
+    public int Total { get; set; }
+
+    public int TotalPages { get; set; } = 1;
+
+    public int? SelectedSellerId { get; set; }
+
+    public MerchantStatsViewModel Stats { get; set; } = new();
+
+    public List<MerchantOptionViewModel> StatusOptions { get; set; } = new();
+
+    public List<MerchantListItemViewModel> Merchants { get; set; } = new();
+
+    public MerchantDetailViewModel? Details { get; set; }
+}
+
+public sealed class MerchantStatsViewModel
+{
+    public int TotalSellers { get; set; }
+
+    public int ActiveSellers { get; set; }
+
+    public int SuspendedSellers { get; set; }
+
+    public int ReviewNeeded { get; set; }
+
+    public int MissingAddress { get; set; }
+}
+
+public sealed class MerchantOptionViewModel
+{
+    public string Value { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
+}
+
+public class MerchantListItemViewModel
+{
+    public int SellerId { get; set; }
+
+    public string ShopName { get; set; } = string.Empty;
+
+    public string UserName { get; set; } = string.Empty;
+
+    public string FullName { get; set; } = string.Empty;
+
+    public string Email { get; set; } = string.Empty;
+
+    public string? Phone { get; set; }
+
+    public string? Avatar { get; set; }
+
+    public bool IsActive { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public DateTime? LastLogin { get; set; }
+
+    public string AddressSummary { get; set; } = string.Empty;
+
+    public int ProfileScore { get; set; }
+
+    public string ComplianceStatus { get; set; } = string.Empty;
+
+    public List<MerchantFlagViewModel> Flags { get; set; } = new();
+
+    public int? DaysSinceLastLogin { get; set; }
+}
+
+public class MerchantDetailViewModel : MerchantListItemViewModel
+{
+    public string? AddressDetail { get; set; }
+
+    public string? Province { get; set; }
+
+    public string? District { get; set; }
+
+    public string? Ward { get; set; }
+
+    public string ComplianceSummary { get; set; } = string.Empty;
+}
+
+public sealed class MerchantFlagViewModel
+{
+    public string Code { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public string Tone { get; set; } = string.Empty;
+}
+

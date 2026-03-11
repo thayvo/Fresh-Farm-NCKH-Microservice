@@ -9,7 +9,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 
 [ApiController]
 [Route("auth/admin/settings/store")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOnly")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOrAdmin")]
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly FreshFarmIdentityDBContext _db;

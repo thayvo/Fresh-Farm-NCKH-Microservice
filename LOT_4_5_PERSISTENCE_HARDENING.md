@@ -96,6 +96,11 @@
     - Mapping `Users/AddressBook/Orders/OrderDetail`.
     - Chuan hoa status `Completed -> Delivered`, `Cancelled -> Canceled`.
     - Trinh tu backup -> stage -> upsert -> verify -> smoke.
+- Da bo sung script thuc thi + verify cho lot 4.5.6:
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-import.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-import.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-verify.sql`
 
 ## Cac lenh nho de ra tiep (micro-commands)
 1. `Lam lot 4.5.6: migrate customer data tu final3.sql theo plan + verify runtime`

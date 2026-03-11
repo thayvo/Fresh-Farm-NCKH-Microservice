@@ -1,12 +1,19 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyUsersVM
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var loyaltyScopeLabel = ViewData["LoyaltyScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Thành viên tích điểm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 }
 
 <main class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="fw-bold">Thành viên</h2>
+        <div>
+            <h2 class="fw-bold mb-1">Thành viên</h2>
+            <span class="badge bg-light text-primary">@loyaltyScopeLabel</span>
+        </div>
         <form class="d-flex" method="get">
             <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tìm theo tên..." />
             <button class="btn btn-primary ms-2" type="submit"><i class="bi bi-search"></i></button>
@@ -28,7 +35,7 @@
                 <tbody>
                     @if (Model.Rows == null || !Model.Rows.Any())
                     {
-                        <tr><td colspan="4" class="text-muted">Không có dữ liệu.</td></tr>
+                        <tr><td colspan="5" class="text-muted">Không có dữ liệu.</td></tr>
                     }
                     else
                     {
@@ -40,7 +47,11 @@
                                 <td>@(string.IsNullOrWhiteSpace(u.RankName)?"-":u.RankName)</td>
                                 <td class="text-end">@u.TotalPoints</td>
                                 <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" onclick="openAdjust(@u.UserID, '@u.FullName')">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            type="button"
+                                            data-user-id="@u.UserID"
+                                            data-user-name="@u.FullName"
+                                            onclick="openAdjust(this)">
                                         <i class="bi bi-pencil"></i> Điều chỉnh
                                     </button>
                                 </td>
@@ -61,8 +72,8 @@
                     var prev = Math.Max(1, Model.Page - 1);
                     var next = Math.Min(totalPages == 0 ? 1 : totalPages, Model.Page + 1);
                 }
-                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { q = Model.Query, page = prev, pageSize = Model.PageSize })">«</a>
-                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { q = Model.Query, page = next, pageSize = Model.PageSize })">»</a>
+                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { area = areaName, q = Model.Query, page = prev, pageSize = Model.PageSize })">«</a>
+                <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Users", new { area = areaName, q = Model.Query, page = next, pageSize = Model.PageSize })">»</a>
             </div>
         </div>
     </div>
@@ -75,7 +86,7 @@
                     <h5 class="modal-title">Điều chỉnh điểm</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="post" action="@Url.Action("AdjustPoints","Loyalty", new { area = "Seller" })" onsubmit="return submitAdjust(event)">
+                <form method="post" action="@Url.Action("AdjustPoints","Loyalty", new { area = areaName })" onsubmit="return submitAdjust(event)">
                     @Html.AntiForgeryToken()
                     <div class="modal-body">
                         <input type="hidden" name="userId" id="adjUserId" />
@@ -107,9 +118,9 @@
 </main>
 
 <script>var _modal;
-    function openAdjust(id, name) {
-        document.getElementById('adjUserId').value = id;
-        document.getElementById('adjUserName').value = name;
+    function openAdjust(button) {
+        document.getElementById('adjUserId').value = button.dataset.userId || '';
+        document.getElementById('adjUserName').value = button.dataset.userName || '';
         var el = document.getElementById('adjustModal');
         _modal = new bootstrap.Modal(el);
         _modal.show();

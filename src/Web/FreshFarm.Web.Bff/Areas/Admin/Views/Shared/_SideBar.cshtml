@@ -1,0 +1,230 @@
+@{
+    string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
+}
+
+<nav id="sidebar">
+    <div class="sidebar-header text-center">
+        <h3><i class="bi bi-person-workspace"></i> Admin</h3>
+    </div>
+
+    <ul class="nav flex-column">
+        <li class="nav-item">
+            <a class="nav-link @(currentAction == "Dashboard" && currentController == "Home" ? "active" : "")"
+               href="@Url.Action("Dashboard", "Home", new { area = "Admin" })">
+                <i class="bi bi-grid-1x2-fill"></i> Bảng điều khiển
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "User" && currentAction == "ManageUsers" ? "active" : "")"
+               href="@Url.Action("ManageUsers", "User", new { area = "Admin" })">
+                <i class="bi bi-people-fill"></i> Quản lý người dùng
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "User" && currentAction == "ManageAdmins" ? "active" : "")"
+               href="@Url.Action("ManageAdmins", "User", new { area = "Admin" })">
+                <i class="bi bi-shield-lock-fill"></i> Admin
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "User" && currentAction == "ManageSellers" ? "active" : "")"
+               href="@Url.Action("ManageSellers", "User", new { area = "Admin" })">
+                <i class="bi bi-shop"></i> Seller
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Merchant" ? "active" : "")"
+               href="@Url.Action("Index", "Merchant", new { area = "Admin" })">
+                <i class="bi bi-patch-check-fill"></i> Merchant compliance
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "User" && currentAction == "ManageBuyers" ? "active" : "")"
+               href="@Url.Action("ManageBuyers", "User", new { area = "Admin" })">
+                <i class="bi bi-person-badge-fill"></i> Buyer
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Order" ? "active" : "")"
+               href="@Url.Action("ManageOrders", "Order", new { area = "Admin" })">
+                <i class="bi bi-receipt-cutoff"></i> Quản lý đơn hàng
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Shipping" ? "active" : "")"
+               href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin" })">
+                <i class="bi bi-truck"></i> Quản lý vận chuyển
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Finance" ? "active" : "")"
+               href="@Url.Action("Index", "Finance", new { area = "Admin" })">
+                <i class="bi bi-cash-stack"></i> Tài chính & đối soát
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Delivery" ? "active" : "")"
+               href="@Url.Action("Index", "Delivery", new { area = "Admin" })">
+                <i class="bi bi-truck-flatbed"></i> Điều phối giao hàng
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Report" ? "active" : "")"
+               href="@Url.Action("Revenue", "Report", new { area = "Admin" })">
+                <i class="bi bi-bar-chart-line-fill"></i> Báo cáo
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Coupon" ? "active" : "")"
+               href="@Url.Action("ManageCoupons", "Coupon", new { area = "Admin" })">
+                <i class="bi bi-ticket-perforated-fill"></i> Voucher sàn
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Campaign" ? "active" : "")"
+               href="@Url.Action("Index", "Campaign", new { area = "Admin" })">
+                <i class="bi bi-megaphone-fill"></i> Campaign center
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Risk" ? "active" : "")"
+               href="@Url.Action("Index", "Risk", new { area = "Admin" })">
+                <i class="bi bi-radar"></i> Risk center
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Audit" ? "active" : "")"
+               href="@Url.Action("Index", "Audit", new { area = "Admin" })">
+                <i class="bi bi-journal-text"></i> Audit center
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Category" ? "active" : "")"
+               href="@Url.Action("ManageCategories", "Category", new { area = "Admin" })">
+                <i class="bi bi-collection-fill"></i> Danh mục
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Product" ? "active" : "")"
+               href="@Url.Action("ManageProducts", "Product", new { area = "Admin" })">
+                <i class="bi bi-box-seam-fill"></i> Sản phẩm
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "CatalogModeration" ? "active" : "")"
+               href="@Url.Action("Index", "CatalogModeration", new { area = "Admin" })">
+                <i class="bi bi-shield-check"></i> Kiểm duyệt sản phẩm
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "CatalogReadiness" ? "active" : "")"
+               href="@Url.Action("Index", "CatalogReadiness", new { area = "Admin" })">
+                <i class="bi bi-search-heart"></i> Catalog readiness
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "FreshOps" ? "active" : "")"
+               href="@Url.Action("Index", "FreshOps", new { area = "Admin" })">
+                <i class="bi bi-basket2-fill"></i> Fresh ops
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Unit" ? "active" : "")"
+               href="@Url.Action("Index", "Unit", new { area = "Admin" })">
+                <i class="bi bi-rulers"></i> Đơn vị tính
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Status" && currentAction == "Status" ? "active" : "")"
+               href="@Url.Action("Status", "Status", new { area = "Admin" })">
+                <i class="bi bi-list-task"></i> Trạng thái
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Status" && currentAction == "StatusType" ? "active" : "")"
+               href="@Url.Action("StatusType", "Status", new { area = "Admin" })">
+                <i class="bi bi-diagram-3"></i> Loại trạng thái
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Feedback" ? "active" : "")"
+               href="@Url.Action("Index", "Feedback", new { area = "Admin" })">
+                <i class="bi bi-chat-left-dots-fill"></i> Phản hồi khách hàng
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "SupportChat" ? "active" : "")"
+               href="@Url.Action("Index", "SupportChat", new { area = "Admin" })">
+                <i class="bi bi-headset"></i> Hỗ trợ trực tuyến
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Dispute" ? "active" : "")"
+               href="@Url.Action("Index", "Dispute", new { area = "Admin" })">
+                <i class="bi bi-shield-exclamation"></i> Tranh chấp & CS
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Notification" ? "active" : "")"
+               href="@Url.Action("Index", "Notification", new { area = "Admin" })">
+                <i class="bi bi-bell-fill"></i> Trung tâm thông báo
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Communication" ? "active" : "")"
+               href="@Url.Action("Index", "Communication", new { area = "Admin" })">
+                <i class="bi bi-broadcast-pin"></i> Comms governance
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Customer" ? "active" : "")"
+               href="@Url.Action("ManageCustomers", "Customer", new { area = "Admin" })">
+                <i class="bi bi-person-hearts"></i> Khách hàng
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Loyalty" ? "active" : "")"
+               href="@Url.Action("Index", "Loyalty", new { area = "Admin" })">
+                <i class="bi bi-stars"></i> Tích điểm
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "Setting" ? "active" : "")"
+               href="@Url.Action("Index", "Setting", new { area = "Admin" })">
+                <i class="bi bi-gear-fill"></i> Cài đặt hệ thống
+            </a>
+        </li>
+    </ul>
+</nav>
+

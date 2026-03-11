@@ -1,0 +1,47 @@
+@{
+    var isLoggedIn = User?.Identity?.IsAuthenticated ?? false;
+    var adminName = User?.Identity?.Name ?? "Admin";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+
+<nav class="navbar navbar-expand-lg bg-white shadow-sm">
+    <div class="container-fluid">
+        <button type="button" id="sidebarCollapse" class="btn btn-light">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                @if (isLoggedIn)
+                {
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> @adminName
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="@Url.Action("Dashboard", "Home", new { area = "Admin" })">Trang quản trị</a>
+                            </li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                @using (Html.BeginForm("Logout", "AdminAccount", new { area = "Seller" }, FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "px-3 m-0" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item">Đăng xuất</button>
+                                }
+                            </li>
+                        </ul>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" href="@Url.Action("Login", "AdminAccount", new { area = "Seller", returnUrl = returnUrl })">
+                            <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</nav>

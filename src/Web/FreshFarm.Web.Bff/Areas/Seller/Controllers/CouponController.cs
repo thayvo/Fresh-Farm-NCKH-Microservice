@@ -31,6 +31,13 @@ public class CouponController : LegacySellerControllerBase
     {
         try
         {
+            var sellerId = GetCurrentPrincipalUserId();
+            if (!sellerId.HasValue)
+            {
+                TempData["Error"] = "Khong xac dinh duoc seller hien tai.";
+                return View(new List<Coupon>());
+            }
+
             var client = CreateAuthorizedClient("Ordering");
             var response = await client.GetAsync("/api/orders/admin/coupons");
 
@@ -41,7 +48,10 @@ public class CouponController : LegacySellerControllerBase
             }
 
             var payload = await response.Content.ReadFromJsonAsync<List<CouponApiDto>>(JsonOptions) ?? new List<CouponApiDto>();
-            var coupons = payload.Select(MapCoupon).ToList();
+            var coupons = payload
+                .Where(c => c.createdBy == sellerId.Value)
+                .Select(MapCoupon)
+                .ToList();
 
             return View(coupons);
         }
@@ -95,6 +105,12 @@ public class CouponController : LegacySellerControllerBase
     {
         try
         {
+            var sellerId = GetCurrentPrincipalUserId();
+            if (!sellerId.HasValue)
+            {
+                return Json(new { error = "Khong xac dinh duoc seller hien tai" });
+            }
+
             if (!id.HasValue)
             {
                 return Json(new { error = "ID khong hop le" });
@@ -111,6 +127,11 @@ public class CouponController : LegacySellerControllerBase
             if (dto is null)
             {
                 return Json(new { error = "Khong doc duoc thong tin ma giam gia" });
+            }
+
+            if (dto.createdBy != sellerId.Value)
+            {
+                return Json(new { error = "Ban khong co quyen xem ma giam gia nay" });
             }
 
             return Json(new
@@ -229,6 +250,12 @@ public class CouponController : LegacySellerControllerBase
     {
         try
         {
+            var sellerCustomerIds = await GetSellerCustomerIdsAsync();
+            if (sellerCustomerIds.Count == 0)
+            {
+                return Json(new List<object>());
+            }
+
             var client = CreateAuthorizedClient("Identity");
             var query = "take=50";
             if (!string.IsNullOrWhiteSpace(search))
@@ -251,7 +278,9 @@ public class CouponController : LegacySellerControllerBase
                 fullName = c.fullName,
                 email = c.email,
                 phone = c.phone
-            }).ToList();
+            })
+            .Where(x => sellerCustomerIds.Contains(x.userID))
+            .ToList();
 
             return Json(result);
         }
@@ -272,20 +301,21 @@ public class CouponController : LegacySellerControllerBase
                 return Json(new { success = false, message = "Ma giam gia khong hop le!" });
             }
 
+            var sellerCustomerIds = await GetSellerCustomerIdsAsync();
+            if (sellerCustomerIds.Count == 0)
+            {
+                return Json(new { success = false, message = "Khong co khach hang thuoc seller de gui!" });
+            }
+
             var ids = customerIds?.Distinct().Where(x => x > 0).ToList() ?? new List<int>();
 
             if (sendToAll || ids.Count == 0)
             {
-                var identityClient = CreateAuthorizedClient("Identity");
-                var allResponse = await identityClient.GetAsync("/auth/admin/customers?take=5000");
-                if (!allResponse.IsSuccessStatusCode)
-                {
-                    return Json(new { success = false, message = await ReadApiErrorAsync(allResponse, "Khong the tai danh sach khach hang") });
-                }
-
-                var allCustomers = await allResponse.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
-                    ?? new List<IdentityCustomerDto>();
-                ids = allCustomers.Select(x => x.userId).Distinct().ToList();
+                ids = sellerCustomerIds.ToList();
+            }
+            else
+            {
+                ids = ids.Where(sellerCustomerIds.Contains).Distinct().ToList();
             }
 
             if (ids.Count == 0)
@@ -321,6 +351,24 @@ public class CouponController : LegacySellerControllerBase
         {
             return Json(new { success = false, message = "Loi: " + ex.Message });
         }
+    }
+
+    private async Task<HashSet<int>> GetSellerCustomerIdsAsync()
+    {
+        var client = CreateAuthorizedClient("Ordering");
+        var response = await client.GetAsync("/api/orders/admin/customers/ids");
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HashSet<int>();
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SellerCustomerIdsResponse>(JsonOptions);
+        if (payload?.success != true || payload.data is null)
+        {
+            return new HashSet<int>();
+        }
+
+        return payload.data.Where(id => id > 0).ToHashSet();
     }
 
     public async Task<JsonResult> GenerateCode()
@@ -510,22 +558,7 @@ public class CouponController : LegacySellerControllerBase
         client.DefaultRequestHeaders.Remove("Authorization");
         client.DefaultRequestHeaders.Authorization = null;
 
-        var authHeader = Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(authHeader))
-        {
-            if (AuthenticationHeaderValue.TryParse(authHeader, out var parsed))
-            {
-                client.DefaultRequestHeaders.Authorization = parsed;
-            }
-            else
-            {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", authHeader);
-            }
-
-            return client;
-        }
-
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -610,5 +643,12 @@ public class CouponController : LegacySellerControllerBase
         public string? email { get; set; }
 
         public string? phone { get; set; }
+    }
+
+    private sealed class SellerCustomerIdsResponse
+    {
+        public bool success { get; set; }
+
+        public List<int>? data { get; set; }
     }
 }

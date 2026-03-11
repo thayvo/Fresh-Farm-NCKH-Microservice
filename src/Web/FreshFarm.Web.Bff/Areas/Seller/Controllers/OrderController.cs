@@ -66,13 +66,24 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
         }
 
-        var rows = NormalizeOrderRows(response.data);
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        if (allowedOrderIds is null)
+        {
+            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+        }
+
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
         return Json(new { success = true, data = rows });
     }
 
     [HttpGet]
     public async Task<JsonResult> GetOrderDetail(int orderId)
     {
+        if (!await CanAccessOrderAsync(orderId))
+        {
+            return Json(new { success = false, message = "Bạn không có quyền xem đơn hàng này." });
+        }
+
         var client = CreateOrderingClient();
         var response = await client.GetAsync($"/api/orders/admin/{orderId}/detail");
 
@@ -82,6 +93,11 @@ public class OrderController : LegacySellerControllerBase
     [HttpGet]
     public async Task<IActionResult> PrintInvoice(int orderId)
     {
+        if (!await CanAccessOrderAsync(orderId))
+        {
+            return Forbid();
+        }
+
         var client = CreateOrderingClient();
         var response = await client.GetAsync($"/api/orders/admin/{orderId}/detail");
 
@@ -132,6 +148,11 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
         }
 
+        if (!await CanAccessOrderAsync(req.orderId))
+        {
+            return Json(new { success = false, message = "Bạn không có quyền cập nhật đơn hàng này." });
+        }
+
         var client = CreateOrderingClient();
         var response = await client.PostAsJsonAsync($"/api/orders/admin/{req.orderId}/status", new
         {
@@ -150,6 +171,11 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
         }
 
+        if (!await CanAccessOrderAsync(req.orderId))
+        {
+            return Json(new { success = false, message = "Bạn không có quyền xóa đơn hàng này." });
+        }
+
         var client = CreateOrderingClient();
         var response = await client.DeleteAsync($"/api/orders/admin/{req.orderId}");
 
@@ -165,14 +191,20 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
         }
 
-        var rows = NormalizeOrderRows(response.data);
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        if (allowedOrderIds is null)
+        {
+            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+        }
+
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
         return Json(new
         {
             success = true,
             data = rows,
             page = response.page,
             pageSize = response.pageSize,
-            total = response.total
+            total = Math.Min(response.total, allowedOrderIds.Count)
         });
     }
 
@@ -185,7 +217,13 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
         }
 
-        var rows = NormalizeOrderRows(response.data);
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        if (allowedOrderIds is null)
+        {
+            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+        }
+
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
         return Json(new { success = true, data = rows });
     }
 
@@ -198,14 +236,20 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
         }
 
-        var rows = NormalizeOrderRows(response.data);
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        if (allowedOrderIds is null)
+        {
+            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+        }
+
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
         return Json(new
         {
             success = true,
             data = rows,
             page = response.page,
             pageSize = response.pageSize,
-            total = response.total
+            total = Math.Min(response.total, allowedOrderIds.Count)
         });
     }
 
@@ -261,12 +305,25 @@ public class OrderController : LegacySellerControllerBase
             return Json(new { success = false, message = "Vui lòng chọn ít nhất một đơn hàng và trạng thái hợp lệ." });
         }
 
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        if (allowedOrderIds is null)
+        {
+            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+        }
+
+        var requestedOrderIds = req.orderIds.Distinct().ToList();
+        var permittedOrderIds = requestedOrderIds.Where(allowedOrderIds.Contains).ToList();
+        if (permittedOrderIds.Count == 0)
+        {
+            return Json(new { success = false, message = "Không có đơn hàng hợp lệ trong phạm vi của bạn." });
+        }
+
         var successCount = 0;
         var failCount = 0;
         var errors = new List<string>();
 
         var client = CreateOrderingClient();
-        foreach (var orderId in req.orderIds.Distinct())
+        foreach (var orderId in permittedOrderIds)
         {
             var response = await client.PostAsJsonAsync($"/api/orders/admin/{orderId}/status", new { newStatus = req.newStatus });
             if (response.IsSuccessStatusCode)
@@ -277,6 +334,13 @@ public class OrderController : LegacySellerControllerBase
 
             failCount++;
             errors.Add($"Đơn #{orderId}: {await ReadApiErrorAsync(response, "không thể cập nhật")}");
+        }
+
+        var blockedCount = requestedOrderIds.Count - permittedOrderIds.Count;
+        if (blockedCount > 0)
+        {
+            failCount += blockedCount;
+            errors.Add($"{blockedCount} đơn hàng không thuộc phạm vi seller hiện tại.");
         }
 
         return Json(new
@@ -296,6 +360,11 @@ public class OrderController : LegacySellerControllerBase
         if (req is null || req.orderId <= 0)
         {
             return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
+        }
+
+        if (!await CanAccessOrderAsync(req.orderId))
+        {
+            return Json(new { success = false, message = "Bạn không có quyền hủy đơn hàng này." });
         }
 
         var client = CreateOrderingClient();
@@ -354,28 +423,42 @@ public class OrderController : LegacySellerControllerBase
         return await response.Content.ReadFromJsonAsync<PagedOrdersResponse>(JsonOptions);
     }
 
+    private async Task<HashSet<int>?> GetAllowedOrderIdsAsync()
+    {
+        var client = CreateOrderingClient();
+        var response = await client.GetAsync("/api/orders/admin/order-ids");
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SellerOrderIdsResponse>(JsonOptions);
+        if (payload?.success != true || payload.data is null)
+        {
+            return null;
+        }
+
+        return payload.data.Where(id => id > 0).ToHashSet();
+    }
+
+    private async Task<bool> CanAccessOrderAsync(int orderId)
+    {
+        if (orderId <= 0)
+        {
+            return false;
+        }
+
+        var allowedOrderIds = await GetAllowedOrderIdsAsync();
+        return allowedOrderIds is not null && allowedOrderIds.Contains(orderId);
+    }
+
     private HttpClient CreateOrderingClient()
     {
         var client = _httpClientFactory.CreateClient("Ordering");
         client.DefaultRequestHeaders.Remove("Authorization");
         client.DefaultRequestHeaders.Authorization = null;
 
-        var authHeader = Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(authHeader))
-        {
-            if (AuthenticationHeaderValue.TryParse(authHeader, out var parsed))
-            {
-                client.DefaultRequestHeaders.Authorization = parsed;
-            }
-            else
-            {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", authHeader);
-            }
-
-            return client;
-        }
-
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -488,6 +571,35 @@ public class OrderController : LegacySellerControllerBase
         return normalized;
     }
 
+    private static List<Dictionary<string, object?>> FilterRowsByAllowedOrderIds(
+        List<Dictionary<string, object?>> rows,
+        HashSet<int> allowedOrderIds)
+    {
+        return rows.Where(row =>
+        {
+            var orderId = TryGetOrderIdFromRow(row);
+            return orderId.HasValue && allowedOrderIds.Contains(orderId.Value);
+        }).ToList();
+    }
+
+    private static int? TryGetOrderIdFromRow(IReadOnlyDictionary<string, object?> row)
+    {
+        var raw = GetRowValue(row, "OrderID", "orderID", "orderId", "id");
+        if (raw is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Convert.ToInt32(raw);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static object? GetRowValue(IReadOnlyDictionary<string, object?> row, params string[] keys)
     {
         foreach (var key in keys)
@@ -571,6 +683,13 @@ public class OrderController : LegacySellerControllerBase
             get;
             set;
         }
+    }
+
+    private sealed class SellerOrderIdsResponse
+    {
+        public bool success { get; set; }
+
+        public List<int>? data { get; set; }
     }
 
     private sealed class AdminOrderDetailDto

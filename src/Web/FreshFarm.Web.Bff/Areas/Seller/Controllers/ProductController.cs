@@ -652,7 +652,7 @@ public class ProductController : LegacySellerControllerBase
     private HttpClient CreateCatalogClient()
     {
         var client = _httpClientFactory.CreateClient("Catalog");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
 
         if (!string.IsNullOrWhiteSpace(token))
         {

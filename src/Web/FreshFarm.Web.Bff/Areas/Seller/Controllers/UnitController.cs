@@ -1,7 +1,9 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -14,6 +16,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class UnitController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const string SellerUnitAdminDisabledMessage = "Tinh nang quan ly don vi tinh he thong da bi khoa cho Seller.";
     private readonly IHttpClientFactory _httpClientFactory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -24,6 +27,21 @@ public class UnitController : LegacySellerControllerBase
     public UnitController(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
+    }
+
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (IsApiLikeRequest(context.HttpContext.Request))
+        {
+            context.Result = new JsonResult(new { success = false, message = SellerUnitAdminDisabledMessage })
+            {
+                StatusCode = StatusCodes.Status403Forbidden
+            };
+            return;
+        }
+
+        TempData["ErrorMessage"] = SellerUnitAdminDisabledMessage;
+        context.Result = RedirectToAction("Dashboard", "Home", new { area = "Seller" });
     }
 
     public async Task<IActionResult> Index()
@@ -395,6 +413,11 @@ public class UnitController : LegacySellerControllerBase
         return string.Equals(request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsApiLikeRequest(HttpRequest request)
+    {
+        return request.Method != HttpMethods.Get || IsAjaxRequest(request);
+    }
+
     private bool IsAjaxRequest()
     {
         return IsAjaxRequest(Request);
@@ -403,7 +426,7 @@ public class UnitController : LegacySellerControllerBase
     private HttpClient CreateCatalogClient()
     {
         var client = _httpClientFactory.CreateClient("Catalog");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
 
         if (!string.IsNullOrWhiteSpace(token))
         {

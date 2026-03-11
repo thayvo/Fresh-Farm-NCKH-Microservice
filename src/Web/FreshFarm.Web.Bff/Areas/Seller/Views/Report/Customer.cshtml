@@ -2,7 +2,8 @@
 
 @{
     ViewBag.Title = "Báo Cáo Khách Hàng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 @Html.AntiForgeryToken()
@@ -332,7 +333,7 @@
         }
 
         <!-- BỘ LỌC -->
-        @using (Html.BeginForm("Customer", "Report", FormMethod.Get, new { area = "Seller", id = "filterForm" }))
+        @using (Html.BeginForm("Customer", "Report", FormMethod.Get, new { area = currentArea, id = "filterForm" }))
         {
             <div class="filter-card p-4 mb-4">
                 <div class="d-flex align-items-center gap-3 mb-3">
@@ -534,11 +535,18 @@
                                     <td class="text-center">@customer.TotalOrders</td>
                                     <td class="fw-bold text-success">@customer.TotalSpentFormatted</td>
                                     <td class="text-center">
-                                        <a href="@Url.Action("Edit", "Customer", new { area = "Seller", id = customer.UserID })"
-                                           class="btn btn-sm btn-outline-primary rounded-3"
-                                           title="Chỉnh sửa thông tin khách hàng">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
+                                        @if (string.Equals(currentArea, "Seller", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <a href="@Url.Action("Edit", "Customer", new { area = currentArea, id = customer.UserID })"
+                                               class="btn btn-sm btn-outline-primary rounded-3"
+                                               title="Chỉnh sửa thông tin khách hàng">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-primary border rounded-3 px-3 py-2">Admin view</span>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -649,7 +657,7 @@
                 const t = document.getElementById('registerToDate').value;
                 const s = document.getElementById('customerSegment').value;
 
-                let url = '@Url.Action("ExportCustomerExcel", "Report", new { area = "Seller" })';
+                let url = '@Url.Action("ExportCustomerExcel", "Report", new { area = currentArea })';
                 const qs = [];
                 if (f) qs.push('registerFromDate=' + encodeURIComponent(f));
                 if (t) qs.push('registerToDate='   + encodeURIComponent(t));

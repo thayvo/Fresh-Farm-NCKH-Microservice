@@ -1,4 +1,6 @@
 using FreshFarm.Ordering.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,7 @@ namespace FreshFarm.Ordering.Api.Controllers;
 
 [ApiController]
 [Route("api/orders/admin/coupons")]
-[Authorize(Policy = "SellerOnly")]
+[Authorize(Policy = "SellerOrAdmin")]
 public sealed class CouponsAdminController : ControllerBase
 {
     private static readonly string[] SupportedDiscountTypes = { "fixed", "percent" };
@@ -20,9 +22,9 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAll([FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
-        var coupons = await _db.Coupons
+        var coupons = await ApplyCouponScopeToQuery(_db.Coupons, scope)
             .AsNoTracking()
             .OrderByDescending(c => c.CreatedDate)
             .ThenByDescending(c => c.CouponId)
@@ -49,9 +51,9 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
-        var coupon = await _db.Coupons
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
             .AsNoTracking()
             .Where(c => c.CouponId == id)
             .Select(c => new
@@ -84,13 +86,20 @@ public sealed class CouponsAdminController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CouponUpsertRequest request, CancellationToken cancellationToken)
     {
+        var actorUserId = TryGetActorUserIdFromToken();
+        if (!actorUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+        }
+
         var normalized = NormalizeRequest(request);
         if (!normalized.isValid)
         {
             return BadRequest(new { message = normalized.error });
         }
 
-        var duplicate = await _db.Coupons.AnyAsync(c => c.Code == normalized.code, cancellationToken);
+        var duplicate = await ApplyCouponScopeToQuery(_db.Coupons, GetCreationScope())
+            .AnyAsync(c => c.Code == normalized.code, cancellationToken);
         if (duplicate)
         {
             return BadRequest(new { message = "Ma giam gia da ton tai!" });
@@ -109,7 +118,7 @@ public sealed class CouponsAdminController : ControllerBase
             MaxDiscountAmount = normalized.maxDiscountAmount,
             IsActive = normalized.isActive,
             CreatedDate = DateTime.UtcNow,
-            CreatedBy = null,
+            CreatedBy = IsAdminUser() ? null : actorUserId.Value,
             UpdatedDate = null
         };
 
@@ -120,9 +129,16 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update([FromRoute] int id, [FromBody] CouponUpsertRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update([FromRoute] int id, [FromBody] CouponUpsertRequest request, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
-        var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
+        var actorUserId = TryGetActorUserIdFromToken();
+        if (!actorUserId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung." });
+        }
+
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
         if (coupon is null)
         {
             return NotFound(new { message = "Khong tim thay ma giam gia!" });
@@ -134,7 +150,8 @@ public sealed class CouponsAdminController : ControllerBase
             return BadRequest(new { message = normalized.error });
         }
 
-        var duplicate = await _db.Coupons.AnyAsync(c => c.CouponId != id && c.Code == normalized.code, cancellationToken);
+        var duplicate = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .AnyAsync(c => c.CouponId != id && c.Code == normalized.code, cancellationToken);
         if (duplicate)
         {
             return BadRequest(new { message = "Ma giam gia da ton tai!" });
@@ -149,6 +166,10 @@ public sealed class CouponsAdminController : ControllerBase
         coupon.Description = normalized.description;
         coupon.MaxDiscountAmount = normalized.maxDiscountAmount;
         coupon.IsActive = normalized.isActive;
+        if (!IsAdminUser())
+        {
+            coupon.CreatedBy ??= actorUserId.Value;
+        }
         coupon.UpdatedDate = DateTime.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -157,9 +178,10 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
-        var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
         if (coupon is null)
         {
             return NotFound(new { success = false, message = "Khong tim thay ma giam gia!" });
@@ -190,9 +212,10 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPost("{id:int}/toggle-active")]
-    public async Task<IActionResult> ToggleActive([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> ToggleActive([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
-        var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .FirstOrDefaultAsync(c => c.CouponId == id, cancellationToken);
         if (coupon is null)
         {
             return NotFound(new { success = false, message = "Khong tim thay ma giam gia!" });
@@ -218,7 +241,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("validate")]
-    public async Task<IActionResult> ValidateCoupon([FromQuery] string code, [FromQuery] decimal orderAmount, CancellationToken cancellationToken)
+    public async Task<IActionResult> ValidateCoupon([FromQuery] string code, [FromQuery] decimal orderAmount, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -226,7 +249,9 @@ public sealed class CouponsAdminController : ControllerBase
         }
 
         var normalizedCode = code.Trim().ToUpperInvariant();
-        var coupon = await _db.Coupons.AsNoTracking().FirstOrDefaultAsync(c => c.Code == normalizedCode, cancellationToken);
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Code == normalizedCode, cancellationToken);
 
         if (coupon is null)
         {
@@ -271,17 +296,18 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("statistics")]
-    public async Task<IActionResult> GetStatistics(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStatistics([FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
+        var query = ApplyCouponScopeToQuery(_db.Coupons, scope).AsNoTracking();
 
-        var total = await _db.Coupons.AsNoTracking().CountAsync(cancellationToken);
-        var active = await _db.Coupons.AsNoTracking().CountAsync(c => c.IsActive && c.ExpiryDate >= today, cancellationToken);
-        var expired = await _db.Coupons.AsNoTracking().CountAsync(c => c.ExpiryDate < today, cancellationToken);
-        var disabled = await _db.Coupons.AsNoTracking().CountAsync(c => !c.IsActive, cancellationToken);
-        var usageLimitReached = await _db.Coupons.AsNoTracking()
+        var total = await query.CountAsync(cancellationToken);
+        var active = await query.CountAsync(c => c.IsActive && c.ExpiryDate >= today, cancellationToken);
+        var expired = await query.CountAsync(c => c.ExpiryDate < today, cancellationToken);
+        var disabled = await query.CountAsync(c => !c.IsActive, cancellationToken);
+        var usageLimitReached = await query
             .CountAsync(c => c.UsageLimit.HasValue && c.UsedCount >= c.UsageLimit.Value, cancellationToken);
-        var totalUsed = await _db.Coupons.AsNoTracking().SumAsync(c => (int?)c.UsedCount, cancellationToken) ?? 0;
+        var totalUsed = await query.SumAsync(c => (int?)c.UsedCount, cancellationToken) ?? 0;
 
         return Ok(new
         {
@@ -295,8 +321,16 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("{id:int}/usage-history")]
-    public async Task<IActionResult> GetUsageHistory([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetUsageHistory([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
+        var couponExists = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .AsNoTracking()
+            .AnyAsync(c => c.CouponId == id, cancellationToken);
+        if (!couponExists)
+        {
+            return NotFound(new { message = "Khong tim thay ma giam gia." });
+        }
+
         var history = await _db.CouponUsageHistories
             .AsNoTracking()
             .Where(h => h.CouponId == id)
@@ -316,8 +350,16 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("{id:int}/distribution-list")]
-    public async Task<IActionResult> GetDistributionList([FromRoute] int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetDistributionList([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
+        var couponExists = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .AsNoTracking()
+            .AnyAsync(c => c.CouponId == id, cancellationToken);
+        if (!couponExists)
+        {
+            return NotFound(new { message = "Khong tim thay ma giam gia." });
+        }
+
         var distributions = await _db.CouponDistributions
             .AsNoTracking()
             .Where(d => d.CouponId == id)
@@ -339,15 +381,22 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPost("send")]
-    public async Task<IActionResult> SendToCustomers([FromBody] SendCouponRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> SendToCustomers([FromBody] SendCouponRequest request, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
+        var actorUserId = TryGetActorUserIdFromToken();
+        if (!actorUserId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc nguoi dung." });
+        }
+
         if (request is null || string.IsNullOrWhiteSpace(request.CouponCode))
         {
             return BadRequest(new { success = false, message = "Ma giam gia khong hop le!" });
         }
 
         var couponCode = request.CouponCode.Trim().ToUpperInvariant();
-        var coupon = await _db.Coupons.FirstOrDefaultAsync(c => c.Code == couponCode, cancellationToken);
+        var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
+            .FirstOrDefaultAsync(c => c.Code == couponCode, cancellationToken);
         if (coupon is null)
         {
             return BadRequest(new { success = false, message = "Khong tim thay ma giam gia!" });
@@ -386,7 +435,7 @@ public sealed class CouponsAdminController : ControllerBase
                 CouponId = coupon.CouponId,
                 UserId = userId,
                 SentDate = DateTime.UtcNow,
-                SentBy = null,
+                SentBy = actorUserId.Value,
                 IsUsed = false,
                 UsedDate = null,
                 Channel = "Admin",
@@ -513,6 +562,57 @@ public sealed class CouponsAdminController : ControllerBase
                 return code;
             }
         }
+    }
+
+    private int? TryGetActorUserIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var userId) ? userId : null;
+    }
+
+    private bool IsAdminUser()
+    {
+        return User.IsInRole("Admin");
+    }
+
+    private IQueryable<Coupon> ApplyCouponScopeToQuery(IQueryable<Coupon> query, string? scope)
+    {
+        if (IsAdminUser())
+        {
+            return NormalizeScope(scope) switch
+            {
+                "platform" => query.Where(c => c.CreatedBy == null),
+                "seller" => query.Where(c => c.CreatedBy != null),
+                _ => query
+            };
+        }
+
+        var sellerId = TryGetActorUserIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(c => c.CreatedBy == sellerId.Value);
+    }
+
+    private string GetCreationScope()
+    {
+        return IsAdminUser() ? "platform" : "seller";
+    }
+
+    private static string NormalizeScope(string? scope)
+    {
+        if (string.IsNullOrWhiteSpace(scope))
+        {
+            return "all";
+        }
+
+        var normalized = scope.Trim().ToLowerInvariant();
+        return normalized is "all" or "platform" or "seller" ? normalized : "all";
     }
 
     public sealed class CouponUpsertRequest

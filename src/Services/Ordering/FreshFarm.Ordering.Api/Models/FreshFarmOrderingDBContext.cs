@@ -13,11 +13,27 @@ public partial class FreshFarmOrderingDBContext : DbContext
     {
     }
 
+    public virtual DbSet<AdminActionLog> AdminActionLogs { get; set; }
+
+    public virtual DbSet<AdsCampaign> AdsCampaigns { get; set; }
+
+    public virtual DbSet<AdsSpendLedger> AdsSpendLedgers { get; set; }
+
+    public virtual DbSet<AdsTopup> AdsTopups { get; set; }
+
+    public virtual DbSet<Campaign> Campaigns { get; set; }
+
+    public virtual DbSet<CampaignProductSlot> CampaignProductSlots { get; set; }
+
+    public virtual DbSet<CampaignSellerParticipation> CampaignSellerParticipations { get; set; }
+
     public virtual DbSet<CancelReason> CancelReasons { get; set; }
 
     public virtual DbSet<Cart> Carts { get; set; }
 
     public virtual DbSet<CartItem> CartItems { get; set; }
+
+    public virtual DbSet<CommunicationTemplate> CommunicationTemplates { get; set; }
 
     public virtual DbSet<ContactMessage> ContactMessages { get; set; }
 
@@ -35,9 +51,17 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<LoyaltyPointHistory> LoyaltyPointHistories { get; set; }
 
+    public virtual DbSet<ModerationAudit> ModerationAudits { get; set; }
+
+    public virtual DbSet<NotificationPolicyRule> NotificationPolicyRules { get; set; }
+
+    public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
+
     public virtual DbSet<Order> Orders { get; set; }
 
     public virtual DbSet<OrderDetail> OrderDetails { get; set; }
+
+    public virtual DbSet<OrderDetailInvalidProductArchive> OrderDetailInvalidProductArchives { get; set; }
 
     public virtual DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
 
@@ -59,9 +83,19 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<ReviewReport> ReviewReports { get; set; }
 
+    public virtual DbSet<RiskCase> RiskCases { get; set; }
+
+    public virtual DbSet<RiskDecision> RiskDecisions { get; set; }
+
+    public virtual DbSet<RiskSignal> RiskSignals { get; set; }
+
+    public virtual DbSet<SellerAdsWallet> SellerAdsWallets { get; set; }
+
     public virtual DbSet<SellerOrder> SellerOrders { get; set; }
 
     public virtual DbSet<SellerOrderItem> SellerOrderItems { get; set; }
+
+    public virtual DbSet<SettlementAudit> SettlementAudits { get; set; }
 
     public virtual DbSet<Shipment> Shipments { get; set; }
 
@@ -79,8 +113,247 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<SupportMessageReaction> SupportMessageReactions { get; set; }
 
+    public virtual DbSet<VoucherAbuseCase> VoucherAbuseCases { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AdminActionLog>(entity =>
+        {
+            entity.ToTable("AdminActionLog");
+
+            entity.HasIndex(e => new { e.Area, e.CreatedAt }, "IX_AdminActionLog_Area_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.TargetType, e.TargetId }, "IX_AdminActionLog_Target");
+
+            entity.Property(e => e.ActionName)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.Area)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdminActionLog_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.MetadataJson).HasMaxLength(4000);
+            entity.Property(e => e.Summary)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.TargetType)
+                .IsRequired()
+                .HasMaxLength(80);
+        });
+
+        modelBuilder.Entity<AdsCampaign>(entity =>
+        {
+            entity.ToTable("AdsCampaign");
+
+            entity.HasIndex(e => new { e.SellerId, e.Channel }, "IX_AdsCampaign_Seller_Channel");
+
+            entity.HasIndex(e => new { e.Status, e.StartAt }, "IX_AdsCampaign_Status_StartAt").IsDescending(false, true);
+
+            entity.Property(e => e.Channel)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("onsite")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_Channel");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DailyBudget)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_DailyBudget")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.EndAt).HasColumnType("datetime");
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.SpendToDate)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_SpendToDate")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.StartAt).HasColumnType("datetime");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("draft")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_Status");
+            entity.Property(e => e.TotalBudget)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsCampaign_TotalBudget")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Campaign).WithMany(p => p.AdsCampaigns)
+                .HasForeignKey(d => d.CampaignId)
+                .HasConstraintName("FK_AdsCampaign_Campaign");
+
+            entity.HasOne(d => d.Wallet).WithMany(p => p.AdsCampaigns)
+                .HasForeignKey(d => d.WalletId)
+                .HasConstraintName("FK_AdsCampaign_Wallet");
+        });
+
+        modelBuilder.Entity<AdsSpendLedger>(entity =>
+        {
+            entity.HasKey(e => e.SpendId);
+
+            entity.ToTable("AdsSpendLedger");
+
+            entity.HasIndex(e => new { e.SellerId, e.CreatedAt }, "IX_AdsSpendLedger_Seller_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAt }, "IX_AdsSpendLedger_Status_CreatedAt").IsDescending(false, true);
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsSpendLedger_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.SpendType)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("manual_adjustment")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsSpendLedger_SpendType");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("posted")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsSpendLedger_Status");
+
+            entity.HasOne(d => d.AdsCampaign).WithMany(p => p.AdsSpendLedgers)
+                .HasForeignKey(d => d.AdsCampaignId)
+                .HasConstraintName("FK_AdsSpendLedger_AdsCampaign");
+
+            entity.HasOne(d => d.Wallet).WithMany(p => p.AdsSpendLedgers)
+                .HasForeignKey(d => d.WalletId)
+                .HasConstraintName("FK_AdsSpendLedger_Wallet");
+        });
+
+        modelBuilder.Entity<AdsTopup>(entity =>
+        {
+            entity.HasKey(e => e.TopupId);
+
+            entity.ToTable("AdsTopup");
+
+            entity.HasIndex(e => new { e.SellerId, e.CreatedAt }, "IX_AdsTopup_Seller_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAt }, "IX_AdsTopup_Status_CreatedAt").IsDescending(false, true);
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.ConfirmedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsTopup_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.PaymentMethod).HasMaxLength(50);
+            entity.Property(e => e.ReferenceCode).HasMaxLength(100);
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("confirmed")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_AdsTopup_Status");
+
+            entity.HasOne(d => d.Wallet).WithMany(p => p.AdsTopups)
+                .HasForeignKey(d => d.WalletId)
+                .HasConstraintName("FK_AdsTopup_Wallet");
+        });
+
+        modelBuilder.Entity<Campaign>(entity =>
+        {
+            entity.ToTable("Campaign");
+
+            entity.HasIndex(e => new { e.Status, e.StartAt }, "IX_Campaign_Status_StartAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.CampaignType, e.Status }, "IX_Campaign_Type_Status");
+
+            entity.Property(e => e.ApprovedAt).HasColumnType("datetime");
+            entity.Property(e => e.BudgetAmount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CampaignType)
+                .IsRequired()
+                .HasMaxLength(40);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Campaign_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Description).HasMaxLength(2000);
+            entity.Property(e => e.EndAt).HasColumnType("datetime");
+            entity.Property(e => e.IsFeatured).HasAnnotation("Relational:DefaultConstraintName", "DF_Campaign_IsFeatured");
+            entity.Property(e => e.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.RegistrationEndAt).HasColumnType("datetime");
+            entity.Property(e => e.RegistrationStartAt).HasColumnType("datetime");
+            entity.Property(e => e.StartAt).HasColumnType("datetime");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("draft")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Campaign_Status");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.VoucherCoupon).WithMany(p => p.Campaigns)
+                .HasForeignKey(d => d.VoucherCouponId)
+                .HasConstraintName("FK_Campaign_Coupon");
+        });
+
+        modelBuilder.Entity<CampaignProductSlot>(entity =>
+        {
+            entity.HasKey(e => e.SlotId);
+
+            entity.ToTable("CampaignProductSlot");
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAt }, "IX_CampaignProductSlot_Status_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.CampaignId, e.SellerId, e.ProductId }, "UQ_CampaignProductSlot_Campaign_Seller_Product").IsUnique();
+
+            entity.Property(e => e.ApprovedAt).HasColumnType("datetime");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CampaignProductSlot_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.FlashSalePrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("draft")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CampaignProductSlot_Status");
+
+            entity.HasOne(d => d.Campaign).WithMany(p => p.CampaignProductSlots)
+                .HasForeignKey(d => d.CampaignId)
+                .HasConstraintName("FK_CampaignProductSlot_Campaign");
+
+            entity.HasOne(d => d.Participation).WithMany(p => p.CampaignProductSlots)
+                .HasForeignKey(d => d.ParticipationId)
+                .HasConstraintName("FK_CampaignProductSlot_Participation");
+        });
+
+        modelBuilder.Entity<CampaignSellerParticipation>(entity =>
+        {
+            entity.HasKey(e => e.ParticipationId);
+
+            entity.ToTable("CampaignSellerParticipation");
+
+            entity.HasIndex(e => new { e.Status, e.RequestedAt }, "IX_CampaignSellerParticipation_Status_RequestedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.CampaignId, e.SellerId }, "UQ_CampaignSellerParticipation_Campaign_Seller").IsUnique();
+
+            entity.Property(e => e.DiscountPercent).HasColumnType("decimal(5, 2)");
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.RequestedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CampaignSellerParticipation_RequestedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("pending")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CampaignSellerParticipation_Status");
+
+            entity.HasOne(d => d.Campaign).WithMany(p => p.CampaignSellerParticipations)
+                .HasForeignKey(d => d.CampaignId)
+                .HasConstraintName("FK_CampaignSellerParticipation_Campaign");
+        });
+
         modelBuilder.Entity<CancelReason>(entity =>
         {
             entity.HasKey(e => e.CancelReasonId).HasName("PK__CancelRe__9D7E8F962F0E33D0");
@@ -132,8 +405,51 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasConstraintName("FK__CartItem__CartID__2EDAF651");
         });
 
+        modelBuilder.Entity<CommunicationTemplate>(entity =>
+        {
+            entity.ToTable("CommunicationTemplate");
+
+            entity.HasIndex(e => new { e.Channel, e.IsActive }, "IX_CommunicationTemplate_Channel_IsActive");
+
+            entity.HasIndex(e => new { e.EventType, e.Channel, e.Locale, e.TemplateName }, "UQ_CommunicationTemplate_Event_Channel_Locale_Name").IsUnique();
+
+            entity.Property(e => e.Body)
+                .IsRequired()
+                .HasMaxLength(4000);
+            entity.Property(e => e.Channel)
+                .IsRequired()
+                .HasMaxLength(30);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CommunicationTemplate_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EventType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CommunicationTemplate_IsActive");
+            entity.Property(e => e.Locale)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("vi-VN")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CommunicationTemplate_Locale");
+            entity.Property(e => e.Subject).HasMaxLength(200);
+            entity.Property(e => e.TemplateName)
+                .IsRequired()
+                .HasMaxLength(120);
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+            entity.Property(e => e.Version)
+                .HasDefaultValue(1)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CommunicationTemplate_Version");
+        });
+
         modelBuilder.Entity<ContactMessage>(entity =>
         {
+            entity.HasIndex(e => new { e.IsDeleted, e.CreatedAt }, "IX_ContactMessages_IsDeleted_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => e.Status, "IX_ContactMessages_Status");
+
             entity.Property(e => e.AdminNote).HasMaxLength(1000);
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getutcdate())")
@@ -371,6 +687,105 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.UserId).HasColumnName("UserID");
         });
 
+        modelBuilder.Entity<ModerationAudit>(entity =>
+        {
+            entity.ToTable("ModerationAudit");
+
+            entity.HasIndex(e => new { e.Decision, e.CreatedAt }, "IX_ModerationAudit_Decision_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.SubjectType, e.SubjectId }, "IX_ModerationAudit_Subject");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ModerationAudit_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Decision)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.SubjectType)
+                .IsRequired()
+                .HasMaxLength(80);
+
+            entity.HasOne(d => d.AdminActionLog).WithMany(p => p.ModerationAudits)
+                .HasForeignKey(d => d.AdminActionLogId)
+                .HasConstraintName("FK_ModerationAudit_AdminActionLog");
+        });
+
+        modelBuilder.Entity<NotificationPolicyRule>(entity =>
+        {
+            entity.ToTable("NotificationPolicyRule");
+
+            entity.HasIndex(e => new { e.Channel, e.IsEnabled }, "IX_NotificationPolicyRule_Channel_IsEnabled");
+
+            entity.HasIndex(e => new { e.EventType, e.Channel, e.AudienceType }, "UQ_NotificationPolicyRule_Event_Channel_Audience").IsUnique();
+
+            entity.Property(e => e.AudienceType)
+                .IsRequired()
+                .HasMaxLength(40);
+            entity.Property(e => e.Channel)
+                .IsRequired()
+                .HasMaxLength(30);
+            entity.Property(e => e.CooldownMinutes).HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPolicyRule_CooldownMinutes");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPolicyRule_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DeliveryMode)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValue("immediate")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPolicyRule_DeliveryMode");
+            entity.Property(e => e.EventType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.IsEnabled)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPolicyRule_IsEnabled");
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.Priority)
+                .HasDefaultValue(50)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPolicyRule_Priority");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.CommunicationTemplate).WithMany(p => p.NotificationPolicyRules)
+                .HasForeignKey(d => d.CommunicationTemplateId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_NotificationPolicyRule_CommunicationTemplate");
+        });
+
+        modelBuilder.Entity<NotificationPreference>(entity =>
+        {
+            entity.ToTable("NotificationPreference");
+
+            entity.HasIndex(e => new { e.Channel, e.IsOptedIn }, "IX_NotificationPreference_Channel_IsOptedIn");
+
+            entity.HasIndex(e => new { e.UserId, e.EventType, e.Channel }, "UQ_NotificationPreference_User_Event_Channel").IsUnique();
+
+            entity.Property(e => e.Channel)
+                .IsRequired()
+                .HasMaxLength(30);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPreference_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EventType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.IsOptedIn)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPreference_IsOptedIn");
+            entity.Property(e => e.Source)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("admin_console")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPreference_Source");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_NotificationPreference_UpdatedAt")
+                .HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<Order>(entity =>
         {
             entity.HasKey(e => e.OrderId).HasName("PK__Orders__C3905BAF4CCB8F90");
@@ -429,6 +844,27 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasForeignKey(d => d.OrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__OrderDeta__Order__395884C4");
+        });
+
+        modelBuilder.Entity<OrderDetailInvalidProductArchive>(entity =>
+        {
+            entity.HasKey(e => e.ArchiveId).HasName("PK__OrderDet__33A73E7717E354DA");
+
+            entity.ToTable("OrderDetailInvalidProductArchive");
+
+            entity.Property(e => e.ArchiveId).HasColumnName("ArchiveID");
+            entity.Property(e => e.ArchivedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_OrderDetailInvalidProductArchive_ArchivedAt");
+            entity.Property(e => e.OrderDetailId).HasColumnName("OrderDetailID");
+            entity.Property(e => e.OrderId).HasColumnName("OrderID");
+            entity.Property(e => e.ProductId).HasColumnName("ProductID");
+            entity.Property(e => e.Reason)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.UnitSymbol).HasMaxLength(20);
         });
 
         modelBuilder.Entity<OrderStatusHistory>(entity =>
@@ -705,6 +1141,145 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasConstraintName("FK_ReviewReport_Review");
         });
 
+        modelBuilder.Entity<RiskCase>(entity =>
+        {
+            entity.ToTable("RiskCase");
+
+            entity.HasIndex(e => new { e.Status, e.Severity }, "IX_RiskCase_Status_Severity");
+
+            entity.HasIndex(e => new { e.CaseType, e.CreatedAt }, "IX_RiskCase_Type_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => e.ReferenceKey, "UQ_RiskCase_ReferenceKey").IsUnique();
+
+            entity.Property(e => e.CaseType)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskCase_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.IsEscalated).HasAnnotation("Relational:DefaultConstraintName", "DF_RiskCase_IsEscalated");
+            entity.Property(e => e.LastSignalAt).HasColumnType("datetime");
+            entity.Property(e => e.ReferenceKey)
+                .IsRequired()
+                .HasMaxLength(180);
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime");
+            entity.Property(e => e.Severity)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("medium")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskCase_Severity");
+            entity.Property(e => e.SignalCount).HasAnnotation("Relational:DefaultConstraintName", "DF_RiskCase_SignalCount");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("open")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskCase_Status");
+            entity.Property(e => e.Summary).HasMaxLength(2000);
+            entity.Property(e => e.Title)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RiskDecision>(entity =>
+        {
+            entity.ToTable("RiskDecision");
+
+            entity.HasIndex(e => new { e.RiskCaseId, e.CreatedAt }, "IX_RiskDecision_Case_CreatedAt").IsDescending(false, true);
+
+            entity.HasIndex(e => e.DecisionType, "IX_RiskDecision_Type");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskDecision_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DecisionType)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+
+            entity.HasOne(d => d.RiskCase).WithMany(p => p.RiskDecisions)
+                .HasForeignKey(d => d.RiskCaseId)
+                .HasConstraintName("FK_RiskDecision_RiskCase");
+        });
+
+        modelBuilder.Entity<RiskSignal>(entity =>
+        {
+            entity.ToTable("RiskSignal");
+
+            entity.HasIndex(e => new { e.RiskCaseId, e.TriggeredAt }, "IX_RiskSignal_Case_TriggeredAt").IsDescending(false, true);
+
+            entity.HasIndex(e => new { e.SignalType, e.Severity }, "IX_RiskSignal_Type_Severity");
+
+            entity.HasIndex(e => e.ReferenceKey, "UQ_RiskSignal_ReferenceKey").IsUnique();
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskSignal_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.MetadataJson).HasMaxLength(4000);
+            entity.Property(e => e.ReferenceKey)
+                .IsRequired()
+                .HasMaxLength(180);
+            entity.Property(e => e.Score)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskSignal_Score")
+                .HasColumnType("decimal(5, 2)");
+            entity.Property(e => e.Severity)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(e => e.SignalCode)
+                .IsRequired()
+                .HasMaxLength(120);
+            entity.Property(e => e.SignalType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.Source)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasDefaultValue("heuristic_engine")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RiskSignal_Source");
+            entity.Property(e => e.TriggeredAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.RiskCase).WithMany(p => p.RiskSignals)
+                .HasForeignKey(d => d.RiskCaseId)
+                .HasConstraintName("FK_RiskSignal_RiskCase");
+        });
+
+        modelBuilder.Entity<SellerAdsWallet>(entity =>
+        {
+            entity.HasKey(e => e.WalletId);
+
+            entity.ToTable("SellerAdsWallet");
+
+            entity.HasIndex(e => new { e.Status, e.Balance }, "IX_SellerAdsWallet_Status_Balance").IsDescending(false, true);
+
+            entity.HasIndex(e => e.SellerId, "UQ_SellerAdsWallet_Seller").IsUnique();
+
+            entity.Property(e => e.Balance)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_Balance")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ReservedBalance)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_Reserved")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("active")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_Status");
+            entity.Property(e => e.TotalSpend)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_TotalSpend")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.TotalTopup)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_TotalTopup")
+                .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<SellerOrder>(entity =>
         {
             entity.HasKey(e => e.SellerOrderId).HasName("PK__SellerOr__EE1F8CF4BF4B2300");
@@ -761,6 +1336,37 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasForeignKey(d => d.SellerOrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_SellerOrderItems_SO");
+        });
+
+        modelBuilder.Entity<SettlementAudit>(entity =>
+        {
+            entity.ToTable("SettlementAudit");
+
+            entity.HasIndex(e => new { e.ReferenceType, e.ReferenceId }, "IX_SettlementAudit_Reference");
+
+            entity.HasIndex(e => new { e.AuditType, e.CreatedAt }, "IX_SettlementAudit_Type_CreatedAt").IsDescending(false, true);
+
+            entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.AuditType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SettlementAudit_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Currency)
+                .IsRequired()
+                .HasMaxLength(10)
+                .HasDefaultValue("VND")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SettlementAudit_Currency");
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.ReferenceType)
+                .IsRequired()
+                .HasMaxLength(80);
+
+            entity.HasOne(d => d.AdminActionLog).WithMany(p => p.SettlementAudits)
+                .HasForeignKey(d => d.AdminActionLogId)
+                .HasConstraintName("FK_SettlementAudit_AdminActionLog");
         });
 
         modelBuilder.Entity<Shipment>(entity =>
@@ -957,6 +1563,37 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasForeignKey(d => d.MessageId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_SupportReactions_Message");
+        });
+
+        modelBuilder.Entity<VoucherAbuseCase>(entity =>
+        {
+            entity.ToTable("VoucherAbuseCase");
+
+            entity.HasIndex(e => new { e.CouponId, e.Status }, "IX_VoucherAbuseCase_Coupon_Status");
+
+            entity.HasIndex(e => e.ReferenceKey, "UQ_VoucherAbuseCase_ReferenceKey").IsUnique();
+
+            entity.Property(e => e.AbuseType)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_VoucherAbuseCase_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.ReferenceKey)
+                .IsRequired()
+                .HasMaxLength(180);
+            entity.Property(e => e.ReviewedAt).HasColumnType("datetime");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(40)
+                .HasDefaultValue("open")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_VoucherAbuseCase_Status");
+            entity.Property(e => e.SuspectedBenefitAmount).HasColumnType("decimal(18, 2)");
+
+            entity.HasOne(d => d.RiskCase).WithMany(p => p.VoucherAbuseCases)
+                .HasForeignKey(d => d.RiskCaseId)
+                .HasConstraintName("FK_VoucherAbuseCase_RiskCase");
         });
 
         OnModelCreatingGeneratedFunctions(modelBuilder);

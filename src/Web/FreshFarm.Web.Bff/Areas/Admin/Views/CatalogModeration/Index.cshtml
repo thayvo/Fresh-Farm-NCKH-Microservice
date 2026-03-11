@@ -1,0 +1,415 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.ProductModerationPageViewModel
+@{
+    ViewBag.Title = "Kiểm duyệt sản phẩm";
+}
+
+<style>
+    .moderation-shell {
+        min-height: 100vh;
+        background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+        padding: 1.5rem;
+    }
+
+    .hero-card {
+        background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%);
+        border-radius: 1.75rem;
+        color: #fff;
+        padding: 2rem;
+        box-shadow: 0 24px 50px rgba(29, 78, 216, .22);
+    }
+
+    .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .45rem .85rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,.18);
+        font-weight: 600;
+        font-size: .9rem;
+    }
+
+    .stat-card {
+        border: 0;
+        border-radius: 1.25rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        height: 100%;
+    }
+
+    .filter-card, .table-card {
+        border: 0;
+        border-radius: 1.5rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+    }
+
+    .risk-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .8rem;
+        text-transform: uppercase;
+    }
+
+    .risk-high {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .risk-medium {
+        background: #fef3c7;
+        color: #b45309;
+    }
+
+    .risk-low {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .state-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: .85rem;
+    }
+
+    .state-flagged {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .state-clean {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .issue-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: .25rem .55rem;
+        border-radius: .8rem;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+        color: #1e3a8a;
+        font-size: .8rem;
+        margin: 0 .35rem .35rem 0;
+    }
+
+    .keyword-chip {
+        display: inline-block;
+        padding: .2rem .5rem;
+        border-radius: .75rem;
+        background: #fee2e2;
+        color: #991b1b;
+        font-size: .8rem;
+        margin: 0 .35rem .35rem 0;
+    }
+
+    .table-modern thead th {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border-bottom: 2px solid #bfdbfe;
+    }
+
+    .thumb-box {
+        width: 64px;
+        height: 64px;
+        border-radius: 1rem;
+        background: #e2e8f0;
+        object-fit: cover;
+    }
+</style>
+
+<main class="moderation-shell">
+    <div class="hero-card mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-center">
+            <div>
+                <div class="hero-pill mb-3">
+                    <i class="bi bi-shield-check"></i>
+                    <span>Catalog moderation MVP</span>
+                </div>
+                <h1 class="fw-bold mb-2">Kiểm duyệt sản phẩm</h1>
+                <p class="mb-0 opacity-75">Soi nhanh nội dung nhạy cảm, dữ liệu thiếu và quyết định ẩn/mở bán ở scope toàn sàn.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-light rounded-pill px-4" href="@Url.Action("ManageProducts", "Product", new { area = "Admin" })">
+                    <i class="bi bi-box-seam me-2"></i>Quản lý sản phẩm
+                </a>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success border-0 shadow-sm">@Html.Raw(TempData["SuccessMessage"])</div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@Html.Raw(TempData["ErrorMessage"])</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Tổng sản phẩm</div>
+                    <div class="display-6 fw-bold">@Model.TotalProducts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Bị gắn cờ</div>
+                    <div class="display-6 fw-bold text-primary">@Model.FlaggedProducts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Rủi ro cao</div>
+                    <div class="display-6 fw-bold text-danger">@Model.HighRiskProducts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Sản phẩm ẩn</div>
+                    <div class="display-6 fw-bold text-warning">@Model.HiddenProducts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Sạch</div>
+                    <div class="display-6 fw-bold text-success">@Model.CleanProducts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="text-muted small">Keywords</div>
+                    <div class="fw-semibold">@string.Join(", ", Model.KeywordSuggestions.Take(3))</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Tìm kiếm</label>
+                    <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tên sản phẩm, SKU, danh mục..." />
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Trạng thái</label>
+                    <select class="form-select" name="state">
+                        @if (Model.State == "flagged")
+                        {
+                            <option value="all">Tất cả</option>
+                            <option value="flagged" selected>Bị gắn cờ</option>
+                            <option value="clean">Sạch</option>
+                        }
+                        else if (Model.State == "clean")
+                        {
+                            <option value="all">Tất cả</option>
+                            <option value="flagged">Bị gắn cờ</option>
+                            <option value="clean" selected>Sạch</option>
+                        }
+                        else
+                        {
+                            <option value="all" selected>Tất cả</option>
+                            <option value="flagged">Bị gắn cờ</option>
+                            <option value="clean">Sạch</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Rủi ro</label>
+                    <select class="form-select" name="risk">
+                        @if (Model.Risk == "high")
+                        {
+                            <option value="all">Tất cả</option>
+                            <option value="high" selected>Cao</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="low">Thấp</option>
+                        }
+                        else if (Model.Risk == "medium")
+                        {
+                            <option value="all">Tất cả</option>
+                            <option value="high">Cao</option>
+                            <option value="medium" selected>Trung bình</option>
+                            <option value="low">Thấp</option>
+                        }
+                        else if (Model.Risk == "low")
+                        {
+                            <option value="all">Tất cả</option>
+                            <option value="high">Cao</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="low" selected>Thấp</option>
+                        }
+                        else
+                        {
+                            <option value="all" selected>Tất cả</option>
+                            <option value="high">Cao</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="low">Thấp</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Keyword</label>
+                    <input class="form-control" type="text" name="keyword" value="@Model.Keyword" placeholder="Ví dụ: fake" />
+                </div>
+                <div class="col-lg-2 d-flex align-items-end gap-2">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-funnel me-2"></i>Lọc
+                    </button>
+                    <a class="btn btn-outline-secondary" href="@Url.Action("Index", "CatalogModeration", new { area = "Admin" })">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card table-card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-modern align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Sản phẩm</th>
+                            <th>Rủi ro</th>
+                            <th>Trạng thái kiểm duyệt</th>
+                            <th>Vấn đề phát hiện</th>
+                            <th class="text-center">Đang bán</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Rows.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-muted">Không có sản phẩm nào khớp bộ lọc moderation.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var row in Model.Rows)
+                            {
+                                var riskClass = row.RiskLevel switch
+                                {
+                                    "high" => "risk-badge risk-high",
+                                    "medium" => "risk-badge risk-medium",
+                                    _ => "risk-badge risk-low"
+                                };
+                                var stateClass = row.ModerationState == "flagged" ? "state-badge state-flagged" : "state-badge state-clean";
+                                <tr>
+                                    <td>
+                                        <div class="d-flex gap-3">
+                                            <img class="thumb-box" src="@(string.IsNullOrWhiteSpace(row.ImageFileName) ? Url.Content("~/Images/no-image.png") : Url.Content("~/Images/" + row.ImageFileName))" alt="@row.ProductName" />
+                                            <div>
+                                                <div class="fw-bold">@row.ProductName</div>
+                                                <div class="text-muted small">SKU: @row.Sku</div>
+                                                <div class="text-muted small">@row.CategoryName | Giá @row.Price.ToString("N0") đ | Tồn kho @row.StockQuantity</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="@riskClass">@row.RiskLevel</span>
+                                        @if (row.MatchedKeywords.Any())
+                                        {
+                                            <div class="mt-2">
+                                                @foreach (var keyword in row.MatchedKeywords)
+                                                {
+                                                    <span class="keyword-chip">@keyword</span>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="@stateClass">
+                                            <i class="bi @(row.ModerationState == "flagged" ? "bi-exclamation-triangle" : "bi-check-circle")"></i>
+                                            @(row.ModerationState == "flagged" ? "Bị gắn cờ" : "Sạch")
+                                        </span>
+                                        @if (row.IsManuallyDisabled)
+                                        {
+                                            <div class="small text-muted mt-2">Đã ẩn thủ công</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!row.Issues.Any())
+                                        {
+                                            <span class="text-success">Không phát hiện vấn đề.</span>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var issue in row.Issues)
+                                            {
+                                                <span class="issue-chip">@issue</span>
+                                            }
+                                        }
+                                    </td>
+                                    <td class="text-center">
+                                        @if (row.Status)
+                                        {
+                                            <span class="badge bg-success-subtle text-success">Bật</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary">Ẩn</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-2">
+                                            <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Edit", "Product", new { area = "Admin", id = row.ProductId })">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                            <form method="post" action="@Url.Action("Approve", "CatalogModeration", new { area = "Admin", id = row.ProductId })">
+                                                @Html.AntiForgeryToken()
+                                                <button class="btn btn-sm btn-success" type="submit" title="Duyệt / mở bán">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="@Url.Action("Reject", "CatalogModeration", new { area = "Admin", id = row.ProductId })">
+                                                @Html.AntiForgeryToken()
+                                                <button class="btn btn-sm btn-outline-danger" type="submit" title="Ẩn / từ chối">
+                                                    <i class="bi bi-eye-slash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+            <span class="text-muted">Trang @Model.Page / @Model.TotalPages - Tổng @Model.Total kết quả</span>
+            <div class="btn-group">
+                <a class="btn btn-outline-primary @(Model.Page <= 1 ? "disabled" : "")"
+                   href="@Url.Action("Index", "CatalogModeration", new { area = "Admin", q = Model.Query, state = Model.State, risk = Model.Risk, keyword = Model.Keyword, page = Math.Max(1, Model.Page - 1) })">
+                    «
+                </a>
+                <a class="btn btn-outline-primary @(Model.Page >= Model.TotalPages ? "disabled" : "")"
+                   href="@Url.Action("Index", "CatalogModeration", new { area = "Admin", q = Model.Query, state = Model.State, risk = Model.Risk, keyword = Model.Keyword, page = Math.Min(Model.TotalPages, Model.Page + 1) })">
+                    »
+                </a>
+            </div>
+        </div>
+    </div>
+</main>

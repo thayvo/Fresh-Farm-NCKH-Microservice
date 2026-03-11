@@ -223,10 +223,11 @@ public sealed class OrdersController : ControllerBase
 
             if (request.Payment is not null)
             {
+                var paymentMethod = NormalizePaymentMethod(request.Payment.PaymentMethod);
                 var payment = new Payment
                 {
                     OrderId = order.OrderId,
-                    PaymentMethod = request.Payment.PaymentMethod,
+                    PaymentMethod = paymentMethod,
                     PaymentStatus = "Pending",
                     PaymentDate = null,
                     UserId = userId.Value
@@ -250,7 +251,7 @@ public sealed class OrdersController : ControllerBase
         }
     }
 
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     [HttpGet("admin/paged")]
     public async Task<IActionResult> GetAdminOrdersPaged(
         [FromQuery] int page = 1,
@@ -260,6 +261,13 @@ public sealed class OrdersController : ControllerBase
         [FromQuery] string? dateFilter = null,
         CancellationToken cancellationToken = default)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
         if (page < 1)
         {
             page = 1;
@@ -270,7 +278,7 @@ public sealed class OrdersController : ControllerBase
             pageSize = 10;
         }
 
-        var query = _db.Orders.AsNoTracking().AsQueryable();
+        var query = ApplySellerScopeToAdminOrders(_db.Orders.AsNoTracking().AsQueryable(), sellerId, isAdmin);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -306,7 +314,12 @@ public sealed class OrdersController : ControllerBase
                 OrderCode = $"#{o.OrderId:D6}",
                 CustomerName = string.IsNullOrWhiteSpace(o.BuyerFullName) ? $"U{o.UserId}" : o.BuyerFullName,
                 OrderDate = o.OrderDate,
-                TotalAmount = o.TotalAmount,
+                TotalAmount = isAdmin
+                    ? o.TotalAmount
+                    : o.SellerOrders
+                        .Where(so => sellerId.HasValue && so.SellerId == sellerId.Value)
+                        .SelectMany(so => so.SellerOrderItems)
+                        .Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m,
                 Status = o.Status,
                 StatusBadgeClass = GetStatusBadgeClass(o.Status),
                 StatusText = GetStatusText(o.Status)
@@ -323,15 +336,40 @@ public sealed class OrdersController : ControllerBase
         });
     }
 
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
+    [HttpGet("admin/order-ids")]
+    public async Task<IActionResult> GetAdminOrderIds(CancellationToken cancellationToken = default)
+    {
+        var orderIds = await ApplySellerScopeToAdminOrders(_db.Orders.AsNoTracking().AsQueryable(), isAdmin: IsAdminUser())
+            .Select(o => o.OrderId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            data = orderIds
+        });
+    }
+
+    [Authorize(Policy = "SellerOrAdmin")]
     [HttpGet("admin/{orderId:int}/detail")]
     public async Task<IActionResult> GetAdminOrderDetail([FromRoute] int orderId, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
         var order = await _db.Orders
             .AsNoTracking()
             .Include(o => o.OrderDetails)
             .Include(o => o.Payments)
             .Include(o => o.Shippings)
+            .Include(o => o.SellerOrders)
+                .ThenInclude(so => so.SellerOrderItems)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
 
         if (order is null)
@@ -339,21 +377,62 @@ public sealed class OrdersController : ControllerBase
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
         }
 
+        if (!CanAccessOrderBySeller(order, sellerId, isAdmin))
+        {
+            return Forbid();
+        }
+
         var payment = order.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
         var shipping = order.Shippings.OrderByDescending(s => s.ShippingId).FirstOrDefault();
 
-        var items = order.OrderDetails
-            .OrderBy(od => od.OrderDetailId)
-            .Select(od => new
-            {
-                productId = od.ProductId,
-                productName = $"#P{od.ProductId}",
-                quantity = od.Quantity,
-                unitPrice = od.UnitPrice,
-                unitSymbol = od.UnitSymbol ?? string.Empty,
-                totalPrice = od.Quantity * od.UnitPrice
-            })
+        var sellerOrderItems = order.SellerOrders
+            .Where(so => isAdmin || (sellerId.HasValue && so.SellerId == sellerId.Value))
+            .SelectMany(so => so.SellerOrderItems)
             .ToList();
+
+        if (sellerOrderItems.Count == 0 && !isAdmin)
+        {
+            return NotFound(new { message = "Don hang khong con mat hang hop le trong pham vi seller." });
+        }
+
+        var orderDetailsById = order.OrderDetails.ToDictionary(od => od.OrderDetailId);
+
+        var items = sellerOrderItems.Count > 0
+            ? sellerOrderItems
+                .OrderBy(soi => soi.SellerOrderItemId)
+                .Select(soi =>
+                {
+                    orderDetailsById.TryGetValue(soi.ListingId, out var detail);
+                    var fallbackTotal = (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount;
+                    return new
+                    {
+                        productId = soi.ProductId,
+                        productName = string.IsNullOrWhiteSpace(soi.SnapshotName) ? $"#P{soi.ProductId}" : soi.SnapshotName,
+                        quantity = soi.Quantity,
+                        unitPrice = soi.UnitPrice,
+                        unitSymbol = detail?.UnitSymbol ?? string.Empty,
+                        totalPrice = Math.Max(0m, soi.FinalAmount ?? fallbackTotal)
+                    };
+                })
+                .ToList()
+            : order.OrderDetails
+                .OrderBy(od => od.OrderDetailId)
+                .Select(od => new
+                {
+                    productId = od.ProductId,
+                    productName = $"#P{od.ProductId}",
+                    quantity = od.Quantity,
+                    unitPrice = od.UnitPrice,
+                    unitSymbol = od.UnitSymbol ?? string.Empty,
+                    totalPrice = Math.Max(0m, od.UnitPrice * od.Quantity)
+                })
+                .ToList();
+
+        var sellerSubtotal = items.Sum(i => i.totalPrice);
+        var fallbackSubtotal = Math.Max(0m, order.TotalAmount - order.ShippingFee);
+        var subtotal = sellerSubtotal > 0 ? sellerSubtotal : fallbackSubtotal;
+        var shippingFee = sellerSubtotal > 0 ? 0m : Math.Max(0m, order.ShippingFee);
+        var total = subtotal + shippingFee;
 
         return Ok(new
         {
@@ -371,13 +450,13 @@ public sealed class OrdersController : ControllerBase
             orderDate = order.OrderDate,
             status = GetStatusText(order.Status),
             statusCode = order.Status,
-            paymentMethod = payment?.PaymentMethod ?? "COD",
+            paymentMethod = NormalizePaymentMethod(payment?.PaymentMethod),
             paymentStatus = payment?.PaymentStatus ?? order.PaymentStatus,
             bankName = payment?.BankName,
             transactionCode = payment?.TransactionCode,
-            subtotal = order.TotalAmount - order.ShippingFee,
-            shippingFee = order.ShippingFee,
-            total = order.TotalAmount,
+            subtotal,
+            shippingFee,
+            total,
             orderNote = order.OrderNote,
             items,
             canCancel = order.Status == "Pending" || order.Status == "Processing",
@@ -385,7 +464,7 @@ public sealed class OrdersController : ControllerBase
         });
     }
 
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     [HttpPost("admin/{orderId:int}/status")]
     public async Task<IActionResult> UpdateAdminOrderStatus([FromRoute] int orderId, [FromBody] UpdateAdminOrderStatusRequest request)
     {
@@ -399,10 +478,24 @@ public sealed class OrdersController : ControllerBase
             return BadRequest(new { message = "Trạng thái không hợp lệ." });
         }
 
-        var order = await _db.Orders.FirstOrDefaultAsync(o => o.OrderId == orderId);
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
+        var order = await _db.Orders
+            .Include(o => o.SellerOrders)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
         if (order is null)
         {
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        }
+
+        if (!CanAccessOrderBySeller(order, sellerId, isAdmin))
+        {
+            return Forbid();
         }
 
         if (!CanChangeStatus(order.Status, newStatus))
@@ -458,10 +551,17 @@ public sealed class OrdersController : ControllerBase
         });
     }
 
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     [HttpDelete("admin/{orderId:int}")]
     public async Task<IActionResult> DeleteAdminOrder([FromRoute] int orderId)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
         var order = await _db.Orders
             .Include(o => o.OrderDetails)
             .Include(o => o.Payments)
@@ -476,6 +576,11 @@ public sealed class OrdersController : ControllerBase
         if (order is null)
         {
             return NotFound(new { message = "Không tìm thấy đơn hàng." });
+        }
+
+        if (!CanAccessOrderBySeller(order, sellerId, isAdmin))
+        {
+            return Forbid();
         }
 
         if (string.Equals(order.Status, "Delivered", StringComparison.OrdinalIgnoreCase))
@@ -618,7 +723,7 @@ public sealed class OrdersController : ControllerBase
         }
     }
 
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     [HttpGet("admin/statistics")]
     public async Task<IActionResult> GetAdminStatistics(CancellationToken cancellationToken)
     {
@@ -628,7 +733,7 @@ public sealed class OrdersController : ControllerBase
         var diff = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
         var startOfWeek = today.AddDays(-diff);
 
-        var query = _db.Orders.AsNoTracking();
+        var query = ApplySellerScopeToAdminOrders(_db.Orders.AsNoTracking(), isAdmin: IsAdminUser());
 
         var totalOrders = await query.CountAsync(cancellationToken);
         var pendingOrders = await query.CountAsync(o => o.Status == "Pending", cancellationToken);
@@ -732,6 +837,18 @@ public sealed class OrdersController : ControllerBase
         };
     }
 
+    private static string NormalizePaymentMethod(string? paymentMethod)
+    {
+        var normalized = (paymentMethod ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            string.Equals(normalized, "string", StringComparison.OrdinalIgnoreCase))
+        {
+            return "COD";
+        }
+
+        return normalized;
+    }
+
     private int? TryGetUserIdFromToken()
     {
         var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
@@ -743,6 +860,55 @@ public sealed class OrdersController : ControllerBase
         }
 
         return userId;
+    }
+
+    private int? TryGetSellerIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var sellerId) ? sellerId : null;
+    }
+
+    private bool IsAdminUser()
+    {
+        return User.IsInRole("Admin");
+    }
+
+    private IQueryable<Order> ApplySellerScopeToAdminOrders(IQueryable<Order> query, int? sellerId = null, bool isAdmin = false)
+    {
+        if (isAdmin)
+        {
+            return query;
+        }
+
+        var resolvedSellerId = sellerId ?? TryGetSellerIdFromToken();
+        if (!resolvedSellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(o => o.SellerOrders.Any(so =>
+            so.SellerId == resolvedSellerId.Value &&
+            so.SellerOrderItems.Any()));
+    }
+
+    private bool CanAccessOrderBySeller(Order order, int? sellerId, bool isAdmin = false)
+    {
+        if (isAdmin)
+        {
+            return true;
+        }
+
+        if (!sellerId.HasValue)
+        {
+            return false;
+        }
+
+        return order.SellerOrders.Any(so =>
+            so.SellerId == sellerId.Value &&
+            so.SellerOrderItems.Any());
     }
 
     public sealed class UpdateAdminOrderStatusRequest

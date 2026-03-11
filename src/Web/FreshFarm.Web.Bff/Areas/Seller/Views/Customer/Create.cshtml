@@ -1,16 +1,21 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.CreateCustomerViewModel
 
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var customerScopeLabel = ViewData["CustomerScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Thêm Khách Hàng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 }
 
 <main class="container-fluid p-4">
     <div class="mb-4">
         <h2 class="fw-bold">Thêm khách hàng mới</h2>
+        <span class="badge bg-light text-primary mb-2">@customerScopeLabel</span>
         @{
             ViewBag.BreadcrumbParentTitle = "Quản lý khách hàng";
-            ViewBag.BreadcrumbParentUrl = Url.Action("ManageCustomers", "Customer");
+            ViewBag.BreadcrumbParentUrl = Url.Action("ManageCustomers", "Customer", new { area = areaName });
             ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
         }
         @Html.Partial("_Breadcrumb")
@@ -18,7 +23,7 @@
 
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
-            @using (Html.BeginForm("Create", "Customer", FormMethod.Post, new { @class = "row g-3" }))
+            @using (Html.BeginForm("Create", "Customer", new { area = areaName }, FormMethod.Post, true, new { @class = "row g-3" }))
             {
                 @Html.AntiForgeryToken()
 
@@ -64,7 +69,7 @@
                 </div>
 
                 <div class="col-12 mt-4 text-end">
-                    <a href="@Url.Action("ManageCustomers", "Customer")" class="btn btn-secondary">
+                    <a href="@Url.Action("ManageCustomers", "Customer", new { area = areaName })" class="btn btn-secondary">
                         <i class="bi bi-x-circle me-1"></i> Hủy
                     </a>
                     <button type="submit" class="btn btn-primary">

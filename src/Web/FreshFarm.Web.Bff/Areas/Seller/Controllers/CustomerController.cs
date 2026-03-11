@@ -41,7 +41,8 @@ public class CustomerController : LegacySellerControllerBase
                 pageSize = 10;
             }
 
-            var customers = await GetCustomersAsync(keyword: null, take: 5000);
+            var sellerCustomerIds = await GetSellerCustomerIdsAsync();
+            var customers = await GetCustomersAsync(keyword: null, take: 5000, sellerCustomerIds);
             var metrics = await GetCustomerMetricsAsync(customers.Select(c => c.userId).ToList());
             var metricsByUserId = metrics.ToDictionary(m => m.userId, m => m);
 
@@ -149,6 +150,12 @@ public class CustomerController : LegacySellerControllerBase
     {
         try
         {
+            if (!await CanAccessCustomerAsync(id))
+            {
+                TempData["ErrorMessage"] = "Ban khong co quyen xem khach hang nay.";
+                return RedirectToAction(nameof(ManageCustomers));
+            }
+
             var client = CreateAuthorizedClient("Identity");
             var response = await client.GetAsync($"/auth/admin/customers/{id}");
             if (!response.IsSuccessStatusCode)
@@ -194,6 +201,12 @@ public class CustomerController : LegacySellerControllerBase
             return View(model);
         }
 
+        if (!await CanAccessCustomerAsync(model.UserID))
+        {
+            TempData["ErrorMessage"] = "Ban khong co quyen cap nhat khach hang nay.";
+            return RedirectToAction(nameof(ManageCustomers));
+        }
+
         model.FullName = model.FullName?.Trim() ?? string.Empty;
         model.Email = model.Email?.Trim().ToLowerInvariant() ?? string.Empty;
         model.Phone = model.Phone?.Trim();
@@ -228,6 +241,11 @@ public class CustomerController : LegacySellerControllerBase
             if (id <= 0)
             {
                 return Json(new { success = false, message = "ID khach hang khong hop le" });
+            }
+
+            if (!await CanAccessCustomerAsync(id))
+            {
+                return Json(new { success = false, message = "Ban khong co quyen xoa khach hang nay." });
             }
 
             var orderingClient = CreateAuthorizedClient("Ordering");
@@ -272,7 +290,8 @@ public class CustomerController : LegacySellerControllerBase
                 return Json(new { success = false, message = "Vui long nhap tu khoa tim kiem" });
             }
 
-            var customers = await GetCustomersAsync(keyword, 200);
+            var sellerCustomerIds = await GetSellerCustomerIdsAsync();
+            var customers = await GetCustomersAsync(keyword, 200, sellerCustomerIds);
             var metrics = await GetCustomerMetricsAsync(customers.Select(c => c.userId).ToList());
             var metricsByUserId = metrics.ToDictionary(m => m.userId, m => m);
 
@@ -309,8 +328,13 @@ public class CustomerController : LegacySellerControllerBase
         }
     }
 
-    private async Task<List<IdentityCustomerDto>> GetCustomersAsync(string? keyword, int take)
+    private async Task<List<IdentityCustomerDto>> GetCustomersAsync(string? keyword, int take, IReadOnlyCollection<int>? sellerCustomerIds = null)
     {
+        if (sellerCustomerIds is { Count: 0 })
+        {
+            return new List<IdentityCustomerDto>();
+        }
+
         var query = $"take={take}";
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -324,8 +348,16 @@ public class CustomerController : LegacySellerControllerBase
             return new List<IdentityCustomerDto>();
         }
 
-        return await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
+        var customers = await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
             ?? new List<IdentityCustomerDto>();
+
+        if (sellerCustomerIds is { Count: > 0 })
+        {
+            var allowed = sellerCustomerIds.ToHashSet();
+            customers = customers.Where(c => allowed.Contains(c.userId)).ToList();
+        }
+
+        return customers;
     }
 
     private async Task<List<CustomerMetricDto>> GetCustomerMetricsAsync(List<int> userIds)
@@ -353,6 +385,35 @@ public class CustomerController : LegacySellerControllerBase
         return payload.data;
     }
 
+    private async Task<HashSet<int>> GetSellerCustomerIdsAsync()
+    {
+        var client = CreateAuthorizedClient("Ordering");
+        var response = await client.GetAsync("/api/orders/admin/customers/ids");
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HashSet<int>();
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SellerCustomerIdsResponse>(JsonOptions);
+        if (payload?.success != true || payload.data is null)
+        {
+            return new HashSet<int>();
+        }
+
+        return payload.data.Where(id => id > 0).ToHashSet();
+    }
+
+    private async Task<bool> CanAccessCustomerAsync(int userId)
+    {
+        if (userId <= 0)
+        {
+            return false;
+        }
+
+        var sellerCustomerIds = await GetSellerCustomerIdsAsync();
+        return sellerCustomerIds.Contains(userId);
+    }
+
     private HttpClient CreateAuthorizedClient(string clientName)
     {
         var client = _httpClientFactory.CreateClient(clientName);
@@ -360,22 +421,7 @@ public class CustomerController : LegacySellerControllerBase
         client.DefaultRequestHeaders.Remove("Authorization");
         client.DefaultRequestHeaders.Authorization = null;
 
-        var authHeader = Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(authHeader))
-        {
-            if (AuthenticationHeaderValue.TryParse(authHeader, out var parsed))
-            {
-                client.DefaultRequestHeaders.Authorization = parsed;
-            }
-            else
-            {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", authHeader);
-            }
-
-            return client;
-        }
-
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -458,6 +504,13 @@ public class CustomerController : LegacySellerControllerBase
         public bool success { get; set; }
 
         public bool hasOrders { get; set; }
+    }
+
+    private sealed class SellerCustomerIdsResponse
+    {
+        public bool success { get; set; }
+
+        public List<int>? data { get; set; }
     }
 
     public sealed class SearchRequest

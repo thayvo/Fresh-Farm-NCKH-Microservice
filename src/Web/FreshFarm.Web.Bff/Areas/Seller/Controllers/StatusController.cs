@@ -8,6 +8,7 @@ using FreshFarm.Web.Bff.Areas.Seller.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
@@ -18,6 +19,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class StatusController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const string SellerStatusAdminDisabledMessage = "Tinh nang quan ly trang thai he thong da bi khoa cho Seller.";
 
     private readonly IHttpClientFactory _httpClientFactory;
 
@@ -29,6 +31,21 @@ public class StatusController : LegacySellerControllerBase
     public StatusController(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
+    }
+
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (IsAjaxLikeRequest(context.HttpContext.Request))
+        {
+            context.Result = new JsonResult(new { success = false, message = SellerStatusAdminDisabledMessage })
+            {
+                StatusCode = StatusCodes.Status403Forbidden
+            };
+            return;
+        }
+
+        TempData["ErrorMessage"] = SellerStatusAdminDisabledMessage;
+        context.Result = RedirectToAction("Dashboard", "Home", new { area = "Seller" });
     }
 
     [HttpGet]
@@ -485,13 +502,24 @@ public class StatusController : LegacySellerControllerBase
         var client = _httpClientFactory.CreateClient(clientName);
 
         client.DefaultRequestHeaders.Remove("Authorization");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
         return client;
+    }
+
+    private static bool IsAjaxLikeRequest(HttpRequest request)
+    {
+        if (request.Method != HttpMethods.Get)
+        {
+            return true;
+        }
+
+        var xrw = request.Headers["X-Requested-With"].ToString();
+        return string.Equals(xrw, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task ApplyStatusViewBagFallbackAsync(

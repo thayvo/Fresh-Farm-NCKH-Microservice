@@ -169,10 +169,10 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         }
 
         TempData["OrderDate"] = DateTime.Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture); // Lưu dạng chuỗi ISO để an toàn serialize TempData.
-        TempData["PaymentMethod"] = request.Payment.PaymentMethod;
-        TempData["RecipientName"] = request.Shipping.FullName;
-        TempData["RecipientPhone"] = request.Shipping.Phone;
-        TempData["RecipientAddress"] = request.Shipping.AddressDetail ?? "Chưa cập nhật";
+        TempData["PaymentMethod"] = request.Payment?.PaymentMethod ?? "COD";
+        TempData["RecipientName"] = request.Shipping?.FullName ?? "Khách hàng";
+        TempData["RecipientPhone"] = request.Shipping?.Phone ?? string.Empty;
+        TempData["RecipientAddress"] = request.Shipping?.AddressDetail ?? "Chưa cập nhật";
 
         _cart.Clear();
         HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);

@@ -2,17 +2,107 @@
 
 - **Goal** (incl. success criteria):
   - Hoan tat Seller area service-first on dinh runtime tren .NET 8 (khong con EF legacy trong BFF Seller).
-  - Success criteria hien tai: Seller pages chay dung data, khong 404/binding error, report/export on dinh, DB schema khop microservices.
+  - Khoi tao lane Admin theo phong cach UI Seller (xanh duong + hieu ung quet anh sang), thiet ke/pham vi chuan theo cac san TMĐT.
+  - Success criteria hien tai: Seller pages chay dung data, khong 404/binding error, report/export on dinh, DB schema khop microservices; Admin UI thong nhat theme Seller.
 - **Constraints/Assumptions**:
   - Giu UI/UX hien co cua views Seller (chi sua model/route/binding/controller mapping).
   - Khong dung lenh git/destructive.
-  - Moi truong assistant khong co `dotnet`, khong co ket noi SQL runtime truc tiep.
+
+  - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
   - Service-first: BFF goi `Identity/Catalog/Ordering API`, khong truy cap DB truc tiep.
   - Lot 4.5 da chot DB-backed (khong file-backed cho business state).
   - Lot 4.6 tiep tuc theo huong re-wire views -> controller/action/model binding.
+  - Lot 4.5.6 `final3-import` la buoc migration du lieu mot lan (bootstrap/backfill), KHONG phai phu thuoc bat buoc khi runtime microservices.
+  - Theo user: tam thoi BO QUA import du lieu `final3`, uu tien hoan tat runtime multi-seller truoc.
+  - Da xac minh moi truong hien tai co `dotnet` (`C:\Program Files\dotnet\dotnet.exe`), co the build verify lai cac lane dang migrate.
+  - Hien tiep tuc roadmap theo `Phase 7.7 Growth ops`:
+    - `Campaigns MVP` (voucher san + flash sale) da xong khung service-first.
+    - `Ads wallet` + `ads finance overview` da duoc noi vao `Campaign center`.
+    - Da bat dau `7.7A Cross-cutting Marketplace Controls` bang `Risk center MVP`.
+    - Da mo rong tiep `7.7A` voi `Audit center MVP`.
+    - Da mo rong tiep `7.7A` voi `Catalog readiness MVP`.
+    - Da mo rong tiep `7.7A` voi `Fresh-goods operations MVP`.
+    - Da mo rong tiep `7.7A` voi `Communications governance MVP`.
 - **State**:
   - *Done*:
+    - Da thuc hien "feasibility check" cho roadmap Admin marketplace theo 6 nhom user yeu cau:
+      - Dashboard analytics, Users, Catalog moderation, Orders/Logistics, Disputes/CS, Campaigns.
+      - Da danh dau ro module nao "lam ngay" va module nao "can bo sung schema/API".
+    - Da cap nhat roadmap chi tiet vao `ROADMAP_SELLER_ADMIN_MIGRATION.md`:
+      - Them `Phase 7 - Admin Marketplace Ops`.
+      - Co cac muc 7.0 -> 7.9 voi buoc nho theo tung module + DoD + thu tu sprint (A/B/C).
+      - Da chot nguyen tac UI Admin theo phong cach Seller (gradient xanh + quet anh sang) trong roadmap.
+    - User xac nhan trang Seller da "on" sau patch tenant-scope review report.
+    - Da audit lane Admin ban dau:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers` va `Views` hien dang rong (chua co UI/Admin flow rieng).
+      - Nhieu endpoint route dang mang ten `admin` o Services nhung policy hien tai van la `SellerOnly`.
+      - Da xac nhan chua co `AdminOnly` policy trong `Ordering/Identity/Catalog` Program (moi co `SellerOnly`).
+    - Da them policy `AdminOnly` (role `Admin`) vao:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
+      - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
+      - `src/Web/FreshFarm.Web.Bff/Program.cs`
+    - Da scaffold lane Admin toi thieu o BFF:
+      - Them controller `Areas/Admin/HomeController` voi gate `[Authorize(Policy = "AdminOnly")]`.
+      - Them views:
+        - `Areas/Admin/Views/_ViewImports.cshtml`
+        - `Areas/Admin/Views/_ViewStart.cshtml`
+        - `Areas/Admin/Views/Home/Dashboard.cshtml`
+      - Route vao du kien: `/Admin/Home/Dashboard`.
+    - Da bo sung endpoint KPI cho Admin dashboard:
+      - Ordering: `GET /api/orders/admin/platform/dashboard` (`PlatformAdminController`, policy `AdminOnly`).
+      - Identity: `GET /auth/admin/users/metrics` (`AdminUsersController`, policy `AdminOnly`).
+    - Da harden luong auth token cho Admin dashboard:
+      - BFF `Areas/Admin/HomeController`: neu mat token (session/claim) se force re-login thay vi hien KPI loi.
+      - Neu API tra `401/403` se force re-login.
+      - Error message KPI hien kem `HTTP status` de triage nhanh.
+    - Da patch KPI APIs de tranh vo trang `/Admin` khi co schema/runtime drift:
+      - Ordering `PlatformAdminController`: bo phu thuoc `SellerOrders.CommissionAmount`, tinh `platformRevenue` fallback = `gmv * 3%`; top-level try/catch tra payload fallback thay vi HTTP 500.
+      - Identity `AdminUsersController.GetMetrics`: doi dem seller/buyer theo `RoleId` (join truc tiep), boc `UserSessions` bang fallback try/catch; top-level fallback return KPI 0 + warnings.
+    - Da dong bo luu token vao cookie claims o login web chung:
+      - `AccountController.SignIn` bo sung claim `ff_access_token` + `sub`.
+      - Cookie auth expiry can theo `auth.ExpiredAtUtc` de giam mismatch (cookie con han nhung JWT da het han).
+      - `AdminAccountController.Login` cung uu tien expiry theo `auth.ExpiredAtUtc`.
+    - Da migrate module User sang lane Admin (BFF + Identity API):
+      - Them `Areas/Admin/Controllers/UserController.cs` (Manage/Search/GetById/Create/Update/Delete) goi `Identity /auth/admin/users`.
+      - Them model tach rieng: `Areas/Admin/Models/UserAdminModels.cs`.
+      - Them view: `Areas/Admin/Views/User/ManageUsers.cshtml` (copy tu Seller, doi route sang `area = Admin`).
+      - Them layout admin rieng:
+        - `Areas/Admin/Views/Shared/_LayoutAdmin.cshtml`
+        - `Areas/Admin/Views/Shared/_SideBar.cshtml`
+        - `Areas/Admin/Views/Shared/_NavBar.cshtml`
+      - `Areas/Admin/Views/_ViewStart.cshtml` da tro ve layout admin moi.
+    - Da sua tiep logic Admin User Management theo role-split:
+      - Identity `AdminUsersController.GetById/Update/Delete` khong con hard-filter loai `Customer`.
+      - Create/Update role validation chap nhan role active (bao gom `Customer`), dung scope "quan ly toan bo user" cho Admin.
+      - Sua thong diep NotFound tu "quan tri vien" thanh "nguoi dung" de khop nghiep vu.
+    - Da fix loi build Razor `RZ1031` trong `Areas/Admin/Views/User/ManageUsers.cshtml`:
+      - Bo C# inline trong thuoc tinh `<option ...>` va doi sang Razor `if/else` de render `selected` hop le.
+    - Da trien khai tiep Sprint A - Buoc 3 (phase dau) cho Admin Orders:
+      - Ordering API:
+        - Them policy `SellerOrAdmin` trong `Program.cs`.
+        - Doi cac endpoint `/api/orders/admin/*` sang `SellerOrAdmin`.
+        - Bo sung role-aware scope trong `OrdersController`: neu role `Admin` thi global order scope; neu `Seller` thi giu seller-scope nhu cu.
+      - BFF Admin:
+        - Them `Areas/Admin/Controllers/OrderController.cs` (AdminOnly) de su dung lane `/Admin/Order/ManageOrders`.
+        - Them views:
+          - `Areas/Admin/Views/Order/ManageOrders.cshtml`
+          - `Areas/Admin/Views/Order/PrintInvoice.cshtml`
+        - Sidebar Admin bo sung muc `Quan ly don hang`.
+    - Da nang cap Identity `AdminUsersController` ve dung quyen `AdminOnly`:
+      - Doi policy route `auth/admin/users` tu `SellerOnly` -> `AdminOnly`.
+      - Mo lai CRUD cho admin:
+        - `GET/GET roles/GET by id`: cho admin quan tri danh sach user he thong (non-customer).
+        - `POST`: tao user + gan role + tao password hash.
+        - `PUT`: cap nhat profile/isActive/role/newPassword.
+        - `DELETE`: vo hieu hoa tai khoan (soft-disable) + revoke sessions.
+    - Da cap nhat flow login BFF de vao dung lane:
+      - `AdminAccountController.Login` chap nhan account co role `Seller` hoac `Admin`.
+      - Sau login, neu co role `Admin` thi redirect mac dinh vao `/Admin/Home/Dashboard`.
+      - `RedirectToLocal` cung uu tien admin dashboard khi user co role `Admin`.
+    - Da chay static smoke script sau patch admin migration:
+      - `bash scripts/seller_static_smoke.sh` -> PASS (legacy hits 0, missing route 0, @page hits 0).
     - Hoan tat lot 5.1 -> 5.6 cho cum Seller (Setting/User/SupportChat/Review/Report read+export) theo service-first.
     - Da execute/verify schema lot 4.5.4 tren DB that (Identity + Ordering), co hotfix index ContactMessages.
     - Da cutover controllers sang DB-backed (Identity + Ordering admin endpoints).
@@ -35,36 +125,714 @@
       - `ManageOrders.cshtml`: bo sung fallback key map cho payload (`OrderID/orderId`, `TotalAmount/totalAmount/total`, ...) de tranh render `0đ` khi doi casing/contract.
       - `ReportsAdminController`: bo loc `OrderDetail` bat thuong khi tinh report (quantity/unitprice/productId) de tranh meo thong ke.
       - `OrdersController.Create` + DTO: chan quantity ngoai khoang `1..10000` de ngan outlier moi.
+    - Da fix nhom loi `HTTP 401` Seller do mat token session:
+      - Them `GetAccessToken()` tai `LegacySellerControllerBase` voi fallback theo thu tu: `Authorization header` -> `Session(ACCESS_TOKEN)` -> `Claim(ff_access_token/access_token)`.
+      - `AdminAccountController.Login` da luu access token vao claim `ff_access_token` de phuc hoi session token sau restart/session timeout.
+      - Da cap nhat toan bo Seller controllers dung `GetAccessToken(AccessTokenSessionKey)` thay vi doc session truc tiep.
     - Da bo sung script doc-only de soi outlier so luong OrderDetail:
       - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`.
     - Da them plan migrate customer data tu monolith:
       - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`.
+    - Da bo sung bo script thuc thi lot 4.5.6 (Final3 -> microservices):
+      - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-import.sql`.
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-import.sql`.
+      - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-verify.sql`.
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-verify.sql`.
+    - Da cap nhat roadmap/persistence docs de tham chieu bo script 4.5.6 moi.
+    - Da them runbook thao tac:
+      - `docs/LOT_4_5_6_EXECUTION_RUNBOOK_2026-02-28.md`.
+    - Da bo sung phan multi-seller ownership cho Catalog:
+      - Model/table map: `SellerProduct` + `FreshFarmCatalogDBContext.Extras.cs`.
+      - `ProductsController` da scope theo seller token (`sub`) + ownership check create/update/delete/toggle.
+    - Da bo sung script DB Catalog cho bang ownership con thieu:
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.delta.sql`
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.verify.sql`
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.down.sql`
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.seed-template.sql`
+      - `docs/FreshFarmCatalogDb/SCHEMA_ALIGNMENT_2026-03-01.md`
+    - Da bo sung script backfill seller ownership cho Ordering:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.verify.sql`
+      - Backfill `SellerOrders/SellerOrderItems` dua tren `CatalogDB.dbo.SellerProducts` (idempotent).
+    - User da chay verify ownership Ordering va PASS:
+      - `TotalOrderDetails=149`, `MappedOrderDetails=148`, `UnmappedOrderDetails=1`, `MissingSellerOrders=0`, `MissingSellerOrderItems=0`.
+    - Da harden 2 script backfill/verify ownership Ordering:
+      - Tu dong `DROP IF EXISTS` temp tables `#SellerProductsRaw/#SellerProducts` o `TRY` va `CATCH`.
+      - Tranh loi rerun trong cung session SSMS: `There is already an object named '#SellerProductsRaw'`.
+    - Da bo sung buoc tiep theo cho phan unmapped:
+      - Them script: `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.unmapped-orderdetail-diagnostics.sql`.
+      - Cap nhat `seller-products.seed-template.sql` sang che do an toan multi-seller (targeted product list la mac dinh, khong assign-all mac dinh).
+      - Cap nhat tiep `seller-products.seed-template.sql` de chay nhanh:
+        - Mac dinh `@SellerId = 1`, `@AutoFillFromOrderingUnmapped = 1`.
+        - Tu dong nap `#TargetProducts` tu `OrderingDB.dbo.OrderDetail` (phan ProductID chua co ownership).
+      - Cap nhat tiep `seller-products.seed-template.sql` de khong fail khi khong co target:
+        - Tra `SeedStatus = NOOP` thay vi throw `57304`.
+        - Tra them result set chuan doan `ProductID/UnmappedRows/ExistsInCatalogProducts`.
+    - User da xac nhan ket qua `NOOP` va diagnostic:
+      - `ProductID=2147483647`, `UnmappedRows=1`, `ExistsInCatalogProducts=0`.
+      - Ket luan: du lieu `OrderDetail` co 1 dong ProductID invalid (khong ton tai trong Catalog).
+    - User da chay lai backfill + verify sau do:
+      - `BackfillStatus=PASS`, `InsertedSellerOrders=0`, `InsertedSellerOrderItems=0`.
+      - Verify van `UnmappedOrderDetails=1` (khop voi dong invalid ProductID da xac dinh).
+    - Da them script remediation invalid ProductID trong Ordering:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.invalid-orderdetail-product-remediation.sql`.
+      - Co che do `@ApplyDelete = 0/1` (diagnostic hoac archive+delete).
+    - User da remediate dong invalid ProductID va chay lai ownership scripts:
+      - `BackfillStatus=PASS`, `TotalOrderDetails=148`, `MappedOrderDetails=148`, `UnmappedOrderDetails=0`.
+      - Verify: `VerifyStatus=PASS`, `MissingSellerOrders=0`, `MissingSellerOrderItems=0`.
+    - Da fix compile error Catalog `CS0102` (`FreshFarmCatalogDBContext` trung `SellerProducts`):
+      - Lam gon `FreshFarmCatalogDBContext.Extras.cs` ve extension point rong.
+      - Giu duy nhat DbSet/mapping `SellerProducts` trong file EFPT generated `FreshFarmCatalogDBContext.cs`.
+    - Da fix bug Create/Edit Product bi fail model validation sai:
+      - Nguyen nhan: `Product.Category` duoc init `new()` + `CategoryName` co `[Required]` -> post form Product bi dinh loi `Category.CategoryName`.
+      - Fix: them `[ValidateNever]` cho navigation props `Product.Category`, `Product.Unit`, `Product.ProductInfoes` trong `CatalogSellerModels.cs`.
+    - Da fix loi runtime Nhap Kho (`/Seller/Warehouse/ImportCart`) khi xac nhan gio nhap:
+      - Nguyen nhan: JS gui `productId` dang chuoi trong `cartJson`, backend deserialize `ImportCartItem.ProductId` dang `int` -> loi `The JSON value could not be converted to System.Int32`.
+      - Fix: ep kieu `selectedProductId` sang so nguyen (`Number.parseInt`) + validate `Number.isInteger(productId) && productId > 0` truoc khi push vao `importCart`.
+    - Da khoa module `Seller/User` de loai bo quyen quan tri he thong tu Seller:
+      - `UserController` (Seller area) tra ve redirect/403 cho `ManageUsers/SearchUsers/GetUserById/CreateUser/UpdateUser/DeleteUser`.
+      - Sidebar Seller bo muc `Quan ly nguoi dung`, thay bang `Tai khoan cua toi` (link `Home/Profile`).
+      - Muc tieu: chan nguy co seller tao/sua tai khoan role Admin qua UI Seller.
+    - Da bo sung fallback gui tin nhan cho Seller SupportChat khi khong co SignalR hub:
+      - Ordering API: them endpoint `POST /api/orders/admin/support-chat/conversations/{conversationId}/messages` (scope theo seller + validate conversation + luu `SupportMessages`).
+      - BFF Seller: them action bridge `POST /Seller/SupportChat/SendMessage`.
+      - Frontend `support-chat-admin.js`: neu SignalR unavailable thi gui qua HTTP (polling mode), khong con khoa input/send.
+    - Da bo emotion reaction tren UI SupportChat Seller theo yeu cau:
+      - Hover menu message chi con `Tra loi` (va `Thu hoi` cho tin nhan admin), bo nut tim/emotion.
+      - Bo render badge emoji tren bubble va bo CSS reaction picker/badge.
+      - Giu nguyen luong tra loi (reply preview + replyTo) nhu hien tai.
+    - Da bo sung SignalR ASP.NET Core cho SupportChat Seller (thay vi legacy `$.connection`):
+      - BFF `Program.cs`: `AddSignalR()` + map hub `/hubs/support-chat`.
+      - Them hub: `Areas/Seller/Hubs/SupportChatHub.cs` + `SupportChatHubGroups.cs`.
+      - `SupportChatController`: push event realtime vao group seller/conversation sau `SendMessage`, `MarkAsRead`, `Close`.
+      - `SupportChat/Index.cshtml`: them client script SignalR (CDN).
+      - `support-chat-admin.js`: chuyen sang `window.signalR.HubConnectionBuilder`, auto reconnect, join group, fallback polling 8s khi realtime khong san sang.
+    - Da fix loi Razor compile `CS0103: microsoft does not exist in the current context` o Seller SupportChat view:
+      - Nguyen nhan: URL CDN co segment `@microsoft` bi Razor parse nhu C#.
+      - Fix: doi URL sang `%40microsoft` trong `Index.cshtml` (`/npm/%40microsoft/signalr...`).
+    - Da harden Identity `auth/admin/users` de chan seller xem/sua tai khoan seller khac:
+      - `GET /auth/admin/users`: chi tra ve chinh user dang login (`sub`).
+      - `GET /auth/admin/users/{id}`: chi cho phep `id == currentUserId`, khac -> `403`.
+      - `POST /auth/admin/users`: `403` (seller khong duoc tao tai khoan he thong).
+      - `DELETE /auth/admin/users/{id}`: `403` (seller khong duoc xoa tai khoan he thong).
+      - `PUT /auth/admin/users/{id}`: chi cho phep sua chinh minh, bo doi role trong API nay.
+    - Da fix hien thi sai `Thanh toan: string` tren popup chi tiet don Seller:
+      - Ordering API `OrdersController`: normalize `PaymentMethod` (null/blank/"string" -> `COD`) khi create va khi tra `admin/{orderId}/detail`.
+      - BFF View `ManageOrders.cshtml`: them `normalizePaymentMethod()` o client de fallback phong thu.
+    - Da patch `ReportsAdminController` scope theo seller cho toan bo query `_db.Orders` (customers/orders/revenue/products/shipping/review mapping).
+    - Da patch `CouponsAdminController` theo seller:
+      - list/detail/create/update/delete/toggle/statistics/validate/send/usage/distribution.
+      - `CreatedBy` duoc set theo seller token khi tao (legacy `CreatedBy = NULL` cho phep fallback read transitional).
+    - Da patch `AdminCustomersController` scope theo seller cho `metrics` va `has-orders`.
+    - Da patch `ShippingAdminController` scope theo seller:
+      - list/detail/order-info/create/update/delete/reconcile-cod/unreconcile-cod.
+    - Da patch `ReviewsAdminController` scope theo seller:
+      - list/reported/resolve/delete/approve/toggle/reply/update/get-reports.
+    - Da khoi tao lane `Merchant lifecycle & compliance` MVP cho Admin tren nen Identity hien co:
+      - Identity API: them `AdminMerchantsController` (`GET /auth/admin/merchants`, `GET /auth/admin/merchants/{sellerId}`, `PATCH /auth/admin/merchants/{sellerId}/status`) voi policy `AdminOnly`.
+      - Compliance MVP hien tai la heuristic: diem ho so + co `missing-phone/email/address/avatar`, `stale-login`, `suspended`; chua co bang KYC/workflow phe duyet rieng.
+      - BFF: them `Areas/Admin/Controllers/MerchantController.cs`, `Areas/Admin/Models/MerchantAdminModels.cs`, `Areas/Admin/Views/Merchant/Index.cshtml`.
+      - Sidebar Admin bo sung muc `Merchant compliance`.
+    - Da thu build verify `Identity` va `BFF` nhung bi chan boi environment:
+      - `dotnet build ...` -> `/bin/bash: dotnet: command not found`.
+      - ownership review xac dinh qua `SellerOrderItems -> SellerOrder.SellerId`.
+    - Da tach lane `Voucher san` cho Admin de mo dau Sprint C / Campaigns ma chua can schema moi:
+      - Ordering `CouponsAdminController` ho tro `scope=platform|seller|all` cho list/detail/statistics/validate/send/toggle/delete.
+      - Khi `Admin` tao coupon moi, `CreatedBy = NULL` de danh dau voucher san; seller van giu `CreatedBy = sellerId`.
+      - BFF Admin `CouponController` da chot lane `scope=platform`; sidebar doi nhan `Voucher san`.
+      - View dung chung `Areas/Seller/Views/Coupon/ManageCoupons.cshtml` nhung da cho phep override title/subtitle/empty-state qua `ViewData`.
+    - Da fix triage UI loi Admin User Management:
+      - `Areas/Admin/Views/User/ManageUsers.cshtml` truoc do luôn toast `Co loi mang, vui long thu lai.` trong callback AJAX `error`, che mat loi backend `400/409`.
+      - Da them `extractAjaxError(xhr, fallbackMessage)` de uu tien hien `responseJSON.message`/payload JSON tu BFF.
+      - Create/update/delete user gio se hien dung message conflict/validation tu Identity API thay vi bao loi mang gia.
+    - Da patch `SupportChatAdminController` scope theo seller:
+      - conversations/messages/details/close/mark-read.
+      - chi hien conversation cua user co order thuoc seller.
+    - Da patch `FeedbacksAdminController` scope theo seller:
+      - list/detail/update/delete feedback chi theo contact cua khach co order thuoc seller.
+      - khong con tra toan bo feedback global cho moi seller.
+    - Da mo lane Admin cho `Feedback` (Sprint B - Disputes & CS, pha dau):
+      - Ordering API `FeedbacksAdminController` doi policy `SellerOnly` -> `SellerOrAdmin`.
+      - Them role-aware scope: Admin xem/xu ly feedback toan san; Seller van giu seller-scope nhu truoc.
+      - Them BFF `Areas/Admin/Controllers/FeedbackController.cs` su dung lai API `/api/orders/admin/feedbacks`.
+      - Patch `Areas/Seller/Views/Feedback/Index.cshtml` cho phep dung lai o ca `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `PageTitle`, `PageDescription`, `ScopeLabel`.
+      - Sidebar Admin bo sung link `Phan hoi khach hang`.
+    - Da mo lane Admin cho `SupportChat` (Sprint B - Disputes & CS, pha dau):
+      - Ordering API `SupportChatAdminController` doi policy `SellerOnly` -> `SellerOrAdmin`.
+      - Them role-aware scope: Admin xem/tra loi/close/mark-read hoi thoai toan san; Seller van giu seller-scope.
+      - Them BFF `Areas/Admin/Controllers/SupportChatController.cs`.
+      - Patch `Areas/Seller/Views/SupportChat/Index.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData`.
+      - Patch `wwwroot/Scripts/support-chat-admin.js` de nhan route dong + `orderPageUrl` + `forcePolling`.
+      - Sidebar Admin bo sung link `Ho tro truc tuyen`.
+    - Da bo seed du lieu gia trong `SupportChatAdminController`:
+      - Xoa toan bo goi `EnsureSeedDataAsync(...)` va xoa luon method seed.
+      - Tu nay `SupportChat` chi doc du lieu that co san trong `SupportConversations` + `SupportMessages`.
+      - Luu y: neu du lieu seed gia da tung duoc chen vao DB truoc do thi can cleanup DB rieng, bo seed trong code chi ngan phat sinh moi.
+    - Da mo lane Admin cho `Loyalty`:
+      - Ordering API `LoyaltyAdminController` doi policy `SellerOnly` -> `SellerOrAdmin`.
+      - Them role-aware scope: Admin xem dashboard/users/history va thuc hien config/adjust/sync-award tren scope toan san; Seller van giu seller-scope.
+      - Them BFF `Areas/Admin/Controllers/LoyaltyController.cs`.
+      - Patch `Areas/Seller/Views/Loyalty/{Index,Users,History,Config}.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `LoyaltyScopeLabel`.
+      - Sidebar Admin bo sung link `Tich diem`.
+    - Da hoan thien them nghiep vu `Loyalty`:
+      - `LoyaltyAdminController` da tinh scope history theo `Orders + UserId` de diem dieu chinh thu cong thuc su xuat hien o dashboard/users/history, khong con bi ghi vao DB roi "mat hut".
+      - Checkbox `includeInRank` khi dieu chinh diem da co tac dung thuc te: API gan marker noi bo va chi cong vao diem xep hang quy khi user tick chon.
+      - `History` da strip marker noi bo truoc khi tra ve UI; `direction` filter duoc normalize uppercase de loc on dinh hon.
+      - `SyncAward` tra ve message ro rang va chan khoang ngay `start > end`.
+      - View `Loyalty/Users.cshtml` da sua nut dieu chinh de khong vo JS khi ten thanh vien co dau nhay, sua lai phan trang theo dung `area`, va sua `colspan`.
+      - View `Loyalty/Config.cshtml` bo cach render `selected` inline de tranh loi Razor; `Loyalty/Index.cshtml` da bo helper local khong dung.
+    - Da mo tiep lane Admin cho `Delivery` (thuoc cum Orders & Logistics):
+      - Them BFF `Areas/Admin/Controllers/DeliveryController.cs` (AdminOnly) theo service-first, render lai view giao hang Seller theo layout Admin.
+      - Patch `Areas/Seller/Views/Delivery/Index.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `DeliveryScopeLabel`.
+      - Sua luong cap nhat trang thai giao hang de goi dung `Delivery/UpdateStatus` theo area hien tai, khong con hard-code ve `Seller/Order`.
+      - Bo sung anti-forgery token cho luong `UpdateStatus`; Seller `DeliveryController.UpdateStatus` da them `[ValidateAntiForgeryToken]`.
+      - Sidebar Admin bo sung menu `Dieu phoi giao hang`.
+    - Da mo tiep lane Admin cho `Product` (khép catalog core truoc moderation):
+      - Catalog API `ProductsController` doi CRUD/toggle policy `SellerOnly` -> `SellerOrAdmin`.
+      - Admin co the create/update/delete/toggle product tren scope toan san; Seller van giu ownership-check nhu truoc.
+      - Them BFF `Areas/Admin/Controllers/ProductController.cs` (AdminOnly), render lai bo view `Seller/Product/*` theo layout Admin.
+      - Patch `Areas/Seller/Views/Product/{ManageProducts,Create,Edit}.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `ProductScopeLabel`.
+      - Sidebar Admin bo sung menu `San pham`.
+    - Da mo MVP `Catalog moderation` cho Admin tren du lieu product hien co:
+      - Them BFF `Areas/Admin/Controllers/CatalogModerationController.cs` va model `Areas/Admin/Models/ProductModerationModels.cs`.
+      - Them view `Areas/Admin/Views/CatalogModeration/Index.cshtml` theo theme Admin Seller-style.
+      - MVP moderation queue duoc suy ra theo heuristic tu du lieu `Products`: keyword nhay cam, thieu anh/mo ta, gia/tồn kho bat thuong, trang thai an thu cong.
+      - Hanh dong `Duyet` / `An san pham` hien tai map vao toggle status product, CHUA co bang quyet dinh moderation rieng.
+      - Sidebar Admin bo sung menu `Kiem duyet san pham`.
+    - Da mo lane Admin cho `Trung tam thong bao`:
+      - Ordering API them `NotificationsAdminController` (AdminOnly) doc du lieu that tu `CustomerNotifications`.
+      - Ho tro filter theo `q/type/isRead/userId/orderId`, thong ke `tong/chua doc/push/24h`, va thao tac `mark-read`, `mark-all-read`.
+      - Them BFF `Areas/Admin/Controllers/NotificationController.cs` + model `Areas/Admin/Models/NotificationAdminModels.cs`.
+      - Them view `Areas/Admin/Views/Notification/Index.cshtml` theo theme Admin Seller-style.
+      - Sidebar Admin bo sung menu `Trung tam thong bao`.
+      - Da fix loi runtime ban dau: controller thong bao truoc do chay nhieu query async song song tren cung `FreshFarmOrderingDBContext`, gay loi EF Core concurrency; da doi ve truy van tuan tu.
+    - Da re-review roadmap tong the duoi goc nhin san TMĐT:
+      - Ket luan huong di hien tai van DUNG (service-first + tenant isolation + seller stability + admin ops).
+      - Da bo sung gap analysis vao `ROADMAP_SELLER_ADMIN_MIGRATION.md`: finance/settlement/refund, merchant compliance, risk/fraud, search/catalog readiness, ops audit, va domain operations cho nong san/thuc pham tuoi.
+      - Da doi lai thu tu uu tien sprint: dua `Finance/Settlement + Returns/Refunds` len truoc `Campaigns/Ads`.
+    - Da mo MVP `Finance/Settlement + Returns/Refunds` theo service-first tren schema Ordering hien co:
+      - Ordering API them `Controllers/FinanceAdminController.cs` (`SellerOrAdmin`) cho dashboard + console filter/paging tren `Payouts`, `RefundTransactions`, `ReturnRequests`, `PaymentTransactions`, `SellerOrders`.
+      - BFF them lane:
+        - `Areas/Admin/Controllers/FinanceController.cs`
+        - `Areas/Seller/Controllers/FinanceController.cs`
+      - Them model `Areas/Admin/Models/FinanceAdminModels.cs`.
+      - Them view dung chung `Areas/Seller/Views/Finance/Index.cshtml` theo style Admin/Seller xanh duong + quet anh sang.
+      - Sidebar da bo sung:
+        - Admin: `Tai chinh & doi soat`
+        - Seller: `Doi soat thanh toan`
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj` -> PASS.
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj` -> PASS.
+    - Da fix runtime JSON mismatch o `Admin/Finance/Index`:
+      - Nguyen nhan: API tra `filters.sellerOptions[].value` dang so nguyen, trong khi BFF deserialize truong nay ve `string`.
+      - Fix: `FinanceAdminController` doi `sellerOptions.value` thanh chuoi (`x.ToString()`), khop contract voi `FinanceAdminModels`.
+      - Build verify lai bang `dotnet build ... -p:UseAppHost=false` -> PASS.
+      - Ghi chu: build thuong dang bi lock file do `FreshFarm.Ordering.Api.exe` va `FreshFarm.Web.Bff.exe` dang chay, KHONG phai loi compile.
+    - Da mo lane Admin cho `Setting`:
+      - Identity API `AdminSettingsController` doi policy `SellerOnly` -> `SellerOrAdmin`.
+      - Them BFF `Areas/Admin/Controllers/SettingController.cs`.
+      - Patch `Areas/Seller/Views/Setting/Index.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `SettingsTitle`, `SettingsScopeLabel`.
+      - Sidebar Admin bo sung link `Cai dat he thong`.
+    - Da mo lane Admin cho `Customer`:
+      - Identity API `AdminCustomersController` doi policy `SellerOnly` -> `SellerOrAdmin`.
+      - Ordering API `AdminCustomersController` doi policy `SellerOnly` -> `SellerOrAdmin` va bo sung global scope cho Admin o `ids/metrics/has-orders`.
+      - Them BFF `Areas/Admin/Controllers/CustomerController.cs`.
+      - Patch `Areas/Seller/Views/Customer/{ManageCustomers,Create,Edit}.cshtml` de dung chung cho `Seller` va `Admin` qua `ViewData["AreaName"]`, `LayoutPath`, `CustomerScopeLabel`.
+      - Sidebar Admin bo sung link `Khach hang`.
+    - Da fix compile error Razor `CS7036` sau patch lane Admin Customer:
+      - `Areas/Seller/Views/Customer/Create.cshtml` va `Edit.cshtml` dung lai overload `Html.BeginForm(..., FormMethod.Post, true, htmlAttributes)` dung voi ASP.NET Core.
+    - Da siet fallback seller-scope theo huong `strict-if-mapped`:
+      - `Orders/Reports/Shipping/Review/SupportChat/Loyalty/AdminCustomers`:
+        - Neu seller da co mapping trong `SellerOrders` => chi thay order cua seller do.
+        - Chi fallback order legacy khong map seller khi seller chua co ownership mapping.
+      - `CouponsAdminController`:
+        - Neu seller da co coupon co `CreatedBy` => chi thay coupon cua seller do.
+        - Chi fallback coupon `CreatedBy = NULL` khi seller chua co coupon ownership.
+      - `OrdersController` va `ShippingAdminController` da siet ca `CanAccessOrderBySeller` theo cung rule tren.
+    - Da chay lai static smoke sau patch scope:
+      - `scripts/seller_static_smoke.sh` -> PASS.
+    - Da triage lai bug "seller thay thong tin cua nhau" tren code hien tai:
+      - KHONG phai loi "chia chung DB sai"; DB microservice duoc dung chung cho nhieu seller la thiet ke binh thuong.
+      - Root cause la thieu tenant-scope o mot so endpoint/controller:
+        - Identity `AdminCustomersController` (`/auth/admin/customers`): query global customer, chua loc theo ownership seller.
+        - BFF Seller `CustomerController` va `CouponController`: dang goi endpoint customer global va render khong loc lai theo customer cua seller.
+        - Ordering `StatusesAdminController`: module status/status-type dang global (khong co seller ownership), seller nao cung thay/sua duoc tap status chung.
+    - Da patch tenant-scope cho module kho (Catalog `WarehouseAdminController`):
+      - `products`, `products/{id}`, `product-info/{id}` chi tra ve san pham co mapping active trong `SellerProducts` cua seller dang login.
+      - `import-batch`, `export-batch` chan thao tac neu product khong thuoc seller.
+      - `transactions`, `transactions/{id}` loc theo `SellerId`; bo nhip history chia se giua seller.
+      - Luu `SellerId` vao transaction store in-memory de tach du lieu giao dich theo seller.
+    - Da sua BFF Seller Warehouse import dropdown de dung endpoint scope theo seller:
+      - `WarehouseController.PopulateImportProducts` goi `/api/admin/warehouse/products?page=1&pageSize=5000` thay vi `/api/products`.
+    - Da sua leak `Seller/Report/Review` o Ordering `ReportsAdminController`:
+      - `GET /api/orders/admin/reports/reviews` da scope theo seller (dieu kien ton tai `SellerOrderItems` khop `ProductId + UserId` cua review).
+      - `GET /api/orders/admin/reports/reviews/export` da scope theo seller.
+      - `DELETE /api/orders/admin/reports/reviews/{reviewId}` da check ownership seller truoc khi soft-delete.
+      - Bo sung helper `ApplySellerScopeToReviewsQuery(...)` de dung chung trong review report APIs.
+    - Da chay lai static smoke sau patch review report:
+      - `bash scripts/seller_static_smoke.sh` -> PASS (legacy hits 0, missing route 0, @page hits 0).
+    - Da harden lai token isolation o BFF Seller de giam leak cross-account do token cu:
+      - `LegacySellerControllerBase.GetAccessToken`: chi chap nhan token co `sub` giong `ClaimTypes.NameIdentifier` cua principal hien tai.
+      - Bo chap nhan token session/claim khong parse duoc user id; token sai user bi xoa khoi session.
+      - `AdminAccountController.Login`: sign-out cookie cu + clear session key admin/token truoc khi gan token moi.
+      - Them claim `sub`/`JwtRegisteredClaimNames.Sub` luc sign-in de doi chieu token-user nhat quan.
+    - Da khoa duong nap token tu request header o cac Seller BFF controllers de tranh lay nham token cu:
+      - Da sua `CreateAuthorizedClient`/`CreateOrderingClient` trong `OrderController`, `CustomerController`, `CouponController`, `ShippingController`, `WarehouseController`.
+      - Chi con su dung `GetAccessToken(ACCESS_TOKEN)` (token da verify `sub` khop user dang login), khong con uu tien `Request.Headers.Authorization`.
+    - Da chot them phan migrate User Management sang Admin:
+      - Don gon `Areas/Seller/Controllers/UserController.cs` ve che do vo hieu hoa thuong truc (khong con code goi API `auth/admin/users`).
+      - BFF `Program.cs` bo chan truoc duong dan `/Seller/User*` trong middleware redirect, de cho action seller tra thong bao vo hieu hoa ro rang.
+    - Da migrate module `Status/StatusType` sang lane Admin:
+      - Them `Areas/Admin/Controllers/StatusController.cs` (AdminOnly) goi Ordering `/api/orders/admin/status*`.
+      - Them models `Areas/Admin/Models/StatusAdminModels.cs`.
+      - Copy views tu Seller sang `Areas/Admin/Views/Status/{Status,StatusType}.cshtml` va tro ve layout admin.
+      - `Areas/Admin/Views/_ViewImports.cshtml` bo sung `Admin.Models` + `Microsoft.AspNetCore.Mvc.Rendering`.
+      - Ordering API `StatusesAdminController` doi policy `AdminOnly`.
+      - BFF `Program.cs` bo chan `/Seller/Status*` trong middleware redirect (cho action seller tu tra thong bao khoa).
+    - Da fix loop redirect khi user khong co role Admin truy cap `/Admin/*`:
+      - `AccountController.RedirectToLocal` chuyen ve dung dashboard neu returnUrl la `/Admin/*` ma user khong co role `Admin` (va nguoc lai cho `/Seller/*`).
+    - Da bat dau Sprint A - Buoc 1 (Admin Dashboard global):
+      - Ordering API: them `PlatformAdminController` (`AdminOnly`) voi endpoint `GET /api/orders/admin/platform/dashboard`.
+      - KPI tra ve: `gmv`, `platformRevenue`, `totalOrders`, `newOrdersToday`, `cancelledOrders`, `cancelRate`, `realtimeTransactions`, trend 7 ngay (`trendLabels/trendOrders/trendGmv`).
+      - Identity API: them `GET /auth/admin/users/metrics` (`AdminOnly`) trong `AdminUsersController`.
+      - KPI user tra ve: tong user, user moi hom nay/7 ngay, tong seller/buyer + seller/buyer moi 7 ngay, traffic session hom nay, active sessions.
+      - BFF Admin: `Areas/Admin/Controllers/HomeController` da goi song song 2 endpoint tren va map vao ViewModel.
+      - BFF Admin: them model `Areas/Admin/Models/AdminDashboardModels.cs`.
+      - UI Admin Dashboard (`Areas/Admin/Views/Home/Dashboard.cshtml`) da thay placeholder bang giao dien analytics xanh duong, co hieu ung quet anh sang + chart xu huong 7 ngay.
+    - Da tiep tuc Sprint A - Buoc 3 (Admin Logistics lane):
+      - Them BFF controller `Areas/Admin/Controllers/ShippingController.cs` (`AdminOnly`) theo service-first goi `Ordering /api/orders/admin/shippings`.
+      - Them view `Areas/Admin/Views/Shipping/ManageShipping.cshtml` (giu nguyen UI/UX Seller, doi route area sang `Admin` + layout admin).
+      - Cap nhat sidebar admin: them menu `Quan ly van chuyen` (`/Admin/Shipping/ManageShipping`).
+    - Da hoan tat Sprint A - Buoc 2 (tach lane User Management theo role):
+      - Identity API `AdminUsersController.Get` bo sung filter `userType`, `isActive`, `createdFrom`, `createdTo`.
+      - BFF `Areas/Admin/Controllers/UserController` them route rieng:
+        - `/Admin/User/ManageAdmins`
+        - `/Admin/User/ManageSellers`
+        - `/Admin/User/ManageBuyers`
+      - BFF them `AdminUserManagementPageViewModel` de giu state filter/page metadata cho UI User lane Admin.
+      - UI `Areas/Admin/Views/User/ManageUsers.cshtml` them lane tabs (All/Admin/Seller/Buyer), bo loc trang thai + khoang ngay tao, va doi label modal/table theo lane hien tai.
+      - Sidebar Admin bo sung shortcut rieng cho Admin/Seller/Buyer user lanes.
+    - Da trien khai tiep lane Admin cho Reports + Coupons (global scope):
+      - Ordering API:
+        - `ReportsAdminController` doi policy sang `SellerOrAdmin`, cho Admin doc/xuat/xoa review tren scope toan san; Seller giu seller-scope nhu cu.
+        - `CouponsAdminController` doi policy sang `SellerOrAdmin`, cho Admin CRUD/toggle/statistics/distribution/send coupon tren scope toan san; Seller giu scope theo `CreatedBy`.
+      - BFF Admin:
+        - Them `Areas/Admin/Controllers/ReportController.cs` (AdminOnly), render lai bo view report hien co theo layout Admin.
+        - Them `Areas/Admin/Controllers/CouponController.cs` (AdminOnly), render lai `ManageCoupons` theo layout Admin.
+        - Sidebar Admin bo sung menu `Bao cao` va `Ma giam gia`.
+      - Razor views Seller duoc harden de dung chung cho lane Admin:
+        - Doc `ViewData["AreaName"]` / `ViewData["LayoutPath"]` de route/export/layout linh hoat.
+        - `Report/Customer.cshtml` khoa nut edit customer khi render trong lane Admin (tam hien badge `Admin view`).
+    - Da bat dau module 7.4 Catalog Management (phase dau - trung tam danh muc):
+      - Catalog API:
+        - Them policy `SellerOrAdmin`.
+        - Mo write endpoints `CategoriesController` va `UnitsController` cho `SellerOrAdmin`.
+      - BFF Admin:
+        - Them `Areas/Admin/Controllers/CategoryController.cs` (AdminOnly), render lai views `Seller/Category/*` theo layout Admin.
+        - Them `Areas/Admin/Controllers/UnitController.cs` (AdminOnly), render lai views `Seller/Unit/*` theo layout Admin.
+        - Sidebar Admin bo sung menu `Danh muc` va `Don vi tinh`.
+      - Razor views `Seller/Category` + `Seller/Unit` duoc harden de dung chung lane Admin:
+        - Ho tro `ViewData["AreaName"]` / `ViewData["LayoutPath"]`.
+        - Form/breadcrumb/dashboard links khong con hard-code `area = Seller`.
+    - Da hoan tat MVP module `Disputes & CS` cho lane Admin:
+      - Ordering API:
+        - Them `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/DisputesAdminController.cs` (`AdminOnly`).
+        - API moi:
+          - `GET /api/orders/admin/disputes/queue`
+          - `GET /api/orders/admin/disputes/details?type=&id=`
+        - Queue duoc bridge tu `SupportConversation/SupportMessage`, `ReturnRequest`, `RefundTransaction`.
+        - Co filter `q/section/status/sellerId`, heuristic `SLA breach`, va payload detail gom buyer/seller/order/after-sales tren 1 man.
+      - BFF Admin:
+        - Them `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`.
+        - Them model `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/DisputeAdminModels.cs`.
+        - Them view `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Dispute/Index.cshtml`.
+        - Sidebar Admin bo sung menu `Tranh chap & CS`.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\`
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\`
+        - Build pass; build thuong vao `bin/Debug` van co the fail neu file dang bi Visual Studio/runtime lock.
+    - Da fix lane Admin `Customer` bi hien `0 khach hang` du du lieu Ordering van co:
+      - Nguyen nhan: BFF phu thuoc cứng `Identity /auth/admin/customers`; neu role `Customer` trong Identity bi lech/chua backfill, trang se trong.
+      - Fix o `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CustomerController.cs`:
+        - Giữ source chinh tu `Identity /auth/admin/customers`.
+        - Them fallback sang `Ordering /api/orders/admin/customers/ids`.
+        - Backfill thong tin user bang `Identity /auth/admin/users/{id}` va merge theo `userId`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\`
   - *Now*:
-    - Cho user restart services va retest lai report sau data-quality guard.
-    - Doi chieu lai thong ke UI voi output triage SQL (luong da bo outlier).
+    - Workspace hien build on dinh sau `Campaigns`, `Ads wallet`, `Risk center`, `Audit center`, `Catalog readiness`, `Fresh ops`, va `Communications governance`.
+    - `Fresh ops` da verify SQL tren DB that; `Communications governance` cung da duoc user apply CSDL.
+    - Da hoan tat patch code `Campaigns + Ads wallet MVP` cho lane Admin:
+      - Ordering API co schema/model/controller `Campaign`, `CampaignSellerParticipation`, `CampaignProductSlot`, `SellerAdsWallet`, `AdsTopup`, `AdsSpendLedger`, `AdsCampaign`.
+      - BFF Admin co lane `/Admin/Campaign/Index` + `Campaign center` + `ads finance overview` + form thao tac `topup/spend/create ads campaign`.
+      - Da them SQL docs delta/verify cho schema `campaigns` va `ads wallet` trong Ordering DB.
+    - Da hoan tat `Risk center MVP` cho `7.7A Cross-cutting Marketplace Controls`:
+      - Ordering API co schema/model/controller moi: `RiskCase`, `RiskSignal`, `RiskDecision`, `VoucherAbuseCase`, `RiskAdminController`.
+      - Heuristic sync MVP tao queue tu `CouponUsageHistory` (voucher abuse) va `ReturnRequest` (return spike), co detail + decision log.
+      - BFF Admin co lane `/Admin/Risk/Index`, menu `Risk center`, queue/detail/decision form.
+      - Da them SQL docs delta/verify cho schema risk center trong Ordering DB.
+    - Da hoan tat `Audit center MVP` cho `7.7A Cross-cutting Marketplace Controls`:
+      - Ordering API co schema/model/controller moi: `AdminActionLog`, `ModerationAudit`, `SettlementAudit`, `AuditAdminController`.
+      - Da hook audit vao `CampaignsAdminController` (create/update/toggle campaign, ads topup/spend/create ads campaign) va `RiskAdminController` (sync heuristic, decision).
+      - BFF Admin co lane `/Admin/Audit/Index`, menu `Audit center`, overview + action log + moderation audit + settlement audit.
+    - Da them SQL docs delta/verify cho schema audit center trong Ordering DB.
+    - Da hoan tat `Catalog readiness MVP` cho `7.7A Search/catalog readiness`:
+      - Catalog API co `CatalogReadinessAdminController` voi `GET center`, `POST/PUT category-attributes`, `POST sync-product-info`.
+      - Catalog model/schema co `CategoryAttribute`, `ProductAttributeValue`, EF map trong `FreshFarmCatalogDBContext.Extras.cs`.
+      - BFF Admin co lane `/Admin/CatalogReadiness/Index`, menu `Catalog readiness`, readiness queue + attribute registry + form create/update + sync.
+      - Da them SQL docs delta/verify cho schema catalog readiness trong Catalog DB.
+    - Da hoan tat `Fresh-goods operations MVP` cho `7.7A Fresh-goods operations`:
+      - Catalog API co `FreshGoodsAdminController` voi `GET center`, `POST lots`, `POST recalls`, `POST recalls/{id}/resolve`.
+      - Catalog model/schema co `FreshInventoryLot`, `FreshQualityRecall`; `Product` partial duoc noi them collections lots/recalls.
+      - BFF Admin co lane `/Admin/FreshOps/Index`, menu `Fresh ops`, FEFO queue, bang lot, danh sach recall, form tao lot va tao recall.
+      - Da them SQL docs delta/verify cho schema fresh ops trong Catalog DB.
+    - User da verify SQL `Fresh ops` tren DB that:
+      - `FreshInventoryLot` va `FreshQualityRecall` ton tai; cac index verify = 1.
+      - Row count hien = 0 la hop le cho trang thai chua phat sinh lo hang/recall.
+    - Da hoan tat `Communications governance MVP` cho `7.7A Communications governance`:
+      - Ordering API co `CommunicationsAdminController` voi lane `GET center`, `POST templates`, `POST policies`, `POST preferences`, va `toggle` cho template/policy.
+      - Ordering model/schema co `CommunicationTemplate`, `NotificationPolicyRule`, `NotificationPreference`; da log action vao `AdminActionLog`.
+      - BFF Admin co lane `/Admin/Communication/Index`, menu `Comms governance`, dashboard template/policy/preference, va form tao rule.
+      - Da them SQL docs delta/verify cho schema communications governance trong Ordering DB.
+    - Da fix drift sau khi EF Power Tools regenerate context:
+      - `FreshFarmOrderingDBContext.Extras.cs` va `FreshFarmCatalogDBContext.Extras.cs` khong con khai bao trung `DbSet` da duoc generate vao context chinh.
+      - Catalog partials giu lai phan thieu thuc su can bo sung (`CategoryAttribute` navigation + `ProductAttributeValue` mapping/DbSet).
+      - Ordering/Catalog/BFF build lai PASS sau patch.
+    - Da sua script verify SQL `risk-center` va `audit-center`:
+      - Bo alias `RowCount` vi đung keyword `ROWCOUNT` cua SQL Server.
+      - Doi sang `TotalRows` de chay on dinh trong SSMS.
+    - Da sua SQL `catalog-readiness` delta:
+      - FK `CategoryAttribute -> dbo.Categories(CategoryID)`
+      - FK `ProductAttributeValue -> dbo.Products(ProductID)`
+    - Da build verify thanh cong:
+      - `src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.API.csproj`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj`
+      - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj`
+    - Da xac minh lai workspace sau `Fresh ops`:
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_check2\` -> PASS, 0 warning.
+      - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog_check2\` -> PASS, 3 warning cu o `ProductsController`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_check2\` -> PASS, warning cu/nullability + MVC1000.
+    - Da build verify `Communications governance MVP`:
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\communications_ordering\` -> PASS, warning cu/nullability o `OrdersController` + `CommunicationsAdminController`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\communications_bff\` -> PASS, 0 warning.
+    - Da verify lai sau khi user apply CSDL communications:
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\post_comms_ordering\` -> PASS, 0 warning.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\post_comms_bff\` -> PASS, 31 warning cu.
+    - Da bat dau cleanup warning build uu tien cao cho Web BFF:
+      - Fix `CS8073` o `Areas/Seller/Views/Unit/Edit.cshtml`.
+      - Fix nullability o `CheckoutController`, `Areas/Seller/Views/Shared/_SideBar.cshtml`, `Category/{Edit,ManageCategories}.cshtml`, `Product/{Create,Edit,ManageProducts}.cshtml`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\warning_cleanup_bff\` -> PASS, con 20 warning.
+    - Da go them blocker build co san o lane Merchant (`sealed` inheritance trong DTO/view model).
+    - Da tang thong diep loi runtime cho `/Admin/Campaign/Index` o BFF:
+      - Hien `HTTP status` + body snippet de de triage loi schema/API.
+      - Seed fallback options cho bo loc khi API list fail.
   - *Next*:
-    - Neu `Report/Product` van fail: lay HTTP status/message tu alert `ViewBag.ErrorMessage` + log API de khoanh vung tiep.
-    - Neu ManageOrders van 0đ: dump JSON endpoint `/Seller/Order/GetOrdersPaged` de bat contract drift con lai.
-    - Khi runtime on dinh: tiep tuc lot 4.5.6 migrate customer/orders tu `final3.sql` theo roadmap da tao.
+    - User/apply DB scripts neu muon bat runtime `Risk center`:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.delta.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.verify.sql`
+    - User/apply DB scripts neu muon bat runtime `Audit center`:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.audit-center.delta.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.audit-center.verify.sql`
+    - User/apply DB scripts neu muon bat runtime `Catalog readiness`:
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.catalog-readiness.delta.sql`
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.catalog-readiness.verify.sql`
+    - User/apply DB scripts neu muon bat runtime `Fresh ops`:
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.fresh-ops.delta.sql`
+      - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.fresh-ops.verify.sql`
+    - Retest lane moi `/Admin/Risk/Index`:
+      - Thu `Dong bo heuristic`, filter `type/status/severity`, mo case detail, ghi `decision`.
+      - Doi chieu case `voucher_abuse` va `return_spike` co sinh tu du lieu that hay khong.
+    - Retest lane moi `/Admin/Audit/Index`:
+      - Thu filter `q/area/type`, doi chieu action log sau khi thao tac `Campaign center` va `Risk center`.
+      - Xac nhan `ModerationAudit` sinh khi ghi decision risk, `SettlementAudit` sinh khi topup/spend/reserve ads budget.
+    - Retest lane `/Admin/Campaign/Index`:
+      - Tao/sua campaign, mo/dong dang ky seller, doi chieu detail participation/slot.
+      - Thu `topup/spend/create ads campaign`, doi chieu cards `wallet/balance/reserved/running ads`.
+      - Thu lien ket voucher qua `VoucherCouponId` va xac nhan badge/timeline render dung.
+    - Retest lane `/Admin/CatalogReadiness/Index`:
+      - Thu tao/cap nhat attribute, sync readiness tu `ProductInfo`, doi chieu queue san pham thieu thuoc tinh.
+    - Retest lane `/Admin/FreshOps/Index`:
+      - Thu tao lot moi, doi chieu FEFO queue theo `ExpiresAt`, tao recall, va `resolve recall`.
+    - Retest lane `/Admin/Communication/Index`:
+      - Thu tao template, tao policy, ghi de preference opt-in/out, va toggle template/policy.
+      - Doi chieu `Audit center` co log area `communications_governance`.
+    - User/apply DB scripts neu muon bat runtime module moi:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-08.7.7.campaigns.delta.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-08.7.7.campaigns.verify.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7.ads-wallet.delta.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7.ads-wallet.verify.sql`
+    - Tiep tuc cleanup warning build uu tien cao:
+      - `Areas/Seller/Views/Report/{Order,Product,Review}.cshtml`
+      - `Areas/Seller/Views/Review/ManageReview.cshtml`
+      - `Areas/{Seller,Admin}/Views/Shipping/ManageShipping.cshtml`
+      - `Areas/{Admin,Seller}/Views/*/_LayoutAdmin.cshtml` MVC1000 (`Partial` -> `<partial>`/`PartialAsync`)
+    - Sau khi cleanup warning on dinh, chot smoke test tay cho cac lane moi cua Sprint D.
+    - Retest lane moi `/Admin/Merchant/Index`:
+      - Thu filter `q/status`, chon seller xem detail, thu `Tạm khóa/Mở lại seller`.
+      - Xac nhan badge compliance, flag heuristic, diem ho so, thong tin lien he/dia chi render dung.
+    - Retest lane `Voucher san`:
+      - `/Admin/Coupon/ManageCoupons`
+      - Thu `Create/Edit/Delete/Toggle/GenerateCode/GetStatistics/SendToCustomers`.
+      - Xac nhan coupon moi tao boi Admin vao scope `platform` (khong leak vao lane Seller).
+    - Retest `Disputes & CS` tren lane Admin:
+      - `/Admin/Dispute/Index`
+      - Xac nhan queue co case tu `support/returns/refunds`, filter dung, detail panel render on dinh.
+    - Neu `Disputes & CS` on dinh, tiep tuc module roadmap tiep theo:
+      - `Flash sale / campaign participation schema`
+    - Retest `Product` tren ca `Seller` va `Admin`:
+      - `/Seller/Product/ManageProducts`
+      - `/Admin/Product/ManageProducts`
+      - `/Admin/Product/Create`
+      - `/Admin/Product/Edit/{id}`
+      - Thu `Create/Edit/Delete/ToggleStatus/GetProductDetails`.
+    - Retest `CatalogModeration` tren lane Admin:
+      - `/Admin/CatalogModeration/Index`
+      - Thu filter theo `q/state/risk/keyword`.
+      - Thu `Duyet` / `An san pham` va doi chieu lai trang thai o `/Admin/Product/ManageProducts`.
+      - Xac nhan cac dong bi gan co dung keyword/du lieu thieu; luu y day la heuristic MVP, chua co persistence moderation decision rieng.
+    - Retest `Notification Center` tren lane Admin:
+      - `/Admin/Notification/Index`
+      - Thu filter theo `q/type/isRead/userId/orderId`.
+      - Thu `Danh dau da doc` tung dong va `Danh dau da doc toan bo`.
+      - Doi chieu link order sang `/Admin/Shipping/ManageShipping`.
+    - Retest `Finance` tren ca `Seller` va `Admin`:
+      - `/Seller/Finance/Index`
+      - `/Admin/Finance/Index`
+      - Thu chuyen 3 tab `Payouts/Refunds/Returns`.
+      - Thu filter theo `q/status`; voi Admin thu them filter `seller`.
+      - Xac nhan so lieu cards khop ky vong scope (`GMV`, `captured`, `commission`, `pending payout`, `refund`, `open return/refund`).
+    - Retest `Delivery` tren ca `Seller` va `Admin`:
+      - `/Seller/Delivery/Index`
+      - `/Admin/Delivery/Index`
+      - Thu doi filter trang thai, pagination, `Nhan giao`, `Da giao`, `Huy`.
+    - Retest `Loyalty` tren ca `Seller` va `Admin`:
+      - `/Seller/Loyalty/{Index,Users,History,Config}`
+      - `/Admin/Loyalty/{Index,Users,History,Config}`
+      - Thu `AdjustPoints` voi ca 2 truong hop co/khong tick `includeInRank`.
+      - Thu `SyncAward` voi khoang ngay hop le va khoang ngay sai (`start > end`) de xac nhan message.
+    - Retest `/Admin/Feedback/Index`: list/search/view detail/update status/delete feedback o scope toan san.
+    - Retest `/Admin/SupportChat/Index`: conversations/messages/details/send/mark-read/close va link sang don hang.
+    - Retest `/Admin/Setting/Index`: load/save, tabs, validate route sang `ManageShipping`.
+    - Retest `/Admin/Customer/{ManageCustomers,Create,Edit}` + `Search` + `Delete`.
+    - Neu van con hoi thoai/tin nhan mau, can xoa ban ghi seed cu trong DB `SupportConversations`/`SupportMessages`.
+    - Thu lai create user o `/Admin/User/ManageUsers`; doi chieu toast moi de xac dinh neu bi duplicate username/email/phone hoac loi validation.
+    - Retest ngay luong `/Admin`:
+      - Logout -> login lai account Admin.
+      - Mo `/Admin` va xac nhan khong con banner loi KPI HTTP 500.
+      - Neu van loi, lay stack trace/log backend (Identity/Ordering) de fix goc schema.
+    - Sprint A - Buoc 3 (phan con lai):
+      - Chot QA lane Orders & Logistics global cho Admin (`Order + Shipping`) va sua loi runtime neu co.
+    - Retest lane Admin moi:
+      - `/Admin/Report/Revenue` + cac page report con lai -> test filter/export/delete review.
+      - `/Admin/Coupon/ManageCoupons` -> test list/create/edit/delete/toggle/send coupon.
+      - `/Admin/Category/ManageCategories` + `/Admin/Category/Create|Edit/{slug}` -> test list/create/edit/delete.
+      - `/Admin/Unit/Index` + `/Admin/Unit/Create|Edit/{id}` -> test list/create/edit/delete/toggle.
+    - Module tiep theo trong roadmap Admin sau khi retest on:
+      - Catalog moderation (moderation queue / blacklist / audit) hoac disputes / CS theo phase sau.
+    - User retest nhanh migration User Management:
+      - Seller vao `/Seller/User/ManageUsers` -> phai bi chuyen ve Profile kem thong bao vo hieu hoa.
+      - Admin vao `/Admin/User/ManageUsers` -> test Search/Create/Update/Delete.
+      - Admin vao `/Admin/User/ManageAdmins|ManageSellers|ManageBuyers` -> test tab/filter theo role + create/update/delete trong tung lane.
+    - User retest module `Status/StatusType` lane Admin:
+      - Admin vao `/Admin/Status/Status` va `/Admin/Status/StatusType` -> test list/create/edit/delete.
+      - Seller vao `/Seller/Status/Status*` -> phai bi chan va hien thong bao khoa.
+    - Retest full lane Admin User:
+      - Dang nhap account role `Admin`, mo `/Admin/User/ManageUsers`, test Search/Create/Update/Delete.
+      - Xac nhan seller account khong con truy cap duoc `/auth/admin/users` va `/Admin/User/*`.
+    - Tiep tuc migrate lane Admin (service-first + role isolation):
+      - Migrate `Status/StatusType`, `Reports`, `Coupons`, `Shipping`.
+      - Tach endpoint: seller dung `SellerOnly`, admin dung `AdminOnly` (khong dung chung route/controller de tranh leak quyen).
+      - Smoke test Admin pages uu tien: Dashboard, User, Status/StatusType, Reports, Coupons, Shipping.
+    - Chot patch tenant isolation cho module con lai:
+      - Quy dinh module `Status/StatusType` la global hay tenant-specific; neu tenant-specific can them ownership va seller filter.
+      - Danh gia `auth/admin/customers` cho seller (hien global), can endpoint scope theo order ownership hoac disable tac vu vuot pham vi.
+    - User can retest ngay sau patch token isolation:
+      - Stop/start lai `FreshFarm.Web.Bff` + APIs.
+      - Dang xuat seller hien tai, xoa cookie/session trinh duyet, dang nhap lai account `tho`.
+      - Recheck `Order/Customer/Coupon/Warehouse/Report-Review` xem con hien du lieu seller khac hay khong.
+    - YEU CAU user chay doi chieu DB de xac dinh data leak hay ownership da gan vao seller:
+      - `Identity.Users` userId cua account `tho`.
+      - `Catalog.SellerProducts` theo `SellerID = <thoUserId>`.
+      - `Ordering.SellerOrders` theo `SellerID = <thoUserId>`.
+      - `Ordering.Coupons` theo `CreatedBy = <thoUserId>`.
+    - Neu build pass, tiep tuc retest realtime chat Seller (gui/nhan/mark-read/close conversation).
+    - User can chay:
+      - Smoke UI/APIs cho Seller scope:
+        - `/Seller/Order/ManageOrders`
+        - `/Seller/Report/{Customer,Order,Revenue,Product,Shipping}`
+        - `/Seller/Coupon/ManageCoupons`
+        - `/Seller/Shipping/ManageShipping`
+        - `/Seller/Review/{ManageReview,ReportedReviews}`
+        - `/Seller/SupportChat/Index`
+        - `/Seller/Feedback/Index`
+      - Test tenant isolation voi 2 seller account:
+        - Doi chieu orders/reports/coupons/shipping/reviews khong bi leak cross-seller.
+      - Neu pass, danh dau hoan tat lane Seller runtime (lot 4.6) va chuyen qua module con global (`Status`, `Loyalty`) de quyet dinh co tenant-scope hay khong.
+    - Sau do smoke-test:
+      - `/Seller/Product/ManageProducts` (chi thay san pham cua seller dang login)
+      - `/Seller/Warehouse/ImportCart` (them gio + xac nhan nhap khong con loi convert `productId`)
+      - `/Seller/Report/{Customer,Order,Revenue,Product,Shipping}` (khong leak cross-seller data)
+      - `/Seller/Coupon/ManageCoupons` (scope theo seller)
+      - `/Seller/Customer/ManageCustomers` (metrics/order totals khop seller scope)
+      - `/Seller/Shipping/ManageShipping`
+      - `/Seller/Review/{ManageReview,ReportedReviews}`
+      - `/Seller/Feedback/Index`
+      - `/Seller/SupportChat/Index`
+    - Test them tenant isolation:
+      - Dang nhap 2 seller khac nhau, doi chieu danh sach don/report/coupon/review/shipping phai khac scope.
+      - Kiem tra seller da co mapping ownership se KHONG thay order/coupon legacy global.
+    - Neu status module can tenant-scope rieng, can bo sung schema/ownership cho `Status`/`StatusType` (hien van global).
+    - Danh gia tiep `LoyaltyAdminController` de tenant-scope (hien van doc global `LoyaltyPointHistory/Orders`).
+    - Chay lai:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.seller-runtime-diagnostics.sql`
+      - smoke UI: `ManageOrders`, `Report/{Order,Revenue,Customer,Product}`.
+    - Neu van `401` o Report/Coupon/Status: trace token/auth policy o Ordering/Identity APIs.
+    - Sau 4.5.6 on dinh: tiep tuc lot 4.6 (re-check binding/route toan bo Seller views).
+    - Thu thap reference UI Admin (Shopee/Amazon) tu user hoac tai lieu noi bo; chot guideline UI Admin khop theme Seller.
 - **Open questions** (UNCONFIRMED if needed):
-  - UNCONFIRMED ket qua UI sau patch moi nhat (can user retest va gui screenshot).
-  - UNCONFIRMED co outlier du lieu `OrderDetail.Quantity` can cleanup o DB goc hay khong.
+  - Da xac nhan user da yeu cau bat dau ngay; Sprint A buoc 1 (Dashboard global) da duoc implement.
+  - Da xac nhan user chon huong (A): skip import final3 tam thoi, lam runtime multi-seller truoc.
+  - UNCONFIRMED schema nguon final3 co thong tin phan bo seller ownership hay khong (neu khong co can luat mapping bo sung).
+  - UNCONFIRMED co can tach tenant cho `Status`/`StatusType` hay cho phep dung chung he thong.
+  - UNCONFIRMED cac reference/UI guideline cu the (Shopee/Amazon) can theo; can user cung cap link/screenshot.
+  - Da xac nhan user da apply catalog `SellerProducts` delta/verify tren DB that (`VerifyStatus=PASS`, `SellerProductRows=100`).
+  - Da xac nhan ownership backfill Ordering sau cleanup dat PASS (`UnmappedOrderDetails=0`).
+  - Build `dotnet` dang chay duoc trong moi truong hien tai; van UNCONFIRMED runtime UI/API that sau khi user retest.
+  - UNCONFIRMED DB that da apply schema Campaign chua; can chay script delta/verify truoc khi retest runtime `/Admin/Campaign`.
+  - UNCONFIRMED DB that da apply schema `Ads wallet`; can chay script delta/verify truoc khi retest topup/spend/ads campaign.
+  - UNCONFIRMED DB that da apply schema `Risk center`; can chay script delta/verify truoc khi retest `/Admin/Risk`.
+  - UNCONFIRMED DB that da apply schema `Audit center`; can chay script delta/verify truoc khi retest `/Admin/Audit`.
+  - UNCONFIRMED DB that da apply schema `Catalog readiness`; can chay script delta/verify truoc khi retest `/Admin/CatalogReadiness`.
+  - Da xac nhan DB that da apply schema `Fresh ops` (`verify` pass, row count = 0).
+  - Da xac nhan user da apply schema `Communications governance`.
 - **Working set** (files/ids/commands):
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
   - `LOT_4_5_PERSISTENCE_HARDENING.md`
   - `CONTINUITY.md`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CampaignsAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AuditAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AdminAuditLogger.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/RiskAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/PlatformAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/DisputesAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/NotificationsAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CommunicationsAdminController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminUsersController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/CatalogReadinessAdminController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/FreshGoodsAdminController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Models/FreshFarmCatalogDBContext.Extras.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Models/FreshInventoryLot.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Models/FreshQualityRecall.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/CommunicationTemplate.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/NotificationPolicyRule.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/NotificationPreference.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CampaignController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AuditController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/RiskController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogReadinessController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FreshOpsController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogModerationController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/HomeController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/NotificationController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CommunicationController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/CampaignAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/AuditAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/RiskAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/CatalogReadinessAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FreshOpsAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/CommunicationGovernanceAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/AdminDashboardModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/DisputeAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/NotificationAdminModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/ProductModerationModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/FinanceController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Campaign/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Audit/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Risk/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/CatalogReadiness/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/FreshOps/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/CatalogModeration/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Dispute/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Home/Dashboard.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Notification/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Communication/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Shared/_SideBar.cshtml`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-import.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-import.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-08.7.7.campaigns.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-08.7.7.campaigns.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7.ads-wallet.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7.ads-wallet.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.audit-center.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.audit-center.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.communications-governance.delta.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-10.7.7a.communications-governance.verify.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.catalog-readiness.delta.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.catalog-readiness.verify.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.fresh-ops.delta.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-10.7.7a.fresh-ops.verify.sql`
+  - `docs/LOT_4_5_6_EXECUTION_RUNBOOK_2026-02-28.md`
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.seller-runtime-diagnostics.sql`
   - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-27.4.5.4.delta.sql`
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.4.hotfix-indexes.sql`
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-27.4.5.4.verify.sql`
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.{delta,verify,down}.sql`
+  - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.seed-template.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.verify.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.unmapped-orderdetail-diagnostics.sql`
+  - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.invalid-orderdetail-product-remediation.sql`
+  - `docs/FreshFarmCatalogDb/SCHEMA_ALIGNMENT_2026-03-01.md`
   - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-27.4.5.4.verify.sql`
   - `docs/final3.sql`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{OrderController,ReportController}.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Infrastructure/LegacySellerControllerBase.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/AdminAccountController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{CouponController,StatusController,ShippingController,SupportChatController,UserController,SettingController,ReviewController,ProductController,CategoryController,WarehouseController,LoyaltyController,HomeController,DeliveryController,CustomerController,FeedbackController,UnitController}.cs`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/User/ManageUsers.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Warehouse/ImportCart.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FeedbackController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Feedback/Index.cshtml`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FeedbacksAdminController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/SupportChatController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/SupportChat/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/LoyaltyAdminController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/LoyaltyController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Loyalty/{Index,Users,History,Config}.cshtml`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/SettingController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Setting/Index.cshtml`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminCustomersController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AdminCustomersController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CustomerController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Customer/{ManageCustomers,Create,Edit}.cshtml`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ReportsAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CouponsAdminController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/{ShippingAdminController,ReviewsAdminController,SupportChatAdminController,AdminCustomersController}.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FeedbacksAdminController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Models/{SellerProduct,FreshFarmCatalogDBContext.Extras}.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Order/ManageOrders.cshtml`
   - Commands:
     - `rg -n "INSERT \[dbo\]\.\[Orders\]|INSERT \[dbo\]\.\[Users\]" docs/final3.sql`
     - `rg -n "GetAdminOrdersPaged|Revenue|Products" ...`
     - `sed -n ...` de doi chieu mapping/controller/view.
+    - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\`
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\`
+
+
+

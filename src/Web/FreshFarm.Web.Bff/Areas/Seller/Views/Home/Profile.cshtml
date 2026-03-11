@@ -8,72 +8,386 @@
     string roleName = ViewBag.RoleName as string ?? "—";
     string avatar = ViewBag.Avatar as string ?? "no-avatar.jpg";
     Func<string, string> avatarUrl = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-avatar.jpg" : f));
+
+    var activities = ViewBag.Activities as IEnumerable<string> ?? Enumerable.Empty<string>();
 }
 
 <style>
-    .profile-header {
-        background: linear-gradient(135deg,#28a745,#218838);
-        color: #fff;
-        border-radius: 10px;
-        padding: 30px;
-        text-align: center
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+        --glass-border: rgba(148, 163, 184, 0.30);
+        --shadow-blue: rgba(30, 64, 175, 0.18);
     }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-8px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    /* Light sweep / shimmer */
+    @@keyframes sweepLight {
+        0% {
+            left: -70%;
+            opacity: 0;
+        }
+
+        10% {
+            opacity: 1;
+        }
+
+        55% {
+            opacity: 1;
+        }
+
+        100% {
+            left: 120%;
+            opacity: 0;
+        }
+    }
+
+    .sweep {
+        position: relative;
+        overflow: hidden;
+    }
+
+        .sweep::after {
+            content: "";
+            position: absolute;
+            top: -30%;
+            left: -60%;
+            width: 50%;
+            height: 160%;
+            transform: rotate(20deg);
+            background: linear-gradient( 90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.18) 55%, rgba(255,255,255,0) 100% );
+            animation: sweepLight 2.8s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        padding: 2.25rem 2rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.45);
+        position: relative;
+        overflow: hidden;
+        color: #fff;
+        animation: fadeInUp .5s ease-out;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0%, transparent 70%);
+            animation: rotate 26s linear infinite;
+            z-index: 0;
+        }
+
+        .grad-header::before,
+        .grad-header::after {
+            pointer-events: none;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            bottom: -40px;
+            right: -40px;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(191, 219, 254, 0.35) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+            z-index: 0;
+        }
+
+    .grad-header-content {
+        position: relative;
+        z-index: 2;
+    }
+
+    .icon-wrapper {
+        background: rgba(15, 23, 42, 0.25);
+        border-radius: 1.5rem;
+        padding: 1.15rem;
+        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-pill {
+        border-radius: 999px;
+        padding: .7rem 1.8rem;
+        font-weight: 600;
+        border: none;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, .18);
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, .25);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-outline-primary {
+        border-radius: 999px;
+        font-weight: 600;
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border-radius: 1.5rem;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 18px 55px var(--shadow-blue);
+        animation: fadeInUp .6s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .section-title {
+        font-weight: 800;
+        color: var(--primary-blue-dark);
+        letter-spacing: .02em;
+    }
+
+    .form-control, .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .7rem 1rem;
+        transition: all .2s ease;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
 
     .profile-avatar {
-        width: 120px;
-        height: 120px;
+        width: 124px;
+        height: 124px;
         border-radius: 50%;
-        border: 4px solid #fff;
+        border: 4px solid rgba(255,255,255,.95);
         object-fit: cover;
-        margin-top: -60px
-    }
-
-    .info-card, .sidebar-right {
+        box-shadow: 0 18px 45px rgba(30, 64, 175, 0.25);
         background: #fff;
-        border-radius: 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,.08);
-        padding: 20px
     }
 
-    .info-card {
-        margin-bottom: 20px
+    .muted-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .35rem .9rem;
+        border-radius: 999px;
+        background: rgba(219,234,254,.8);
+        border: 1px solid rgba(147,197,253,.6);
+        color: #1e3a8a;
+        font-size: .85rem;
+        font-weight: 600;
     }
 
     .sidebar-right {
         position: sticky;
-        top: 20px
+        top: 20px;
+    }
+
+    .list-group-item {
+        border-radius: 1rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        margin-bottom: .6rem;
+        box-shadow: 0 8px 22px rgba(30,64,175,.08);
+        animation: slideIn .35s ease-out backwards;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+
+    @@media (max-width: 992px) {
+        .sidebar-right {
+            position: static;
+            top: auto;
+        }
     }
 </style>
 
-<main class="container-fluid mt-4">
+<main class="container-fluid py-4 min-vh-100">
+
     @if (TempData["SuccessMessage"] != null)
-    {<div class="alert alert-success">@TempData["SuccessMessage"]</div>}
+    {
+        <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Thành công!</strong> @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
 
     @if (TempData["ErrorMessage"] != null)
-    {<div class="alert alert-danger">@TempData["ErrorMessage"]</div>}
+    {
+        <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Lỗi!</strong> @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
 
     @Html.ValidationSummary(true, "", new { @class = "alert alert-danger" })
 
-    <div class="row">
+    <!-- HEADER -->
+    <div class="grad-header sweep mb-4">
+        <div class="grad-header-content">
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                <div>
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="icon-wrapper">
+                            <i class="bi bi-person-badge-fill text-white" style="font-size: 2.2rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1" style="font-size: 2.1rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+                                Hồ sơ quản trị viên
+                            </h1>
+                            <p class="mb-0 opacity-90" style="font-size: 1rem;">
+                                Quản lý thông tin cá nhân và bảo mật tài khoản
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-md-end">
+                    <span class="muted-pill">
+                        <i class="bi bi-shield-check"></i>
+                        @safe(roleName)
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
         <!-- Main -->
         <div class="col-lg-9">
-            <div class="profile-header mb-4">
-                <h2 class="fw-bold">Hồ sơ quản trị viên</h2>
-                <p class="mb-0">Quản lý thông tin cá nhân và bảo mật tài khoản</p>
+
+            <!-- Avatar / Quick info -->
+            <div class="card-glass sweep p-4 mb-4">
+                <div class="d-flex flex-column flex-md-row align-items-center align-items-md-start gap-4">
+                    <div class="text-center">
+                        <img src="@avatarUrl(avatar)" class="profile-avatar" alt="Avatar" />
+                    </div>
+                    <div class="flex-grow-1">
+                        <h4 class="fw-bold mb-1 text-primary">@safe(Model.FullName)</h4>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <span class="muted-pill">
+                                <i class="bi bi-person-fill"></i>@safe(Model.UserName)
+                            </span>
+                            <span class="muted-pill">
+                                <i class="bi bi-envelope-fill"></i>@safe(Model.Email)
+                            </span>
+                            <span class="muted-pill">
+                                <i class="bi bi-telephone-fill"></i>@safe(Model.Phone)
+                            </span>
+                            <span class="muted-pill">
+                                <i class="bi bi-calendar-check"></i>@Model.CreatedDate.ToString("dd/MM/yyyy")
+                            </span>
+                        </div>
+
+                        @* Nếu bật upload avatar *@
+                        @* <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary btn-pill px-4" disabled>
+                                <i class="bi bi-image me-1"></i>Thay đổi ảnh đại diện
+                            </button>
+                        </div> *@
+                    </div>
+                </div>
             </div>
 
-            <div class="text-center mb-4">
-                <img src="https://cdn-icons-png.flaticon.com/512/149/149071.png"
- class="profile-avatar" alt="Avatar" />
-                <h4 class="mt-3">@safe(Model.FullName)</h4>
-                <p class="text-muted">@safe(Model.UserName) • @safe(roleName)</p>
-                <!-- Nếu có tính năng upload avatar, bật nút/đổi link -->
-                @*<button type="button" class="btn btn-outline-success btn-sm" disabled>Thay đổi ảnh đại diện</button>*@
-            </div>
+            <!-- Thông tin cá nhân -->
+            <div class="card-glass sweep p-4 mb-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                    <h5 class="section-title mb-0">
+                        <i class="bi bi-card-checklist me-2"></i>Thông tin cá nhân
+                    </h5>
+                    <span class="text-muted small">
+                        <i class="bi bi-info-circle me-1"></i>Cập nhật đúng email/điện thoại để nhận thông báo
+                    </span>
+                </div>
 
-            <!-- Thông tin cá nhân (khớp UserAdmin) -->
-            <div class="info-card">
-                <h5 class="fw-bold mb-3">Thông tin cá nhân</h5>
                 @using (Html.BeginForm("Profile", "Home", FormMethod.Post, new { area = "Seller" }))
                 {
                     @Html.AntiForgeryToken()
@@ -81,68 +395,81 @@
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.FullName, new { @class = "form-label" })
+                            @Html.LabelFor(m => m.FullName, new { @class = "form-label fw-semibold text-primary" })
                             @Html.TextBoxFor(m => m.FullName, new { @class = "form-control", placeholder = "Họ tên" })
                             @Html.ValidationMessageFor(m => m.FullName, "", new { @class = "text-danger" })
                         </div>
+
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.Email, new { @class = "form-label" })
+                            @Html.LabelFor(m => m.Email, new { @class = "form-label fw-semibold text-primary" })
                             @Html.TextBoxFor(m => m.Email, new { @class = "form-control", type = "email", placeholder = "Email" })
                             @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger" })
                         </div>
+
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.Phone, new { @class = "form-label" })
+                            @Html.LabelFor(m => m.Phone, new { @class = "form-label fw-semibold text-primary" })
                             @Html.TextBoxFor(m => m.Phone, new { @class = "form-control", placeholder = "Số điện thoại" })
                             @Html.ValidationMessageFor(m => m.Phone, "", new { @class = "text-danger" })
                         </div>
 
-                        @* UserAdmin KHÔNG có Address -> bỏ trường này để tránh hiểu nhầm *@
-                        @* <div class="col-md-6">
-                        @Html.LabelFor(m => m.Address, new { @class = "form-label" })
-                        @Html.TextBoxFor(m => m.Address, new { @class = "form-control", placeholder = "Địa chỉ (ghi chú)" })
-                    </div> *@
-
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.UserName, new { @class = "form-label" })
+                            @Html.LabelFor(m => m.UserName, new { @class = "form-label fw-semibold text-primary" })
                             @Html.TextBoxFor(m => m.UserName, new { @class = "form-control", @readonly = "readonly" })
                         </div>
+
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.CreatedDate, new { @class = "form-label" })
+                            @Html.LabelFor(m => m.CreatedDate, new { @class = "form-label fw-semibold text-primary" })
                             <input class="form-control" value="@Model.CreatedDate.ToString("dd/MM/yyyy HH:mm")" readonly />
                         </div>
                     </div>
 
                     <div class="text-end mt-4">
-                        <button class="btn btn-success" type="submit">Cập nhật thông tin</button>
+                        <button class="btn btn-primary btn-pill px-4" type="submit">
+                            <i class="bi bi-save2 me-1"></i>Cập nhật thông tin
+                        </button>
                     </div>
                 }
             </div>
 
             <!-- Đổi mật khẩu -->
-            <div class="info-card">
-                <h5 class="fw-bold mb-3">Đổi mật khẩu</h5>
+            <div class="card-glass sweep p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                    <h5 class="section-title mb-0">
+                        <i class="bi bi-key-fill me-2"></i>Đổi mật khẩu
+                    </h5>
+                    <span class="text-muted small">
+                        <i class="bi bi-shield-lock me-1"></i>Nên dùng mật khẩu mạnh và khác mật khẩu cũ
+                    </span>
+                </div>
+
                 @using (Html.BeginForm("ChangePassword", "Home", FormMethod.Post, new { area = "Seller" }))
                 {
                     @Html.AntiForgeryToken()
+
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label for="CurrentPassword" class="form-label">Mật khẩu hiện tại</label>
+                            <label for="CurrentPassword" class="form-label fw-semibold text-primary">Mật khẩu hiện tại</label>
                             <input id="CurrentPassword" name="CurrentPassword" type="password"
                                    class="form-control" autocomplete="current-password" />
                         </div>
+
                         <div class="col-md-4">
-                            <label for="NewPassword" class="form-label">Mật khẩu mới</label>
+                            <label for="NewPassword" class="form-label fw-semibold text-primary">Mật khẩu mới</label>
                             <input id="NewPassword" name="NewPassword" type="password"
                                    class="form-control" autocomplete="new-password" />
                         </div>
+
                         <div class="col-md-4">
-                            <label for="ConfirmPassword" class="form-label">Xác nhận mật khẩu</label>
+                            <label for="ConfirmPassword" class="form-label fw-semibold text-primary">Xác nhận mật khẩu</label>
                             <input id="ConfirmPassword" name="ConfirmPassword" type="password"
                                    class="form-control" autocomplete="new-password" />
                         </div>
                     </div>
+
                     <div class="text-end mt-4">
-                        <button class="btn btn-outline-success" type="submit">Đổi mật khẩu</button>
+                        <button class="btn btn-outline-primary btn-pill px-4" type="submit">
+                            <i class="bi bi-arrow-repeat me-1"></i>Đổi mật khẩu
+                        </button>
                     </div>
                 }
             </div>
@@ -151,31 +478,45 @@
 
         <!-- Sidebar -->
         <div class="col-lg-3">
-            <div class="sidebar-right">
-                <h5 class="fw-bold mb-3">Tóm tắt tài khoản</h5>
-                <ul class="list-unstyled small">
-                    <li class="mb-2"><i class="bi bi-person-fill text-success me-2"></i>@safe(Model.UserName)</li>
-                    <li class="mb-2"><i class="bi bi-envelope-fill text-success me-2"></i>@safe(Model.Email)</li>
-                    <li class="mb-2"><i class="bi bi-telephone-fill text-success me-2"></i>@safe(Model.Phone)</li>
-                    <li class="mb-2"><i class="bi bi-award-fill text-success me-2"></i>@safe(roleName)</li>
-                    <li><i class="bi bi-calendar-check text-success me-2"></i>Ngày tạo: @Model.CreatedDate.ToString("dd/MM/yyyy")</li>
+            <div class="card-glass sweep p-4 sidebar-right">
+                <h5 class="section-title mb-3">
+                    <i class="bi bi-person-lines-fill me-2"></i>Tóm tắt tài khoản
+                </h5>
+
+                <ul class="list-unstyled small mb-3">
+                    <li class="mb-2"><i class="bi bi-person-fill text-primary me-2"></i>@safe(Model.UserName)</li>
+                    <li class="mb-2"><i class="bi bi-envelope-fill text-primary me-2"></i>@safe(Model.Email)</li>
+                    <li class="mb-2"><i class="bi bi-telephone-fill text-primary me-2"></i>@safe(Model.Phone)</li>
+                    <li class="mb-2"><i class="bi bi-award-fill text-primary me-2"></i>@safe(roleName)</li>
+                    <li><i class="bi bi-calendar-check text-primary me-2"></i>Ngày tạo: @Model.CreatedDate.ToString("dd/MM/yyyy")</li>
                 </ul>
+
                 <hr />
-                <h6 class="fw-bold">Hoạt động gần đây</h6>
-                <ul class="list-group small">
-                    @*<li class="list-group-item">@safe(Model.LastActivity)</li>
-        <li class="list-group-item">Đổi mật khẩu</li>
-        <li class="list-group-item">Cập nhật hồ sơ</li>*@
-                    @foreach (var item in (IEnumerable<string>)ViewBag.Activities)
-                    {
-                        <li class="list-group-item">@item</li>
-                    }
-                </ul>
+
+                <h6 class="fw-bold text-primary mb-2">
+                    <i class="bi bi-activity me-2"></i>Hoạt động gần đây
+                </h6>
+
+                @if (!activities.Any())
+                {
+                    <div class="text-muted small">
+                        <i class="bi bi-info-circle me-1"></i>Chưa có hoạt động gần đây.
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group small">
+                        @foreach (var item in activities)
+                        {
+                            <li class="list-group-item">@item</li>
+                        }
+                    </ul>
+                }
             </div>
         </div>
     </div>
 </main>
 
-@section Scripts{
+@section Scripts {
     <partial name="_ValidationScriptsPartial" />
 }

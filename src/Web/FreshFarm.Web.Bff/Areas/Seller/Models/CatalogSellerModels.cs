@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Models;
 
@@ -38,10 +39,13 @@ public sealed class Product
 
     public bool IsManuallyDisabled { get; set; }
 
+    [ValidateNever]
     public Category Category { get; set; } = new();
 
+    [ValidateNever]
     public Unit Unit { get; set; } = new();
 
+    [ValidateNever]
     public List<ProductInfo> ProductInfoes { get; set; } = new();
 }
 

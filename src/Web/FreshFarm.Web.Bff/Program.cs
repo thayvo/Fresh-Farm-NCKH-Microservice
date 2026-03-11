@@ -1,4 +1,5 @@
 ﻿using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
+using FreshFarm.Web.Bff.Areas.Seller.Hubs;
 using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 
@@ -26,7 +27,12 @@ builder.Services // Dang ky cookie authentication cho user web.
         options.ExpireTimeSpan = TimeSpan.FromHours(2); // Han cookie auth.
     });
 
-builder.Services.AddAuthorization(); // Bat [Authorize] cho controller/action.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("SellerOnly", policy => policy.RequireRole("Seller"));
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+}); // Bat [Authorize] va policy role cho area controllers.
+builder.Services.AddSignalR();
 
 builder.Services.AddHttpClient("Identity", client => // HttpClient typed by name cho Identity API.
 {
@@ -76,7 +82,24 @@ app.UseSession(); // IMPORTANT: session truoc auth neu action can doc session to
 app.UseAuthentication(); // Doc cookie auth.
 app.UseAuthorization(); // Enforce [Authorize].
 
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true && context.User.IsInRole("Seller"))
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/Seller/Category", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/Seller/Unit", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Response.Redirect("/Seller/Home/Dashboard");
+            return;
+        }
+    }
+
+    await next();
+});
+
 app.MapControllers(); // Map API controllers.
+app.MapHub<SupportChatHub>("/hubs/support-chat");
 app.MapControllerRoute( // Map MVC area route cho Seller/Admin modules.
     name: "areas",
     pattern: "{area:exists}/{controller=Home}/{action=Dashboard}/{id?}");

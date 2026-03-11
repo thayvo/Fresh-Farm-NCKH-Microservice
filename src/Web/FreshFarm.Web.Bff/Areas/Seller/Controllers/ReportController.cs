@@ -363,7 +363,7 @@ public class ReportController : LegacySellerControllerBase
         var client = _httpClientFactory.CreateClient("Ordering");
 
         client.DefaultRequestHeaders.Remove("Authorization");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

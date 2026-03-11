@@ -1,8 +1,13 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.SellerSettingViewModel
 
 @{
-    ViewBag.Title = "Cài Đặt Cửa Hàng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var settingsTitle = ViewData["SettingsTitle"] as string ?? "Cài Đặt Cửa Hàng";
+    var settingsScopeLabel = ViewData["SettingsScopeLabel"] as string ?? "Theo seller";
+
+    ViewBag.Title = settingsTitle;
+    Layout = layoutPath;
 }
 
 <style type="text/css">
@@ -29,8 +34,11 @@
 
 <main class="container-fluid p-4">
     <h2 class="fw-bold mb-4">
-        <i class="bi bi-gear-fill me-2"></i>Cài Đặt Cửa Hàng
+        <i class="bi bi-gear-fill me-2"></i>@settingsTitle
     </h2>
+    <div class="mb-3">
+        <span class="badge bg-light text-primary">@settingsScopeLabel</span>
+    </div>
 
     @if (!string.IsNullOrEmpty(ViewBag.Error))
     {
@@ -40,7 +48,7 @@
         </div>
     }
 
-    <form id="settingForm" method="post" action="@Url.Action("Save", "Setting")">
+    <form id="settingForm" method="post" action="@Url.Action("Save", "Setting", new { area = areaName })">
         @Html.AntiForgeryToken()
 
         <div class="row g-4">
@@ -151,7 +159,7 @@
                                 <div class="alert alert-info">
                                     <i class="bi bi-info-circle me-2"></i>
                                     Các cài đặt chi tiết về khu vực và phương thức vận chuyển được quản lý tại
-                                    <a href="@Url.Action("ManageShipping", "Shipping")" class="alert-link">trang quản lý vận chuyển</a>.
+                                    <a href="@Url.Action("ManageShipping", "Shipping", new { area = areaName })" class="alert-link">trang quản lý vận chuyển</a>.
                                 </div>
                                 <hr />
                                 <h6 class="fw-bold">Cài đặt nhanh</h6>
@@ -253,7 +261,7 @@
                 var formData = $(this).serialize();
 
                 $.ajax({
-                    url: '@Url.Action("Save", "Setting")',
+                    url: '@Url.Action("Save", "Setting", new { area = areaName })',
                     type: 'POST',
                     data: formData,
                     dataType: 'json',

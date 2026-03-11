@@ -1,8 +1,12 @@
 ﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.CustomerViewModel>
 
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var customerScopeLabel = ViewData["CustomerScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Quản Lý Khách Hàng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 }
 
 <style>
@@ -322,6 +326,7 @@
                                 <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">
                                     Quản lý khách hàng
                                 </h1>
+                                <span class="badge bg-light text-primary-blue mt-2">@customerScopeLabel</span>
                                 <p class="mb-0 text-white opacity-90" style="font-size: 1.05rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">
                                     Theo dõi hồ sơ, lịch sử mua hàng và chăm sóc khách hàng hiệu quả
                                 </p>
@@ -354,11 +359,11 @@
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="@Url.Action("Index", "Loyalty")" class="btn btn-success btn-pill d-flex align-items-center gap-2 hover-scale">
+                        <a href="@Url.Action("Index", "Loyalty", new { area = areaName })" class="btn btn-success btn-pill d-flex align-items-center gap-2 hover-scale">
                             <i class="bi bi-star"></i>
                             <span>Quản lý tích điểm</span>
                         </a>
-                        <a href="@Url.Action("Create", "Customer")" class="btn btn-primary btn-pill d-flex align-items-center gap-2 hover-scale">
+                        <a href="@Url.Action("Create", "Customer", new { area = areaName })" class="btn btn-primary btn-pill d-flex align-items-center gap-2 hover-scale">
                             <i class="bi bi-plus-circle"></i>
                             <span>Thêm khách hàng mới</span>
                         </a>
@@ -550,7 +555,7 @@
                                                     data-bs-target="#customerDetailModal">
                                                 <i class="bi bi-eye-fill"></i>
                                             </button>
-                                            <a href="@Url.Action("Edit", "Customer", new { id = customer.UserID })"
+                                            <a href="@Url.Action("Edit", "Customer", new { area = areaName, id = customer.UserID })"
                                                class="btn btn-sm btn-primary me-1" title="Sửa">
                                                 <i class="bi bi-pencil-square"></i>
                                             </a>
@@ -599,18 +604,18 @@
                             string sortBy = ViewBag.CurrentSort ?? "date_desc";
 
                             <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                                <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = currentPage - 1 })"><i class="bi bi-chevron-left"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageCustomers", new { area = areaName, sortBy = sortBy, page = currentPage - 1 })"><i class="bi bi-chevron-left"></i></a>
                             </li>
 
                             for (int i = 1; i <= totalPages; i++)
                             {
                                 <li class="page-item @(i == currentPage ? "active" : "")">
-                                    <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = i })">@i</a>
+                                    <a class="page-link" href="@Url.Action("ManageCustomers", new { area = areaName, sortBy = sortBy, page = i })">@i</a>
                                 </li>
                             }
 
                             <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                                <a class="page-link" href="@Url.Action("ManageCustomers", new { sortBy = sortBy, page = currentPage + 1 })"><i class="bi bi-chevron-right"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageCustomers", new { area = areaName, sortBy = sortBy, page = currentPage + 1 })"><i class="bi bi-chevron-right"></i></a>
                             </li>
                         }
                     </ul>
@@ -684,7 +689,7 @@
             const sortSelect = document.getElementById("sortSelect");
             sortSelect.addEventListener("change", function () {
                 const sortBy = this.value;
-                window.location.href = '@Url.Action("ManageCustomers", "Customer")?sortBy=' + sortBy;
+                window.location.href = '@Url.Action("ManageCustomers", "Customer", new { area = areaName })?sortBy=' + sortBy;
             });
 
             // === TÌM KIẾM ===
@@ -694,14 +699,14 @@
             function performSearch() {
                 const keyword = searchInput.value.trim();
                 if (!keyword) {
-                    window.location.href = '@Url.Action("ManageCustomers", "Customer")';
+                    window.location.href = '@Url.Action("ManageCustomers", "Customer", new { area = areaName })';
                     return;
                 }
 
                 searchBtn.disabled = true;
                 searchBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Đang tìm...';
 
-                fetch('@Url.Action("Search", "Customer")', {
+                fetch('@Url.Action("Search", "Customer", new { area = areaName })', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -779,7 +784,7 @@
                                     data-bs-target="#customerDetailModal">
                                 <i class="bi bi-eye-fill"></i>
                             </button>
-                            <a href="@Url.Action("Edit", "Customer")?id=${customer.UserID}"
+                            <a href="@Url.Action("Edit", "Customer", new { area = areaName })?id=${customer.UserID}"
                                class="btn btn-sm btn-primary me-1" title="Sửa">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
@@ -837,7 +842,7 @@
                 formData.append('id', deleteUserId);
                 formData.append('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]').value);
 
-                fetch('@Url.Action("Delete", "Customer")', {
+                fetch('@Url.Action("Delete", "Customer", new { area = areaName })', {
                     method: 'POST',
                     body: formData
                 })

@@ -1,7 +1,7 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.RevenueReportViewModel
 @{
     ViewBag.Title = "Báo Cáo Doanh Thu";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 <style>

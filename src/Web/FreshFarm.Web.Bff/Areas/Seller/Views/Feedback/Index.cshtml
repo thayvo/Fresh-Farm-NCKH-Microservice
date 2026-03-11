@@ -1,7 +1,13 @@
 ﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.SellerFeedbackViewModel>
 @{
-    ViewBag.Title = "Quản lý phản hồi người dùng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var pageTitle = ViewData["PageTitle"] as string ?? "Quản lý phản hồi người dùng";
+    var pageDescription = ViewData["PageDescription"] as string ?? "Xem, tìm kiếm, xử lý và lưu trữ phản hồi từ khách hàng.";
+    var scopeLabel = ViewData["ScopeLabel"] as string ?? "Theo seller";
+
+    ViewBag.Title = pageTitle;
+    Layout = layoutPath;
 
     int currentPage = ViewBag.CurrentPage is int cp ? cp : 1;
     int pageSize = ViewBag.PageSize is int ps ? ps : 10;
@@ -487,14 +493,18 @@
                                 <i class="bi bi-chat-dots text-white fs-3"></i>
                             </div>
                             <h2 class="fw-bold mb-0 text-white" style="text-shadow:0 4px 12px rgba(0,0,0,0.35);">
-                                Quản lý phản hồi người dùng
+                                @pageTitle
                             </h2>
                         </div>
                         <p class="page-header-subtitle mb-0 mt-2 text-white" style="text-shadow:0 2px 8px rgba(0,0,0,0.25);">
-                            Xem, tìm kiếm, xử lý và lưu trữ phản hồi từ khách hàng.
+                            @pageDescription
                         </p>
                     </div>
                     <div class="page-header-meta">
+                        <div class="page-header-pill">
+                            <i class="bi bi-broadcast-pin"></i>
+                            <span>@scopeLabel</span>
+                        </div>
                         <div class="page-header-pill">
                             <i class="bi bi-funnel"></i>
                             <span>Tìm kiếm theo từ khóa</span>
@@ -632,7 +642,7 @@
                         <ul class="pagination mb-0">
                             <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
                                 <a class="page-link"
-                                   href="@Url.Action("Index", "Feedback", new { area = "Seller", page = currentPage - 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
+                                   href="@Url.Action("Index", "Feedback", new { area = areaName, page = currentPage - 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
                                     <i class="bi bi-chevron-left"></i>
                                 </a>
                             </li>
@@ -644,14 +654,14 @@
                                 {
                                     <li class="page-item @(p == currentPage ? "active" : "")">
                                         <a class="page-link"
-                                           href="@Url.Action("Index", "Feedback", new { area = "Seller", page = p, pageSize = pageSize, q = currentQuery, status = currentStatus })">@p</a>
+                                           href="@Url.Action("Index", "Feedback", new { area = areaName, page = p, pageSize = pageSize, q = currentQuery, status = currentStatus })">@p</a>
                                     </li>
                                 }
                             }
 
                             <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
                                 <a class="page-link"
-                                   href="@Url.Action("Index", "Feedback", new { area = "Seller", page = currentPage + 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
+                                   href="@Url.Action("Index", "Feedback", new { area = areaName, page = currentPage + 1, pageSize = pageSize, q = currentQuery, status = currentStatus })">
                                     <i class="bi bi-chevron-right"></i>
                                 </a>
                             </li>
@@ -829,9 +839,9 @@
         }
 
         // ===== API endpoints (chỉnh lại tên action/controller nếu cần) =====
-        const detailUrl = '@Url.Action("GetFeedback", "Feedback", new { area = "Seller" })';
-        const statusUrl = '@Url.Action("UpdateStatus", "Feedback", new { area = "Seller" })';
-        const deleteUrl = '@Url.Action("Delete", "Feedback", new { area = "Seller" })';
+        const detailUrl = '@Url.Action("GetFeedback", "Feedback", new { area = areaName })';
+        const statusUrl = '@Url.Action("UpdateStatus", "Feedback", new { area = areaName })';
+        const deleteUrl = '@Url.Action("Delete", "Feedback", new { area = areaName })';
 
         let currentStatusId = 0;
         let currentDeleteId = 0;

@@ -3,6 +3,8 @@ using FreshFarm.Catalog.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace FreshFarm.Catalog.Api.Controllers;
 
@@ -20,11 +22,23 @@ public sealed class ProductsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? name)
     {
+        var sellerId = TryGetCurrentSellerId();
+
         var query = _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Unit)
             .AsQueryable();
+
+        if (sellerId.HasValue)
+        {
+            var ownedProductIds = _db.SellerProducts
+                .AsNoTracking()
+                .Where(sp => sp.SellerId == sellerId.Value && sp.IsActive)
+                .Select(sp => sp.ProductId);
+
+            query = query.Where(p => ownedProductIds.Contains(p.ProductId));
+        }
 
         if (!string.IsNullOrWhiteSpace(name))
         {
@@ -61,6 +75,19 @@ public sealed class ProductsController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([FromRoute] int id)
     {
+        var sellerId = TryGetCurrentSellerId();
+        if (sellerId.HasValue)
+        {
+            var owned = await _db.SellerProducts
+                .AsNoTracking()
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+
+            if (!owned)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+        }
+
         var product = await _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
@@ -102,9 +129,16 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Create([FromBody] ProductUpsertRequest request)
     {
+        var isAdmin = User.IsInRole("Admin");
+        var sellerId = TryGetCurrentSellerId();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -171,6 +205,19 @@ public sealed class ProductsController : ControllerBase
         try
         {
             await _db.SaveChangesAsync();
+
+            if (!isAdmin && sellerId.HasValue)
+            {
+                _db.SellerProducts.Add(new SellerProduct
+                {
+                    SellerId = sellerId.Value,
+                    ProductId = product.ProductId,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                await _db.SaveChangesAsync();
+            }
         }
         catch (DbUpdateException ex)
         {
@@ -181,9 +228,27 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] ProductUpsertRequest request)
     {
+        var isAdmin = User.IsInRole("Admin");
+        var sellerId = TryGetCurrentSellerId();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
+        if (!isAdmin)
+        {
+            var owned = await _db.SellerProducts
+                .AsNoTracking()
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+            if (!owned)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+        }
+
         if (!ModelState.IsValid)
         {
             return ValidationProblem(ModelState);
@@ -264,9 +329,41 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Delete([FromRoute] int id)
     {
+        var isAdmin = User.IsInRole("Admin");
+        var sellerId = TryGetCurrentSellerId();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
+        SellerProduct? ownership = null;
+        if (!isAdmin)
+        {
+            ownership = await _db.SellerProducts
+                .FirstOrDefaultAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+            if (ownership is null)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+        }
+
+        if (!isAdmin)
+        {
+            // Multi-seller: nếu product đang được nhiều seller dùng, chỉ gỡ ownership của seller hiện tại.
+            var activeOwnerCount = await _db.SellerProducts
+                .CountAsync(sp => sp.ProductId == id && sp.IsActive);
+            if (activeOwnerCount > 1)
+            {
+                ownership!.IsActive = false;
+                ownership.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                return Ok(new { message = "Đã gỡ sản phẩm khỏi danh sách của seller hiện tại." });
+            }
+        }
+
         var product = await _db.Products
             .Include(p => p.ProductInfos)
             .Include(p => p.ProductImages)
@@ -287,6 +384,12 @@ public sealed class ProductsController : ControllerBase
             _db.ProductImages.RemoveRange(product.ProductImages);
         }
 
+        var ownershipRows = await _db.SellerProducts.Where(sp => sp.ProductId == id).ToListAsync();
+        if (ownershipRows.Count > 0)
+        {
+            _db.SellerProducts.RemoveRange(ownershipRows);
+        }
+
         _db.Products.Remove(product);
 
         try
@@ -302,9 +405,27 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost("{id:int}/toggle-status")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> ToggleStatus([FromRoute] int id)
     {
+        var isAdmin = User.IsInRole("Admin");
+        var sellerId = TryGetCurrentSellerId();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
+        if (!isAdmin)
+        {
+            var owned = await _db.SellerProducts
+                .AsNoTracking()
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+            if (!owned)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+        }
+
         var product = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == id);
         if (product is null)
         {
@@ -332,5 +453,19 @@ public sealed class ProductsController : ControllerBase
     {
         var count = await _db.Products.CountAsync(p => p.CategoryId == categoryId) + 1;
         return $"PRD-{categoryId:D3}-{count:D4}";
+    }
+
+    private int? TryGetCurrentSellerId()
+    {
+        if (User?.Identity?.IsAuthenticated != true || !User.IsInRole("Seller"))
+        {
+            return null;
+        }
+
+        var raw = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(raw, out var sellerId) ? sellerId : null;
     }
 }

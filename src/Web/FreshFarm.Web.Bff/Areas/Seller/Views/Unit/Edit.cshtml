@@ -1,7 +1,8 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.UnitViewModel
 @{
     ViewBag.Title = "Chỉnh Sửa Đơn Vị Tính";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 <style>
@@ -198,7 +199,7 @@
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
-                            <a href="@Url.Action("Dashboard", "Home", new { area = "Seller" })" class="text-decoration-none">Dashboard</a>
+                            <a href="@Url.Action("Dashboard", "Home", new { area = currentArea })" class="text-decoration-none">Dashboard</a>
                         </li>
                         <li class="breadcrumb-item">
                             <a href="@Url.Action("Index", "Unit")" class="text-decoration-none">Đơn vị tính</a>
@@ -225,7 +226,7 @@
     </div>
 
     <!-- Meta Info -->
-    @if (Model != null && Model.CreatedDate != null)
+    @if (Model?.CreatedDate is not null)
     {
         <div class="meta-info">
             <div class="meta-item">
@@ -251,7 +252,7 @@
 
     <!-- Form Card -->
     <div class="form-card">
-        @using (Html.BeginForm("Edit", "Unit", FormMethod.Post, new { @class = "needs-validation", novalidate = "novalidate" }))
+        @using (Html.BeginForm("Edit", "Unit", FormMethod.Post, new { area = currentArea, @class = "needs-validation", novalidate = "novalidate" }))
         {
             @Html.AntiForgeryToken()
             @Html.ValidationSummary(true, "", new { @class = "alert alert-danger" })

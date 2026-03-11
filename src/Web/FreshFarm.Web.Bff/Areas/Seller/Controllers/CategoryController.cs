@@ -3,6 +3,7 @@ using FreshFarm.Web.Bff.Areas.Seller.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -16,6 +17,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class CategoryController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const string SellerCatalogAdminDisabledMessage = "Tinh nang quan ly danh muc he thong da bi khoa cho Seller.";
     private static readonly string[] AllowedExts = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
     private const int MaxFileSizeBytes = 2 * 1024 * 1024;
     private const string UploadFolderVPath = "~/Images/";
@@ -31,6 +33,21 @@ public class CategoryController : LegacySellerControllerBase
     public CategoryController(IHttpClientFactory httpClientFactory)
     {
         _httpClientFactory = httpClientFactory;
+    }
+
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        if (IsAjaxLikeRequest(context.HttpContext.Request))
+        {
+            context.Result = new JsonResult(new { success = false, message = SellerCatalogAdminDisabledMessage })
+            {
+                StatusCode = StatusCodes.Status403Forbidden
+            };
+            return;
+        }
+
+        TempData["ErrorMessage"] = SellerCatalogAdminDisabledMessage;
+        context.Result = RedirectToAction("Dashboard", "Home", new { area = "Seller" });
     }
 
     public async Task<IActionResult> ManageCategories(int? page, string? search)
@@ -300,6 +317,17 @@ public class CategoryController : LegacySellerControllerBase
         return items.Select(MapCategory).ToList();
     }
 
+    private static bool IsAjaxLikeRequest(HttpRequest request)
+    {
+        if (request.Method != HttpMethods.Get)
+        {
+            return true;
+        }
+
+        var xrw = request.Headers["X-Requested-With"].ToString();
+        return string.Equals(xrw, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+    }
+
     private async Task<Category?> GetCategoryByIdAsync(int id)
     {
         var client = CreateCatalogClient();
@@ -331,7 +359,7 @@ public class CategoryController : LegacySellerControllerBase
     private HttpClient CreateCatalogClient()
     {
         var client = _httpClientFactory.CreateClient("Catalog");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
 
         if (!string.IsNullOrWhiteSpace(token))
         {

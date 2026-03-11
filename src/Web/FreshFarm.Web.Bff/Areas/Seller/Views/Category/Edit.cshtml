@@ -1,7 +1,8 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.Category
 @{
     ViewBag.Title = "Sửa Danh Mục";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     ViewBag.BreadcrumbParentTitle = "Quản lý danh mục";
     ViewBag.BreadcrumbParentUrl = Url.Action("ManageCategories", "Category");
     ViewBag.BreadcrumbCurrentTitle = "Chỉnh sửa";
@@ -26,7 +27,7 @@
 
     <div class="card shadow-sm border-0">
         <div class="card-body p-4">
-            @using (Html.BeginForm("Edit", "Category", FormMethod.Post, new { area = "Seller", enctype = "multipart/form-data" }))
+            @using (Html.BeginForm("Edit", "Category", FormMethod.Post, new { area = currentArea, enctype = "multipart/form-data" }))
             {
                 @Html.AntiForgeryToken()
                 @Html.HiddenFor(m => m.CategoryID)
@@ -56,7 +57,7 @@
                                 <!-- Ảnh hiện tại (cũ) -->
                                 <label class="form-label fw-semibold">Ảnh hiện tại</label>
                                 <div class="mb-3 text-center">
-                                    <img id="imgCurrent" src="@catImg(Model.ImageCategoriesName)"
+                                    <img id="imgCurrent" src="@catImg(Model.ImageCategoriesName ?? string.Empty)"
                                          class="rounded border"
                                          style="width:160px;height:160px;object-fit:cover;" />
                                     <div class="small text-muted mt-1">
@@ -103,7 +104,7 @@
                 </div>
 
                 <div class="mt-4 text-end">
-                    <a href="@Url.Action("ManageCategories", "Category")" class="btn btn-secondary">
+                    <a href="@Url.Action("ManageCategories", "Category", new { area = currentArea })" class="btn btn-secondary">
                         <i class="bi bi-x-circle me-1"></i> Hủy
                     </a>
                     <button type="submit" class="btn btn-success">

@@ -73,7 +73,7 @@ public sealed class UnitsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Create([FromBody] UnitUpsertRequest request)
     {
         if (!ModelState.IsValid)
@@ -122,7 +122,7 @@ public sealed class UnitsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] UnitUpsertRequest request)
     {
         if (!ModelState.IsValid)
@@ -170,7 +170,7 @@ public sealed class UnitsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Delete([FromRoute] int id)
     {
         var unit = await _db.Units.FirstOrDefaultAsync(u => u.UnitId == id);
@@ -192,7 +192,7 @@ public sealed class UnitsController : ControllerBase
     }
 
     [HttpPost("{id:int}/toggle-status")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> ToggleStatus([FromRoute] int id)
     {
         var unit = await _db.Units.FirstOrDefaultAsync(u => u.UnitId == id);

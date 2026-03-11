@@ -328,7 +328,8 @@ public class WarehouseController : LegacySellerControllerBase
     private async Task PopulateImportProducts(WarehouseImportViewModel vm)
     {
         var client = CreateAuthorizedClient("Catalog");
-        var response = await client.GetAsync("/api/products");
+        // Use seller-scoped warehouse products for import dropdown.
+        var response = await client.GetAsync("/api/admin/warehouse/products?page=1&pageSize=5000");
 
         if (!response.IsSuccessStatusCode)
         {
@@ -391,22 +392,7 @@ public class WarehouseController : LegacySellerControllerBase
         client.DefaultRequestHeaders.Remove("Authorization");
         client.DefaultRequestHeaders.Authorization = null;
 
-        var authHeader = Request.Headers.Authorization.ToString();
-        if (!string.IsNullOrWhiteSpace(authHeader))
-        {
-            if (AuthenticationHeaderValue.TryParse(authHeader, out var parsed))
-            {
-                client.DefaultRequestHeaders.Authorization = parsed;
-            }
-            else
-            {
-                client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", authHeader);
-            }
-
-            return client;
-        }
-
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

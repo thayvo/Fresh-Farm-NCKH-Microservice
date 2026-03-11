@@ -1,0 +1,381 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.MerchantManagementPageViewModel
+@{
+    ViewBag.Title = "Merchant lifecycle & compliance";
+}
+
+@functions {
+    string ComplianceBadge(string status) => (status ?? string.Empty).ToLowerInvariant() switch
+    {
+        "ready" => "bg-success-subtle text-success",
+        "suspended" => "bg-danger-subtle text-danger",
+        _ => "bg-warning-subtle text-warning"
+    };
+
+    string ComplianceText(string status) => (status ?? string.Empty).ToLowerInvariant() switch
+    {
+        "ready" => "Sẵn sàng",
+        "suspended" => "Tạm khóa",
+        _ => "Cần rà soát"
+    };
+
+    string FlagBadge(string tone) => (tone ?? string.Empty).ToLowerInvariant() switch
+    {
+        "danger" => "text-bg-danger",
+        "warning" => "text-bg-warning",
+        _ => "text-bg-secondary"
+    };
+}
+
+<style>
+    .merchant-shell {
+        min-height: 100vh;
+        padding: 1.5rem;
+        background:
+            radial-gradient(circle at top right, rgba(125, 211, 252, 0.35), transparent 30%),
+            linear-gradient(180deg, #edf7ff 0%, #f8fbff 100%);
+    }
+
+    .merchant-hero {
+        border-radius: 1.75rem;
+        padding: 2rem;
+        color: #fff;
+        background: linear-gradient(135deg, #0f4c81 0%, #2563eb 50%, #7dd3fc 100%);
+        box-shadow: 0 24px 54px rgba(37, 99, 235, 0.22);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .merchant-hero::after {
+        content: "";
+        position: absolute;
+        inset: -20% auto auto 40%;
+        width: 35%;
+        height: 180%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+        transform: rotate(18deg);
+    }
+
+    .merchant-card,
+    .merchant-filter-card,
+    .merchant-list-card,
+    .merchant-detail-card {
+        border: 0;
+        border-radius: 1.5rem;
+        box-shadow: 0 16px 34px rgba(15, 23, 42, .08);
+    }
+
+    .merchant-row {
+        border-radius: 1rem;
+        border: 1px solid transparent;
+        transition: .2s ease;
+    }
+
+    .merchant-row:hover,
+    .merchant-row.is-selected {
+        border-color: rgba(37, 99, 235, .18);
+        background: #f8fbff;
+    }
+
+    .merchant-score {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .merchant-avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 16px;
+        object-fit: cover;
+        background: #dbeafe;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #1d4ed8;
+        font-weight: 700;
+    }
+
+    .merchant-flags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem;
+    }
+
+    .merchant-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    @@media (max-width: 991.98px) {
+        .merchant-shell {
+            padding: 1rem;
+        }
+    }
+</style>
+
+<main class="merchant-shell">
+    <section class="merchant-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+            <div>
+                <div class="badge rounded-pill text-bg-light text-primary px-3 py-2 mb-3">Sprint C · Merchant lifecycle & compliance</div>
+                <h1 class="fw-bold mb-2">Lane merchant compliance</h1>
+                <p class="mb-0 opacity-75">Rà seller theo mức đầy đủ hồ sơ, hoạt động gần đây và trạng thái vận hành để chuẩn bị cho các module compliance sâu hơn.</p>
+            </div>
+            <div class="text-lg-end">
+                <div class="small opacity-75">Heuristic MVP</div>
+                <div class="fw-semibold">Dựa trên hồ sơ Identity hiện có</div>
+                <div class="small opacity-75">Chưa có bảng KYC riêng hoặc workflow phê duyệt nhiều bước</div>
+            </div>
+        </div>
+    </section>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success border-0 shadow-sm">@TempData["SuccessMessage"]</div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@TempData["ErrorMessage"]</div>
+    }
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@ViewBag.Error</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng seller</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Cần rà soát</div><div class="display-6 fw-bold text-warning">@Model.Stats.ReviewNeeded</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tạm khóa</div><div class="display-6 fw-bold text-danger">@Model.Stats.SuspendedSellers</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Thiếu địa chỉ</div><div class="display-6 fw-bold text-primary">@Model.Stats.MissingAddress</div></div></div>
+        </div>
+    </div>
+
+    <div class="card merchant-filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-7">
+                    <label class="form-label fw-semibold">Tìm kiếm seller</label>
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tên shop, username, email, số điện thoại..." />
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-semibold">Trạng thái compliance</label>
+                    <select class="form-select" name="status">
+                        @foreach (var option in Model.StatusOptions)
+                        {
+                            if (string.Equals(option.Value, Model.Status, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 flex-fill">
+                        <i class="bi bi-funnel me-2"></i>Lọc
+                    </button>
+                    <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Merchant", new { area = "Admin" })">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <div class="card merchant-list-card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h2 class="h5 mb-1">Danh sách merchant</h2>
+                            <div class="text-muted small">Trang @Model.Page / @Model.TotalPages · @Model.Total seller phù hợp bộ lọc</div>
+                        </div>
+                    </div>
+
+                    @if (Model.Merchants.Count == 0)
+                    {
+                        <div class="alert alert-light border mb-0">Chưa có seller phù hợp bộ lọc hiện tại.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-column gap-3">
+                            @foreach (var merchant in Model.Merchants)
+                            {
+                                var selected = Model.SelectedSellerId == merchant.SellerId;
+                                <a class="merchant-row text-decoration-none text-reset p-3 @(selected ? "is-selected" : string.Empty)"
+                                   href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, page = Model.Page, selectedSellerId = merchant.SellerId })">
+                                    <div class="d-flex gap-3">
+                                        @if (!string.IsNullOrWhiteSpace(merchant.Avatar))
+                                        {
+                                            <img src="@merchant.Avatar" alt="@merchant.ShopName" class="merchant-avatar" />
+                                        }
+                                        else
+                                        {
+                                            <div class="merchant-avatar">@merchant.ShopName.Substring(0, 1).ToUpperInvariant()</div>
+                                        }
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex flex-column flex-lg-row justify-content-between gap-2">
+                                                <div>
+                                                    <div class="fw-bold">@merchant.ShopName</div>
+                                                    <div class="text-muted small">@merchant.UserName · Seller ID #@merchant.SellerId</div>
+                                                </div>
+                                                <div class="d-flex gap-2 align-items-center">
+                                                    <span class="badge rounded-pill @ComplianceBadge(merchant.ComplianceStatus)">@ComplianceText(merchant.ComplianceStatus)</span>
+                                                    <span class="merchant-score">@merchant.ProfileScore</span>
+                                                </div>
+                                            </div>
+                                            <div class="small mt-2 text-muted">@merchant.Email · @(string.IsNullOrWhiteSpace(merchant.Phone) ? "Chưa có SĐT" : merchant.Phone)</div>
+                                            <div class="small text-muted">@merchant.AddressSummary</div>
+                                            <div class="merchant-flags mt-2">
+                                                @foreach (var flag in merchant.Flags.Take(4))
+                                                {
+                                                    <span class="badge rounded-pill @FlagBadge(flag.Tone)">@flag.Label</span>
+                                                }
+                                                @if (merchant.Flags.Count == 0)
+                                                {
+                                                    <span class="badge rounded-pill text-bg-success">Hồ sơ nền tảng ổn</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </a>
+                            }
+                        </div>
+
+                        @if (Model.TotalPages > 1)
+                        {
+                            <nav class="mt-4">
+                                <ul class="pagination mb-0">
+                                    @for (var i = 1; i <= Model.TotalPages; i++)
+                                    {
+                                        <li class="page-item @(i == Model.Page ? "active" : string.Empty)">
+                                            <a class="page-link" href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, page = i, selectedSellerId = Model.SelectedSellerId })">@i</a>
+                                        </li>
+                                    }
+                                </ul>
+                            </nav>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="card merchant-detail-card">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Chi tiết compliance</h2>
+
+                    @if (ViewBag.DetailError != null)
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm">@ViewBag.DetailError</div>
+                    }
+                    else if (Model.Details is null)
+                    {
+                        <div class="alert alert-light border mb-0">Chọn một seller để xem chi tiết.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex gap-3 align-items-center mb-3">
+                            @if (!string.IsNullOrWhiteSpace(Model.Details.Avatar))
+                            {
+                                <img src="@Model.Details.Avatar" alt="@Model.Details.ShopName" class="merchant-avatar" />
+                            }
+                            else
+                            {
+                                <div class="merchant-avatar">@Model.Details.ShopName.Substring(0, 1).ToUpperInvariant()</div>
+                            }
+                            <div>
+                                <div class="fw-bold fs-5">@Model.Details.ShopName</div>
+                                <div class="text-muted small">@Model.Details.UserName · Seller ID #@Model.Details.SellerId</div>
+                                <span class="badge rounded-pill mt-2 @ComplianceBadge(Model.Details.ComplianceStatus)">@ComplianceText(Model.Details.ComplianceStatus)</span>
+                            </div>
+                        </div>
+
+                        <div class="merchant-detail-grid mb-3">
+                            <div class="p-3 bg-light rounded-4">
+                                <div class="text-muted small">Điểm hồ sơ</div>
+                                <div class="fs-3 fw-bold text-primary">@Model.Details.ProfileScore</div>
+                            </div>
+                            <div class="p-3 bg-light rounded-4">
+                                <div class="text-muted small">Đăng nhập gần nhất</div>
+                                <div class="fw-semibold">@(Model.Details.LastLogin?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa ghi nhận")</div>
+                            </div>
+                            <div class="p-3 bg-light rounded-4">
+                                <div class="text-muted small">Ngày tạo</div>
+                                <div class="fw-semibold">@Model.Details.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Liên hệ</div>
+                            <div class="fw-semibold">@Model.Details.FullName</div>
+                            <div>@Model.Details.Email</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Details.Phone) ? "Chưa có số điện thoại" : Model.Details.Phone)</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Địa chỉ hoạt động</div>
+                            <div>@Model.Details.AddressSummary</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="text-muted small mb-2">Cờ rà soát</div>
+                            <div class="merchant-flags">
+                                @foreach (var flag in Model.Details.Flags)
+                                {
+                                    <span class="badge rounded-pill @FlagBadge(flag.Tone)">@flag.Label</span>
+                                }
+                                @if (Model.Details.Flags.Count == 0)
+                                {
+                                    <span class="badge rounded-pill text-bg-success">Không có cờ đỏ ở mức MVP</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info border-0">
+                            <div class="fw-semibold mb-1">Kết luận hiện tại</div>
+                            <div>@Model.Details.ComplianceSummary</div>
+                        </div>
+
+                        <form method="post" action="@Url.Action("UpdateStatus", "Merchant", new { area = "Admin" })" class="d-grid gap-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
+                            <input type="hidden" name="q" value="@Model.Query" />
+                            <input type="hidden" name="status" value="@Model.Status" />
+                            <input type="hidden" name="page" value="@Model.Page" />
+                            <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
+                            <input type="hidden" name="isActive" value="@((!Model.Details.IsActive).ToString().ToLowerInvariant())" />
+                            <button type="submit" class="btn @(Model.Details.IsActive ? "btn-outline-danger" : "btn-success") rounded-pill">
+                                <i class="bi @(Model.Details.IsActive ? "bi-pause-circle" : "bi-play-circle") me-2"></i>
+                                @(Model.Details.IsActive ? "Tạm khóa seller" : "Mở lại seller")
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</main>

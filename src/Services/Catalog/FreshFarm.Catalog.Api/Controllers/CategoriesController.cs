@@ -105,7 +105,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Create([FromBody] CategoryUpsertRequest request)
     {
         if (!ModelState.IsValid)
@@ -158,7 +158,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] CategoryUpsertRequest request)
     {
         if (!ModelState.IsValid)
@@ -211,7 +211,7 @@ public sealed class CategoriesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Policy = "SellerOnly")]
+    [Authorize(Policy = "SellerOrAdmin")]
     public async Task<IActionResult> Delete([FromRoute] int id)
     {
         var category = await _db.Categories.FirstOrDefaultAsync(c => c.CategoryId == id);

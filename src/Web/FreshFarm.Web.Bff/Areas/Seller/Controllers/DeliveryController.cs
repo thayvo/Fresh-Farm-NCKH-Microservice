@@ -151,6 +151,7 @@ public class DeliveryController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> UpdateStatus([FromBody] UpdateDeliveryStatusRequest? request)
     {
         try
@@ -185,7 +186,7 @@ public class DeliveryController : LegacySellerControllerBase
         var client = _httpClientFactory.CreateClient(clientName);
 
         client.DefaultRequestHeaders.Remove("Authorization");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

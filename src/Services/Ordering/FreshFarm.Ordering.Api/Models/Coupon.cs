@@ -35,6 +35,8 @@ public partial class Coupon
 
     public decimal? MaxDiscountAmount { get; set; }
 
+    public virtual ICollection<Campaign> Campaigns { get; set; } = new List<Campaign>();
+
     public virtual ICollection<CouponDistribution> CouponDistributions { get; set; } = new List<CouponDistribution>();
 
     public virtual ICollection<CouponUsageHistory> CouponUsageHistories { get; set; } = new List<CouponUsageHistory>();

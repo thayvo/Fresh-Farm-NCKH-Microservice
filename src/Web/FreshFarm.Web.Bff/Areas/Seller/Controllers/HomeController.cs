@@ -112,7 +112,7 @@ public class HomeController : LegacySellerControllerBase
             return RedirectToAction(nameof(Profile));
         }
 
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (string.IsNullOrWhiteSpace(token))
         {
             return RedirectToAction("Login", "AdminAccount", new { area = "Seller" });
@@ -435,7 +435,7 @@ public class HomeController : LegacySellerControllerBase
         client.DefaultRequestHeaders.Remove("Authorization");
         client.DefaultRequestHeaders.Authorization = null;
 
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

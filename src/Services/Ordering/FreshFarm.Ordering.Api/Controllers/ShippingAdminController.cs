@@ -1,4 +1,6 @@
 using FreshFarm.Ordering.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,7 @@ namespace FreshFarm.Ordering.Api.Controllers;
 
 [ApiController]
 [Route("api/orders/admin/shippings")]
-[Authorize(Policy = "SellerOnly")]
+[Authorize(Policy = "SellerOrAdmin")]
 public sealed class ShippingAdminController : ControllerBase
 {
     private static readonly string[] PaidStatuses = { "Da thanh toan", "Đã thanh toán", "Hoan tat", "Hoàn tất" };
@@ -56,6 +58,13 @@ public sealed class ShippingAdminController : ControllerBase
         [FromQuery] string deliveredState = "",
         CancellationToken cancellationToken = default)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         if (page < 1)
         {
             page = 1;
@@ -70,6 +79,10 @@ public sealed class ShippingAdminController : ControllerBase
             .AsNoTracking()
             .Include(s => s.Order)
             .ThenInclude(o => o.Payments)
+            .Where(s => isAdmin || s.Order.SellerOrders.Any(so =>
+                sellerId.HasValue &&
+                so.SellerId == sellerId.Value &&
+                so.SellerOrderItems.Any()))
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(status))
@@ -174,14 +187,18 @@ public sealed class ShippingAdminController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
+        var sellerOrderIds = await ApplySellerScopeToOrders(_db.Orders.AsNoTracking(), sellerId, isAdmin)
+            .Select(o => o.OrderId)
+            .ToListAsync(cancellationToken);
+
         var orderIdsWithShipping = await _db.Shippings
             .AsNoTracking()
+            .Where(s => sellerOrderIds.Contains(s.OrderId))
             .Select(s => s.OrderId)
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        var ordersWithoutShipping = await _db.Orders
-            .AsNoTracking()
+        var ordersWithoutShipping = await ApplySellerScopeToOrders(_db.Orders.AsNoTracking(), sellerId, isAdmin)
             .Where(o => !orderIdsWithShipping.Contains(o.OrderId))
             .OrderByDescending(o => o.OrderDate)
             .Select(o => new
@@ -217,11 +234,20 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([FromRoute] int id, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         var shipping = await _db.Shippings
             .AsNoTracking()
+            .Include(s => s.Order)
+            .ThenInclude(o => o.SellerOrders)
             .FirstOrDefaultAsync(s => s.ShippingId == id, cancellationToken);
 
-        if (shipping is null)
+        if (shipping is null || !CanAccessShippingBySeller(shipping, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay thong tin van chuyen!" });
         }
@@ -247,11 +273,19 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpGet("order-info/{orderId:int}")]
     public async Task<IActionResult> GetOrderInfo([FromRoute] int orderId, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         var order = await _db.Orders
             .AsNoTracking()
+            .Include(o => o.SellerOrders)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
 
-        if (order is null)
+        if (order is null || !CanAccessOrderBySeller(order, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay don hang!" });
         }
@@ -282,6 +316,13 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ShippingUpsertRequest request, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         if (request.OrderID <= 0)
         {
             return BadRequest(new { success = false, message = "Vui long chon don hang!" });
@@ -303,8 +344,10 @@ public sealed class ShippingAdminController : ControllerBase
             return BadRequest(new { success = false, message = "Don hang nay da co thong tin van chuyen!" });
         }
 
-        var order = await _db.Orders.FirstOrDefaultAsync(o => o.OrderId == request.OrderID, cancellationToken);
-        if (order is null)
+        var order = await _db.Orders
+            .Include(o => o.SellerOrders)
+            .FirstOrDefaultAsync(o => o.OrderId == request.OrderID, cancellationToken);
+        if (order is null || !CanAccessOrderBySeller(order, sellerId, isAdmin))
         {
             return BadRequest(new { success = false, message = "Don hang khong ton tai!" });
         }
@@ -332,8 +375,18 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] ShippingUpsertRequest request, CancellationToken cancellationToken)
     {
-        var shipping = await _db.Shippings.FirstOrDefaultAsync(s => s.ShippingId == id, cancellationToken);
-        if (shipping is null)
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
+        var shipping = await _db.Shippings
+            .Include(s => s.Order)
+            .ThenInclude(o => o.SellerOrders)
+            .FirstOrDefaultAsync(s => s.ShippingId == id, cancellationToken);
+        if (shipping is null || !CanAccessShippingBySeller(shipping, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay thong tin van chuyen!" });
         }
@@ -366,8 +419,18 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var shipping = await _db.Shippings.FirstOrDefaultAsync(s => s.ShippingId == id, cancellationToken);
-        if (shipping is null)
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
+        var shipping = await _db.Shippings
+            .Include(s => s.Order)
+            .ThenInclude(o => o.SellerOrders)
+            .FirstOrDefaultAsync(s => s.ShippingId == id, cancellationToken);
+        if (shipping is null || !CanAccessShippingBySeller(shipping, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay thong tin van chuyen!" });
         }
@@ -381,11 +444,19 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpPost("reconcile-cod")]
     public async Task<IActionResult> ReconcileCod([FromBody] ReconcileCodRequest request, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         var order = await _db.Orders
             .Include(o => o.Payments)
+            .Include(o => o.SellerOrders)
             .FirstOrDefaultAsync(o => o.OrderId == request.OrderId, cancellationToken);
 
-        if (order is null)
+        if (order is null || !CanAccessOrderBySeller(order, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay don hang!" });
         }
@@ -414,11 +485,19 @@ public sealed class ShippingAdminController : ControllerBase
     [HttpPost("unreconcile-cod")]
     public async Task<IActionResult> UnreconcileCod([FromBody] ReconcileCodRequest request, CancellationToken cancellationToken)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         var order = await _db.Orders
             .Include(o => o.Payments)
+            .Include(o => o.SellerOrders)
             .FirstOrDefaultAsync(o => o.OrderId == request.OrderId, cancellationToken);
 
-        if (order is null)
+        if (order is null || !CanAccessOrderBySeller(order, sellerId, isAdmin))
         {
             return NotFound(new { success = false, message = "Khong tim thay don hang!" });
         }
@@ -435,6 +514,60 @@ public sealed class ShippingAdminController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
 
         return Ok(new { success = true, message = "Da BO doi soat (COD)." });
+    }
+
+    private int? TryGetSellerIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var sellerId) ? sellerId : null;
+    }
+
+    private bool IsAdminUser()
+    {
+        return User.IsInRole("Admin");
+    }
+
+    private IQueryable<Order> ApplySellerScopeToOrders(IQueryable<Order> query, int? sellerId = null, bool isAdmin = false)
+    {
+        if (isAdmin)
+        {
+            return query;
+        }
+
+        var resolvedSellerId = sellerId ?? TryGetSellerIdFromToken();
+        if (!resolvedSellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(o => o.SellerOrders.Any(so =>
+            so.SellerId == resolvedSellerId.Value &&
+            so.SellerOrderItems.Any()));
+    }
+
+    private bool CanAccessOrderBySeller(Order order, int? sellerId, bool isAdmin = false)
+    {
+        if (isAdmin)
+        {
+            return true;
+        }
+
+        if (!sellerId.HasValue)
+        {
+            return false;
+        }
+
+        return order.SellerOrders.Any(so =>
+            so.SellerId == sellerId.Value &&
+            so.SellerOrderItems.Any());
+    }
+
+    private bool CanAccessShippingBySeller(Shipping shipping, int? sellerId, bool isAdmin = false)
+    {
+        return shipping.Order is not null && CanAccessOrderBySeller(shipping.Order, sellerId, isAdmin);
     }
 
     private static (string addressDetail, int? provinceId, int? communeId, string shippingType) NormalizeAddress(ShippingUpsertRequest request)

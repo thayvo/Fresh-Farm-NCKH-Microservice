@@ -7,7 +7,7 @@ namespace FreshFarm.Ordering.Api.Controllers;
 
 [ApiController]
 [Route("api/orders/admin")]
-[Authorize(Policy = "SellerOnly")]
+[Authorize(Policy = "AdminOnly")]
 public sealed class StatusesAdminController : ControllerBase
 {
     private readonly FreshFarmOrderingDBContext _db;

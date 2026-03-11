@@ -1,9 +1,13 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.Product
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var productScopeLabel = ViewData["ProductScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Thêm Sản Phẩm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
     ViewBag.BreadcrumbParentTitle = "Quản lý sản phẩm";
-    ViewBag.BreadcrumbParentUrl = Url.Action("ManageProducts", "Product");
+    ViewBag.BreadcrumbParentUrl = Url.Action("ManageProducts", "Product", new { area = areaName });
     ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
 }
 
@@ -47,7 +51,7 @@
             @foreach (var key in ViewData.ModelState.Keys)
             {
                 var state = ViewData.ModelState[key];
-                if (state.Errors.Count > 0)
+                if (state is not null && state.Errors.Count > 0)
                 {
                     foreach (var error in state.Errors)
                     {
@@ -63,12 +67,13 @@
 <main class="container-fluid p-4">
     <div class="mb-4">
         <h2 class="fw-bold">Thêm sản phẩm mới</h2>
+        <span class="badge bg-light text-primary mb-2">@productScopeLabel</span>
         @Html.Partial("_Breadcrumb")
     </div>
 
     <div class="card shadow-sm border-0">
         <div class="card-body">
-            @using (Html.BeginForm("Create", "Product", FormMethod.Post, new { enctype = "multipart/form-data", @class = "row g-3" }))
+            @using (Html.BeginForm("Create", "Product", new { area = areaName }, FormMethod.Post, true, new { enctype = "multipart/form-data", @class = "row g-3" }))
             {
                 @Html.AntiForgeryToken()
                 @Html.ValidationSummary(true, "", new { @class = "text-danger" })
@@ -224,7 +229,7 @@
                 <!-- Buttons -->
                 <div class="col-12 mt-4">
                     <div class="d-flex justify-content-between align-items-center">
-                        <a href="@Url.Action("ManageProducts", "Product")" class="btn btn-outline-secondary px-4">
+                        <a href="@Url.Action("ManageProducts", "Product", new { area = areaName })" class="btn btn-outline-secondary px-4">
                             <i class="bi bi-arrow-left me-2"></i>Quay lại
                         </a>
                         <div class="d-flex gap-2">

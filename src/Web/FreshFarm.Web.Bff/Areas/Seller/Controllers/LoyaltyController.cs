@@ -372,7 +372,7 @@ public class LoyaltyController : LegacySellerControllerBase
         var client = _httpClientFactory.CreateClient(clientName);
         client.DefaultRequestHeaders.Remove("Authorization");
 
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

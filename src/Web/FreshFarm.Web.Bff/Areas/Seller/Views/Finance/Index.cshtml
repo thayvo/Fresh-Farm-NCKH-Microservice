@@ -1,0 +1,502 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.FinanceConsolePageViewModel
+@{
+    ViewBag.Title = "Tài chính & đối soát";
+    var areaName = (ViewData["AreaName"]?.ToString() ?? "Seller").Trim();
+    var scopeLabel = ViewData["FinanceScopeLabel"]?.ToString() ?? (areaName == "Admin" ? "Toàn sàn" : "Cửa hàng của tôi");
+    var controllerName = "Finance";
+
+    string BuildSectionLink(string section, int? page = null)
+    {
+        return Url.Action("Index", controllerName, new
+        {
+            area = areaName,
+            section,
+            q = Model.Query,
+            status = Model.Status,
+            sellerId = Model.ShowSellerFilter ? Model.SellerId : null,
+            page = page ?? 1
+        }) ?? "#";
+    }
+
+    string FormatMoney(decimal? value) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:#,0} đ", value ?? 0m);
+    string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-";
+}
+
+<style>
+    .finance-shell {
+        min-height: 100vh;
+        padding: 1.5rem;
+        background:
+            radial-gradient(circle at top right, rgba(96, 165, 250, .25), transparent 32%),
+            linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+    }
+
+    .finance-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 1.75rem;
+        padding: 2rem;
+        color: #fff;
+        background: linear-gradient(135deg, #1d4ed8 0%, #38bdf8 100%);
+        box-shadow: 0 24px 50px rgba(29, 78, 216, .2);
+    }
+
+    .finance-hero::after {
+        content: "";
+        position: absolute;
+        inset: -40% auto auto -10%;
+        width: 50%;
+        height: 220%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .22), transparent);
+        transform: rotate(18deg);
+        pointer-events: none;
+    }
+
+    .finance-card,
+    .finance-filter-card,
+    .finance-table-card,
+    .finance-section-card {
+        border: 0;
+        border-radius: 1.5rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+    }
+
+    .finance-stat-label {
+        color: #64748b;
+        font-size: .86rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+
+    .finance-section-link {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .finance-section-link.active .finance-section-card {
+        border: 1px solid rgba(29, 78, 216, .24);
+        background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+    }
+
+    .finance-pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .35rem .8rem;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-weight: 700;
+        font-size: .8rem;
+    }
+
+    .finance-status {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .35rem .8rem;
+        font-weight: 700;
+        font-size: .78rem;
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .finance-status.pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .finance-status.done {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .finance-status.failed {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .finance-table-card table td,
+    .finance-table-card table th {
+        vertical-align: middle;
+    }
+</style>
+
+<main class="finance-shell">
+    <div class="finance-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-center">
+            <div>
+                <div class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">@scopeLabel</div>
+                <h1 class="fw-bold mb-2">Tài chính & đối soát</h1>
+                <p class="mb-0 opacity-75">Theo dõi payout, refund và return theo cùng một luồng để chốt vận hành marketplace trước khi mở rộng settlement schema.</p>
+            </div>
+            <div class="text-lg-end">
+                <div class="small opacity-75">Phạm vi hiện tại</div>
+                <div class="display-6 fw-bold">@Model.Scope</div>
+            </div>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success border-0 shadow-sm">@TempData["SuccessMessage"]</div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@TempData["ErrorMessage"]</div>
+    }
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@ViewBag.Error</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">GMV theo seller-order</div>
+                    <div class="fs-3 fw-bold">@FormatMoney(Model.Stats.GrossMerchandiseValue)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Thanh toán đã capture</div>
+                    <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.CapturedPayments)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Hoa hồng nền tảng</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.PlatformCommission)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Payout chờ xử lý</div>
+                    <div class="fs-3 fw-bold text-warning">@FormatMoney(Model.Stats.PendingPayoutAmount)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Giá trị refund</div>
+                    <div class="fs-3 fw-bold text-danger">@FormatMoney(Model.Stats.RefundedAmount)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Return đang mở</div>
+                    <div class="fs-3 fw-bold">@Model.Stats.OpenReturns</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Refund đang mở</div>
+                    <div class="fs-3 fw-bold">@Model.Stats.OpenRefunds</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Seller trong phạm vi</div>
+                    <div class="fs-3 fw-bold">@Model.Stats.SellerCount</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card finance-filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <input type="hidden" name="section" value="@Model.Section" />
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Tìm kiếm</label>
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Mã record, order, provider ref, lý do..." />
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-semibold">Trạng thái</label>
+                    <select class="form-select" name="status">
+                        @foreach (var option in Model.StatusOptions)
+                        {
+                            if (string.Equals(option.Value, Model.Status, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                @if (Model.ShowSellerFilter)
+                {
+                    <div class="col-md-4 col-lg-3">
+                        <label class="form-label fw-semibold">Seller</label>
+                        <select class="form-select" name="sellerId">
+                            @if (!Model.SellerId.HasValue)
+                            {
+                                <option value="" selected>Tất cả seller</option>
+                            }
+                            else
+                            {
+                                <option value="">Tất cả seller</option>
+                            }
+
+                            @foreach (var option in Model.SellerOptions)
+                            {
+                                if (int.TryParse(option.Value, out var sellerValue) && Model.SellerId == sellerValue)
+                                {
+                                    <option value="@option.Value" selected>@option.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@option.Value">@option.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">
+                        <i class="bi bi-funnel me-2"></i>Lọc dữ liệu
+                    </button>
+                    <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section })">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Đặt lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.Section == "payouts" ? "active" : string.Empty)" href="@BuildSectionLink("payouts")">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">Payout</div>
+                        <div class="display-6 fw-bold">@Model.SectionCounts.Payouts</div>
+                        <div class="text-muted">Đợt đối soát / chi trả seller đang theo dõi</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.Section == "refunds" ? "active" : string.Empty)" href="@BuildSectionLink("refunds")">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">Refund</div>
+                        <div class="display-6 fw-bold">@Model.SectionCounts.Refunds</div>
+                        <div class="text-muted">Giao dịch hoàn tiền cần đối chiếu với order và payment txn</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.Section == "returns" ? "active" : string.Empty)" href="@BuildSectionLink("returns")">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">Return</div>
+                        <div class="display-6 fw-bold">@Model.SectionCounts.Returns</div>
+                        <div class="text-muted">Yêu cầu đổi trả liên quan tới refund và hậu mãi</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="card finance-table-card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="mb-1">
+                        @if (Model.Section == "refunds")
+                        {
+                            <span>Danh sách refund</span>
+                        }
+                        else if (Model.Section == "returns")
+                        {
+                            <span>Danh sách return</span>
+                        }
+                        else
+                        {
+                            <span>Danh sách payout</span>
+                        }
+                    </h5>
+                    <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total bản ghi theo phạm vi hiện tại</div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Mã</th>
+                            <th>Seller</th>
+                            <th>Order</th>
+                            @if (Model.Section == "payouts")
+                            {
+                                <th>Số đơn</th>
+                                <th>Gross</th>
+                                <th>Fee</th>
+                                <th>Net</th>
+                                <th>Provider</th>
+                                <th>Thời gian</th>
+                            }
+                            else if (Model.Section == "refunds")
+                            {
+                                <th>Refund</th>
+                                <th>Provider/Method</th>
+                                <th>Mã tham chiếu</th>
+                                <th>Lý do lỗi cũ</th>
+                                <th>Thời gian</th>
+                            }
+                            else
+                            {
+                                <th>Sản phẩm</th>
+                                <th>Refund dự kiến</th>
+                                <th>Lý do</th>
+                                <th>Resolution</th>
+                                <th>Thời gian</th>
+                            }
+                            <th>Trạng thái</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Rows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-5">Chưa có dữ liệu trong phạm vi lọc hiện tại.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in Model.Rows)
+                            {
+                                var normalizedStatus = (row.Status ?? string.Empty).Trim().ToLowerInvariant();
+                                var statusClass = normalizedStatus.Contains("fail") || normalizedStatus.Contains("reject") || normalizedStatus.Contains("cancel")
+                                    ? "failed"
+                                    : normalizedStatus.Contains("paid") || normalizedStatus.Contains("complete") || normalizedStatus.Contains("success") || normalizedStatus.Contains("approved") || normalizedStatus.Contains("resolve")
+                                        ? "done"
+                                        : "pending";
+
+                                <tr>
+                                    <td class="fw-semibold">#@row.RecordId</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(row.SellerLabel))
+                                        {
+                                            <span>@row.SellerLabel</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (row.OrderId.HasValue && row.OrderId.Value > 0)
+                                        {
+                                            <span>#@row.OrderId</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    @if (Model.Section == "payouts")
+                                    {
+                                        <td>@(row.OrderCount?.ToString() ?? "-")</td>
+                                        <td>@FormatMoney(row.AmountGross)</td>
+                                        <td>@FormatMoney(row.FeeAmount)</td>
+                                        <td class="fw-semibold text-success">@FormatMoney(row.AmountNet)</td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.Provider) ? "-" : row.Provider)</div>
+                                            <div class="small text-muted">@(!string.IsNullOrWhiteSpace(row.Method) ? row.Method : row.ReferenceCode)</div>
+                                        </td>
+                                        <td>
+                                            <div>Tạo: @FormatDate(row.CreatedAt)</div>
+                                            <div class="small text-muted">Lịch: @FormatDate(row.ScheduledAt)</div>
+                                            <div class="small text-muted">Chi trả: @FormatDate(row.PaidAt)</div>
+                                        </td>
+                                    }
+                                    else if (Model.Section == "refunds")
+                                    {
+                                        <td class="fw-semibold text-danger">@FormatMoney(row.RefundAmount)</td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.Provider) ? "-" : row.Provider)</div>
+                                            <div class="small text-muted">@(!string.IsNullOrWhiteSpace(row.Method) ? row.Method : "-")</div>
+                                        </td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.ReferenceCode) ? "-" : row.ReferenceCode)</div>
+                                            <div class="small text-muted">Paid: @FormatDate(row.PaidAt)</div>
+                                        </td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.ReasonCode) ? "-" : row.ReasonCode)</div>
+                                            <div class="small text-muted text-truncate" style="max-width: 220px;">@(string.IsNullOrWhiteSpace(row.Resolution) ? "-" : row.Resolution)</div>
+                                        </td>
+                                        <td>
+                                            <div>Tạo: @FormatDate(row.CreatedAt)</div>
+                                            <div class="small text-muted">Xử lý: @FormatDate(row.ProcessedAt)</div>
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.ItemName) ? "-" : row.ItemName)</div>
+                                            <div class="small text-muted">Giá trị hàng: @FormatMoney(row.AmountGross)</div>
+                                        </td>
+                                        <td class="fw-semibold text-danger">@FormatMoney(row.RefundAmount)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(row.ReasonCode) ? "-" : row.ReasonCode)</td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(row.Resolution) ? "-" : row.Resolution)</div>
+                                            <div class="small text-muted">Duyệt: @FormatDate(row.ScheduledAt)</div>
+                                        </td>
+                                        <td>
+                                            <div>Gửi: @FormatDate(row.CreatedAt)</div>
+                                            <div class="small text-muted">Hoàn tất: @FormatDate(row.ProcessedAt)</div>
+                                        </td>
+                                    }
+                                    <td><span class="finance-status @statusClass">@row.Status</span></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center mb-0">
+                        <li class="page-item @(Model.Page <= 1 ? "disabled" : string.Empty)">
+                            <a class="page-link" href="@BuildSectionLink(Model.Section, Model.Page - 1)">Trước</a>
+                        </li>
+                        @for (var p = 1; p <= Model.TotalPages; p++)
+                        {
+                            <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
+                                <a class="page-link" href="@BuildSectionLink(Model.Section, p)">@p</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : string.Empty)">
+                            <a class="page-link" href="@BuildSectionLink(Model.Section, Model.Page + 1)">Sau</a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</main>

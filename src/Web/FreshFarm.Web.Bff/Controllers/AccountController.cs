@@ -70,7 +70,9 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         var claims = new List<Claim> // Tao claim list cho cookie principal.
         {
             new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty), // sub -> user id.
-            new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? request.Identifier) // Ten hien thi.
+            new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? request.Identifier), // Ten hien thi.
+            new Claim("sub", jwt.Subject ?? string.Empty),
+            new Claim("ff_access_token", auth.AccessToken)
         };
         // ===== 1) Trong action SignIn POST, ngay sau khi parse jwt =====
         var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value; // Đọc email từ JWT.
@@ -93,8 +95,14 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme); // Tao identity cho cookie.
         var principal = new ClaimsPrincipal(identity); // Tao principal.
+        var authProperties = new AuthenticationProperties();
+        if (auth.ExpiredAtUtc > DateTime.UtcNow)
+        {
+            authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
+            authProperties.IsPersistent = true;
+        }
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal); // Set cookie auth.
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties); // Set cookie auth.
 
         return RedirectToLocal(normalizedReturnUrl); // Login xong quay ve trang dang dung neu hop le.
     }
@@ -227,6 +235,17 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     {
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)) // URL noi bo hop le.
         {
+            var path = returnUrl.Trim();
+            if (path.StartsWith("/Admin/", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("Admin"))
+            {
+                return Redirect("/Seller/Home/Dashboard");
+            }
+
+            if (path.StartsWith("/Seller/", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("Seller"))
+            {
+                return Redirect("/Admin/Home/Dashboard");
+            }
+
             return Redirect(returnUrl); // Quay lai trang user dang dung.
         }
 

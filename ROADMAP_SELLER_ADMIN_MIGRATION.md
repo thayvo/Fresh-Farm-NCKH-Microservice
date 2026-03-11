@@ -194,6 +194,34 @@
   - Khong sai huong: van giu `service-first`.
   - Can doi thu tu uu tien: dong gap runtime/he thong truoc khi mo module moi (Admin hoac microservice tiep).
 
+## Danh gia lai roadmap duoi goc nhin san TMĐT (2026-03-07)
+- Ket luan tong quat:
+  - Huong hien tai la DUNG cho bai toan san TMĐT multi-seller:
+    - service-first,
+    - tenant isolation,
+    - seller runtime on dinh,
+    - admin ops duoc mo dan theo lane rieng.
+  - Tuy nhien roadmap hien tai dang manh o `UI/admin CRUD + quan sat van hanh`, nhung chua du day cac truc nen tang cua san TMĐT.
+- Cac khoang trong phai bo sung:
+  1. `Finance/Settlement/Commission/Refund`:
+     - neu khong co ledger doi soat va payout thi chua the goi la san TMĐT van hanh day du.
+  2. `Returns & After-sales`:
+     - doi tra/hoan tien/tranh chap sau giao hang hien chua duoc dat thanh mot truc rieng.
+  3. `Merchant lifecycle & compliance`:
+     - KYC/mo shop/duyet seller/chinh sach phi la bat buoc cho san multi-seller.
+  4. `Catalog quality + searchability`:
+     - attributes theo danh muc, completeness score, search synonym/tag/facet.
+  5. `Risk/Fraud/Abuse control`:
+     - don ao, voucher abuse, fake review, spam account, payment risk.
+  6. `Ops audit & governance`:
+     - admin action log, moderation audit, settlement audit, notification policy.
+  7. Dac thu domain `nong san/thuc pham tuoi`:
+     - lo hang, han su dung, FIFO/FEFO, truy xuat nguon goc, quality recall.
+- Dieu chinh uu tien:
+  - Khong nen day qua nhanh vao `Campaigns/Ads` truoc khi co `Settlement + Refund + Compliance`.
+  - `Trung tam thong bao` la module phu tro, khong phai core luong song con.
+  - Sau `Catalog moderation`, huong dung chat san TMĐT hon la `Finance/Settlement + Returns/Refunds + Disputes`, roi moi toi `Campaigns`.
+
 ## Phase 4 - System Stabilization (uu tien cao nhat)
 
 ### Lot 4.1 - Runtime config baseline
@@ -315,12 +343,18 @@
     - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.quantity-outlier-diagnostics.sql`
   - [x] Da bo sung ke hoach migrate du lieu khach hang tu `final3.sql` sang microservices:
     - `docs/LOT_4_5_6_FINAL3_CUSTOMER_MIGRATION_2026-02-28.md`
+  - [x] Da bo sung bo script thuc thi lot 4.5.6 (Final3 -> microservices):
+    - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-import.sql`
+    - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-import.sql`
+    - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-28.4.5.6.final3-verify.sql`
+    - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-02-28.4.5.6.final3-verify.sql`
+    - `docs/LOT_4_5_6_EXECUTION_RUNBOOK_2026-02-28.md`
   - [i] Chi tiet tracking lot:
     - `LOT_4_5_PERSISTENCE_HARDENING.md`
     - `docs/LOT_4_5_4_DB_SCHEMA_MIGRATION_ROLLBACK_PLAN.md`
     - `docs/LOT_4_5_5_RUNTIME_SMOKE_2026-02-28.md`
 - Lenh giao viec:
-  - `Lam lot 4.5.6: migrate customer data tu final3.sql theo plan + verify runtime`
+  - `Chay 4 script lot 4.5.6 (import + verify) tren staging, sau do chay lai seller runtime diagnostics + smoke UI`
 
 ### Lot 4.6 - Refactor Seller View Integration & Controller Mapping [HIGH]
 - Status:
@@ -396,6 +430,30 @@
       - Loai cac `OrderDetail` bat thuong khi tinh report (`Quantity <= 0`, `Quantity > 10000`, `UnitPrice <= 0`, `ProductId` khong hop le) de tranh meo thong ke.
     - Da bo sung request validation guard o `OrdersController.Create`:
       - Chan tao moi item co `Quantity` ngoai khoang `1..10000` (DTO + server check).
+    - Da harden auth token propagation cho Seller BFF:
+      - `LegacySellerControllerBase.GetAccessToken()` fallback theo `Authorization header -> Session(ACCESS_TOKEN) -> Claim(ff_access_token/access_token)`.
+      - `AdminAccountController.Login` luu them claim `ff_access_token` de phuc hoi session token sau restart/session timeout.
+      - Cac Seller controllers da doi sang `GetAccessToken(AccessTokenSessionKey)` thay vi doc session truc tiep, giam loi `HTTP 401` khi session bi mat.
+    - Da bo sung seller-scope cho cac API Ordering quan trong:
+      - `ReportsAdminController`: scope seller cho toan bo query `Orders` (customers/orders/revenue/products/shipping/review customer mapping).
+      - `CouponsAdminController`: scope theo `CreatedBy` (list/detail/create/update/delete/toggle/statistics/validate/send/usage/distribution), tao moi set `CreatedBy` theo seller token.
+      - `AdminCustomersController`: scope seller cho `metrics` va `has-orders`.
+      - `ShippingAdminController`: scope seller cho list/detail/order-info/create/update/delete/reconcile COD.
+      - `ReviewsAdminController`: scope seller cho moderation flow; ownership review map qua `SellerOrderItems -> SellerOrder.SellerId`.
+      - `SupportChatAdminController`: scope seller cho conversations/messages/details/close/mark-read theo tap user co order cua seller.
+      - `FeedbacksAdminController`: scope seller cho feedback list/detail/update/delete theo contact khach da co order thuoc seller.
+    - Da bo sung ownership schema cho Catalog de phuc vu multi-seller:
+      - Model: `SellerProduct` + context mapping (`FreshFarmCatalogDBContext.Extras.cs`).
+      - DB scripts: `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.{delta,verify,down}.sql`.
+      - Bootstrap script: `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-01.4.6.seller-products.seed-template.sql` (gan ownership cho san pham da co).
+    - Da bo sung backfill scripts cho ownership o Ordering:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.backfill-seller-orders.verify.sql`
+      - Muc tieu: dien du lieu `SellerOrders/SellerOrderItems` tu `CatalogDB.dbo.SellerProducts` de giam phu thuoc fallback legacy.
+    - Da siet fallback tenant-scope theo huong "strict-if-mapped":
+      - Neu seller da co ownership mapping (`SellerOrders`/`CreatedBy`) => chi doc du lieu cua seller do.
+      - Chi fallback du lieu legacy (order chua map hoac coupon `CreatedBy = NULL`) khi seller chua co mapping ownership.
+      - Da apply cho `Orders/Reports/Shipping/Review/SupportChat/Loyalty/AdminCustomers/Coupons`.
   - [!] Con buoc verify build/runtime tren may local (assistant environment khong co `dotnet`).
   - [x] Da bo sung static integrity gate script:
     - `scripts/seller_static_smoke.sh`
@@ -434,3 +492,265 @@
 - Scope:
   - Admin Dashboard/Product/Order theo service-first.
   - Sau do moi tach service nang (Warehouse/Shipping/Report read model) neu can.
+
+## Phase 7 - Admin Marketplace Ops (Shopee/Amazon style, theo huong hien co)
+
+### 7.0 Feasibility check (dua tren code + schema hien tai)
+- Dashboard tong quan:
+  - [~] Co the lam ngay 70% tu `Orders`, `SellerOrders`, `Coupon`, `LoyaltyPointHistory`, `Review`.
+  - [!] Traffic realtime (session/visit/concurrent) CHUA co data source chuan trong schema hien tai.
+- User management (Buyer/Seller):
+  - [~] Co the lam ngay phan user CRUD/co ban role tu `Identity`.
+  - [!] Chua co workflow "xet duyet mo shop", "brand registry", "phi hoa hong theo nganh/shop" (thieu schema + API).
+- Catalog management + moderation:
+  - [~] Co `Categories`, `Products`, `Units`, `SellerProducts` de lam quan ly danh muc/co ban.
+  - [!] Chua co bo bang `Attributes/AttributeValues`, queue kiem duyet noi dung, blacklist tu khoa.
+- Orders & logistics:
+  - [~] Co don hang toan san + shipping records + COD reconcile (nen tang kha dung).
+  - [!] Chua co module quan ly "logistics providers" (provider catalog, SLA, API key/webhook manager) o muc enterprise.
+- Disputes & CS:
+  - [~] Co `SupportConversation/SupportMessage`, `ReturnRequest`, `RefundTransaction` de lam MVP ticket + tranh chap.
+  - [!] Chua co workflow arbitration day du (SLA, phan quyen cap bac, evidences pipeline).
+- Campaigns:
+  - [~] Co `Coupon/CouponDistribution/CouponUsageHistory` de lam voucher do san tai tro.
+  - [!] Chua co FlashSale engine va Ads wallet/bidding subsystem.
+- Finance, settlement & after-sales:
+  - [~] Co the bat dau MVP tu `Orders`, `Payments`, `RefundTransaction`, `ReturnRequest`, `SellerOrders`.
+  - [!] Chua co payout cycle, commission ledger, settlement snapshot, chargeback/reconciliation flow o muc san TMĐT.
+- Merchant compliance:
+  - [~] Co the bat dau tu `Users/Roles` + profile seller hien co.
+  - [!] Chua co KYC, ho so phap ly, trang thai duyet shop, chinh sach phi theo seller/category.
+- Risk & abuse control:
+  - [~] Co the suy ra tin hieu ban dau tu orders/refunds/reviews/coupon usage.
+  - [!] Chua co schema risk case, rule engine, decision log, fraud scoring.
+- Search/discovery & fresh-goods operations:
+  - [!] Chua co search catalog dung nghia marketplace (synonym/tag/facet/ranking).
+  - [!] Chua co inventory-by-lot/HSD/truy xuat nguon goc, trong khi domain la nong san/thuc pham.
+
+### 7.1 Nguyen tac UI Admin (giu phong cach Seller)
+- [x] Chot dinh huong UI:
+  - Dung chung visual language voi Seller: gradient xanh duong, card bo goc, animation "quet anh sang".
+  - Khong doi HTML/CSS/JS legacy khi khong can; uu tien wrap va them class/theme trong Admin layout.
+- [ ] Tao "Admin theme contract":
+  - CSS variables chung (`--ff-primary`, `--ff-accent`, `--ff-gloss`) trong layout Admin.
+  - 1 class utility cho hieu ung quet anh sang dung lai tren hero/header cards.
+  - checklist responsive desktop/mobile.
+
+### 7.2 Module 1 - Dashboard Tong quan (Analytics & Thong ke)
+- Muc tieu:
+  - Dashboard dau vao cho Admin, tach khoi Seller scope.
+- Buoc nho:
+  1. Tao endpoint `Ordering API` moi: `GET /api/orders/platform/dashboard` (`AdminOnly`).
+  2. Tinh KPI kinh doanh:
+     - GMV, commission revenue, orders moi, cancel rate.
+  3. Tinh KPI nguoi dung:
+     - users moi, sellers moi (dua tren role + CreatedAt).
+  4. Them metric "giao dich dang dien ra" theo cua so 5-15 phut (interim) neu chua co event stream.
+  5. Tao BFF `Areas/Admin/Controllers/DashboardController` goi API tren.
+  6. Refactor `Areas/Admin/Views/Home/Dashboard.cshtml` theo style Seller + chart blocks.
+  7. Them fallback "NO DATA" cho metric chua co traffic telemetry.
+- DoD:
+  - Dashboard hien KPI + chart, khong leak seller-only scope.
+
+### 7.3 Module 2 - User Management (tach Buyer/Seller ro rang)
+- Muc tieu:
+  - Admin quan tri user theo nhom role + hanh vi.
+- Buoc nho:
+  1. Tach lane UI:
+     - `Admin/User/ManageAdmins` (giu phan da co).
+     - `Admin/User/ManageSellers`.
+     - `Admin/User/ManageBuyers`.
+  2. Mo rong `Identity API`:
+     - endpoint list/filter theo role + trang thai + date range.
+  3. Bo sung profile Seller (neu chua co): schema `SellerProfile` + trang thai approve.
+  4. Bo sung actions admin:
+     - approve/reject/lock/limit visibility cho seller.
+  5. Bo sung buyer risk flags:
+     - counters don bi huy/hoan/bao cao spam (lay tu Ordering).
+  6. Bo sung wallet/member-tier view bridge (neu loyalty dung nhu tier tam thoi).
+  7. Cap nhat Admin sidebar + page navigation.
+- DoD:
+  - Admin xem/sua duoc Buyer va Seller rieng biet, co lock/approve flow co ban.
+
+### 7.4 Module 3 - Catalog Management & Moderation
+- Muc tieu:
+  - Admin quan ly "nen tang danh muc + kiem duyet noi dung".
+- Buoc nho:
+  1. Migrate UI danh muc tu Seller sang `Areas/Admin/Catalog`.
+  2. Chuyen API categories/units sang lane `AdminOnly` (hoac endpoint admin rieng).
+  3. Thiet ke schema attributes:
+     - `CategoryAttribute`, `AttributeValueOption`, `ProductAttributeValue`.
+  4. Them queue kiem duyet:
+     - `ProductModerationQueue` (Pending/Approved/Rejected).
+  5. Them blacklist tu khoa/hang cam:
+     - `ModerationKeyword` + bo loc pre-publish.
+  6. UI moderation list + detail + approve/reject.
+  7. Them audit log cho hanh dong kiem duyet.
+- DoD:
+  - Admin co danh muc trung tam + hang doi duyet san pham.
+
+### 7.5 Module 4 - Orders & Logistics (toan san)
+- Muc tieu:
+  - Admin theo doi toan bo order flow va hieu suat van chuyen.
+- Buoc nho:
+  1. Tao endpoint order global (`AdminOnly`) khong seller filter.
+  2. Tao BFF `Areas/Admin/Controllers/OrderController` + `ManageOrders` view style Seller.
+  3. Mo rong shipping domain:
+     - bang `LogisticsProvider` + `ProviderConfig` + `ProviderSlaSnapshot`.
+  4. Tao API metrics logistic:
+     - success rate, fail rate, on-time rate theo provider.
+  5. UI provider management (API key, status, SLA dashboard).
+  6. UI order timeline (pending -> processing -> shipping -> completed/cancel/refund).
+  7. Bao dam role guard: Admin xem toan san, Seller chi xem phan minh.
+- DoD:
+  - Admin xem duoc order/logistics toan san, co dashboard theo provider.
+
+### 7.5A Module 5 - Finance, Settlement, Returns & Refunds
+- Muc tieu:
+  - Bo sung truc song con cua san TMĐT: thu tien, giu tien, chia tien, hoan tien, doi soat, doi tra.
+- Buoc nho:
+  1. Dinh nghia schema settlement:
+     - `PlatformCommissionRule`, `SellerSettlementCycle`, `SellerSettlementLedger`, `SellerPayout`.
+  2. Chuan hoa payment/refund ledger:
+     - `PaymentTransaction`, `RefundLedger`, `ChargebackCase`, `SettlementSnapshot`.
+  3. Dinh nghia workflow after-sales:
+     - `ReturnRequest`, `ReturnItem`, `ReturnShipment`, `RefundDecision`.
+  4. API admin:
+     - approve refund,
+     - hold payout,
+     - release payout,
+     - export reconciliation.
+  5. API seller:
+     - xem doi soat, payout pending, refund bi tranh chap.
+  6. UI Admin finance console:
+     - dashboard doanh thu san,
+     - cong no seller,
+     - refund pipeline,
+     - payout queue.
+  7. UI seller settlement:
+     - chi tiet don duoc doi soat,
+     - phi san,
+     - lich su payout.
+- DoD:
+  - Co duoc ledger tai chinh co ban cho san, payout queue MVP, va refund/return flow khong can xu ly tay ngoai he thong.
+
+### 7.6 Module 6 - Disputes & Customer Service
+- Muc tieu:
+  - Ticket + tranh chap co "trong tai admin".
+- Buoc nho:
+  1. Dinh nghia schema ticket:
+     - `SupportTicket`, `TicketMessage`, `TicketAttachment`, `TicketSla`.
+  2. Bridge du lieu tu `SupportConversation` sang ticket lane admin.
+  3. Dinh nghia schema tranh chap:
+     - `DisputeCase`, `DisputeEvidence`, `DisputeDecision`.
+  4. API admin:
+     - tao case, assign staff, request evidence, close with decision.
+  5. UI CS queue:
+     - Open/Pending/SLA breach/Resolved.
+  6. UI arbitration center:
+     - thong tin buyer/seller/order/return/refund tren 1 man.
+  7. Tich hop notifications cho buyer/seller sau khi ra quyet dinh.
+- DoD:
+  - Co ticketing + dispute flow MVP, co SLA va decision log.
+
+### 7.6A Merchant Lifecycle & Compliance
+- Muc tieu:
+  - Bien `Seller` tu role ky thuat thanh `merchant` duoc quan ly vong doi day du.
+- Buoc nho:
+  1. Them `SellerProfile`, `SellerComplianceDocument`, `SellerApprovalHistory`.
+  2. Bo sung trang thai merchant:
+     - Draft/PendingReview/Approved/Suspended/Closed.
+  3. Ho tro tai lieu:
+     - CCCD/GPKD/MST/tai khoan ngan hang.
+  4. Bo sung chinh sach phi:
+     - phi theo nganh hang, shop tier, campaign.
+  5. UI Admin:
+     - queue duyet mo shop,
+     - suspend/reactivate seller,
+     - lich su phe duyet.
+  6. UI seller:
+     - wizard hoan tat ho so,
+     - banner compliance missing.
+- DoD:
+  - Seller onboarding/approval khong con nam ngoai he thong va admin co lich su duyet ro rang.
+
+### 7.7 Module 7 - Campaigns (Flash Sale, Voucher, Ads)
+- Muc tieu:
+  - Admin van hanh campaign do san tai tro + campaign seller tham gia.
+- Buoc nho:
+  1. Tach coupon hien tai thanh 2 lane:
+     - voucher cua san (AdminOnly),
+     - voucher cua seller (SellerOnly).
+  2. Tao schema campaign:
+     - `Campaign`, `CampaignSellerParticipation`, `CampaignProductSlot`.
+  3. Tao flow flash sale:
+     - tao campaign, mo dang ky, duyet seller tham gia.
+  4. Tao KPI campaign:
+     - GMV, conversion, ROI voucher.
+  5. Tao schema ads wallet:
+     - `SellerAdsWallet`, `AdsTopup`, `AdsSpendLedger`, `AdsCampaign`.
+  6. UI Admin campaign center + ads finance overview.
+  7. Export/report cho doi marketing.
+- DoD:
+  - Admin van hanh duoc voucher + campaign flash sale MVP; ads wallet co ledger co ban.
+
+### 7.7A Cross-cutting Marketplace Controls
+- Muc tieu:
+  - Bo sung cac truc can co de san van hanh ben vung, khong bi dung o muc "CRUD co dep UI".
+- Buoc nho:
+  1. Risk/fraud center:
+     - `RiskCase`, `RiskSignal`, `RiskDecision`, `VoucherAbuseCase`.
+  2. Audit log:
+     - `AdminActionLog`, `ModerationAudit`, `SettlementAudit`.
+  3. Search/catalog readiness:
+     - `CategoryAttribute`, `ProductAttributeValue`, synonym/tag/search facet.
+  4. Fresh-goods operations:
+     - lot/HSD/FIFO-FEFO/truy xuat nguon goc/quality issue recall.
+  5. Communications governance:
+     - template thong bao/email/SMS,
+     - notification policy theo event,
+     - opt-in/out tracking.
+- DoD:
+  - Co he thong audit + risk + catalog quality + domain operations du de goi la san TMĐT van hanh that.
+
+### 7.8 Thu tu trien khai de xong nhanh
+- Sprint A (uu tien cao):
+  1. Dashboard tong quan.
+  2. User management tach Buyer/Seller.
+  3. Orders global + logistics base.
+- Sprint B:
+  1. Catalog moderation.
+  2. Finance/Settlement + Returns/Refunds.
+  3. Disputes & CS.
+- Sprint C:
+  1. Merchant lifecycle & compliance.
+  2. Campaigns (voucher san + flash sale).
+  3. Ads wallet.
+- Sprint D:
+  1. Risk/fraud center.
+  2. Search/catalog readiness + fresh-goods operations.
+  3. Audit + communications governance.
+
+### 7.9 Definition of Ready / Done cho moi module Admin
+- Ready:
+  - Co API contract (request/response), role policy, data source ro rang.
+  - Co mapping UI state (loading/empty/error/success).
+- Done:
+  - Co route BFF + view + API endpoint.
+  - Co role guard `AdminOnly`.
+  - Co smoke test tay (desktop + mobile).
+  - Khong tac dong regress lane Seller.
+
+### 7.10 Nguyen tac giu dung huong san TMĐT
+- Uu tien module theo thu tu:
+  1. Runtime on dinh + tenant isolation.
+  2. Order/logistics/refund/settlement.
+  3. Merchant compliance + catalog quality.
+  4. Disputes/risk/audit.
+  5. Campaigns/ads/growth.
+- Khi can chon giua `UI dep hon` va `ledger/nghiep vu dung hon`:
+  - uu tien ledger/nghiep vu.
+- Khi can chon giua `feature growth` va `finance/compliance`:
+  - uu tien finance/compliance.
+- Khi can chon giua `module phu tro van hanh` va `core marketplace flow`:
+  - uu tien core marketplace flow.

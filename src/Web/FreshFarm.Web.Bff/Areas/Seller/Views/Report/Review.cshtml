@@ -1,7 +1,8 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.ReviewReportViewModel
 @{
     ViewBag.Title = "Quản Lý Đánh Giá";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     Func<string, string> imgUrl = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
 }
 
@@ -411,7 +412,7 @@
                 var token = form.find('input[name="__RequestVerificationToken"]').val();
 
                 $.ajax({
-                    url: '@Url.Action("DeleteReview", "Report", new { area = "Seller" })',
+                    url: '@Url.Action("DeleteReview", "Report", new { area = currentArea })',
                     type: 'POST',
                     data: {
                         __RequestVerificationToken: token,

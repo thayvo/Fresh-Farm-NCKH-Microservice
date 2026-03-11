@@ -1,11 +1,18 @@
 ﻿@{
-    ViewBag.Title = "Giao Hàng - Nhân Viên";
-    //Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var deliveryScopeLabel = ViewData["DeliveryScopeLabel"] as string ?? "Theo seller";
+
+    ViewBag.Title = "Giao hàng";
+    Layout = layoutPath;
 }
 
 <main class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="fw-bold mb-0">Giao Hàng</h2>
+        <div>
+            <h2 class="fw-bold mb-1">Giao hàng</h2>
+            <span class="badge bg-light text-primary">@deliveryScopeLabel</span>
+        </div>
         <div class="d-flex gap-2">
             <select id="statusFilter" class="form-select">
                 <option value="Processing">Chờ xử lý</option>
@@ -76,7 +83,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <form id="assignForm" method="post" action="@Url.Action("Assign","Delivery", new { area = "Seller" })">
+        <form id="assignForm" method="post" action="@Url.Action("Assign","Delivery", new { area = areaName })">
             @Html.AntiForgeryToken()
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
             <button type="submit" class="btn btn-primary">Lưu</button>
@@ -86,9 +93,16 @@
   </div>
 </div>
 
+<form id="deliveryStatusTokenForm" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
+
 <script>
     const PAGE_SIZE = 10;
     let currentPage = 1;
+    const listUrl = '@Url.Action("List", "Delivery", new { area = areaName })';
+    const updateStatusUrl = '@Url.Action("UpdateStatus", "Delivery", new { area = areaName })';
+    const requestVerificationToken = document.querySelector('#deliveryStatusTokenForm input[name="__RequestVerificationToken"]')?.value || '';
 
     document.getElementById('btnReload').addEventListener('click', () => loadList(1));
     document.getElementById('statusFilter').addEventListener('change', () => loadList(1));
@@ -96,7 +110,7 @@
     function loadList(page){
         currentPage = (typeof page === 'number' && page > 0) ? page : (currentPage || 1);
         const status = document.getElementById('statusFilter').value;
-        fetch(`@Url.Action("List", "Delivery", new { area = "Seller" })?status=${encodeURIComponent(status)}&page=${currentPage}&pageSize=${PAGE_SIZE}`)
+        fetch(`${listUrl}?status=${encodeURIComponent(status)}&page=${currentPage}&pageSize=${PAGE_SIZE}`)
             .then(r => r.json())
             .then(res => {
                 if (!res.success) throw new Error(res.message || 'Load failed');
@@ -170,10 +184,12 @@
     }
 
     function updateStatus(orderId, newStatus){
-        // Reuse Admin/Order/UpdateOrderStatus
-        fetch('@Url.Action("UpdateOrderStatus", "Order", new { area = "Seller" })', {
+        fetch(updateStatusUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': requestVerificationToken
+            },
             body: JSON.stringify({ orderId: orderId, newStatus: newStatus })
         })
         .then(r => r.json())

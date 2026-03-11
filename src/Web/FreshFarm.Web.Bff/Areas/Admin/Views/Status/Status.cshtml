@@ -1,0 +1,988 @@
+﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Admin.Models.AdminStatusViewModel>
+@{
+    ViewBag.Title = "Quản Lý Trạng Thái";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        position: relative;
+        overflow: hidden;
+        animation: fadeInUp .5s ease-out;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 420px;
+            height: 420px;
+            background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .grad-header-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .header-icon {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-radius: 1.25rem;
+        padding: 1rem 1.2rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.4);
+    }
+
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out .05s backwards;
+    }
+
+    .filter-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        border-radius: 1.5rem;
+        border: 2px solid #bfdbfe;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.12);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .text-primary-blue {
+        color: #1e40af !important;
+    }
+
+    .btn-pill {
+        border-radius: 2rem;
+        padding: .7rem 1.8rem;
+        font-weight: 600;
+        border: none;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.12);
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        white-space: nowrap;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.22);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+    .btn-secondary {
+        background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+        color: #111827;
+        border: none;
+    }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+        }
+
+    .btn-action {
+        width: 38px;
+        height: 38px;
+        border-radius: .875rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all .3s ease;
+        border: 2px solid;
+    }
+
+        .btn-action:hover {
+            transform: scale(1.1);
+        }
+
+    .btn-outline-primary.btn-action {
+        border-color: #bfdbfe;
+        color: #1e40af;
+        background: #eff6ff;
+    }
+
+        .btn-outline-primary.btn-action:hover {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: #ffffff;
+            border-color: #1e40af;
+        }
+
+    .btn-outline-danger.btn-action {
+        border-color: #fecaca;
+        color: #b91c1c;
+        background: #fef2f2;
+    }
+
+        .btn-outline-danger.btn-action:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: #ffffff;
+            border-color: #b91c1c;
+        }
+
+    .form-control,
+    .form-select {
+        border-radius: 1rem;
+        border: 2px solid #bfdbfe;
+        padding: .8rem 1rem;
+        transition: all .3s ease;
+        background-color: #ffffff;
+    }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+        }
+
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.05rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .table-modern tbody tr {
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            animation: slideIn .35s ease-out backwards;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59,130,246,0.08) 0%, rgba(147,197,253,0.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -4px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+        }
+
+    .badge-status-name {
+        border-radius: 999px;
+        padding: .35rem .9rem;
+        font-size: .85rem;
+        font-weight: 600;
+        color: #ffffff;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, .15);
+    }
+
+    .table-empty-state {
+        padding: 3rem 1rem;
+    }
+
+    .table-empty-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        color: #1d4ed8;
+        box-shadow: 0 12px 30px rgba(30, 64, 175, 0.25);
+        margin-bottom: 1rem;
+    }
+
+    .pagination .page-link {
+        border-radius: .875rem;
+        margin: 0 .25rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        font-weight: 600;
+        transition: all .3s ease;
+    }
+
+        .pagination .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            box-shadow: 0 8px 16px rgba(59,130,246,0.35);
+            transform: translateY(-2px);
+        }
+
+    .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
+    }
+
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+    }
+
+    .dynamic-alert {
+        animation: slideIn .35s ease-out;
+        border-radius: 1.25rem;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+        border: none;
+    }
+
+    .modal-content {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
+    }
+
+    .modal-header {
+        border-radius: 1.5rem 1.5rem 0 0;
+        padding: 1.2rem 1.5rem;
+    }
+
+    .modal-header-add {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #ffffff;
+    }
+
+    .modal-header-edit {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: #ffffff;
+    }
+
+    .modal-header-delete {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: #ffffff;
+    }
+
+    .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 4px rgba(220,53,69,.1) !important;
+    }
+
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 4px rgba(25,135,84,.1) !important;
+    }
+
+    @@media (max-width: 768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .btn-pill {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .table-modern {
+            font-size: .87rem;
+        }
+    }
+</style>
+
+<div class="min-vh-100">
+    <main class="container-fluid py-4">
+        <!-- Header gradient với hiệu ứng quét ánh sáng -->
+        <div class="grad-header p-4 p-md-5 mb-4">
+            <div class="grad-header-inner">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="header-icon">
+                            <i class="bi bi-sliders fs-2 text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size: 2.2rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+                                Quản Lý Trạng Thái
+                            </h1>
+                            <p class="mb-0 text-white-50" style="font-size: 1.02rem;">
+                                Cấu hình và quản lý các trạng thái hệ thống một cách linh hoạt
+                            </p>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-success btn-pill shadow-lg"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalAdd"
+                            id="btnAddNew">
+                        <i class="bi bi-plus-circle fs-5"></i>
+                        <span>Thêm trạng thái</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert TempData -->
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show mb-4">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <strong>Thành công!</strong> @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show mb-4">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Lỗi!</strong> @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        <!-- Bộ lọc & tìm kiếm -->
+        <div class="filter-card p-4 mb-4">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="p-3 rounded-3" style="background: linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                    <i class="bi bi-funnel text-white" style="font-size: 1.25rem;"></i>
+                </div>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc trạng thái</h5>
+            </div>
+            <form method="get" class="row g-3">
+                <input type="hidden" name="page" value="1" />
+                <div class="col-md-5 col-lg-4">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        <i class="bi bi-search me-1"></i> Tìm theo tên trạng thái
+                    </label>
+                    <input type="text"
+                           name="searchTerm"
+                           value="@ViewBag.SearchTerm"
+                           class="form-control"
+                           placeholder="Nhập tên trạng thái..." />
+                </div>
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-semibold text-primary-blue">
+                        <i class="bi bi-tags me-1"></i> Loại trạng thái
+                    </label>
+                    @Html.DropDownList("statusTypeID",
+                        (SelectList)ViewBag.StatusTypes,
+                        "-- Loại trạng thái --",
+                        new { @class = "form-select" })
+                </div>
+                <div class="col-md-3 col-lg-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-pill w-100">
+                        <i class="bi bi-funnel-fill"></i>
+                        <span>Lọc</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Bảng danh sách -->
+        <div class="card-glass overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 table-modern">
+                    <thead>
+                        <tr>
+                            <th class="px-4">#</th>
+                            <th class="px-4">Tên trạng thái</th>
+                            <th class="px-4">Loại trạng thái</th>
+                            <th class="px-4">Màu hiển thị</th>
+                            <th class="px-4">Thứ tự</th>
+                            <th class="px-4">Ghi chú</th>
+                            <th class="px-4 text-end">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            int index = (ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1;
+                            foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td class="px-4">
+                                        <span class="badge bg-primary text-white rounded-pill px-3 py-2">
+                                            @index
+                                        </span>
+                                    </td>
+                                    <td class="px-4">
+                                        <span class="badge-status-name" style="background-color:@item.ColorCode;">
+                                            @item.StatusName
+                                        </span>
+                                    </td>
+                                    <td class="px-4">
+                                        <span class="fw-semibold text-primary-blue">
+                                            @item.StatusType.StatusTypeName
+                                        </span>
+                                    </td>
+                                    <td class="px-4">
+                                        <span class="me-2" style="color:@item.ColorCode;">
+                                            <i class="bi bi-square-fill"></i>
+                                        </span>
+                                        <small class="text-muted">@item.ColorCode</small>
+                                    </td>
+                                    <td class="px-4">
+                                        <span class="fw-semibold">@item.DisplayOrder</span>
+                                    </td>
+                                    <td class="px-4">
+                                        @if (!string.IsNullOrEmpty(item.Note))
+                                        {
+                                            <small>@item.Note</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 text-end">
+                                        <button class="btn btn-sm btn-outline-primary btn-action me-1 btn-edit"
+                                                data-id="@item.StatusID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalEdit"
+                                                title="Chỉnh sửa">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger btn-action btn-delete"
+                                                data-id="@item.StatusID"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalDelete"
+                                                title="Xóa">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                index++;
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center table-empty-state">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <div class="table-empty-icon">
+                                            <i class="bi bi-inbox fs-1"></i>
+                                        </div>
+                                        <h5 class="fw-bold text-primary-blue mb-1">Chưa có trạng thái nào</h5>
+                                        <p class="text-muted mb-0">
+                                            Hãy nhấn <strong>“Thêm trạng thái”</strong> để tạo trạng thái mới.
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Phân trang -->
+            @if (ViewBag.TotalPages > 1)
+            {
+                <div class="px-4 py-3 border-top" style="background: linear-gradient(90deg,#f0f9ff 0%,#dbeafe 100%);">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="text-muted">
+                            <i class="bi bi-journals me-2 text-primary"></i>
+                            Hiển thị
+                            <strong class="text-primary-blue">
+                                @((ViewBag.CurrentPage - 1) * ViewBag.PageSize + 1)
+                            </strong>
+                            đến
+                            <strong class="text-primary-blue">
+                                @Math.Min(ViewBag.CurrentPage * ViewBag.PageSize, ViewBag.TotalItems)
+                            </strong>
+                            trong tổng số
+                            <strong class="text-primary-blue">@ViewBag.TotalItems</strong> mục
+                        </div>
+                        <nav aria-label="Phân trang">
+                            <ul class="pagination mb-0">
+                                <li class="page-item @(ViewBag.CurrentPage == 1 ? "disabled" : "")">
+                                    <a class="page-link"
+                                       href="@Url.Action("Status", new { page = ViewBag.CurrentPage - 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">
+                                        <span>&laquo;</span>
+                                    </a>
+                                </li>
+
+                                @{
+                                    int currentPage = ViewBag.CurrentPage;
+                                    int totalPages = ViewBag.TotalPages;
+                                    int startPage = Math.Max(1, currentPage - 2);
+                                    int endPage = Math.Min(totalPages, currentPage + 2);
+
+                                    if (startPage > 1)
+                                    {
+                                        <li class="page-item">
+                                            <a class="page-link" href="@Url.Action("Status", new { page = 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">1</a>
+                                        </li>
+                                        if (startPage > 2)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        }
+                                    }
+
+                                    for (int i = startPage; i <= endPage; i++)
+                                    {
+                                        <li class="page-item @(i == currentPage ? "active" : "")">
+                                            <a class="page-link" href="@Url.Action("Status", new { page = i, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">@i</a>
+                                        </li>
+                                    }
+
+                                    if (endPage < totalPages)
+                                    {
+                                        if (endPage < totalPages - 1)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        }
+                                        <li class="page-item">
+                                            <a class="page-link" href="@Url.Action("Status", new { page = totalPages, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">@totalPages</a>
+                                        </li>
+                                    }
+                                }
+
+                                <li class="page-item @(ViewBag.CurrentPage == ViewBag.TotalPages ? "disabled" : "")">
+                                    <a class="page-link"
+                                       href="@Url.Action("Status", new { page = ViewBag.CurrentPage + 1, searchTerm = ViewBag.SearchTerm, statusTypeID = ViewBag.StatusTypeID })">
+                                        <span>&raquo;</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            }
+        </div>
+    </main>
+</div>
+
+@section modal {
+    <!-- Modal thêm trạng thái -->
+    <div class="modal fade" id="modalAdd" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-add">
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi bi-plus-circle"></i>
+                        <span>Thêm trạng thái mới</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="formAdd">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Tên trạng thái <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="StatusName" class="form-control" placeholder="Nhập tên trạng thái..." required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Loại trạng thái <span class="text-danger">*</span>
+                            </label>
+                            @Html.DropDownList("StatusTypeID",
+                                (SelectList)ViewBag.StatusTypes,
+                                "-- Chọn loại --",
+                                new { @class = "form-select", required = "required" })
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Màu hiển thị</label>
+                            <input type="color" name="ColorCode" class="form-control form-control-color" value="#28a745" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Thứ tự hiển thị</label>
+                            <input type="number" name="DisplayOrder" class="form-control" value="0" min="0" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Ghi chú</label>
+                            <textarea name="Note" class="form-control" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer p-4 border-top">
+                    <button class="btn btn-secondary btn-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </button>
+                    <button class="btn btn-success btn-pill" id="btnSaveAdd">
+                        <i class="bi bi-check-circle me-1"></i> Lưu
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal sửa trạng thái -->
+    <div class="modal fade" id="modalEdit" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-edit">
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi bi-pencil-square"></i>
+                        <span>Chỉnh sửa trạng thái</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="formEdit">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="StatusID" id="EditStatusID" />
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Tên trạng thái <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="StatusName" id="EditStatusName" class="form-control" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">
+                                Loại trạng thái <span class="text-danger">*</span>
+                            </label>
+                            @Html.DropDownList("StatusTypeID",
+                                (SelectList)ViewBag.StatusTypes,
+                                "-- Chọn loại --",
+                                new { @class = "form-select", id = "EditStatusTypeID", required = "required" })
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Màu hiển thị</label>
+                            <input type="color" name="ColorCode" id="EditColorCode" class="form-control form-control-color" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Thứ tự hiển thị</label>
+                            <input type="number" name="DisplayOrder" id="EditDisplayOrder" class="form-control" min="0" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold text-primary-blue">Ghi chú</label>
+                            <textarea name="Note" id="EditNote" class="form-control" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer p-4 border-top">
+                    <button class="btn btn-secondary btn-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </button>
+                    <button class="btn btn-primary btn-pill" id="btnSaveEdit">
+                        <i class="bi bi-check-circle me-1"></i> Cập nhật
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal xóa -->
+    <div class="modal fade" id="modalDelete" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modal-header-delete">
+                    <h5 class="modal-title d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <span>Xác nhận xóa</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        <div class="p-4 rounded-circle d-inline-flex"
+                             style="background: linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);">
+                            <i class="bi bi-trash fs-1" style="color:#dc2626;"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold mb-2">Bạn có chắc chắn muốn xóa?</h5>
+                    <p class="text-muted mb-0">
+                        Hành động này không thể hoàn tác. Trạng thái sẽ bị xóa vĩnh viễn.
+                    </p>
+                </div>
+                <div class="modal-footer p-4 border-top justify-content-center">
+                    <button class="btn btn-secondary btn-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i> Hủy
+                    </button>
+                    <button class="btn btn-danger btn-pill" id="btnConfirmDelete">
+                        <i class="bi bi-trash3 me-1"></i> Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+        let currentDeleteId = 0;
+
+        function showNotification(message, type = 'info') {
+            const oldAlert = document.querySelector('.dynamic-alert');
+            if (oldAlert) oldAlert.remove();
+
+            const iconMap = {
+                'success': 'check-circle-fill',
+                'danger': 'exclamation-triangle-fill',
+                'warning': 'exclamation-circle-fill',
+                'info': 'info-circle-fill'
+            };
+
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+            alertDiv.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:500px;';
+            alertDiv.innerHTML =
+                `<div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-${iconMap[type]} fs-4"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`;
+
+            document.body.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.style.animation = 'slideOut .3s ease-out';
+                setTimeout(() => alertDiv.remove(), 300);
+            }, 5000);
+        }
+
+        // Reset form khi mở modal thêm mới
+        document.getElementById('btnAddNew').addEventListener('click', function () {
+            const form = document.getElementById('formAdd');
+            if (form) form.reset();
+        });
+
+        // Xử lý thêm mới
+        document.getElementById('btnSaveAdd').addEventListener('click', function () {
+            const form = document.getElementById('formAdd');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
+
+            fetch('@Url.Action("CreateStatus", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalAdd')).hide();
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                });
+        });
+
+        // Xử lý sửa - Load dữ liệu
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', function () {
+                const id = this.dataset.id;
+
+                fetch('@Url.Action("GetStatusDetail", "Status")?id=' + id)
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.success) {
+                            const data = result.data;
+                            document.getElementById('EditStatusID').value = data.StatusID;
+                            document.getElementById('EditStatusName').value = data.StatusName;
+                            document.getElementById('EditStatusTypeID').value = data.StatusTypeID;
+                            document.getElementById('EditColorCode').value = data.ColorCode;
+                            document.getElementById('EditDisplayOrder').value = data.DisplayOrder;
+                            document.getElementById('EditNote').value = data.Note || '';
+                        } else {
+                            showNotification(result.message, 'danger');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showNotification('Không thể tải thông tin trạng thái', 'danger');
+                    });
+            });
+        });
+
+        // Xử lý cập nhật
+        document.getElementById('btnSaveEdit').addEventListener('click', function () {
+            const form = document.getElementById('formEdit');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const saveBtn = this;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang cập nhật...';
+
+            fetch('@Url.Action("EditStatus", "Status")', {
+                method: 'POST',
+                body: formData
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalText;
+                });
+        });
+
+        // Xử lý xóa
+        document.querySelectorAll('.btn-delete').forEach(btn => {
+            btn.addEventListener('click', function () {
+                currentDeleteId = this.dataset.id;
+            });
+        });
+
+        document.getElementById('btnConfirmDelete').addEventListener('click', function () {
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
+            const deleteBtn = this;
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
+
+            fetch('@Url.Action("DeleteStatus", "Status")?id=' + currentDeleteId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: '__RequestVerificationToken=' + encodeURIComponent(token)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('modalDelete')).hide();
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showNotification(data.message, 'danger');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showNotification('Có lỗi xảy ra! Vui lòng thử lại.', 'danger');
+                })
+                .finally(() => {
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalText;
+                });
+        });
+    </script>
+}

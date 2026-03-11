@@ -1,0 +1,337 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.NotificationCenterPageViewModel
+@{
+    ViewBag.Title = "Trung tâm thông báo";
+}
+
+<style>
+    .notification-shell {
+        min-height: 100vh;
+        background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+        padding: 1.5rem;
+    }
+
+    .notification-hero {
+        background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%);
+        border-radius: 1.75rem;
+        color: #fff;
+        padding: 2rem;
+        box-shadow: 0 24px 50px rgba(29, 78, 216, .22);
+    }
+
+    .notification-card,
+    .notification-filter-card,
+    .notification-table-card {
+        border: 0;
+        border-radius: 1.5rem;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+    }
+
+    .notification-type {
+        display: inline-flex;
+        align-items: center;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-weight: 600;
+        font-size: .8rem;
+    }
+
+    .notification-read {
+        display: inline-flex;
+        align-items: center;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: .8rem;
+    }
+
+    .notification-read.is-read {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .notification-read.is-unread {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .notification-row-unread {
+        background: #f8fbff;
+    }
+
+    .notification-message {
+        color: #475569;
+        max-width: 420px;
+    }
+</style>
+
+<main class="notification-shell">
+    <div class="notification-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4">
+            <div>
+                <div class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">Toàn sàn</div>
+                <h1 class="fw-bold mb-2">Trung tâm thông báo</h1>
+                <p class="mb-0 opacity-75">Theo dõi thông báo đơn hàng đã gửi cho khách, rà thông báo chưa đọc và xử lý nhanh theo phạm vi toàn sàn.</p>
+            </div>
+            <form method="post" action="@Url.Action("MarkAllAsRead", "Notification", new { area = "Admin" })">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="q" value="@Model.Query" />
+                <input type="hidden" name="type" value="@Model.Type" />
+                <input type="hidden" name="userId" value="@Model.UserId" />
+                <input type="hidden" name="orderId" value="@Model.OrderId" />
+                @if (Model.IsRead.HasValue)
+                {
+                    <input type="hidden" name="isRead" value="@Model.IsRead.Value.ToString().ToLowerInvariant()" />
+                }
+                <input type="hidden" name="page" value="@Model.Page" />
+                <button type="submit" class="btn btn-light rounded-pill px-4">
+                    <i class="bi bi-envelope-open me-2"></i>Đánh dấu đã đọc toàn bộ
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success border-0 shadow-sm">@TempData["SuccessMessage"]</div>
+    }
+
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@TempData["ErrorMessage"]</div>
+    }
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@ViewBag.Error</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card notification-card">
+                <div class="card-body">
+                    <div class="text-muted small">Tổng thông báo</div>
+                    <div class="display-6 fw-bold">@Model.TotalNotifications</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card notification-card">
+                <div class="card-body">
+                    <div class="text-muted small">Chưa đọc</div>
+                    <div class="display-6 fw-bold text-danger">@Model.UnreadNotifications</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card notification-card">
+                <div class="card-body">
+                    <div class="text-muted small">Thông báo đẩy</div>
+                    <div class="display-6 fw-bold text-primary">@Model.PushNotifications</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card notification-card">
+                <div class="card-body">
+                    <div class="text-muted small">Phát sinh 24h qua</div>
+                    <div class="display-6 fw-bold text-success">@Model.Recent24hNotifications</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card notification-filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Tìm kiếm</label>
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tiêu đề, nội dung, loại thông báo..." />
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Loại</label>
+                    <select class="form-select" name="type">
+                        @if (string.IsNullOrWhiteSpace(Model.Type))
+                        {
+                            <option value="" selected>Tất cả</option>
+                        }
+                        else
+                        {
+                            <option value="">Tất cả</option>
+                        }
+
+                        @foreach (var typeOption in Model.TypeOptions)
+                        {
+                            if (string.Equals(typeOption, Model.Type, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@typeOption" selected>@typeOption</option>
+                            }
+                            else
+                            {
+                                <option value="@typeOption">@typeOption</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Đã đọc</label>
+                    <select class="form-select" name="isRead">
+                        @if (!Model.IsRead.HasValue)
+                        {
+                            <option value="" selected>Tất cả</option>
+                            <option value="false">Chưa đọc</option>
+                            <option value="true">Đã đọc</option>
+                        }
+                        else if (Model.IsRead.Value)
+                        {
+                            <option value="">Tất cả</option>
+                            <option value="false">Chưa đọc</option>
+                            <option value="true" selected>Đã đọc</option>
+                        }
+                        else
+                        {
+                            <option value="">Tất cả</option>
+                            <option value="false" selected>Chưa đọc</option>
+                            <option value="true">Đã đọc</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">User ID</label>
+                    <input type="number" min="1" class="form-control" name="userId" value="@Model.UserId" placeholder="Ví dụ: 12" />
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Order ID</label>
+                    <input type="number" min="1" class="form-control" name="orderId" value="@Model.OrderId" placeholder="Ví dụ: 101" />
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">
+                        <i class="bi bi-funnel me-2"></i>Lọc dữ liệu
+                    </button>
+                    <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Notification", new { area = "Admin" })">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Đặt lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card notification-table-card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h5 class="mb-1">Danh sách thông báo</h5>
+                    <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total thông báo theo bộ lọc hiện tại</div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Mã</th>
+                            <th>Loại</th>
+                            <th>Tiêu đề</th>
+                            <th>Nội dung</th>
+                            <th>Khách</th>
+                            <th>Đơn hàng</th>
+                            <th>Trạng thái</th>
+                            <th>Thời gian</th>
+                            <th class="text-end">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Rows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-5">Chưa có thông báo nào khớp bộ lọc.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model.Rows)
+                            {
+                                <tr class="@(item.IsRead ? string.Empty : "notification-row-unread")">
+                                    <td class="fw-semibold">#@item.NotificationId</td>
+                                    <td><span class="notification-type">@item.NotificationType</span></td>
+                                    <td class="fw-semibold">@item.Title</td>
+                                    <td class="notification-message">@item.Message</td>
+                                    <td>#@item.UserId</td>
+                                    <td>
+                                        @if (item.OrderId > 0)
+                                        {
+                                            <a href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", q = item.OrderId })" class="text-decoration-none">#@item.OrderId</a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Không có</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="notification-read @(item.IsRead ? "is-read" : "is-unread")">
+                                            @(item.IsRead ? "Đã đọc" : "Chưa đọc")
+                                        </span>
+                                        @if (item.IsPushNotification)
+                                        {
+                                            <div class="small text-primary mt-1">Có push</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div>@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div>
+                                        <div class="small text-muted">Đọc: @(item.ReadAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa")</div>
+                                    </td>
+                                    <td class="text-end">
+                                        @if (!item.IsRead)
+                                        {
+                                            <form method="post" action="@Url.Action("MarkAsRead", "Notification", new { area = "Admin" })" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@item.NotificationId" />
+                                                <input type="hidden" name="q" value="@Model.Query" />
+                                                <input type="hidden" name="type" value="@Model.Type" />
+                                                <input type="hidden" name="userId" value="@Model.UserId" />
+                                                <input type="hidden" name="orderId" value="@Model.OrderId" />
+                                                @if (Model.IsRead.HasValue)
+                                                {
+                                                    <input type="hidden" name="isRead" value="@Model.IsRead.Value.ToString().ToLowerInvariant()" />
+                                                }
+                                                <input type="hidden" name="page" value="@Model.Page" />
+                                                <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill">
+                                                    Đánh dấu đã đọc
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Đã xử lý</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (Model.TotalPages > 1)
+            {
+                <nav class="mt-4">
+                    <ul class="pagination justify-content-center mb-0">
+                        <li class="page-item @(Model.Page <= 1 ? "disabled" : string.Empty)">
+                            <a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, type = Model.Type, isRead = Model.IsRead, userId = Model.UserId, orderId = Model.OrderId, page = Model.Page - 1 })">Trước</a>
+                        </li>
+                        @for (var p = 1; p <= Model.TotalPages; p++)
+                        {
+                            <li class="page-item @(p == Model.Page ? "active" : string.Empty)">
+                                <a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, type = Model.Type, isRead = Model.IsRead, userId = Model.UserId, orderId = Model.OrderId, page = p })">@p</a>
+                            </li>
+                        }
+                        <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : string.Empty)">
+                            <a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, type = Model.Type, isRead = Model.IsRead, userId = Model.UserId, orderId = Model.OrderId, page = Model.Page + 1 })">Sau</a>
+                        </li>
+                    </ul>
+                </nav>
+            }
+        </div>
+    </div>
+</main>

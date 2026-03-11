@@ -1,7 +1,11 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyHistoryVM
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var loyaltyScopeLabel = ViewData["LoyaltyScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Lịch sử tích điểm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 
     // Phòng thủ null
     var userIdVal = Model?.UserID ?? 0;
@@ -19,9 +23,12 @@
 }
 
 <main class="container-fluid p-4">
-    <h2 class="fw-bold mb-3">Lịch sử điểm</h2>
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1">Lịch sử điểm</h2>
+        <span class="badge bg-light text-primary">@loyaltyScopeLabel</span>
+    </div>
 
-    <form class="row g-2 mb-3" method="get" action="@Url.Action("History", new { area = "Seller" })">
+    <form class="row g-2 mb-3" method="get" action="@Url.Action("History", new { area = areaName })">
         <div class="col-md-2">
             <input type="number" class="form-control" name="userId" value="@(userIdVal == 0 ? "" : userIdVal.ToString())" placeholder="UserID" />
         </div>
@@ -92,10 +99,10 @@
             </div>
             <div class="btn-group">
                 <a class="btn btn-sm btn-outline-primary"
-                   href="@Url.Action("History", new { area = "Seller", userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = prev, pageSize = pageSize })">«</a>
+                   href="@Url.Action("History", new { area = areaName, userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = prev, pageSize = pageSize })">«</a>
 
                 <a class="btn btn-sm btn-outline-primary"
-                   href="@Url.Action("History", new { area = "Seller", userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = next, pageSize = pageSize })">»</a>
+                   href="@Url.Action("History", new { area = areaName, userId = userIdVal == 0 ? (int?)null : userIdVal, direction = dirVal, start = startStr, end = endStr, page = next, pageSize = pageSize })">»</a>
             </div>
         </div>
     </div>

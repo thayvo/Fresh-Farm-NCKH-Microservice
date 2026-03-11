@@ -1,4 +1,6 @@
 using FreshFarm.Ordering.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +11,7 @@ namespace FreshFarm.Ordering.Api.Controllers;
 
 [ApiController]
 [Route("api/orders/admin/reports")]
-[Authorize(Policy = "SellerOnly")]
+[Authorize(Policy = "SellerOrAdmin")]
 public sealed class ReportsAdminController : ControllerBase
 {
     private static readonly string[] ShippingStaffNames =
@@ -34,7 +36,7 @@ public sealed class ReportsAdminController : ControllerBase
         [FromQuery] string? customerSegment,
         CancellationToken cancellationToken = default)
     {
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !registerFromDate.HasValue || o.OrderDate >= registerFromDate.Value.Date)
             .Where(o => !registerToDate.HasValue || o.OrderDate <= registerToDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -130,7 +132,7 @@ public sealed class ReportsAdminController : ControllerBase
         [FromQuery] string? customerSegment,
         CancellationToken cancellationToken = default)
     {
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !registerFromDate.HasValue || o.OrderDate >= registerFromDate.Value.Date)
             .Where(o => !registerToDate.HasValue || o.OrderDate <= registerToDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -186,7 +188,7 @@ public sealed class ReportsAdminController : ControllerBase
     {
         var statusFilter = string.IsNullOrWhiteSpace(orderStatus) ? "all" : orderStatus.Trim();
 
-        var filteredOrders = await _db.Orders
+        var filteredOrders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -261,7 +263,7 @@ public sealed class ReportsAdminController : ControllerBase
     {
         var statusFilter = string.IsNullOrWhiteSpace(orderStatus) ? "all" : orderStatus.Trim();
 
-        var filteredOrders = await _db.Orders
+        var filteredOrders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -299,7 +301,7 @@ public sealed class ReportsAdminController : ControllerBase
     {
         var groupBy = string.IsNullOrWhiteSpace(viewBy) ? "day" : viewBy.Trim().ToLowerInvariant();
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -402,7 +404,7 @@ public sealed class ReportsAdminController : ControllerBase
     {
         var groupBy = string.IsNullOrWhiteSpace(viewBy) ? "day" : viewBy.Trim().ToLowerInvariant();
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -455,7 +457,7 @@ public sealed class ReportsAdminController : ControllerBase
             page = 1;
         }
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -572,7 +574,7 @@ public sealed class ReportsAdminController : ControllerBase
     {
         var categoryFilter = string.IsNullOrWhiteSpace(productCategory) ? "all" : productCategory.Trim();
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -655,7 +657,7 @@ public sealed class ReportsAdminController : ControllerBase
         var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
         var keyword = string.IsNullOrWhiteSpace(q) ? string.Empty : q.Trim().ToLowerInvariant();
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -838,7 +840,7 @@ public sealed class ReportsAdminController : ControllerBase
         var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
         var keyword = string.IsNullOrWhiteSpace(q) ? string.Empty : q.Trim().ToLowerInvariant();
 
-        var orders = await _db.Orders
+        var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => !fromDate.HasValue || o.OrderDate >= fromDate.Value.Date)
             .Where(o => !toDate.HasValue || o.OrderDate <= toDate.Value.Date.AddDays(1).AddTicks(-1))
@@ -963,8 +965,14 @@ public sealed class ReportsAdminController : ControllerBase
             pageSize = 10;
         }
 
-        var reviews = await _db.Reviews
-            .AsNoTracking()
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
+        var reviews = await ApplyScopedReviewsQuery(_db.Reviews.AsNoTracking(), sellerId, isAdmin)
             .Where(r => !r.IsDeleted)
             .Where(r => r.Rating > 0)
             .Where(r => !fromDate.HasValue || r.CreatedAt >= fromDate.Value.Date)
@@ -973,7 +981,7 @@ public sealed class ReportsAdminController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var userIds = reviews.Select(r => r.UserId).Distinct().ToList();
-        var latestOrdersByUser = await _db.Orders
+        var latestOrdersByUser = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => userIds.Contains(o.UserId))
             .GroupBy(o => o.UserId)
@@ -1071,8 +1079,14 @@ public sealed class ReportsAdminController : ControllerBase
         [FromQuery] string? starRating,
         CancellationToken cancellationToken = default)
     {
-        var reviews = await _db.Reviews
-            .AsNoTracking()
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
+        var reviews = await ApplyScopedReviewsQuery(_db.Reviews.AsNoTracking(), sellerId, isAdmin)
             .Where(r => !r.IsDeleted)
             .Where(r => r.Rating > 0)
             .Where(r => !fromDate.HasValue || r.CreatedAt >= fromDate.Value.Date)
@@ -1081,7 +1095,7 @@ public sealed class ReportsAdminController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var userIds = reviews.Select(r => r.UserId).Distinct().ToList();
-        var latestOrdersByUser = await _db.Orders
+        var latestOrdersByUser = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
             .Where(o => userIds.Contains(o.UserId))
             .GroupBy(o => o.UserId)
@@ -1118,12 +1132,20 @@ public sealed class ReportsAdminController : ControllerBase
     [HttpDelete("reviews/{reviewId:int}")]
     public async Task<IActionResult> DeleteReview([FromRoute] int reviewId, CancellationToken cancellationToken = default)
     {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc seller." });
+        }
+
         if (reviewId <= 0)
         {
             return BadRequest(new { message = "ID danh gia khong hop le." });
         }
 
-        var review = await _db.Reviews.FirstOrDefaultAsync(x => x.ReviewId == reviewId, cancellationToken);
+        var review = await ApplyScopedReviewsQuery(_db.Reviews, sellerId, isAdmin)
+            .FirstOrDefaultAsync(x => x.ReviewId == reviewId, cancellationToken);
         if (review is null)
         {
             return NotFound(new { message = "Khong tim thay danh gia." });
@@ -1135,6 +1157,56 @@ public sealed class ReportsAdminController : ControllerBase
         await _db.SaveChangesAsync(cancellationToken);
 
         return Ok(new { success = true, message = "Da xoa danh gia thanh cong." });
+    }
+
+    private int? TryGetSellerIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var sellerId) ? sellerId : null;
+    }
+
+    private bool IsAdminUser()
+    {
+        return User.IsInRole("Admin");
+    }
+
+    private IQueryable<Order> ApplySellerScopeToOrdersQuery(IQueryable<Order> query)
+    {
+        if (IsAdminUser())
+        {
+            return query;
+        }
+
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(o => o.SellerOrders.Any(so =>
+            so.SellerId == sellerId.Value &&
+            so.SellerOrderItems.Any()));
+    }
+
+    private IQueryable<Review> ApplyScopedReviewsQuery(IQueryable<Review> query, int? sellerId, bool isAdmin = false)
+    {
+        if (isAdmin)
+        {
+            return query;
+        }
+
+        if (!sellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(r => _db.SellerOrderItems.Any(soi =>
+            soi.ProductId == r.ProductId &&
+            soi.SellerOrder.SellerId == sellerId.Value &&
+            soi.SellerOrder.Order.UserId == r.UserId));
     }
 
     private static string BuildOrderCode(int orderId)

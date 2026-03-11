@@ -512,7 +512,8 @@
 
     // Thêm vào giỏ nhập
     function addToImportCart() {
-        const productId = document.getElementById('selectedProductId').value;
+        const selectedProductIdRaw = document.getElementById('selectedProductId').value;
+        const productId = Number.parseInt(selectedProductIdRaw, 10);
         const productName = document.getElementById('productSearchInput').value;
         const quantity = parseInt(document.getElementById('quantity').value);
         const importPrice = parseFloat(document.getElementById('importPrice').value);
@@ -525,7 +526,7 @@
         const keepDisabled = document.getElementById('keepDisabled').checked;
 
         // Validation
-        if (!productId) {
+        if (!Number.isInteger(productId) || productId <= 0) {
             alert('Vui lòng chọn sản phẩm');
             return;
         }

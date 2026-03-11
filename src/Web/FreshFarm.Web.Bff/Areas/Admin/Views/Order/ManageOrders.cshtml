@@ -1,0 +1,1040 @@
+﻿@{
+    ViewBag.Title = "Quản Lý Đơn Hàng";
+    Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+@Html.AntiForgeryToken()
+
+<style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+        --border-blue: #bfdbfe;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes float {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotate {
+        from {
+            transform: rotate(0);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    body {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    .order-page .container-fluid {
+        padding-bottom: 2.5rem;
+    }
+
+    /* Card glass & header gradient (đồng bộ Shipping) */
+    .card-glass {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(30, 64, 175, 0.1);
+        box-shadow: 0 20px 60px rgba(30, 64, 175, 0.15);
+        border-radius: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .grad-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #60a5fa 100%);
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 50px rgba(30, 64, 175, 0.4);
+        animation: fadeInUp .5s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .grad-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+            animation: rotate 25s linear infinite;
+        }
+
+        .grad-header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            animation: float 6s ease-in-out infinite;
+        }
+
+    .icon-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 10px 30px rgba(30, 64, 175, 0.5);
+        border-radius: 1.25rem;
+    }
+
+    /* Filter card (đồng bộ Shipping) */
+    .filter-card {
+        background: linear-gradient(135deg, #fff 0%, #f0f9ff 100%);
+        border: 2px solid #bfdbfe;
+        border-radius: 1.5rem;
+        box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
+        animation: fadeInUp .6s ease-out .1s backwards;
+    }
+
+    .form-select,
+    .form-control {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .875rem 1.25rem;
+        transition: all .3s ease;
+        background: #fff;
+    }
+
+        .form-select:focus,
+        .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.15);
+            background: #fff;
+        }
+
+    .search-icon-wrapper {
+        position: relative;
+    }
+
+        .search-icon-wrapper i {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #60a5fa;
+            font-size: 1.125rem;
+        }
+
+        .search-icon-wrapper input {
+            padding-left: 3.25rem;
+        }
+
+    /* Button pill (đồng bộ Shipping) */
+    .btn-pill {
+        border-radius: 2rem;
+        padding: .75rem 2rem;
+        font-weight: 600;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 12px rgba(0,0,0,.1);
+        border: none;
+    }
+
+        .btn-pill:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(0,0,0,.2);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border: none;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border: none;
+    }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+
+    .btn-sm {
+        border-radius: .875rem;
+        padding: .35rem .75rem;
+        transition: all .2s ease;
+    }
+
+        .btn-sm:hover {
+            transform: scale(1.06);
+        }
+
+    /* Table modern (đồng bộ Shipping) */
+    .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+        .table-modern thead th {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border-bottom: 3px solid #3b82f6;
+            font-weight: 600;
+            color: #1e3a8a;
+            text-transform: uppercase;
+            font-size: .75rem;
+            letter-spacing: .5px;
+            padding: 1.1rem 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .table-modern tbody tr {
+            transition: all .3s cubic-bezier(.4,0,.2,1);
+            animation: slideIn .4s ease-out backwards;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+            .table-modern tbody tr:hover {
+                background: linear-gradient(90deg, rgba(59, 130, 246, 0.08) 0%, rgba(147, 197, 253, 0.08) 100%);
+                transform: translateY(-2px);
+                box-shadow: -5px 0 0 0 #3b82f6;
+            }
+
+        .table-modern tbody td {
+            padding: 1rem 1rem;
+            vertical-align: middle;
+        }
+
+    /* Badge status (scoped theo order-page) */
+    .order-page .badge-status {
+        padding: .5rem 1rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: .8rem;
+        letter-spacing: .3px;
+    }
+
+        .order-page .badge-status.bg-secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
+            color: #fff;
+        }
+
+        .order-page .badge-status.bg-info {
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%) !important;
+            color: #fff;
+        }
+
+        .order-page .badge-status.bg-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            color: #fff;
+        }
+
+        .order-page .badge-status.bg-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            color: #fff;
+        }
+
+        .order-page .badge-status.bg-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: #fff;
+        }
+
+    .badge-ready {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        color: white;
+    }
+
+    /* Pagination (đồng bộ Shipping) */
+    .pagination .page-link {
+        border-radius: .875rem;
+        margin: 0 .375rem;
+        border: 2px solid #bfdbfe;
+        color: #1e40af;
+        transition: all .3s ease;
+        font-weight: 600;
+    }
+
+        .pagination .page-link:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: #fff;
+            border-color: #3b82f6;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
+        }
+
+    .pagination .page-item.active .page-link {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        border-color: #1e40af;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    .pagination .page-item.disabled .page-link {
+        background-color: #f1f5f9;
+        border-color: #e2e8f0;
+        color: #94a3b8;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #64748b;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    /* Modal (đồng bộ Shipping) */
+    .modal-content {
+        border-radius: 1.5rem;
+        border: none;
+        box-shadow: 0 25px 60px rgba(30, 64, 175, 0.3);
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        border-radius: 1.5rem 1.5rem 0 0;
+        padding: 1.25rem 1.75rem;
+    }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+    .modal-title {
+        font-weight: 700;
+        font-size: 1.25rem;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #e5e7eb;
+        padding: 1rem 1.75rem;
+    }
+
+    /* Floating alert (đồng bộ Shipping) */
+    .alert {
+        border-radius: 1.25rem;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    }
+
+    @@keyframes slideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+
+    @@media (max-width:768px) {
+        .grad-header {
+            padding: 2rem 1.5rem !important;
+        }
+
+        .table-modern {
+            font-size: .875rem;
+        }
+
+        .btn-pill {
+            padding: .625rem 1.5rem;
+        }
+    }
+</style>
+
+<script>
+/* ============================
+   Phân trang & tìm kiếm (AJAX)
+   ============================ */
+(function () {
+    var PAGE_SIZE = 10;
+    var currentPage = 1;
+    var totalItems = 0;
+    window.usingSearch = false;
+    window.currentFilters = { searchTerm: '', statusFilter: '', dateFilter: '' };
+    window._ordersCurrentPage = currentPage; // sync ra global cho chỗ khác xài
+
+    function updatePaginationInfo(total, page, pageSize) {
+        var info = document.getElementById('pagination-info');
+        var totalPages = Math.max(1, Math.ceil((total || 0) / (pageSize || PAGE_SIZE)));
+        var current = Math.min(Math.max(1, page || 1), totalPages);
+        var from = total === 0 ? 0 : ((current - 1) * (pageSize || PAGE_SIZE)) + 1;
+        var to = Math.min(total || 0, current * (pageSize || PAGE_SIZE));
+        if (info) info.textContent = 'Hiển thị ' + from + '-' + to + ' / ' + (total || 0);
+    }
+
+    function renderPagination(total, page, pageSize) {
+        var wrapper = document.getElementById('pagination-wrapper');
+        if (!wrapper) return;
+        wrapper.innerHTML = '';
+        var totalPages = Math.max(1, Math.ceil((total || 0) / (pageSize || PAGE_SIZE)));
+        var current = Math.min(Math.max(1, page || 1), totalPages);
+
+        function makeLi(text, p, disabled, active) {
+            var li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+            var a = document.createElement('a');
+            a.className = 'page-link';
+            a.href = '#';
+            a.textContent = text;
+            if (!disabled) a.onclick = function (e) { e.preventDefault(); goToPage(p); };
+            li.appendChild(a); return li;
+        }
+        wrapper.appendChild(makeLi('«', current - 1, current <= 1, false));
+        var span = 2; var start = Math.max(1, current - span); var end = Math.min(totalPages, current + span);
+        if (start > 1) wrapper.appendChild(makeLi('1', 1, false, current === 1));
+        if (start > 2) { var ell = document.createElement('li'); ell.className = 'page-item disabled'; ell.innerHTML = '<span class="page-link">…</span>'; wrapper.appendChild(ell); }
+        for (var p = start; p <= end; p++) wrapper.appendChild(makeLi(String(p), p, false, p === current));
+        if (end < totalPages - 1) { var ell2 = document.createElement('li'); ell2.className = 'page-item disabled'; ell2.innerHTML = '<span class="page-link">…</span>'; wrapper.appendChild(ell2); }
+        if (end < totalPages) wrapper.appendChild(makeLi(String(totalPages), totalPages, false, current === totalPages));
+        wrapper.appendChild(makeLi('»', current + 1, current >= totalPages, false));
+    }
+
+    function goToPage(p) { if (window.usingSearch) searchOrders(p); else loadOrders(p); }
+
+    window.loadOrders = function (page) {
+        currentPage = (typeof page === 'number' && page > 0) ? page : (currentPage || 1);
+        window._ordersCurrentPage = currentPage;
+        window.usingSearch = false;
+        $.ajax({
+            url: '@Url.Action("GetOrdersPaged", "Order", new { area = "Admin" })',
+            type: 'GET', dataType: 'json', data: { page: currentPage, pageSize: PAGE_SIZE },
+            success: function (data) {
+                if (data?.success) {
+                    totalItems = data.total || 0;
+                    renderTable(data.data || []);
+                    renderPagination(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                    updatePaginationInfo(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                } else { showError(data?.message || 'Lỗi không xác định'); }
+            }, error: function (xhr, status, error) { showError('Lỗi khi tải dữ liệu: ' + error); }
+        });
+    };
+
+    window.searchOrders = function (page) {
+        currentPage = (typeof page === 'number' && page > 0) ? page : (currentPage || 1);
+        window._ordersCurrentPage = currentPage;
+        window.usingSearch = true;
+        $.ajax({
+            url: '@Url.Action("SearchOrdersPaged", "Order", new { area = "Admin" })',
+            type: 'GET', dataType: 'json',
+            data: {
+                searchTerm: window.currentFilters.searchTerm,
+                statusFilter: window.currentFilters.statusFilter,
+                dateFilter: window.currentFilters.dateFilter,
+                page: currentPage, pageSize: PAGE_SIZE
+            },
+            success: function (data) {
+                if (data?.success) {
+                    totalItems = data.total || 0; var items = data.data || [];
+                    if (items.length === 0) {
+                        const tb = document.getElementById('orders-table-body');
+                        tb.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">🔍</div><p>Không tìm thấy kết quả</p></div></td></tr>';
+                    } else { renderTable(items); }
+                    renderPagination(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                    updatePaginationInfo(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
+                } else { showError(data?.message || 'Lỗi không xác định'); }
+            }, error: function (xhr, status, error) { showError('Lỗi khi tìm kiếm: ' + error); }
+        });
+    };
+
+    function __bindOrderHandlers() {
+        $('#searchBtn').off('click').on('click', function () {
+            window.currentFilters.searchTerm = $('#searchInput').val().trim();
+            window.currentFilters.statusFilter = $('#statusFilter').val();
+            window.currentFilters.dateFilter = $('#dateFilter').val();
+            searchOrders(1);
+        });
+        $('#statusFilter').off('change').on('change', function () { window.currentFilters.statusFilter = this.value; searchOrders(1); });
+        $('#dateFilter').off('change').on('change', function () { window.currentFilters.dateFilter = this.value; searchOrders(1); });
+        $('#searchInput').off('input').on('input', function () {
+            if (this.value.trim() === '') {
+                window.currentFilters.searchTerm = '';
+                if (!window.currentFilters.statusFilter && !window.currentFilters.dateFilter) { window.usingSearch = false; loadOrders(1); }
+            }
+        });
+        $('#searchInput').off('keypress').on('keypress', function (e) { if (e.key === 'Enter') $('#searchBtn').click(); });
+
+        // ensure "Ready" option exists
+        try {
+            var sf = document.getElementById('statusFilter');
+            if (sf && !Array.from(sf.options).some(function (o) { return o.value === 'Ready'; })) {
+                var opt = document.createElement('option');
+                opt.value = 'Ready'; opt.text = 'Đã xử lý / Sẵn sàng giao';
+                var idx = Array.from(sf.options).findIndex(function (o) { return o.value === 'Processing'; });
+                if (idx >= 0 && sf.options.length > idx + 1) sf.add(opt, sf.options[idx + 1]); else sf.add(opt);
+            }
+            var os = document.getElementById('orderStatusSelect');
+            if (os && !Array.from(os.options).some(function (o) { return o.value === 'Ready'; })) {
+                var opt2 = document.createElement('option');
+                opt2.value = 'Ready'; opt2.text = 'Đã xử lý / Sẵn sàng giao';
+                var idx2 = Array.from(os.options).findIndex(function (o) { return o.value === 'Processing'; });
+                if (idx2 >= 0 && os.options.length > idx2 + 1) os.add(opt2, os.options[idx2 + 1]); else os.add(opt2);
+            }
+        } catch (e) { console.warn(e); }
+
+        loadOrders(1);
+    }
+    if (window.jQuery) { $(__bindOrderHandlers); }
+    else { window.addEventListener('load', __bindOrderHandlers); }
+})();
+</script>
+
+<main class="container-fluid p-4 order-page">
+    <div class="grad-header p-4 p-md-5 mb-4 position-relative">
+        <div class="position-relative" style="z-index:1;">
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4">
+                <div>
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="p-3 icon-gradient">
+                            <i class="bi bi-receipt-cutoff text-white" style="font-size:2.4rem;"></i>
+                        </div>
+                        <div>
+                            <h1 class="fw-bold mb-1 text-white" style="font-size:2.3rem; text-shadow:0 4px 12px rgba(0,0,0,.3);">
+                                Quản Lý Đơn Hàng
+                            </h1>
+                            <p class="mb-0 text-white opacity-90" style="font-size:1.05rem; text-shadow:0 2px 8px rgba(0,0,0,.2);">
+                                Theo dõi, cập nhật trạng thái và xử lý đơn hàng tập trung
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                @*<div class="text-md-end text-white opacity-90">
+                    <div class="d-flex flex-md-column gap-2">
+                        <div><i class="bi bi-clock-history me-1"></i>Realtime trạng thái qua SignalR</div>
+                        <div><i class="bi bi-funnel me-1"></i>Bộ lọc theo trạng thái & ngày</div>
+                    </div>
+                </div>*@
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-card p-4 mb-4">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="p-3 rounded-3" style="background: linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                <i class="bi bi-funnel text-white" style="font-size:1.2rem;"></i>
+            </div>
+            <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc tìm kiếm</h5>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-5">
+                <div class="search-icon-wrapper">
+                    <i class="bi bi-search"></i>
+                    <input type="text" class="form-control" id="searchInput"
+                           placeholder="Tìm theo mã đơn hàng, tên khách hàng..." />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Lọc theo trạng thái</option>
+                    <option value="All">Tất cả</option>
+                    <option value="Pending">Chờ xử lý</option>
+                    <option value="Processing">Đang xử lý</option>
+                    <option value="Ready">Đã xử lý / Sẵn sàng giao</option>
+                    <option value="Shipped">Đang giao hàng</option>
+                    <option value="Delivered">Đã giao hàng</option>
+                    <option value="Canceled">Đã hủy</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" class="form-control" id="dateFilter" />
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-primary btn-pill" id="searchBtn">
+                    <i class="bi bi-search me-2"></i>Tìm kiếm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-glass overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle table-modern">
+                <thead>
+                    <tr>
+                        <th>Mã ĐH</th>
+                        <th>Khách hàng</th>
+                        <th>Ngày đặt</th>
+                        <th class="text-end">Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th class="text-end">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-table-body">
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Đang tải...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex flex-column flex-md-row align-items-center justify-content-between px-4 py-3 border-top"
+             style="background: linear-gradient(90deg,#f0f9ff 0%,#dbeafe 100%);">
+            <span class="small text-primary-blue" id="pagination-info"></span>
+            <nav>
+                <ul class="pagination justify-content-end mb-0" id="pagination-wrapper"></ul>
+            </nav>
+        </div>
+    </div>
+</main>
+
+@section modal{
+    <div class="modal fade" id="orderDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="detailModalOrderId">Chi tiết đơn hàng</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detailModalBody">
+                    <div class="text-center py-5">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Đang tải...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Đóng
+                    </button>
+                    <button type="button" class="btn btn-primary btn-pill" id="btnPrintInvoice">
+                        <i class="bi bi-printer me-2"></i>In hóa đơn
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editOrderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Cập nhật đơn hàng</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Mã đơn hàng: <strong id="editOrderId"></strong></p>
+                    <div class="mb-3">
+                        <label for="orderStatusSelect" class="form-label">Trạng thái đơn hàng</label>
+                        <select class="form-select" id="orderStatusSelect">
+                            <option value="Pending">Chờ xử lý</option>
+                            <option value="Processing">Đang xử lý</option>
+                            <option value="Ready">Đã xử lý / Sẵn sàng giao</option>
+                            <option value="Shipped">Đang giao hàng</option>
+                            <option value="Delivered">Đã giao hàng</option>
+                            <option value="Canceled">Đã hủy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary btn-pill" id="saveOrderStatusBtn">
+                        <i class="bi bi-check-lg me-2"></i>Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteOrderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger">
+                    <h5 class="modal-title text-white">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Xác nhận xóa
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <p>Bạn có chắc chắn muốn xóa đơn hàng <strong id="deleteOrderCode"></strong> không?</p>
+                    <p class="text-muted mb-0">Hành động này không thể hoàn tác.</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-light btn-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Hủy
+                    </button>
+                    <button type="button" class="btn btn-danger btn-pill" id="confirmDeleteBtn">
+                        <i class="bi bi-trash me-2"></i>Xóa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section scripts {
+    <script>
+let currentEditingOrderId = null;
+let currentDeletingOrderId = null;
+let currentViewingOrderId = null;
+
+function getToken() {
+    return $('input[name="__RequestVerificationToken"]').val();
+}
+function vnd(n) { return Number(n || 0).toLocaleString('vi-VN') + '₫'; }
+function fmtDate(d) { try { return d ? new Date(d).toLocaleString('vi-VN') : ''; } catch (e) { return d || ''; } }
+
+/* Alert nổi góc phải (đồng bộ Shipping) */
+function showNotification(message, type = 'info') {
+    const old = document.querySelector('.dynamic-alert'); if (old) old.remove();
+    const iconMap = { 'success': 'check-circle-fill', 'danger': 'exclamation-triangle-fill', 'info': 'info-circle-fill', 'warning': 'exclamation-circle-fill' };
+    const div = document.createElement('div');
+    div.className = `alert alert-${type} alert-dismissible fade show dynamic-alert`;
+    div.style.cssText = 'position:fixed;top:80px;right:20px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 15px 50px rgba(0,0,0,.25);border-radius:1.25rem;animation:slideIn .4s ease-out';
+    div.innerHTML = `<div class="d-flex align-items-center gap-3"><i class="bi bi-${iconMap[type]} fs-4"></i><span class="flex-grow-1">${message}</span><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+    document.body.appendChild(div);
+    setTimeout(() => { div.style.animation = 'slideOut .3s ease-out'; setTimeout(() => div.remove(), 300); }, 5000);
+}
+
+function showError(message) {
+    const tableBody = document.getElementById('orders-table-body');
+    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><div class="empty-state"><div class="empty-state-icon">⚠️</div><p>${message}</p></div></td></tr>`;
+    showNotification(message, 'danger');
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case "Processing": return "Đang xử lý";
+        case "Ready": return "Đã xử lý / Sẵn sàng giao";
+        case "Shipped": return "Đang giao hàng";
+        case "Delivered": return "Đã giao hàng";
+        case "Canceled": return "Đã hủy";
+        case "Pending": return "Chờ xử lý";
+        default: return status || '';
+    }
+}
+
+function renderTable(ordersToShow) {
+    const tableBody = document.getElementById('orders-table-body');
+
+    if (!ordersToShow || ordersToShow.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">📦</div><p>Không có đơn hàng</p></div></td></tr>';
+        return;
+    }
+
+    let html = '';
+    ordersToShow.forEach(o => {
+        const orderId = o.OrderID ?? o.orderID ?? o.orderId ?? o.id ?? '';
+        const orderCode = o.OrderCode ?? o.orderCode ?? '';
+        const customerName = o.CustomerName ?? o.customerName ?? o.buyerFullName ?? '';
+        const orderDate = o.OrderDate ?? o.orderDate ?? '';
+        const totalAmount = o.TotalAmount ?? o.totalAmount ?? o.total ?? 0;
+        const status = o.Status ?? o.status ?? '';
+        const statusBadgeClass = o.StatusBadgeClass ?? o.statusBadgeClass ?? '';
+
+        const badgeClass = statusBadgeClass || ({
+            Pending: 'bg-secondary',
+            Processing: 'bg-info',
+            Ready: 'badge-ready',
+            Shipped: 'bg-warning',
+            Delivered: 'bg-success',
+            Canceled: 'bg-danger'
+        }[status] || 'bg-secondary');
+
+        html += `
+            <tr data-order-id="${orderId}">
+                <td><span class="fw-semibold text-primary-blue">${orderCode}</span></td>
+                <td>${customerName}</td>
+                <td>${fmtDate(orderDate)}</td>
+                <td class="text-end"><strong>${vnd(totalAmount)}</strong></td>
+                <td><span class="badge badge-status ${badgeClass}">${getStatusText(status)}</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-success me-1" title="Chi tiết"><i class="bi bi-eye-fill"></i></button>
+                    <button class="btn btn-sm btn-primary me-1" title="Sửa"><i class="bi bi-pencil-square"></i></button>
+                    <button class="btn btn-sm btn-danger" title="Xóa"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+    tableBody.innerHTML = html;
+
+    tableBody.onclick = function (ev) {
+        const btn = ev.target.closest('button');
+        if (!btn) return;
+        const tr = btn.closest('tr');
+        const id = tr ? parseInt(tr.getAttribute('data-order-id')) : NaN;
+        const code = tr ? (tr.querySelector('td:first-child')?.textContent.trim() || '') : '';
+        const statusText = tr?.querySelector('.badge')?.textContent.trim() || '';
+
+        const toKey = (t) => {
+            const s = (t || '').toLowerCase().trim();
+            if (s === 'chờ xử lý') return 'Pending';
+            if (s === 'đang xử lý') return 'Processing';
+            if (s === 'đã xử lý / sẵn sàng giao') return 'Ready';
+            if (s === 'đang giao hàng') return 'Shipped';
+            if (s === 'đã giao hàng') return 'Delivered';
+            if (s === 'đã hủy') return 'Canceled';
+            return '';
+        };
+
+        if (btn.querySelector('.bi-pencil-square')) { if (id) window.editOrderStatus(id, code, toKey(statusText)); }
+        else if (btn.querySelector('.bi-eye-fill')) { if (id) window.viewOrderDetail(id); }
+        else if (btn.querySelector('.bi-trash')) { if (id) window.deleteOrder(id, code); }
+    };
+}
+
+function safeText(str) { return String(str ?? ''); }
+
+function normalizePaymentMethod(value) {
+    const normalized = safeText(value).trim();
+    if (!normalized || normalized.toLowerCase() === 'string') {
+        return 'COD';
+    }
+    return normalized;
+}
+
+window.viewOrderDetail = function (orderId) {
+    currentViewingOrderId = orderId;
+    const modalBody = document.getElementById('detailModalBody');
+    modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border" role="status"><span class="visually-hidden">Đang tải...</span></div></div>';
+
+    $.ajax({
+        url: '@Url.Action("GetOrderDetail", "Order", new { area = "Admin" })',
+        type: 'GET',
+        dataType: 'json',
+        data: { orderId: orderId },
+        success: function (data) {
+            if (data?.success) {
+                let itemsHtml = '';
+                (data.items || []).forEach(item => {
+                    itemsHtml += `
+                        <tr>
+                            <td>${safeText(item.productName)}</td>
+                            <td>${safeText(item.quantity)}</td>
+                            <td class="text-end">${vnd(item.unitPrice)}</td>
+                            <td class="text-end">${vnd(item.totalPrice)}</td>
+                        </tr>
+                    `;
+                });
+
+                modalBody.innerHTML = `
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2">Thông tin khách hàng</h6>
+                            <p class="mb-1"><strong>Tên:</strong> ${safeText(data.customerName)}</p>
+                            <p class="mb-1"><strong>Email:</strong> ${safeText(data.customerEmail)}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold mb-2">Thông tin đơn hàng</h6>
+                            <p class="mb-1"><strong>Ngày đặt:</strong> ${fmtDate(data.orderDate)}</p>
+                            <p class="mb-1"><strong>Trạng thái:</strong> ${safeText(data.status)}</p>
+                            <p class="mb-1"><strong>Thanh toán:</strong> ${normalizePaymentMethod(data.paymentMethod)}</p>
+                            <p class="mb-1"><strong>TT thanh toán:</strong> ${safeText(data.paymentStatus)}</p>
+                        </div>
+                    </div>
+                    <hr />
+                    <h6 class="fw-bold mb-2">Thông tin người nhận</h6>
+                    <p class="mb-1"><strong>Tên người nhận:</strong> ${safeText(data.buyerFullName)}</p>
+                    <p class="mb-1"><strong>SĐT:</strong> ${safeText(data.buyerPhone)}</p>
+                    <p class="mb-1"><strong>Email:</strong> ${safeText(data.buyerEmail)}</p>
+                    <p class="mb-1"><strong>Địa chỉ:</strong> ${safeText(data.address)}</p>
+                    ${data.orderNote ? `<p class="mb-1"><strong>Ghi chú:</strong> ${safeText(data.orderNote)}</p>` : ''}
+                    <hr />
+                    <h6 class="fw-bold mb-2">Chi tiết sản phẩm</h6>
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Sản phẩm</th>
+                                <th>SL</th>
+                                <th class="text-end">Giá</th>
+                                <th class="text-end">Tạm tính</th>
+                            </tr>
+                        </thead>
+                        <tbody>${itemsHtml}</tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end">Tạm tính:</td>
+                                <td class="text-end">${vnd(data.subtotal)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end">Phí vận chuyển:</td>
+                                <td class="text-end">${vnd(data.shippingFee)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">Tổng cộng:</td>
+                                <td class="text-end fw-bold">${vnd(data.total)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `;
+
+                document.getElementById('detailModalOrderId').textContent = 'Chi tiết đơn hàng ' + (data.orderCode || '');
+                new bootstrap.Modal(document.getElementById('orderDetailModal')).show();
+            } else {
+                showNotification('Lỗi: ' + (data?.message || 'Không xác định'), 'danger');
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error('Error:', error);
+            showNotification('Lỗi khi tải dữ liệu: ' + error, 'danger');
+        }
+    });
+};
+
+const printBtn = document.getElementById('btnPrintInvoice');
+if (printBtn) {
+    printBtn.addEventListener('click', function () {
+        if (!currentViewingOrderId) { showNotification('Chưa có đơn hàng để in.', 'warning'); return; }
+        const url = '@Url.Action("PrintInvoice","Order", new { area = "Admin"})' + '?orderId=' + encodeURIComponent(currentViewingOrderId);
+        window.open(url, '_blank');
+    });
+}
+
+window.editOrderStatus = function (orderId, orderCode, currentStatus) {
+    currentEditingOrderId = orderId;
+    document.getElementById('editOrderId').textContent = orderCode || '';
+    document.getElementById('orderStatusSelect').value = currentStatus || 'Pending';
+    new bootstrap.Modal(document.getElementById('editOrderModal')).show();
+};
+
+document.getElementById('saveOrderStatusBtn')?.addEventListener('click', function () {
+    const newStatus = document.getElementById('orderStatusSelect').value;
+
+    $.ajax({
+        url: '@Url.Action("UpdateOrderStatus", "Order", new { area = "Admin" })',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+            __RequestVerificationToken: getToken(),
+            orderId: currentEditingOrderId,
+            newStatus: newStatus
+        },
+        success: function (data) {
+            if (data?.success) {
+                const row = document.querySelector(`tr[data-order-id="${currentEditingOrderId}"]`);
+                if (row) {
+                    const badgeSpan = row.querySelector('.badge');
+                    if (badgeSpan) {
+                        const map = {
+                            Pending: 'bg-secondary',
+                            Processing: 'bg-info',
+                            Ready: 'badge-ready',
+                            Shipped: 'bg-warning',
+                            Delivered: 'bg-success',
+                            Canceled: 'bg-danger'
+                        };
+                        const cls = data.statusClass || map[newStatus] || 'bg-secondary';
+                        badgeSpan.className = 'badge badge-status ' + cls;
+                        badgeSpan.textContent = data.statusText || getStatusText(newStatus);
+                    }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide();
+                showNotification('Cập nhật trạng thái đơn hàng thành công.', 'success');
+            } else {
+                showNotification('Lỗi: ' + (data?.message || 'Không xác định'), 'danger');
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error('Error:', error);
+            showNotification('Lỗi khi cập nhật: ' + error, 'danger');
+        }
+    });
+});
+
+window.deleteOrder = function (orderId, orderCode) {
+    currentDeletingOrderId = orderId;
+    document.getElementById('deleteOrderCode').textContent = orderCode || '';
+    new bootstrap.Modal(document.getElementById('deleteOrderModal')).show();
+};
+
+document.getElementById('confirmDeleteBtn')?.addEventListener('click', function () {
+    $.ajax({
+        url: '@Url.Action("DeleteOrder", "Order", new { area = "Admin" })',
+        type: 'POST',
+        dataType: 'json',
+        data: {
+            __RequestVerificationToken: getToken(),
+            orderId: currentDeletingOrderId
+        },
+        success: function (data) {
+            if (data?.success) {
+                bootstrap.Modal.getInstance(document.getElementById('deleteOrderModal')).hide();
+                showNotification('Xóa đơn hàng thành công.', 'success');
+                if (window.usingSearch) { window.searchOrders(window._ordersCurrentPage || 1); }
+                else { window.loadOrders(window._ordersCurrentPage || 1); }
+            } else {
+                showNotification('Lỗi: ' + (data?.message || 'Không xác định'), 'danger');
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error('Error:', error);
+            showNotification('Lỗi khi xóa: ' + error, 'danger');
+        }
+    });
+});
+
+/* Realtime cập nhật từ SignalR */
+(function initOrderRealtime() {
+    if (!window.jQuery || !$.connection || !$.connection.orderHub) return;
+    var hub = $.connection.orderHub;
+
+    hub.client.orderStatusChanged = function (payload) {
+        if (!payload || !payload.orderId) return;
+        if (window.usingSearch) {
+            window.searchOrders(window._ordersCurrentPage || 1);
+        } else {
+            window.loadOrders(window._ordersCurrentPage || 1);
+        }
+    };
+
+    $.connection.hub.start().done(function () {
+        if (hub.server && hub.server.joinAdmin) {
+            hub.server.joinAdmin();
+        }
+    });
+})();
+    </script>
+}

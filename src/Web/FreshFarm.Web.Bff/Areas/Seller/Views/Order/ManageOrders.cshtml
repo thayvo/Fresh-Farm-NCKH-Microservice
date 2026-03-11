@@ -828,6 +828,14 @@ function renderTable(ordersToShow) {
 
 function safeText(str) { return String(str ?? ''); }
 
+function normalizePaymentMethod(value) {
+    const normalized = safeText(value).trim();
+    if (!normalized || normalized.toLowerCase() === 'string') {
+        return 'COD';
+    }
+    return normalized;
+}
+
 window.viewOrderDetail = function (orderId) {
     currentViewingOrderId = orderId;
     const modalBody = document.getElementById('detailModalBody');
@@ -863,7 +871,7 @@ window.viewOrderDetail = function (orderId) {
                             <h6 class="fw-bold mb-2">Thông tin đơn hàng</h6>
                             <p class="mb-1"><strong>Ngày đặt:</strong> ${fmtDate(data.orderDate)}</p>
                             <p class="mb-1"><strong>Trạng thái:</strong> ${safeText(data.status)}</p>
-                            <p class="mb-1"><strong>Thanh toán:</strong> ${safeText(data.paymentMethod)}</p>
+                            <p class="mb-1"><strong>Thanh toán:</strong> ${normalizePaymentMethod(data.paymentMethod)}</p>
                             <p class="mb-1"><strong>TT thanh toán:</strong> ${safeText(data.paymentStatus)}</p>
                         </div>
                     </div>

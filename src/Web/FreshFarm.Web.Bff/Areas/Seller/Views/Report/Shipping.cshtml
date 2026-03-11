@@ -2,7 +2,7 @@
 @using System.Linq
 @{
     ViewBag.Title = "Báo Cáo Vận Chuyển";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     var staffOptions = ViewBag.DeliveryStaffs as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>();
 }
 

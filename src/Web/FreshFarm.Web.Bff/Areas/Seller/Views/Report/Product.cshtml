@@ -1,7 +1,7 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.ProductReportViewModel
 @{
     ViewBag.Title = "Báo Cáo Sản Phẩm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     // Helper tạo URL ảnh sản phẩm, dùng chung logic với các trang khác
     Func<string, string> productImg = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
 }

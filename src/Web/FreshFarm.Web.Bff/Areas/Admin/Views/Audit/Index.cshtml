@@ -1,0 +1,248 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.AuditCenterPageViewModel
+
+<section class="audit-console">
+    <div class="audit-hero mb-4">
+        <div>
+            <p class="eyebrow text-uppercase mb-2">Cross-cutting controls</p>
+            <h1 class="fw-bold mb-2">Audit center</h1>
+            <p class="mb-0 opacity-75">Theo doi admin action log, moderation audit va settlement audit cho cac lane marketplace moi.</p>
+        </div>
+        <div class="hero-chip">7.7A Audit MVP</div>
+    </div>
+
+    @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
+    {
+        <div class="alert alert-warning">@pageError</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Action logs</span><strong>@Model.Stats.TotalActionLogs</strong><small>@Model.Stats.Recent24hActions trong 24h</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Moderation</span><strong>@Model.Stats.ModerationCount</strong><small>quyet dinh moderation</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Settlement</span><strong>@Model.Stats.SettlementCount</strong><small>ledger audit entries</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">7 ngay</span><strong>@Model.Stats.SettlementAmount7d.ToString("N0") đ</strong><small>tong amount settlement audit</small></div></div>
+    </div>
+
+    <div class="panel-card mb-4">
+        <div class="panel-head">
+            <h2 class="h5 mb-1">Loc audit</h2>
+            <p class="text-muted mb-0">Tap trung vao campaign center va risk center truoc khi mo rong sang lane moderation/finance sau.</p>
+        </div>
+        <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="row g-3">
+            <div class="col-md-5">
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo area, action, summary..." />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="area">
+                    @foreach (var option in Model.AreaOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.Area)">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="type">
+                    @foreach (var option in Model.TypeOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.Type)">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 d-grid">
+                <button class="btn btn-primary" type="submit">Loc</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <div class="panel-card mb-4">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Admin action log</h2>
+                    <p class="text-muted mb-0">Ghi lai thao tac admin o muc action/source/target de truy vet nhanh khi co van de runtime.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle audit-table">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>Target</th>
+                                <th>Actor</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.ActionLogs.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-center text-muted py-4">Chua co admin action log nao.</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in Model.ActionLogs)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@item.ActionName.Replace("_", " ")</div>
+                                            <div class="small text-muted">@item.Area.Replace("_", " ")</div>
+                                            <div class="small mt-1">@item.Summary</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@item.TargetType.Replace("_", " ")</div>
+                                            <div class="small text-muted">#@(item.TargetId?.ToString() ?? "-")</div>
+                                        </td>
+                                        <td>Admin #@(item.ActorUserId?.ToString() ?? "-")</td>
+                                        <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Moderation audit</h2>
+                    <p class="text-muted mb-0">Tap trung vao quyet dinh moderation tu risk center trong MVP nay.</p>
+                </div>
+                <div class="detail-stack">
+                    @if (Model.ModerationAudits.Count == 0)
+                    {
+                        <div class="text-muted">Chua co moderation audit.</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.ModerationAudits)
+                        {
+                            <div class="detail-item">
+                                <div>
+                                    <strong>@item.Decision.Replace("_", " ")</strong>
+                                    <div class="small text-muted">@item.SubjectType.Replace("_", " ") #@(item.SubjectId?.ToString() ?? "-")</div>
+                                    <div class="small">@item.Notes</div>
+                                </div>
+                                <div class="small text-end text-muted">@item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")<br />Admin #@(item.ActorUserId?.ToString() ?? "-")</div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="panel-card sticky-panel">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Settlement audit</h2>
+                    <p class="text-muted mb-0">Theo doi topup, spend va reserve budget tu ads wallet de de doi chieu voi lane finance sau nay.</p>
+                </div>
+                <div class="detail-stack">
+                    @if (Model.SettlementAudits.Count == 0)
+                    {
+                        <div class="text-muted">Chua co settlement audit.</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.SettlementAudits)
+                        {
+                            <div class="detail-item">
+                                <div>
+                                    <strong>@item.AuditType.Replace("_", " ")</strong>
+                                    <div class="small text-muted">@item.ReferenceType.Replace("_", " ") #@(item.ReferenceId?.ToString() ?? "-")</div>
+                                    <div class="small text-muted">Seller #@(item.SellerId?.ToString() ?? "-")</div>
+                                    <div class="small">@item.Notes</div>
+                                </div>
+                                <div class="small text-end text-muted">@((item.Amount ?? 0m).ToString("N0")) @item.Currency<br />@item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .audit-console .audit-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem 1.75rem;
+        border-radius: 1.5rem;
+        background: linear-gradient(135deg, #0f172a 0%, #14532d 45%, #38bdf8 100%);
+        color: #fff;
+        box-shadow: 0 24px 50px rgba(15, 23, 42, .2);
+    }
+
+    .audit-console .hero-chip {
+        padding: .5rem .85rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,.14);
+        font-weight: 700;
+    }
+
+    .audit-console .eyebrow,
+    .audit-console .metric-label {
+        letter-spacing: .15em;
+        font-weight: 700;
+    }
+
+    .audit-console .metric-card,
+    .audit-console .panel-card {
+        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+        border: 1px solid rgba(15,23,42,.08);
+        border-radius: 1.25rem;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+    }
+
+    .audit-console .metric-card {
+        padding: 1.25rem;
+        min-height: 128px;
+    }
+
+    .audit-console .metric-card strong {
+        display: block;
+        font-size: 2rem;
+        line-height: 1.1;
+        color: #0f172a;
+    }
+
+    .audit-console .panel-card {
+        padding: 1.5rem;
+    }
+
+    .audit-console .panel-head {
+        margin-bottom: 1rem;
+    }
+
+    .audit-console .audit-table th {
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+    }
+
+    .audit-console .detail-stack {
+        display: grid;
+        gap: .85rem;
+    }
+
+    .audit-console .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: .9rem 1rem;
+        border-radius: 1rem;
+        background: rgba(15, 23, 42, .03);
+    }
+
+    .audit-console .sticky-panel {
+        position: sticky;
+        top: 1rem;
+    }
+
+    @@media (max-width: 1199.98px) {
+        .audit-console .sticky-panel {
+            position: static;
+        }
+    }
+</style>

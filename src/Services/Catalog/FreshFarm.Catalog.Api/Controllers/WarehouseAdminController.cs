@@ -1,4 +1,6 @@
 using FreshFarm.Catalog.Api.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,8 +42,7 @@ public sealed class WarehouseAdminController : ControllerBase
             pageSize = 10;
         }
 
-        var query = _db.Products
-            .AsNoTracking()
+        var query = ApplySellerScopeToProducts(_db.Products.AsNoTracking())
             .Include(p => p.Category)
             .AsQueryable();
 
@@ -139,7 +140,7 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpGet("products/{id:int}")]
     public async Task<IActionResult> GetProductDetails([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var product = await _db.Products
+        var product = await ApplySellerScopeToProducts(_db.Products)
             .AsNoTracking()
             .Include(p => p.Category)
             .FirstOrDefaultAsync(p => p.ProductId == id, cancellationToken);
@@ -186,7 +187,7 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpGet("product-info/{id:int}")]
     public async Task<IActionResult> GetProductInfo([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var product = await _db.Products
+        var product = await ApplySellerScopeToProducts(_db.Products)
             .AsNoTracking()
             .Include(p => p.Category)
             .FirstOrDefaultAsync(p => p.ProductId == id, cancellationToken);
@@ -206,6 +207,12 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpPost("import-batch")]
     public async Task<IActionResult> ImportBatch([FromBody] List<ImportCartItemRequest>? items, CancellationToken cancellationToken)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         if (items is null || items.Count == 0)
         {
             return BadRequest(new { success = false, message = "Gio nhap trong" });
@@ -221,13 +228,13 @@ public sealed class WarehouseAdminController : ControllerBase
                 return BadRequest(new { success = false, message = "Du lieu nhap kho khong hop le." });
             }
 
-            var product = await _db.Products
+            var product = await ApplySellerScopeToProducts(_db.Products)
                 .Include(p => p.Category)
                 .FirstOrDefaultAsync(p => p.ProductId == item.ProductId, cancellationToken);
 
             if (product is null)
             {
-                return BadRequest(new { success = false, message = $"Khong tim thay san pham #{item.ProductId}." });
+                return BadRequest(new { success = false, message = $"San pham #{item.ProductId} khong thuoc quyen quan ly cua ban." });
             }
 
             product.StockQuantity += item.Quantity;
@@ -264,6 +271,7 @@ public sealed class WarehouseAdminController : ControllerBase
 
         AddTransaction(new WarehouseTransactionStore
         {
+            SellerId = sellerId.Value,
             TransactionCode = transactionCode,
             TransactionType = "Import",
             TransactionDate = DateTime.UtcNow,
@@ -285,6 +293,12 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpPost("export-batch")]
     public async Task<IActionResult> ExportBatch([FromBody] List<ExportCartItemRequest>? items, CancellationToken cancellationToken)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         if (items is null || items.Count == 0)
         {
             return BadRequest(new { success = false, message = "Gio xuat trong" });
@@ -300,10 +314,11 @@ public sealed class WarehouseAdminController : ControllerBase
                 return BadRequest(new { success = false, message = "Du lieu xuat kho khong hop le." });
             }
 
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == item.ProductId, cancellationToken);
+            var product = await ApplySellerScopeToProducts(_db.Products)
+                .FirstOrDefaultAsync(p => p.ProductId == item.ProductId, cancellationToken);
             if (product is null)
             {
-                return BadRequest(new { success = false, message = $"Khong tim thay san pham #{item.ProductId}." });
+                return BadRequest(new { success = false, message = $"San pham #{item.ProductId} khong thuoc quyen quan ly cua ban." });
             }
 
             if (item.Quantity > product.StockQuantity)
@@ -333,6 +348,7 @@ public sealed class WarehouseAdminController : ControllerBase
 
         AddTransaction(new WarehouseTransactionStore
         {
+            SellerId = sellerId.Value,
             TransactionCode = transactionCode,
             TransactionType = "Export",
             TransactionDate = DateTime.UtcNow,
@@ -364,6 +380,12 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpGet("transactions")]
     public IActionResult GetTransactions([FromQuery] string transactionType = "", [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         if (page < 1)
         {
             page = 1;
@@ -378,6 +400,7 @@ public sealed class WarehouseAdminController : ControllerBase
         lock (TransactionLock)
         {
             snapshot = Transactions
+                .Where(t => t.SellerId == sellerId.Value)
                 .OrderByDescending(t => t.TransactionDate)
                 .ToList();
         }
@@ -430,10 +453,16 @@ public sealed class WarehouseAdminController : ControllerBase
     [HttpGet("transactions/{id:int}")]
     public IActionResult GetTransactionDetails([FromRoute] int id)
     {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
         WarehouseTransactionStore? transaction;
         lock (TransactionLock)
         {
-            transaction = Transactions.FirstOrDefault(t => t.TransactionID == id);
+            transaction = Transactions.FirstOrDefault(t => t.TransactionID == id && t.SellerId == sellerId.Value);
         }
 
         if (transaction is null)
@@ -539,6 +568,8 @@ public sealed class WarehouseAdminController : ControllerBase
 
     private sealed class WarehouseTransactionStore
     {
+        public int SellerId { get; set; }
+
         public int TransactionID { get; set; }
 
         public string TransactionCode { get; set; } = string.Empty;
@@ -558,6 +589,26 @@ public sealed class WarehouseAdminController : ControllerBase
         public DateTime CreatedAt { get; set; }
 
         public List<WarehouseTransactionItemStore> Details { get; set; } = new();
+    }
+
+    private int? TryGetSellerIdFromToken()
+    {
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? User.FindFirstValue("sub");
+
+        return int.TryParse(sub, out var sellerId) ? sellerId : null;
+    }
+
+    private IQueryable<Product> ApplySellerScopeToProducts(IQueryable<Product> query)
+    {
+        var sellerId = TryGetSellerIdFromToken();
+        if (!sellerId.HasValue)
+        {
+            return query.Where(_ => false);
+        }
+
+        return query.Where(p => p.SellerProducts.Any(sp => sp.SellerId == sellerId.Value && sp.IsActive));
     }
 
     private sealed class WarehouseTransactionItemStore

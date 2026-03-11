@@ -15,11 +15,15 @@ public partial class FreshFarmCatalogDBContext : DbContext
 
     public virtual DbSet<Category> Categories { get; set; }
 
+    public virtual DbSet<CategoryAttribute> CategoryAttributes { get; set; }
+
     public virtual DbSet<Product> Products { get; set; }
 
     public virtual DbSet<ProductImage> ProductImages { get; set; }
 
     public virtual DbSet<ProductInfo> ProductInfos { get; set; }
+
+    public virtual DbSet<SellerProduct> SellerProducts { get; set; }
 
     public virtual DbSet<Unit> Units { get; set; }
 
@@ -52,6 +56,35 @@ public partial class FreshFarmCatalogDBContext : DbContext
                 .HasMaxLength(255)
                 .IsUnicode(false);
             entity.Property(e => e.UpdatedDate).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<CategoryAttribute>(entity =>
+        {
+            entity.ToTable("CategoryAttribute");
+
+            entity.Property(e => e.AttributeKey)
+                .IsRequired()
+                .HasMaxLength(80);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DisplayName)
+                .IsRequired()
+                .HasMaxLength(120);
+            entity.Property(e => e.InputType)
+                .IsRequired()
+                .HasMaxLength(30)
+                .HasDefaultValue("text")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_InputType");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_IsActive");
+            entity.Property(e => e.IsFacet).HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_IsFacet");
+            entity.Property(e => e.IsRequired).HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_IsRequired");
+            entity.Property(e => e.Placeholder).HasMaxLength(255);
+            entity.Property(e => e.SortOrder).HasAnnotation("Relational:DefaultConstraintName", "DF_CategoryAttribute_SortOrder");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         });
 
         modelBuilder.Entity<Product>(entity =>
@@ -127,6 +160,31 @@ public partial class FreshFarmCatalogDBContext : DbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__ProductIn__Produ__4CA06362");
+        });
+
+        modelBuilder.Entity<SellerProduct>(entity =>
+        {
+            entity.HasIndex(e => new { e.ProductId, e.IsActive }, "IX_SellerProducts_Product_IsActive");
+
+            entity.HasIndex(e => new { e.SellerId, e.IsActive }, "IX_SellerProducts_Seller_IsActive");
+
+            entity.HasIndex(e => new { e.SellerId, e.ProductId }, "UX_SellerProducts_Seller_Product").IsUnique();
+
+            entity.Property(e => e.SellerProductId).HasColumnName("SellerProductID");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerProducts_CreatedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.IsActive)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerProducts_IsActive");
+            entity.Property(e => e.ProductId).HasColumnName("ProductID");
+            entity.Property(e => e.SellerId).HasColumnName("SellerID");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.SellerProducts)
+                .HasForeignKey(d => d.ProductId)
+                .HasConstraintName("FK_SellerProducts_Product");
         });
 
         modelBuilder.Entity<Unit>(entity =>

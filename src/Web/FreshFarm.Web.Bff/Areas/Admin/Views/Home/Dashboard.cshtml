@@ -1,0 +1,362 @@
+@using System.Globalization
+@using System.Linq
+@using System.Text.Json
+@model FreshFarm.Web.Bff.Areas.Admin.Models.AdminDashboardViewModel
+
+@{
+    ViewData["Title"] = "Bảng điều khiển Admin";
+
+    var vi = CultureInfo.GetCultureInfo("vi-VN");
+    var trendLabelsJson = JsonSerializer.Serialize(Model.TrendLabels);
+    var trendOrdersJson = JsonSerializer.Serialize(Model.TrendOrders);
+    var trendGmvMillionsJson = JsonSerializer.Serialize(Model.TrendGmv.Select(x => decimal.Round(x / 1_000_000m, 2)).ToList());
+
+    string Vnd(decimal value) => string.Format(vi, "{0:N0}đ", value);
+}
+
+<style>
+    :root {
+        --admin-blue-1: #1e40af;
+        --admin-blue-2: #2563eb;
+        --admin-blue-3: #60a5fa;
+        --admin-bg-1: #eff6ff;
+        --admin-bg-2: #dbeafe;
+    }
+
+    body {
+        background: linear-gradient(135deg, var(--admin-bg-1) 0%, var(--admin-bg-2) 70%, #bfdbfe 100%);
+        min-height: 100vh;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(24px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes scanLight {
+        0% {
+            transform: translateX(-120%) skewX(-20deg);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: .55;
+        }
+
+        100% {
+            transform: translateX(220%) skewX(-20deg);
+            opacity: 0;
+        }
+    }
+
+    .admin-hero {
+        background: linear-gradient(130deg, var(--admin-blue-1) 0%, var(--admin-blue-2) 52%, var(--admin-blue-3) 100%);
+        border-radius: 1.5rem;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+        padding: 2rem;
+        box-shadow: 0 22px 55px rgba(37, 99, 235, .36);
+        animation: fadeInUp .45s ease-out;
+    }
+
+    .admin-hero::before {
+        content: '';
+        position: absolute;
+        inset: -40% auto -40% -35%;
+        width: 42%;
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.42) 52%, transparent 100%);
+        animation: scanLight 5.2s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    .admin-hero .hero-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 20px;
+        background: rgba(15, 23, 42, .25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .36);
+    }
+
+    .metric-card {
+        border-radius: 1.25rem;
+        border: 1px solid rgba(148, 163, 184, .28);
+        background: linear-gradient(160deg, rgba(255,255,255,.96), rgba(239,246,255,.96));
+        box-shadow: 0 14px 35px rgba(30, 64, 175, .14);
+        padding: 1rem 1.1rem;
+        transition: transform .2s ease, box-shadow .2s ease;
+        animation: fadeInUp .55s ease-out;
+    }
+
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 20px 42px rgba(30, 64, 175, .18);
+    }
+
+    .metric-label {
+        font-size: .74rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #64748b;
+        font-weight: 700;
+        margin-bottom: .35rem;
+    }
+
+    .metric-value {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+
+    .metric-sub {
+        margin-top: .35rem;
+        font-size: .86rem;
+        color: #475569;
+    }
+
+    .chart-card {
+        border-radius: 1.35rem;
+        border: 1px solid rgba(148, 163, 184, .25);
+        background: rgba(255, 255, 255, .96);
+        box-shadow: 0 18px 45px rgba(30, 64, 175, .14);
+        animation: fadeInUp .65s ease-out;
+    }
+
+    .chart-card .chart-header {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .chart-card .chart-body {
+        padding: 1.1rem 1.25rem 1.2rem;
+    }
+
+    .legend-chip {
+        border-radius: 999px;
+        padding: .25rem .65rem;
+        font-size: .75rem;
+        font-weight: 600;
+        background: #e0ecff;
+        color: #1e40af;
+        margin-right: .35rem;
+    }
+
+    @@media (max-width: 768px) {
+        .admin-hero {
+            padding: 1.6rem 1.25rem;
+        }
+
+        .metric-value {
+            font-size: 1.4rem;
+        }
+    }
+</style>
+
+<main class="container-fluid py-4">
+    <section class="admin-hero mb-4">
+        <div class="position-relative" style="z-index:1;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="hero-icon">
+                        <i class="bi bi-graph-up-arrow fs-2"></i>
+                    </div>
+                    <div>
+                        <h1 class="fw-bold mb-1" style="font-size:2rem;">Dashboard Tổng Quan Sàn</h1>
+                        <p class="mb-0 opacity-75">Theo dõi GMV, người dùng, seller mới và giao dịch thời gian thực</p>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="small opacity-75">Cập nhật</div>
+                    <div class="fw-semibold">@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(ViewBag.ErrorMessage as string))
+    {
+        <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @ViewBag.ErrorMessage
+        </div>
+    }
+
+    <section class="row g-3 mb-3">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">GMV toàn sàn</div>
+                <div class="metric-value">@Vnd(Model.Gmv)</div>
+                <div class="metric-sub">Tổng giá trị giao dịch tích lũy</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Doanh thu sàn</div>
+                <div class="metric-value">@Vnd(Model.PlatformRevenue)</div>
+                <div class="metric-sub">Hoa hồng thu được</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Đơn mới hôm nay</div>
+                <div class="metric-value">@Model.NewOrdersToday</div>
+                <div class="metric-sub">Tổng đơn: @Model.TotalOrders</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Tỷ lệ hủy đơn</div>
+                <div class="metric-value">@Model.CancelRate.ToString("N2", vi)%</div>
+                <div class="metric-sub">Đơn hủy: @Model.CancelledOrders</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Traffic hôm nay</div>
+                <div class="metric-value">@Model.TrafficToday</div>
+                <div class="metric-sub">Phiên hoạt động: @Model.ActiveSessions</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">User mới hôm nay</div>
+                <div class="metric-value">@Model.NewUsersToday</div>
+                <div class="metric-sub">7 ngày: @Model.NewUsers7Days</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Seller</div>
+                <div class="metric-value">@Model.TotalSellers</div>
+                <div class="metric-sub">Mở mới 7 ngày: @Model.NewSellers7Days</div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="metric-card h-100">
+                <div class="metric-label">Buyer</div>
+                <div class="metric-value">@Model.TotalBuyers</div>
+                <div class="metric-sub">Mới 7 ngày: @Model.NewBuyers7Days</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="chart-card">
+        <div class="chart-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h5 class="mb-1 fw-bold text-primary">Xu hướng giao dịch 7 ngày</h5>
+                <div class="text-muted small">Realtime transactions (15 phút): <strong>@Model.RealtimeTransactions</strong></div>
+            </div>
+            <div>
+                <span class="legend-chip">Đơn hàng</span>
+                <span class="legend-chip">GMV (triệu VND)</span>
+            </div>
+        </div>
+        <div class="chart-body">
+            <canvas id="adminTrendChart" height="110"></canvas>
+        </div>
+    </section>
+</main>
+
+@section scripts {
+    <script>
+        (function () {
+            const labels = @Html.Raw(trendLabelsJson);
+            const orderData = @Html.Raw(trendOrdersJson);
+            const gmvMillions = @Html.Raw(trendGmvMillionsJson);
+
+            const canvas = document.getElementById('adminTrendChart');
+            if (!canvas || !window.Chart) {
+                return;
+            }
+
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Đơn hàng',
+                            data: orderData,
+                            yAxisID: 'y',
+                            backgroundColor: 'rgba(37, 99, 235, 0.45)',
+                            borderColor: 'rgba(37, 99, 235, 1)',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            maxBarThickness: 36
+                        },
+                        {
+                            type: 'line',
+                            label: 'GMV (triệu VND)',
+                            data: gmvMillions,
+                            yAxisID: 'y1',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                            tension: 0.3,
+                            fill: true,
+                            pointRadius: 3,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.16)'
+                            }
+                        },
+                        y: {
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Đơn hàng'
+                            },
+                            grid: {
+                                color: 'rgba(148, 163, 184, 0.16)'
+                            }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'GMV (triệu VND)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+}

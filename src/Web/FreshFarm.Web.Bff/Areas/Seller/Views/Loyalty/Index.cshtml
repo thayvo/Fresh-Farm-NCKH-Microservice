@@ -1,12 +1,15 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyDashboardVM
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var loyaltyScopeLabel = ViewData["LoyaltyScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Tích điểm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 
     // Null-safe & format helpers
     string N0(long v) => v.ToString("N0");
     string N0i(int v) => v.ToString("N0");
-    string N0d(decimal v) => v.ToString("N0");
 
     var totalEarned = Model?.TotalEarned ?? 0;
     var totalRedeemed = Model?.TotalRedeemed ?? 0;
@@ -415,9 +418,10 @@
             <h2 class="dashboard-title">
                 <i class="bi bi-trophy-fill"></i>Quản lý Tích điểm
             </h2>
+            <span class="badge bg-light text-primary">@loyaltyScopeLabel</span>
 
             <form class="sync-form" method="post"
-                  action="@Url.Action("SyncAward","Loyalty", new { area = "Seller" })"
+                  action="@Url.Action("SyncAward","Loyalty", new { area = areaName })"
                   onsubmit="return syncAward(event)">
                 @Html.AntiForgeryToken()
                 <input type="date" name="start" class="form-control form-control-sm" placeholder="Từ ngày" />
@@ -438,15 +442,15 @@
     </div>
 
     <div class="action-buttons">
-        <a class="btn-action" href="@Url.Action("Users","Loyalty", new { area = "Seller" })">
+        <a class="btn-action" href="@Url.Action("Users","Loyalty", new { area = areaName })">
             <i class="bi bi-people"></i>
             <span>Danh sách thành viên</span>
         </a>
-        <a class="btn-action secondary" href="@Url.Action("History","Loyalty", new { area = "Seller" })">
+        <a class="btn-action secondary" href="@Url.Action("History","Loyalty", new { area = areaName })">
             <i class="bi bi-clock-history"></i>
             <span>Lịch sử điểm</span>
         </a>
-        <a class="btn-action dark" href="@Url.Action("Config","Loyalty", new { area = "Seller" })">
+        <a class="btn-action dark" href="@Url.Action("Config","Loyalty", new { area = areaName })">
             <i class="bi bi-gear"></i>
             <span>Cấu hình</span>
         </a>
@@ -519,7 +523,7 @@
                 </div>
                 <div class="card-footer-link">
                     <a class="btn btn-outline-primary btn-sm w-100"
-                       href="@Url.Action("History","Loyalty", new { area = "Seller" })">
+                       href="@Url.Action("History","Loyalty", new { area = areaName })">
                         Xem thêm <i class="bi bi-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -600,7 +604,7 @@
 
                 const json = await resp.json();
                 if (json && json.success) {
-                    alert('Đồng bộ xong: thành công ' + (json.ok ?? 0) + ', lỗi ' + (json.fail ?? 0));
+                    alert(json.message || ('Đồng bộ xong: thành công ' + (json.ok ?? 0) + ', lỗi ' + (json.fail ?? 0)));
                     location.reload();
                 } else {
                     alert(json && json.message ? json.message : 'Có lỗi xảy ra');

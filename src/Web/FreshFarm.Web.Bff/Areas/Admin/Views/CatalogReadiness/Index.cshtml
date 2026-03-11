@@ -1,0 +1,462 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.CatalogReadinessPageViewModel
+
+<section class="catalog-readiness-shell">
+    <div class="hero-card mb-4">
+        <div>
+            <p class="eyebrow text-uppercase mb-2">7.7A Search readiness MVP</p>
+            <h1 class="fw-bold mb-2">Catalog readiness</h1>
+            <p class="mb-0 opacity-75">Theo doi required attributes theo danh muc, readiness queue cua san pham va sync nhanh tu ProductInfo de giam data debt.</p>
+        </div>
+        <div class="hero-chip">Sprint D</div>
+    </div>
+
+    @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
+    {
+        <div class="alert alert-warning">@pageError</div>
+    }
+
+    @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+
+    @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Categories</span><strong>@Model.Stats.TotalCategories</strong><small>danh muc co trong catalog</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Attributes</span><strong>@Model.Stats.TotalAttributes</strong><small>@Model.Stats.RequiredAttributes bat buoc</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Ready</span><strong>@Model.Stats.ProductsReady</strong><small>san pham da du readiness</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Missing</span><strong>@Model.Stats.ProductsMissing</strong><small>san pham con thieu</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Facets</span><strong>@Model.Stats.FacetAttributes</strong><small>attribute co facet flag</small></div></div>
+        <div class="col-md-6 col-xl-2">
+            <form method="post" asp-action="SyncProductInfo" asp-controller="CatalogReadiness" asp-area="Admin" class="h-100">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="q" value="@Model.Query" />
+                <input type="hidden" name="state" value="@Model.State" />
+                <input type="hidden" name="categoryId" value="@Model.CategoryId" />
+                <button class="metric-card sync-card w-100 border-0 text-start" type="submit">
+                    <span class="metric-label">Sync</span>
+                    <strong><i class="bi bi-arrow-repeat"></i></strong>
+                    <small>weight, origin, standard, preservation</small>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel-card mb-4">
+        <div class="panel-head">
+            <h2 class="h5 mb-1">Bo loc readiness</h2>
+            <p class="text-muted mb-0">Tap trung vao queue san pham chua du required attributes truoc khi mo rong sang synonym/tag/search facet sau.</p>
+        </div>
+        <form method="get" asp-action="Index" asp-controller="CatalogReadiness" asp-area="Admin" class="row g-3">
+            <div class="col-lg-5">
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo ten san pham, SKU, category, attribute..." />
+            </div>
+            <div class="col-lg-3">
+                <select class="form-select" name="categoryId">
+                    @if (!Model.CategoryId.HasValue)
+                    {
+                        <option value="" selected>Tat ca danh muc</option>
+                    }
+                    else
+                    {
+                        <option value="">Tat ca danh muc</option>
+                    }
+                    @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
+                    {
+                        if (int.TryParse(option.Value, out var optionId) && optionId == Model.CategoryId)
+                        {
+                            <option value="@option.Value" selected>@option.Text</option>
+                        }
+                        else
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <select class="form-select" name="state">
+                    @foreach (var option in Model.StateOptions)
+                    {
+                        if (option.Value == Model.State)
+                        {
+                            <option value="@option.Value" selected>@option.Text</option>
+                        }
+                        else
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button class="btn btn-primary" type="submit">Loc queue</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <div class="panel-card mb-4">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Readiness queue</h2>
+                    <p class="text-muted mb-0">Danh sach san pham dang bi thieu thuoc tinh bat buoc theo category definition.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle readiness-table">
+                        <thead>
+                            <tr>
+                                <th>San pham</th>
+                                <th>Coverage</th>
+                                <th>Missing</th>
+                                <th>Trang thai</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.ReadinessRows.Count == 0)
+                            {
+                                <tr><td colspan="4" class="text-center text-muted py-4">Khong co san pham nao khop readiness filter.</td></tr>
+                            }
+                            else
+                            {
+                                @foreach (var row in Model.ReadinessRows)
+                                {
+                                    var readinessClass = row.MissingCount == 0 ? "score-pill score-good" : row.ReadinessScore >= 60 ? "score-pill score-warn" : "score-pill score-danger";
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@row.ProductName</div>
+                                            <div class="small text-muted">SKU: @(string.IsNullOrWhiteSpace(row.Sku) ? "-" : row.Sku)</div>
+                                            <div class="small text-muted">@row.CategoryName</div>
+                                        </td>
+                                        <td>
+                                            <span class="@readinessClass">@row.ReadinessScore%</span>
+                                            <div class="small text-muted mt-2">@row.ReadyCount / @row.TotalRequired required attributes</div>
+                                        </td>
+                                        <td>
+                                            @if (row.MissingAttributes.Count == 0)
+                                            {
+                                                <span class="text-success">Da du readiness.</span>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var item in row.MissingAttributes)
+                                                {
+                                                    <span class="issue-chip">@item</span>
+                                                }
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (row.Status)
+                                            {
+                                                <span class="badge bg-success-subtle text-success">Dang ban</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary-subtle text-secondary">Dang an</span>
+                                            }
+                                            <div class="small text-muted mt-2">@row.CreatedDate.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Category attribute registry</h2>
+                    <p class="text-muted mb-0">Cap nhat nhanh required/facet/input type de chuan hoa search readiness theo tung category.</p>
+                </div>
+                <div class="detail-stack">
+                    @if (Model.Attributes.Count == 0)
+                    {
+                        <div class="text-muted">Chua co category attribute nao.</div>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model.Attributes)
+                        {
+                            <form method="post" asp-action="UpdateAttribute" asp-controller="CatalogReadiness" asp-area="Admin" asp-route-id="@item.CategoryAttributeId" class="detail-item">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="q" value="@Model.Query" />
+                                <input type="hidden" name="state" value="@Model.State" />
+                                <input type="hidden" name="categoryId" value="@Model.CategoryId" />
+                                <div class="row g-3 w-100">
+                                    <div class="col-lg-3">
+                                        <label class="form-label small text-muted">Danh muc</label>
+                                        <select class="form-select" name="CategoryId">
+                                            @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
+                                            {
+                                                if (int.TryParse(option.Value, out var optionId) && optionId == item.CategoryId)
+                                                {
+                                                    <option value="@option.Value" selected>@option.Text</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@option.Value">@option.Text</option>
+                                                }
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-2">
+                                        <label class="form-label small text-muted">Key</label>
+                                        <input class="form-control" type="text" name="AttributeKey" value="@item.AttributeKey" />
+                                    </div>
+                                    <div class="col-lg-3">
+                                        <label class="form-label small text-muted">Display name</label>
+                                        <input class="form-control" type="text" name="DisplayName" value="@item.DisplayName" />
+                                    </div>
+                                    <div class="col-lg-2">
+                                        <label class="form-label small text-muted">Input</label>
+                                        <select class="form-select" name="InputType">
+                                            @foreach (var inputType in new[] { "text", "textarea", "number", "select" })
+                                            {
+                                                if (string.Equals(inputType, item.InputType, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <option value="@inputType" selected>@inputType</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="@inputType">@inputType</option>
+                                                }
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-2">
+                                        <label class="form-label small text-muted">Sort</label>
+                                        <input class="form-control" type="number" name="SortOrder" value="@item.SortOrder" min="0" max="999" />
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <label class="form-label small text-muted">Placeholder</label>
+                                        <input class="form-control" type="text" name="Placeholder" value="@item.Placeholder" />
+                                    </div>
+                                    <div class="col-lg-5 d-flex align-items-end gap-3 flex-wrap">
+                                        <input type="hidden" name="IsRequired" value="false" />
+                                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@item.IsRequired" /><span>Required</span></label>
+                                        <input type="hidden" name="IsFacet" value="false" />
+                                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@item.IsFacet" /><span>Facet</span></label>
+                                        <input type="hidden" name="IsActive" value="false" />
+                                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@item.IsActive" /><span>Active</span></label>
+                                    </div>
+                                    <div class="col-lg-3 d-flex align-items-end justify-content-lg-end">
+                                        <button class="btn btn-outline-primary w-100" type="submit">Cap nhat</button>
+                                    </div>
+                                </div>
+                            </form>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="panel-card sticky-panel">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Tao category attribute moi</h2>
+                    <p class="text-muted mb-0">Dung de bo sung nhanh readiness cho category chua co khung attribute.</p>
+                </div>
+                <form method="post" asp-action="CreateAttribute" asp-controller="CatalogReadiness" asp-area="Admin" class="row g-3">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="q" value="@Model.Query" />
+                    <input type="hidden" name="state" value="@Model.State" />
+                    <input type="hidden" name="categoryId" value="@Model.CategoryId" />
+                    <div class="col-12">
+                        <label class="form-label">Danh muc</label>
+                        <select class="form-select" name="CategoryId" required>
+                            <option value="">Chon danh muc</option>
+                            @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
+                            {
+                                if (int.TryParse(option.Value, out var optionId) && optionId == Model.NewAttribute.CategoryId)
+                                {
+                                    <option value="@option.Value" selected>@option.Text</option>
+                                }
+                                else
+                                {
+                                    <option value="@option.Value">@option.Text</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Attribute key</label>
+                        <input class="form-control" type="text" name="AttributeKey" value="@Model.NewAttribute.AttributeKey" placeholder="weight, origin..." required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Display name</label>
+                        <input class="form-control" type="text" name="DisplayName" value="@Model.NewAttribute.DisplayName" placeholder="Trong luong, Xuat xu..." required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Input type</label>
+                        <select class="form-select" name="InputType">
+                            @foreach (var inputType in new[] { "text", "textarea", "number", "select" })
+                            {
+                                if (string.Equals(inputType, Model.NewAttribute.InputType, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <option value="@inputType" selected>@inputType</option>
+                                }
+                                else
+                                {
+                                    <option value="@inputType">@inputType</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Sort order</label>
+                        <input class="form-control" type="number" name="SortOrder" value="@Model.NewAttribute.SortOrder" min="0" max="999" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Placeholder</label>
+                        <input class="form-control" type="text" name="Placeholder" value="@Model.NewAttribute.Placeholder" />
+                    </div>
+                    <div class="col-12 d-flex gap-3 flex-wrap">
+                        <input type="hidden" name="IsRequired" value="false" />
+                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@Model.NewAttribute.IsRequired" /><span>Required</span></label>
+                        <input type="hidden" name="IsFacet" value="false" />
+                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@Model.NewAttribute.IsFacet" /><span>Facet</span></label>
+                        <input type="hidden" name="IsActive" value="false" />
+                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@(Model.NewAttribute.IsActive || Model.NewAttribute.CategoryId == 0)" /><span>Active</span></label>
+                    </div>
+                    <div class="col-12 d-grid">
+                        <button class="btn btn-primary" type="submit">Tao attribute</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .catalog-readiness-shell .hero-card {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.75rem;
+        border-radius: 1.5rem;
+        background: linear-gradient(135deg, #082f49 0%, #0f766e 42%, #d97706 100%);
+        color: #fff;
+        box-shadow: 0 24px 50px rgba(8, 47, 73, .22);
+    }
+
+    .catalog-readiness-shell .hero-chip {
+        padding: .5rem .85rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,.14);
+        font-weight: 700;
+    }
+
+    .catalog-readiness-shell .eyebrow,
+    .catalog-readiness-shell .metric-label {
+        letter-spacing: .14em;
+        font-weight: 700;
+    }
+
+    .catalog-readiness-shell .metric-card,
+    .catalog-readiness-shell .panel-card {
+        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+        border: 1px solid rgba(15,23,42,.08);
+        border-radius: 1.25rem;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+    }
+
+    .catalog-readiness-shell .metric-card {
+        padding: 1.2rem;
+        min-height: 132px;
+    }
+
+    .catalog-readiness-shell .metric-card strong {
+        display: block;
+        font-size: 1.9rem;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+
+    .catalog-readiness-shell .sync-card {
+        cursor: pointer;
+    }
+
+    .catalog-readiness-shell .panel-card {
+        padding: 1.5rem;
+    }
+
+    .catalog-readiness-shell .panel-head {
+        margin-bottom: 1rem;
+    }
+
+    .catalog-readiness-shell .readiness-table th {
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+    }
+
+    .catalog-readiness-shell .score-pill,
+    .catalog-readiness-shell .issue-chip,
+    .catalog-readiness-shell .toggle-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        font-weight: 600;
+    }
+
+    .catalog-readiness-shell .score-good {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .catalog-readiness-shell .score-warn {
+        background: #fef3c7;
+        color: #b45309;
+    }
+
+    .catalog-readiness-shell .score-danger {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .catalog-readiness-shell .issue-chip {
+        margin: 0 .4rem .4rem 0;
+        background: rgba(15, 23, 42, .05);
+        color: #0f172a;
+    }
+
+    .catalog-readiness-shell .detail-stack {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .catalog-readiness-shell .detail-item {
+        padding: 1rem;
+        border-radius: 1rem;
+        background: rgba(15, 23, 42, .03);
+    }
+
+    .catalog-readiness-shell .toggle-chip {
+        border: 1px solid rgba(14, 116, 144, .15);
+        background: rgba(14, 116, 144, .06);
+    }
+
+    .catalog-readiness-shell .toggle-chip input {
+        accent-color: #0f766e;
+    }
+
+    .catalog-readiness-shell .sticky-panel {
+        position: sticky;
+        top: 1rem;
+    }
+
+    @@media (max-width: 1199.98px) {
+        .catalog-readiness-shell .sticky-panel {
+            position: static;
+        }
+    }
+</style>

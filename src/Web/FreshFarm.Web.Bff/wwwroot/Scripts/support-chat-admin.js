@@ -1,6 +1,11 @@
 (function ($) {
     'use strict';
 
+    const SupportConfig = $.extend({
+        orderPageUrl: '/Seller/Order/ManageOrders',
+        forcePolling: false
+    }, window.supportChatAdminConfig || {});
+
     // ==========================================
     // Chat Data & State Management
     // ==========================================
@@ -10,28 +15,23 @@
         filterMode: 'all',
         allConversations: [],
         hub: null,
+        isRealtimeReady: false,
+        pollTimer: null,
         lastMessageDate: null, // Track last message date for separator
 
         init: function () {
-            this.hub = ($.connection && $.connection.supportChatHub) ? $.connection.supportChatHub : null;
+            this.hub = null;
+            this.isRealtimeReady = false;
         }
     };
-
-    const SUPPORT_REACTIONS = [
-        { type: 'Heart', emoji: '❤️' },
-        { type: 'Like', emoji: '👍' },
-        { type: 'Laugh', emoji: '😂' },
-        { type: 'Wow', emoji: '😮' },
-        { type: 'Sad', emoji: '😢' },
-        { type: 'Angry', emoji: '😡' }
-    ];
 
     const SupportRoutes = $.extend({
         conversations: '/Seller/SupportChat/Conversations',
         messages: '/Seller/SupportChat/Messages',
         conversationDetails: '/Seller/SupportChat/ConversationDetails',
         close: '/Seller/SupportChat/Close',
-        markAsRead: '/Seller/SupportChat/MarkAsRead'
+        markAsRead: '/Seller/SupportChat/MarkAsRead',
+        sendMessage: '/Seller/SupportChat/SendMessage'
     }, window.supportChatAdminRoutes || {});
 
     // ==========================================
@@ -125,36 +125,12 @@
                 }
             });
 
-            this.elements.messages.on('click', '.msg-action-react', function (e) {
-                e.preventDefault();
-                const $msg = $(this).closest('.support-chat-message');
-                ChatUI.showReactionPicker($msg);
-            });
-
-            // Reaction option click
-            this.elements.messages.on('click', '.support-msg-reaction-option', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                const $btn = $(this);
-                const type = $btn.data('type');
-                const $msg = $btn.closest('.support-chat-message');
-                const id = $msg.data('id');
-                if (!id) return;
-                const current = ($msg.data('reaction') || '').toString();
-                const newType = current === type ? '' : type;
-                ChatController.reactToMessage(id, newType);
-                ChatUI.hideReactionPicker();
-            });
-
             // Cancel reply
             this.elements.replyCancel.on('click', function () {
                 ChatUI.clearReplyMode();
             });
 
-            // Hide picker on outside click
-            $(document).on('click.supportChatAdminReaction', function () {
-                ChatUI.hideReactionPicker();
-            });
+            // Keep only reply actions in hover menu.
         },
 
         renderConversations: function (convs) {
@@ -252,6 +228,13 @@
         },
 
         appendMessage: function (m) {
+            if (m && m.messageId) {
+                const existed = this.elements.messages.find(`.support-chat-message[data-id="${m.messageId}"]`);
+                if (existed.length) {
+                    return;
+                }
+            }
+
             // Insert date separator if date changed
             var currentDateKey = ChatUtils.getDateKey(m.createdAt);
             if (currentDateKey && currentDateKey !== ChatState.lastMessageDate) {
@@ -277,8 +260,7 @@
             if (from === 'admin' || from === 'user') {
                 actionsHtml = `
                     <div class="support-msg-actions small text-muted">
-                        <a href="#" class="text-decoration-none msg-action-reply"><i class="bi bi-reply me-1"></i>Trả lời</a>
-                        <a href="#" class="text-decoration-none msg-action-react">❤️</a>`;
+                        <a href="#" class="text-decoration-none msg-action-reply"><i class="bi bi-reply me-1"></i>Trả lời</a>`;
                 if (from === 'admin' && !m.isDeleted) {
                     actionsHtml += `<a href="#" class="text-decoration-none text-danger msg-action-recall"><i class="bi bi-trash me-1"></i>Thu hồi</a>`;
                 }
@@ -296,17 +278,16 @@
                     </div>`;
             }
 
-            // Bubble + reaction badge
+            // Bubble content (reaction badge removed by request)
             const bubbleHtml = `
                 <span class="bubble d-inline-block px-2 py-1 rounded">
                     ${replyHtml}
                     ${contentHtml}
-                    ${ChatUI.buildReactionBadgeHtml(m.reactionType)}
                 </span>`;
 
             // Bubble luôn ở phía ngoài, menu hành động ở phía trong (theo hướng flex của hàng)
             const html = `
-                <div class="support-chat-message ${cls} mb-2 position-relative" data-id="${m.messageId || ''}" data-from="${from}" data-reaction="${m.reactionType || ''}">
+                <div class="support-chat-message ${cls} mb-2 position-relative" data-id="${m.messageId || ''}" data-from="${from}">
                     ${bubbleHtml}
                     ${actionsHtml}
                     <div class="support-msg-meta small mt-1 d-flex justify-content-end align-items-center">
@@ -336,23 +317,11 @@
         },
 
         updateReaction: function (messageId, reactionType, summary) {
-            const $msg = this.elements.messages.find(`.support-chat-message[data-id="${messageId}"]`);
-            if ($msg.length) {
-                $msg.attr('data-reaction', reactionType || '');
-                const badgeHtml = ChatUI.buildReactionBadgeHtml(reactionType);
-                const $badge = $msg.find('.bubble .support-msg-reaction-badge');
-                if ($badge.length) {
-                    $badge.replaceWith(badgeHtml);
-                } else {
-                    $msg.find('.bubble').append(badgeHtml);
-                }
-            }
+            // Reaction UI removed; keep no-op to avoid runtime errors from legacy realtime events.
         },
 
         buildReactionBadgeHtml: function (reactionType) {
-            const emoji = ChatUtils.getReactionEmoji(reactionType);
-            const cur = reactionType || '';
-            return `<button type="button" class="support-msg-reaction-badge" data-current-type="${cur}">${emoji}</button>`;
+            return '';
         },
 
         buildReactionIndicatorHtml: function () {
@@ -360,20 +329,11 @@
         },
 
         showReactionPicker: function ($msg) {
-            this.hideReactionPicker();
-            if (!$msg || !$msg.length) return;
-            const current = $msg.data('reaction') || '';
-            let html = '<div class="support-msg-reaction-picker">';
-            SUPPORT_REACTIONS.forEach(function (r) {
-                const active = r.type === current ? ' active' : '';
-                html += `<button type="button" class="support-msg-reaction-option${active}" data-type="${r.type}">${r.emoji}</button>`;
-            });
-            html += '</div>';
-            $msg.append(html);
+            // Reaction UI removed.
         },
 
         hideReactionPicker: function () {
-            this.elements.messages.find('.support-msg-reaction-picker').remove();
+            // Reaction UI removed.
         },
 
         markMessageRecalled: function (messageId) {
@@ -432,7 +392,7 @@
                     htmlO += `
                         <div class="card mb-2 p-2">
                             <div class="d-flex justify-content-between mb-1">
-                                <a href="/Seller/Order/ManageOrders" target="_blank">${ord.orderCode}</a>
+                                <a href="${ChatUtils.htmlEncode(SupportConfig.orderPageUrl)}" target="_blank">${ord.orderCode}</a>
                                 <span class="fw-bold text-primary">${ChatUtils.formatMoney(ord.totalAmount)}</span>
                             </div>
                             <div class="d-flex justify-content-between small">
@@ -453,95 +413,147 @@
         init: function () {
             ChatState.init();
             ChatUI.init();
-            const realtimeEnabled = this.setupSignalR();
-            this.configureRealtimeUi(realtimeEnabled);
+            if (SupportConfig.forcePolling) {
+                this.configureRealtimeUi(false);
+                this.loadConversations();
+                this.setPollingEnabled(true);
+                return;
+            }
+            const realtimeConfigured = this.setupSignalR();
+            this.configureRealtimeUi(realtimeConfigured);
             this.loadConversations();
+            this.setPollingEnabled(!realtimeConfigured);
         },
 
-        configureRealtimeUi: function (realtimeEnabled) {
-            if (realtimeEnabled) return;
-
-            ChatUI.elements.input.prop('disabled', true);
-            ChatUI.elements.sendBtn.prop('disabled', true);
-            ChatUI.elements.input.attr('placeholder', 'Realtime chat chua duoc bat. Dang o che do xem/quan ly.');
+        configureRealtimeUi: function (realtimeConfigured) {
+            ChatUI.elements.input.prop('disabled', false);
+            ChatUI.elements.sendBtn.prop('disabled', false);
             ChatUI.elements.typing.addClass('d-none');
+
+            if (!realtimeConfigured) {
+                ChatUI.elements.input.attr('placeholder', 'Realtime chua san sang. Dang cap nhat o che do polling.');
+            }
         },
 
         setupSignalR: function () {
-            if (!$.connection || !$.connection.hub) {
-                console.warn('[support-chat-admin] SignalR legacy not loaded. Fallback to polling mode.');
+            if (!window.signalR || !window.signalR.HubConnectionBuilder) {
+                console.warn('[support-chat-admin] ASP.NET Core SignalR client not loaded. Fallback to polling mode.');
+                ChatState.isRealtimeReady = false;
                 return false;
             }
 
-            const hub = ChatState.hub;
-            if (!hub) {
-                console.warn('[support-chat-admin] supportChatHub unavailable. Fallback to polling mode.');
-                return false;
-            }
+            const connection = new window.signalR.HubConnectionBuilder()
+                .withUrl('/hubs/support-chat')
+                .withAutomaticReconnect()
+                .build();
 
-            // Client methods
-            hub.client.newConversationOrMessage = function (payload) {
-                // Reload list or update specific item
-                ChatController.loadConversations(); // Simple approach: reload all
-                // Nếu đang mở đúng hội thoại thì KHÔNG append ở đây để tránh trùng (receiveMessage sẽ lo)
-                if (ChatState.currentConvId === payload.conversationId) {
-                    if (hub.server && hub.server.markAsRead) {
-                        hub.server.markAsRead(ChatState.currentConvId);
-                    }
+            ChatState.hub = connection;
+
+            connection.on('newConversationOrMessage', function (payload) {
+                ChatController.loadConversations();
+                if (ChatState.currentConvId === (payload && payload.conversationId)) {
+                    ChatController.reloadCurrentConversationMessages();
+                    $.post(SupportRoutes.markAsRead, { conversationId: ChatState.currentConvId });
+                }
+            });
+
+            connection.on('receiveMessage', function (payload) {
+                const conversationId = payload && payload.conversationId;
+                const message = payload && payload.message ? payload.message : payload;
+                if (!message || ChatState.currentConvId !== conversationId) {
                     return;
                 }
-            };
 
-            hub.client.receiveMessage = function (payload) {
-                if (ChatState.currentConvId === payload.conversationId) {
-                    ChatUI.appendMessage(payload);
-                    ChatUI.scrollToBottom();
+                const normalized = Object.assign({}, message, { conversationId: conversationId });
+                ChatUI.appendMessage(normalized);
+                ChatUI.scrollToBottom();
+            });
+
+            connection.on('userTyping', function (data) {
+                if (!data || ChatState.currentConvId !== data.conversationId) {
+                    return;
                 }
-            };
 
-            hub.client.userTyping = function (data) {
-                if (ChatState.currentConvId === data.conversationId) {
-                    ChatUI.elements.typing.removeClass('d-none');
-                    clearTimeout(ChatState.typingTimeout);
-                    ChatState.typingTimeout = setTimeout(function () {
-                        ChatUI.elements.typing.addClass('d-none');
-                    }, 3000);
-                }
-            };
+                ChatUI.elements.typing.removeClass('d-none');
+                clearTimeout(ChatState.typingTimeout);
+                ChatState.typingTimeout = setTimeout(function () {
+                    ChatUI.elements.typing.addClass('d-none');
+                }, 3000);
+            });
 
-            hub.client.updateReaction = function (data) {
-                if (ChatState.currentConvId === data.conversationId) { // Note: data might not have convId if we didn't fix Hub. 
-                    // But we fixed Hub to broadcast to group. So we receive it if we are in group.
-                    // Actually, client side doesn't need to check convId if we only receive events for joined groups.
-                    // But for safety/clarity:
-                    ChatUI.updateReaction(data.messageId, data.reactionType, data.summary);
-                }
-            };
+            connection.onclose(function () {
+                ChatState.isRealtimeReady = false;
+                ChatController.setPollingEnabled(true);
+            });
 
-            hub.client.messageRecalled = function (data) {
-                 ChatUI.markMessageRecalled(data.messageId);
-            };
+            connection.onreconnected(async function () {
+                ChatState.isRealtimeReady = true;
+                ChatController.setPollingEnabled(false);
+                await ChatController.registerConversationGroups();
+            });
 
-            hub.client.userSeen = function (data) {
-                if (ChatState.currentConvId === data.conversationId && data.by === 'user') {
-                    // Show "Seen" indicator (simplified)
-                    $('.support-msg-seen').text(''); // Clear old
-                    $('.support-chat-message.me:last .support-msg-seen').text('Đã xem');
-                }
-            };
-
-            // Start connection
-            $.connection.hub.start().done(function () {
-                console.log('SignalR Connected');
-                hub.server.joinAdmin();
-            }).fail(function (err) {
+            connection.start().then(async function () {
+                ChatState.isRealtimeReady = true;
+                ChatController.setPollingEnabled(false);
+                await ChatController.registerConversationGroups();
+                console.log('[support-chat-admin] ASP.NET Core SignalR connected');
+            }).catch(function (err) {
                 console.warn('[support-chat-admin] SignalR start failed, fallback to polling mode.', err);
-                ChatUI.elements.input.prop('disabled', true);
-                ChatUI.elements.sendBtn.prop('disabled', true);
-                ChatUI.elements.input.attr('placeholder', 'Realtime chat chua duoc bat. Dang o che do xem/quan ly.');
+                ChatState.isRealtimeReady = false;
+                ChatController.setPollingEnabled(true);
             });
 
             return true;
+        },
+
+        setPollingEnabled: function (enabled) {
+            if (enabled) {
+                if (ChatState.pollTimer) {
+                    return;
+                }
+
+                ChatState.pollTimer = setInterval(function () {
+                    if (document.hidden) {
+                        return;
+                    }
+
+                    ChatController.loadConversations();
+                    ChatController.reloadCurrentConversationMessages();
+                }, 8000);
+                return;
+            }
+
+            if (ChatState.pollTimer) {
+                clearInterval(ChatState.pollTimer);
+                ChatState.pollTimer = null;
+            }
+        },
+
+        registerConversationGroups: async function () {
+            if (!ChatState.hub || !ChatState.isRealtimeReady) {
+                return;
+            }
+
+            try {
+                await ChatState.hub.invoke('JoinSeller');
+                if (ChatState.currentConvId) {
+                    await ChatState.hub.invoke('JoinConversation', ChatState.currentConvId);
+                }
+            } catch (err) {
+                console.warn('[support-chat-admin] Join groups failed', err);
+            }
+        },
+
+        reloadCurrentConversationMessages: function () {
+            if (!ChatState.currentConvId) {
+                return;
+            }
+
+            $.getJSON(SupportRoutes.messages, { conversationId: ChatState.currentConvId }, function (res) {
+                if (res && res.ok) {
+                    ChatUI.renderMessages(res.messages);
+                }
+            });
         },
 
         loadConversations: function () {
@@ -567,6 +579,8 @@
 
         selectConversation: function (convId) {
             if (ChatState.currentConvId === convId) return;
+
+            const previousConvId = ChatState.currentConvId;
             ChatState.currentConvId = convId;
             ChatUI.clearReplyMode();
 
@@ -585,11 +599,7 @@
             }
 
             // Load messages
-            $.getJSON(SupportRoutes.messages, { conversationId: convId }, function (res) {
-                if (res && res.ok) {
-                    ChatUI.renderMessages(res.messages);
-                }
-            });
+            this.reloadCurrentConversationMessages();
 
             // Load details
             $.getJSON(SupportRoutes.conversationDetails, { conversationId: convId }, function (res) {
@@ -600,10 +610,14 @@
 
             $.post(SupportRoutes.markAsRead, { conversationId: convId });
 
-            // Join group
-            if (ChatState.hub && ChatState.hub.server) {
-                ChatState.hub.server.joinConversation(convId);
-                ChatState.hub.server.markAsRead(convId);
+            // Join realtime group
+            if (ChatState.hub && ChatState.isRealtimeReady) {
+                if (previousConvId) {
+                    ChatState.hub.invoke('LeaveConversation', previousConvId).catch(function () {});
+                }
+                ChatState.hub.invoke('JoinConversation', convId).catch(function (err) {
+                    console.warn('[support-chat-admin] join conversation failed', err);
+                });
             }
 
             // Update list UI
@@ -613,48 +627,47 @@
         sendMessage: function () {
             const msg = ChatUI.elements.input.val().trim();
             if (!msg || !ChatState.currentConvId) return;
+            ChatController.sendMessageViaHttp(msg);
+        },
 
-            if (!(ChatState.hub && ChatState.hub.server)) {
-                alert('Realtime chat chua duoc bat. Khong the gui tin nhan trong che do hien tai.');
-                return;
-            }
-
-            console.log('[support-chat-admin] sendMessage', {
-                convId: ChatState.currentConvId,
-                state: $.connection.hub.state,
-                hasHub: !!ChatState.hub,
-                len: msg.length
-            });
-
-            if (ChatState.hub && ChatState.hub.server) {
-                // Guard: ensure connection is alive to tránh nuốt lỗi im lặng
-                if ($.connection.hub.state !== $.signalR.connectionState.connected) {
-                    console.warn('[support-chat-admin] SignalR chưa sẵn sàng, state:', $.connection.hub.state);
+        sendMessageViaHttp: function (msg) {
+            $.ajax({
+                url: SupportRoutes.sendMessage,
+                type: 'POST',
+                dataType: 'json',
+                data: {
+                    conversationId: ChatState.currentConvId,
+                    content: msg,
+                    replyToMessageId: ChatState.currentReplyToId
+                }
+            }).done(function (res) {
+                if (!res || !res.ok) {
+                    alert((res && res.message) ? res.message : 'Khong the gui tin nhan.');
                     return;
                 }
 
-                let promise;
-                if (ChatState.currentReplyToId) {
-                    promise = ChatState.hub.server.replyMessage(ChatState.currentConvId, msg, ChatState.currentReplyToId);
-                    ChatUI.clearReplyMode();
+                if (res.message) {
+                    ChatUI.appendMessage(res.message);
+                    ChatUI.scrollToBottom();
                 } else {
-                    promise = ChatState.hub.server.sendAdminMessage(ChatState.currentConvId, msg);
-                }
-
-                // Log lỗi nếu có (nếu server trả về fail)
-                if (promise && promise.fail) {
-                    promise.fail(function (err) {
-                        console.error('[support-chat-admin] Gửi tin thất bại', err);
+                    $.getJSON(SupportRoutes.messages, { conversationId: ChatState.currentConvId }, function (reloadRes) {
+                        if (reloadRes && reloadRes.ok) {
+                            ChatUI.renderMessages(reloadRes.messages);
+                        }
                     });
                 }
-            }
 
-            ChatUI.elements.input.val('').focus();
+                ChatUI.clearReplyMode();
+                ChatUI.elements.input.val('').focus();
+                ChatController.loadConversations();
+            }).fail(function () {
+                alert('Khong the gui tin nhan. Vui long thu lai.');
+            });
         },
 
         notifyTyping: function () {
-            if (ChatState.currentConvId && ChatState.hub && ChatState.hub.server) {
-                ChatState.hub.server.adminTyping(ChatState.currentConvId);
+            if (ChatState.currentConvId && ChatState.hub && ChatState.isRealtimeReady) {
+                ChatState.hub.invoke('NotifyTyping', ChatState.currentConvId).catch(function () {});
             }
         },
 
@@ -669,16 +682,10 @@
         },
 
         recallMessage: function (messageId) {
-            if (ChatState.hub && ChatState.hub.server) {
-                ChatState.hub.server.recallMessage(messageId);
-            }
+            console.warn('[support-chat-admin] Thu hoi tin nhan chua duoc ho tro qua endpoint hien tai.', messageId);
         },
 
-        reactToMessage: function (messageId, type) {
-            if (ChatState.hub && ChatState.hub.server) {
-                ChatState.hub.server.reactToMessage(messageId, type);
-            }
-        }
+        reactToMessage: function () {}
     };
 
     // ==========================================
@@ -744,17 +751,7 @@
             return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
         },
 
-        getReactionEmoji: function (type) {
-            switch (type) {
-                case 'Heart': return '❤️';
-                case 'Like': return '👍';
-                case 'Laugh': return '😂';
-                case 'Wow': return '😮';
-                case 'Sad': return '😢';
-                case 'Angry': return '😡';
-                default: return '🙂';
-            }
-        }
+        getReactionEmoji: function () { return ''; }
     };
 
     // Initialize

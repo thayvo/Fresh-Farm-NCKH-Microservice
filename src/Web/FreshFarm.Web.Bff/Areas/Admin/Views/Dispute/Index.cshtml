@@ -1,0 +1,265 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.DisputeCenterPageViewModel
+@{
+    ViewBag.Title = "Tranh chấp & CS";
+    string BadgeClass(string queueStatus, bool breached)
+    {
+        if (breached || string.Equals(queueStatus, "breached", StringComparison.OrdinalIgnoreCase))
+        {
+            return "badge bg-danger-subtle text-danger";
+        }
+
+        if (string.Equals(queueStatus, "resolved", StringComparison.OrdinalIgnoreCase))
+        {
+            return "badge bg-success-subtle text-success";
+        }
+
+        if (string.Equals(queueStatus, "pending", StringComparison.OrdinalIgnoreCase))
+        {
+            return "badge bg-warning-subtle text-warning-emphasis";
+        }
+
+        return "badge bg-primary-subtle text-primary";
+    }
+
+    string QueueLabel(string queueStatus, bool breached)
+    {
+        if (breached || string.Equals(queueStatus, "breached", StringComparison.OrdinalIgnoreCase))
+        {
+            return "SLA breach";
+        }
+
+        if (string.Equals(queueStatus, "resolved", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Resolved";
+        }
+
+        if (string.Equals(queueStatus, "pending", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Pending";
+        }
+
+        return "Open";
+    }
+}
+
+<style>
+    .dispute-shell { min-height: 100vh; background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%); padding: 1.5rem; }
+    .dispute-hero { background: linear-gradient(135deg, #1d4ed8 0%, #38bdf8 100%); border-radius: 1.75rem; color: #fff; padding: 2rem; box-shadow: 0 24px 50px rgba(29, 78, 216, .22); }
+    .dispute-card, .dispute-filter-card, .dispute-table-card, .dispute-detail-card { border: 0; border-radius: 1.5rem; box-shadow: 0 12px 30px rgba(15, 23, 42, .08); }
+    .dispute-summary { color: #64748b; max-width: 360px; }
+    .dispute-selected { background: #f8fbff; }
+    .dispute-section-pill { display: inline-flex; align-items: center; padding: .35rem .7rem; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-weight: 600; font-size: .8rem; text-transform: capitalize; }
+    .dispute-meta-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
+    .dispute-meta-item { background: #f8fbff; border-radius: 1rem; padding: .9rem 1rem; }
+    .dispute-message { border-radius: 1rem; padding: .9rem 1rem; background: #f8fbff; }
+</style>
+
+<main class="dispute-shell">
+    <div class="dispute-hero mb-4">
+        <div class="d-flex flex-column flex-xl-row justify-content-between gap-4">
+            <div>
+                <div class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">Arbitration MVP</div>
+                <h1 class="fw-bold mb-2">Tranh chấp & CS</h1>
+                <p class="mb-0 opacity-75">Queue hợp nhất từ support chat, returns và refunds để admin rà case theo SLA trước khi mở workflow arbitration đầy đủ.</p>
+            </div>
+            <div class="text-xl-end">
+                <div class="opacity-75 mb-1">Phạm vi hiện tại</div>
+                <div class="display-5 fw-bold">Admin</div>
+            </div>
+        </div>
+    </div>
+
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger border-0 shadow-sm">@ViewBag.Error</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3"><div class="card dispute-card"><div class="card-body"><div class="text-muted small">Tổng case</div><div class="display-6 fw-bold">@Model.Stats.TotalCases</div><div class="small text-muted">Support @Model.Stats.SupportCases / Return @Model.Stats.ReturnCases / Refund @Model.Stats.RefundCases</div></div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="card dispute-card"><div class="card-body"><div class="text-muted small">Open</div><div class="display-6 fw-bold text-primary">@Model.Stats.OpenCases</div></div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="card dispute-card"><div class="card-body"><div class="text-muted small">Pending</div><div class="display-6 fw-bold text-warning">@Model.Stats.PendingCases</div></div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="card dispute-card"><div class="card-body"><div class="text-muted small">SLA breach</div><div class="display-6 fw-bold text-danger">@Model.Stats.BreachedCases</div><div class="small text-muted">Resolved: @Model.Stats.ResolvedCases</div></div></div></div>
+    </div>
+
+    <div class="card dispute-filter-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label fw-semibold">Tìm kiếm</label>
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Mã case, order, buyer, seller, nội dung..." />
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Section</label>
+                    <select class="form-select" name="section">
+                        @foreach (var option in Model.SectionOptions)
+                        {
+                            if (string.Equals(option.Value, Model.Section, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Queue</label>
+                    <select class="form-select" name="status">
+                        @foreach (var option in Model.StatusOptions)
+                        {
+                            if (string.Equals(option.Value, Model.Status, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Seller</label>
+                    <select class="form-select" name="sellerId">
+                        @if (!Model.SellerId.HasValue)
+                        {
+                            <option value="" selected>Tất cả seller</option>
+                        }
+                        else
+                        {
+                            <option value="">Tất cả seller</option>
+                        }
+
+                        @foreach (var option in Model.SellerOptions)
+                        {
+                            if (string.Equals(option.Value, Model.SellerId?.ToString(), StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-2"><button type="submit" class="btn btn-primary rounded-pill px-4 w-100"><i class="bi bi-funnel me-2"></i>Lọc dữ liệu</button></div>
+                <div class="col-12"><a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Dispute", new { area = "Admin" })"><i class="bi bi-arrow-clockwise me-2"></i>Đặt lại</a></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xxl-7">
+            <div class="card dispute-table-card h-100">
+                <div class="card-body">
+                    <div class="mb-3"><h5 class="mb-1">CS queue</h5><div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total case theo bộ lọc hiện tại</div></div>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead><tr><th>Case</th><th>Buyer</th><th>Seller</th><th>Order</th><th>Queue</th><th>Thời gian</th></tr></thead>
+                            <tbody>
+                                @if (Model.Rows.Count == 0)
+                                {
+                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có case nào khớp bộ lọc.</td></tr>
+                                }
+                                else
+                                {
+                                    @foreach (var row in Model.Rows)
+                                    {
+                                        var isSelected = string.Equals(row.CaseType, Model.SelectedCaseType, StringComparison.OrdinalIgnoreCase) && row.CaseId == Model.SelectedCaseId;
+                                        <tr class="@(isSelected ? "dispute-selected" : string.Empty)">
+                                            <td>
+                                                <div class="fw-semibold"><a class="text-decoration-none" href="@Url.Action("Index", "Dispute", new { area = "Admin", q = Model.Query, section = Model.Section, status = Model.Status, sellerId = Model.SellerId, page = Model.Page, selectedCaseType = row.CaseType, selectedCaseId = row.CaseId })">#@row.CaseId - @row.Title</a></div>
+                                                <div class="dispute-section-pill mt-1">@row.CaseType</div>
+                                                <div class="small dispute-summary mt-2">@row.Summary</div>
+                                                @if (row.UnreadCount > 0)
+                                                {
+                                                    <div class="small text-danger mt-2">@row.UnreadCount tin chưa đọc từ buyer</div>
+                                                }
+                                            </td>
+                                            <td><div class="fw-semibold">@row.BuyerName</div><div class="small text-muted">#@row.BuyerId</div>@if (!string.IsNullOrWhiteSpace(row.BuyerPhone)) { <div class="small text-muted">@row.BuyerPhone</div> }</td>
+                                            <td><div>@row.SellerLabel</div>@if (row.Amount.HasValue) { <div class="small text-muted">@row.Amount.Value.ToString("N0") đ</div> }</td>
+                                            <td>@if (row.OrderId.HasValue) { <a class="text-decoration-none" href="@Url.Action("ManageOrders", "Order", new { area = "Admin", searchTerm = row.OrderId })">#@row.OrderId</a> } else { <span class="text-muted">Không có</span> }<div class="small text-muted">@row.DisplayStatus</div></td>
+                                            <td><span class="@BadgeClass(row.QueueStatus, row.IsSlaBreached)">@QueueLabel(row.QueueStatus, row.IsSlaBreached)</span></td>
+                                            <td><div>@row.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div><div class="small text-muted">Update: @(row.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div></td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (Model.TotalPages > 1)
+                    {
+                        <nav class="mt-4">
+                            <ul class="pagination justify-content-center mb-0">
+                                <li class="page-item @(Model.Page <= 1 ? "disabled" : string.Empty)"><a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, section = Model.Section, status = Model.Status, sellerId = Model.SellerId, selectedCaseType = Model.SelectedCaseType, selectedCaseId = Model.SelectedCaseId, page = Model.Page - 1 })">Trước</a></li>
+                                @for (var p = 1; p <= Model.TotalPages; p++)
+                                {
+                                    <li class="page-item @(p == Model.Page ? "active" : string.Empty)"><a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, section = Model.Section, status = Model.Status, sellerId = Model.SellerId, selectedCaseType = Model.SelectedCaseType, selectedCaseId = Model.SelectedCaseId, page = p })">@p</a></li>
+                                }
+                                <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : string.Empty)"><a class="page-link" href="@Url.Action("Index", new { area = "Admin", q = Model.Query, section = Model.Section, status = Model.Status, sellerId = Model.SellerId, selectedCaseType = Model.SelectedCaseType, selectedCaseId = Model.SelectedCaseId, page = Model.Page + 1 })">Sau</a></li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xxl-5">
+            <div class="card dispute-detail-card h-100">
+                <div class="card-body">
+                    <div class="mb-3"><h5 class="mb-1">Arbitration center</h5><div class="text-muted small">Buyer, seller, order và after-sales trên cùng một màn.</div></div>
+                    @if (ViewBag.DetailError != null)
+                    {
+                        <div class="alert alert-warning border-0 shadow-sm">@ViewBag.DetailError</div>
+                    }
+                    @if (Model.Details is null)
+                    {
+                        <div class="text-muted py-5 text-center">Chọn một case từ queue để xem chi tiết.</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                            <div><div class="dispute-section-pill mb-2">@Model.Details.CaseType</div><h5 class="mb-1">#@Model.Details.CaseId - @Model.Details.Title</h5><div class="text-muted small">@Model.Details.Summary</div></div>
+                            <span class="@BadgeClass(Model.Details.QueueStatus, Model.Details.IsSlaBreached)">@QueueLabel(Model.Details.QueueStatus, Model.Details.IsSlaBreached)</span>
+                        </div>
+                        <div class="dispute-meta-list mb-4">
+                            <div class="dispute-meta-item"><div class="small text-muted">Buyer</div><div class="fw-semibold">@Model.Details.Buyer?.FullName</div><div class="small text-muted">#@Model.Details.Buyer?.UserId</div><div class="small text-muted">@Model.Details.Buyer?.Phone</div></div>
+                            <div class="dispute-meta-item"><div class="small text-muted">Seller</div><div class="fw-semibold">@Model.Details.Seller?.SellerLabel</div></div>
+                            <div class="dispute-meta-item"><div class="small text-muted">Order</div>@if (Model.Details.Order is not null) { <div class="fw-semibold"><a class="text-decoration-none" href="@Url.Action("ManageOrders", "Order", new { area = "Admin", searchTerm = Model.Details.Order.OrderId })">#@Model.Details.Order.OrderId</a></div><div class="small text-muted">@Model.Details.Order.Status</div><div class="small text-muted">@Model.Details.Order.TotalAmount.ToString("N0") đ</div> } else { <div class="text-muted">Không gắn order</div> }</div>
+                            <div class="dispute-meta-item"><div class="small text-muted">Case status</div><div class="fw-semibold">@Model.Details.DisplayStatus</div><div class="small text-muted">Tạo: @(Model.Details.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div><div class="small text-muted">Update: @(Model.Details.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div></div>
+                        </div>
+
+                        @if (Model.Details.AfterSales is not null)
+                        {
+                            <div class="mb-4"><h6 class="fw-bold">After-sales</h6><div class="dispute-meta-list">
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.AfterSales.ReasonCode)) { <div class="dispute-meta-item"><div class="small text-muted">Reason</div><div class="fw-semibold">@Model.Details.AfterSales.ReasonCode</div></div> }
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.AfterSales.Resolution)) { <div class="dispute-meta-item"><div class="small text-muted">Resolution</div><div class="fw-semibold">@Model.Details.AfterSales.Resolution</div></div> }
+                                @if (Model.Details.AfterSales.RefundAmount.HasValue || Model.Details.AfterSales.Amount.HasValue) { <div class="dispute-meta-item"><div class="small text-muted">Amount</div><div class="fw-semibold">@((Model.Details.AfterSales.RefundAmount ?? Model.Details.AfterSales.Amount ?? 0m).ToString("N0")) đ</div></div> }
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.AfterSales.ReferenceCode)) { <div class="dispute-meta-item"><div class="small text-muted">Reference</div><div class="fw-semibold">@Model.Details.AfterSales.ReferenceCode</div></div> }
+                            </div></div>
+                        }
+
+                        @if (Model.Details.Timeline.Count > 0)
+                        {
+                            <div class="mb-4"><h6 class="fw-bold">Timeline</h6><div class="list-group">@foreach (var item in Model.Details.Timeline.Where(x => x.Value.HasValue)) { <div class="list-group-item border-0 px-0"><div class="fw-semibold">@item.Label</div><div class="small text-muted">@item.Value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div> }</div></div>
+                        }
+
+                        @if (Model.Details.Messages.Count > 0)
+                        {
+                            <div class="mb-4"><div class="d-flex justify-content-between align-items-center mb-2"><h6 class="fw-bold mb-0">Tin nhắn gần nhất</h6><a class="small text-decoration-none" href="@Url.Action("Index", "SupportChat", new { area = "Admin" })">Mở SupportChat</a></div><div class="d-grid gap-2">@foreach (var message in Model.Details.Messages) { <div class="dispute-message"><div class="d-flex justify-content-between align-items-center"><div class="fw-semibold text-capitalize">@message.Sender</div><div class="small text-muted">@message.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div><div class="small mt-2">@message.Content</div></div> }</div></div>
+                        }
+
+                        @if (Model.Details.RelatedCases.Count > 0)
+                        {
+                            <div class="mb-4"><h6 class="fw-bold">Case liên quan</h6><div class="list-group">@foreach (var item in Model.Details.RelatedCases) { <a class="list-group-item list-group-item-action border-0 px-0" href="@Url.Action("Index", "Dispute", new { area = "Admin", q = Model.Query, section = Model.Section, status = Model.Status, sellerId = Model.SellerId, page = 1, selectedCaseType = item.CaseType, selectedCaseId = item.CaseId })"><div class="d-flex justify-content-between gap-3"><div><div class="fw-semibold text-capitalize">@item.CaseType #@item.CaseId</div><div class="small text-muted">@item.Title</div></div><div class="text-end"><div class="small">@item.Status</div><div class="small text-muted">@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</div></div></div></a> }</div></div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</main>

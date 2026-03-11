@@ -1,6 +1,6 @@
 ﻿@{
-    string currentAction = ViewContext.RouteData.Values["action"].ToString();
-    string currentController = ViewContext.RouteData.Values["controller"].ToString();
+    string currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty;
+    string currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty;
 }
 
 <nav id="sidebar">
@@ -65,43 +65,11 @@
             </a>
         </li>
 
-        <!-- Quản lý danh mục (Submenu) -->
         <li class="nav-item">
-            <a class="nav-link @(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "active" : "")"
-               href="#StatusSubmenu"
-               data-bs-toggle="collapse"
-               role="button"
-               aria-expanded="@(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "true" : "false")"
-               aria-controls="StatusSubmenu">
-                <i class="bi bi-list-ul"></i> Quản lý danh mục
+            <a class="nav-link @(currentController == "Finance" ? "active" : "")"
+               href="@Url.Action("Index", "Finance", new { area = "Seller" })">
+                <i class="bi bi-wallet2"></i> Đối soát thanh toán
             </a>
-            <ul class="collapse list-unstyled submenu @(currentController == "Status" || currentController == "Category" || currentController == "Unit" ? "show" : "")"
-                id="StatusSubmenu">
-                <li>
-                    <a class="nav-link @(currentController == "Status" && currentAction == "Status" ? "active" : "")"
-                       href="@Url.Action("Status", "Status")">
-                        <i class="bi bi-toggle2-on"></i>Trạng thái
-                    </a>
-                </li>
-                <li>
-                    <a class="nav-link @(currentController == "Status" && currentAction == "StatusType" ? "active" : "")"
-                       href="@Url.Action("StatusType", "Status")">
-                        <i class="bi bi-layers"></i>Loại trạng thái
-                    </a>
-                </li>
-                <li>
-                    <a class="nav-link @(currentController == "Category" ? "active" : "")"
-                       href="@Url.Action("ManageCategories", "Category")">
-                        <i class="bi bi-tags-fill"></i>Danh mục sản phẩm
-                    </a>
-                </li>
-                <li>
-                    <a class="nav-link @(currentController == "Unit" ? "active" : "")"
-                       href="@Url.Action("Index", "Unit")">
-                        <i class="bi bi-rulers"></i>Đơn vị tính
-                    </a>
-                </li>
-            </ul>
         </li>
 
         <!-- Báo cáo & Thống kê (Submenu) -->
@@ -163,11 +131,11 @@
             </a>
         </li>
 
-        <!-- Quản lý người dùng -->
+        <!-- Tài khoản của tôi -->
         <li class="nav-item">
-            <a class="nav-link @(currentController == "User" ? "active" : "")"
-               href="@Url.Action("ManageUsers", "User")">
-                <i class="bi bi-person-fill-gear"></i> Quản lý người dùng
+            <a class="nav-link @(currentController == "Home" && currentAction == "Profile" ? "active" : "")"
+               href="@Url.Action("Profile", "Home")">
+                <i class="bi bi-person-circle"></i> Tài khoản của tôi
             </a>
         </li>
         <li class="nav-item">

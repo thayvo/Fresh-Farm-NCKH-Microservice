@@ -1,7 +1,8 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.OrderReportViewModel
 @{
     ViewBag.Title = "Báo Cáo Đơn Hàng";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 }
 
 <style>
@@ -639,7 +640,7 @@
                                             <td>
                                                 <div class="d-flex align-items-center">
                                                     <i class="bi bi-receipt text-primary me-2"></i>
-                                                    <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })"
+                                                    <a href="@Url.Action("PrintInvoice", "Order", new { area = currentArea, orderId = order.OrderID })"
                                                        target="_blank"
                                                        class="text-decoration-none fw-bold">@order.OrderCode</a>
                                                 </div>
@@ -663,7 +664,7 @@
                                                 <span class="badge @order.StatusBadgeClass rounded-pill">@order.StatusText</span>
                                             </td>
                                             <td class="text-center">
-                                                <a href="@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = order.OrderID })"
+                                                <a href="@Url.Action("PrintInvoice", "Order", new { area = currentArea, orderId = order.OrderID })"
                                                    target="_blank"
                                                    class="btn btn-sm btn-outline-primary" title="Xem chi tiết / In hóa đơn">
                                                     <i class="bi bi-eye"></i>
@@ -729,7 +730,7 @@
             var to = document.getElementById("toDate")?.value || "";
             var status = document.getElementById("orderStatus")?.value || "";
 
-            var url = '@Url.Action("ExportOrderExcel", "Report", new { area = "Seller" })';
+            var url = '@Url.Action("ExportOrderExcel", "Report", new { area = currentArea })';
             var qs = [];
             if (from) qs.push("fromDate=" + encodeURIComponent(from));
             if (to) qs.push("toDate=" + encodeURIComponent(to));
@@ -838,7 +839,7 @@
                 return;
             }
 
-            var detailBaseUrl = '@Url.Action("PrintInvoice", "Order", new { area = "Seller", orderId = 0 })';
+            var detailBaseUrl = '@Url.Action("PrintInvoice", "Order", new { area = currentArea, orderId = 0 })';
             var rowsHtml = "";
 
             pageItems.forEach(function (o) {

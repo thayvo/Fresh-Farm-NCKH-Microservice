@@ -1,7 +1,8 @@
 ﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.UnitViewModel>
 @{
     ViewBag.Title = "Quản Lý Đơn Vị Tính";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     var stats = ViewBag.Stats as FreshFarm.Web.Bff.Areas.Seller.Models.UnitStatsViewModel;
 }
 
@@ -388,7 +389,7 @@
                             <nav aria-label="breadcrumb">
                                 <ol class="breadcrumb mb-0">
                                     <li class="breadcrumb-item">
-                                        <a href="@Url.Action("Dashboard", "Home", new { area = "Seller" })" class="text-white-50 text-decoration-none">Dashboard</a>
+                                        <a href="@Url.Action("Dashboard", "Home", new { area = currentArea })" class="text-white-50 text-decoration-none">Dashboard</a>
                                     </li>
                                     <li class="breadcrumb-item">
                                         <span class="text-white-50">Cài đặt</span>

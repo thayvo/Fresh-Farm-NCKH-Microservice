@@ -1,8 +1,14 @@
 ﻿@model IEnumerable<FreshFarm.Web.Bff.Areas.Seller.Models.Coupon>
 @using System.Linq
 @{
-    ViewBag.Title = "Quản Lý Mã Giảm Giá";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    ViewBag.Title = (string?)ViewData["CouponTitle"] ?? "Quản Lý Mã Giảm Giá";
+    var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
+    Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var couponTitle = (string?)ViewData["CouponTitle"] ?? "Quản Lý Mã Giảm Giá";
+    var couponSubtitle = (string?)ViewData["CouponSubtitle"] ?? "Tạo, quản lý và gửi mã khuyến mãi đến khách hàng của bạn";
+    var couponCreateLabel = (string?)ViewData["CouponCreateLabel"] ?? "Tạo mã mới";
+    var couponEmptyTitle = (string?)ViewData["CouponEmptyTitle"] ?? "Chưa có mã giảm giá nào";
+    var couponEmptySubtitle = (string?)ViewData["CouponEmptySubtitle"] ?? "Hãy tạo mã đầu tiên để bắt đầu chương trình khuyến mãi.";
 }
 
 <style>
@@ -297,10 +303,10 @@
                             </div>
                             <div>
                                 <h1 class="fw-bold mb-1" style="font-size: 2.1rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
-                                    Quản Lý Mã Giảm Giá
+                                    @couponTitle
                                 </h1>
                                 <p class="mb-0 opacity-90" style="font-size: 1rem;">
-                                    Tạo, quản lý và gửi mã khuyến mãi đến khách hàng của bạn
+                                    @couponSubtitle
                                 </p>
                             </div>
                         </div>
@@ -311,7 +317,7 @@
                                 data-bs-target="#couponModal"
                                 id="btnCreateNew">
                             <i class="bi bi-plus-circle"></i>
-                            <span>Tạo mã mới</span>
+                            <span>@couponCreateLabel</span>
                         </button>
                     </div>
                 </div>
@@ -426,8 +432,8 @@
                                             <i class="bi bi-inbox" style="font-size: 2.8rem; color: #3b82f6;"></i>
                                         </div>
                                         <div>
-                                            <h6 class="fw-bold mb-1 text-primary">Chưa có mã giảm giá nào</h6>
-                                            <p class="text-muted mb-0">Hãy tạo mã đầu tiên để bắt đầu chương trình khuyến mãi.</p>
+                                            <h6 class="fw-bold mb-1 text-primary">@couponEmptyTitle</h6>
+                                            <p class="text-muted mb-0">@couponEmptySubtitle</p>
                                         </div>
                                     </div>
                                 </td>

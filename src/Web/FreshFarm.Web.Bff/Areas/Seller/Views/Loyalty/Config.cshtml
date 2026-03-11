@@ -1,11 +1,17 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.LoyaltyConfigVM
 @{
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var loyaltyScopeLabel = ViewData["LoyaltyScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Cấu hình tích điểm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 }
 
 <main class="container-fluid p-4">
-    <h2 class="fw-bold mb-3">Cấu hình tích điểm</h2>
+    <div class="mb-3">
+        <h2 class="fw-bold mb-1">Cấu hình tích điểm</h2>
+        <span class="badge bg-light text-primary">@loyaltyScopeLabel</span>
+    </div>
 
     @if (TempData["SuccessMessage"] != null)
     {
@@ -25,8 +31,16 @@
                     <div class="col-md-4">
                         <label class="form-label">Tính cả phí ship</label>
                         <select class="form-select" name="IncludeShippingFee">
-                            <option value="false" selected="@(Model.IncludeShippingFee  ? null : "selected")">Không</option>
-                            <option value="true" selected="@(Model.IncludeShippingFee  ? "selected" : null)">Có</option>
+                            @if (Model.IncludeShippingFee)
+                            {
+                                <option value="false">Không</option>
+                                <option value="true" selected>Có</option>
+                            }
+                            else
+                            {
+                                <option value="false" selected>Không</option>
+                                <option value="true">Có</option>
+                            }
                         </select>
                     </div>
                     <div class="col-md-4">

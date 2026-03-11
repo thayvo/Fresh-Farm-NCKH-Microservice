@@ -10,7 +10,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 
 [ApiController]
 [Route("auth/admin/customers")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOnly")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOrAdmin")]
 public sealed class AdminCustomersController : ControllerBase
 {
     private static readonly Regex PhoneRegex = new("^\\d{10}$", RegexOptions.Compiled);

@@ -1,7 +1,11 @@
 ﻿@model List<FreshFarm.Web.Bff.Areas.Seller.Models.Product>
 @{
+    var areaName = ViewData["AreaName"] as string ?? "Seller";
+    var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    var productScopeLabel = ViewData["ProductScopeLabel"] as string ?? "Theo seller";
+
     ViewBag.Title = "Quản Lý Sản Phẩm";
-    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+    Layout = layoutPath;
 }
 
 <style>
@@ -478,13 +482,14 @@
                                 <h1 class="fw-bold mb-1 text-white" style="font-size:2.5rem; text-shadow:0 4px 12px rgba(0,0,0,.3);">
                                     Quản lý sản phẩm
                                 </h1>
+                                <span class="badge bg-light text-primary mb-2">@productScopeLabel</span>
                                 <p class="mb-0 text-white opacity-90" style="text-shadow:0 2px 8px rgba(0,0,0,.2);">
                                     Quản lý tồn kho, giá bán và hạn sử dụng của toàn bộ sản phẩm
                                 </p>
                             </div>
                         </div>
                     </div>
-                    <a href="@Url.Action("Create", "Product")"
+                    <a href="@Url.Action("Create", "Product", new { area = areaName })"
                        class="btn btn-primary btn-pill shadow-lg d-flex align-items-center gap-2 hover-scale">
                         <i class="bi bi-plus-circle" style="font-size:1.4rem;"></i>
                         <span>Thêm sản phẩm mới</span>
@@ -638,7 +643,7 @@
                             </label>
                             <select name="categoryId" class="form-select">
                                 <option value="">Tất cả</option>
-                                @foreach (var cat in ViewBag.Categories as List<FreshFarm.Web.Bff.Areas.Seller.Models.Category>)
+                                @foreach (var cat in (ViewBag.Categories as List<FreshFarm.Web.Bff.Areas.Seller.Models.Category>) ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Category>())
                                 {
                                     <option value="@cat.CategoryID" selected="@(ViewBag.SelectedCategory == cat.CategoryID  ? "selected" : null)">
                                         @cat.CategoryName
@@ -652,7 +657,7 @@
                             </label>
                             <select name="unitId" class="form-select">
                                 <option value="">Tất cả</option>
-                                @foreach (var unit in ViewBag.Units as List<FreshFarm.Web.Bff.Areas.Seller.Models.Unit>)
+                                @foreach (var unit in (ViewBag.Units as List<FreshFarm.Web.Bff.Areas.Seller.Models.Unit>) ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Unit>())
                                 {
                                     <option value="@unit.UnitID" selected="@(ViewBag.SelectedUnit == unit.UnitID  ? "selected" : null)">
                                         @unit.UnitName

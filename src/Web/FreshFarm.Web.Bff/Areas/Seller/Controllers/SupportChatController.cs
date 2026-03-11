@@ -1,8 +1,12 @@
+using System.Security.Claims;
+using FreshFarm.Web.Bff.Areas.Seller.Hubs;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
@@ -15,10 +19,12 @@ public class SupportChatController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHubContext<SupportChatHub> _hubContext;
 
-    public SupportChatController(IHttpClientFactory httpClientFactory)
+    public SupportChatController(IHttpClientFactory httpClientFactory, IHubContext<SupportChatHub> hubContext)
     {
         _httpClientFactory = httpClientFactory;
+        _hubContext = hubContext;
     }
 
     [HttpGet]
@@ -115,6 +121,74 @@ public class SupportChatController : LegacySellerControllerBase
         }
     }
 
+    private async Task NotifyConversationUpdatedAsync(
+        int conversationId,
+        JsonElement? messagePayload = null,
+        string eventType = "updated")
+    {
+        var sellerId = TryGetSellerIdFromClaims();
+        if (!sellerId.HasValue)
+        {
+            return;
+        }
+
+        await _hubContext.Clients.Group(SupportChatHubGroups.Seller(sellerId.Value))
+            .SendAsync("newConversationOrMessage", new
+            {
+                conversationId,
+                eventType,
+                at = DateTime.UtcNow
+            });
+
+        if (messagePayload.HasValue && messagePayload.Value.ValueKind == JsonValueKind.Object)
+        {
+            await _hubContext.Clients.Group(SupportChatHubGroups.Conversation(conversationId))
+                .SendAsync("receiveMessage", new
+                {
+                    conversationId,
+                    message = messagePayload.Value
+                });
+        }
+    }
+
+    private int? TryGetSellerIdFromClaims()
+    {
+        var claim =
+            User.FindFirst("sub")?.Value ??
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return int.TryParse(claim, out var sellerId) ? sellerId : null;
+    }
+
+    private static JsonElement? TryExtractMessagePayload(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (!root.TryGetProperty("message", out var message))
+            {
+                return null;
+            }
+
+            return message.Clone();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     [HttpPost]
     public async Task<IActionResult> Close(int conversationId)
     {
@@ -138,6 +212,7 @@ public class SupportChatController : LegacySellerControllerBase
                 });
             }
 
+            await NotifyConversationUpdatedAsync(conversationId, eventType: "closed");
             return Content(body, "application/json");
         }
         catch (Exception ex)
@@ -169,6 +244,52 @@ public class SupportChatController : LegacySellerControllerBase
                 });
             }
 
+            await NotifyConversationUpdatedAsync(conversationId, eventType: "read");
+            return Content(body, "application/json");
+        }
+        catch (Exception ex)
+        {
+            return Json(new { ok = false, message = "Loi: " + ex.Message });
+        }
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> SendMessage(int conversationId, string content, int? replyToMessageId = null)
+    {
+        try
+        {
+            if (conversationId <= 0)
+            {
+                return Json(new { ok = false, message = "conversationId khong hop le" });
+            }
+
+            content = (content ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return Json(new { ok = false, message = "Noi dung tin nhan khong duoc de trong." });
+            }
+
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.PostAsJsonAsync(
+                $"/api/orders/admin/support-chat/conversations/{conversationId}/messages",
+                new
+                {
+                    content,
+                    replyToMessageId
+                });
+
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                return Json(new
+                {
+                    ok = false,
+                    message = await ReadApiErrorAsync(response, "Khong the gui tin nhan")
+                });
+            }
+
+            var messagePayload = TryExtractMessagePayload(body);
+            await NotifyConversationUpdatedAsync(conversationId, messagePayload, eventType: "message");
             return Content(body, "application/json");
         }
         catch (Exception ex)
@@ -182,7 +303,7 @@ public class SupportChatController : LegacySellerControllerBase
         var client = _httpClientFactory.CreateClient(clientName);
 
         client.DefaultRequestHeaders.Remove("Authorization");
-        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var token = GetAccessToken(AccessTokenSessionKey);
         if (!string.IsNullOrWhiteSpace(token))
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

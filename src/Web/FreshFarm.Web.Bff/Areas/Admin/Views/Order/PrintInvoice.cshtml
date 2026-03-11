@@ -1,0 +1,112 @@
+@model FreshFarm.Web.Bff.Areas.Seller.Models.SellerOrderInvoiceViewModel
+@{
+    Layout = null;
+    var order = Model;
+    var code = "#" + order.OrderID.ToString("D6");
+    var customer = order.CustomerName ?? order.BuyerFullName ?? "Khach le";
+    var phone = order.BuyerPhone;
+    var email = order.BuyerEmail;
+    var address = order.Address ?? string.Empty;
+    var subtotal = order.TotalAmount - order.ShippingFee;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hoa don @code</title>
+    <style>
+        body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; color: #111; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .title { font-size: 22px; font-weight: 700; }
+        .meta { font-size: 14px; color: #555; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background: #f7f7f7; text-align: left; }
+        tfoot td { font-weight: 700; }
+        .right { text-align: right; }
+        .actions { margin: 16px 0; }
+        @@media print { .actions { display: none; } }
+    </style>
+    <script>
+        function doPrint() { window.print(); }
+        window.addEventListener('load', function () {
+            setTimeout(function () { window.print(); }, 300);
+        });
+    </script>
+</head>
+<body>
+    <div class="actions">
+        <button onclick="doPrint()">In</button>
+    </div>
+
+    <div class="header">
+        <div>
+            <div class="title">Hoa don ban hang</div>
+            <div class="meta">Ma don: @code • Ngay: @order.OrderDate.ToString("dd/MM/yyyy HH:mm")</div>
+        </div>
+        <div class="meta">
+            Trang thai: @order.Status<br />
+            TT thanh toan: @(string.IsNullOrWhiteSpace(order.PaymentStatus) ? "-" : order.PaymentStatus)
+        </div>
+    </div>
+
+    <div class="meta" style="margin-bottom:10px">
+        <div><strong>Khach hang:</strong> @customer</div>
+        @if (!string.IsNullOrWhiteSpace(phone))
+        {
+            <div><strong>Dien thoai:</strong> @phone</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(email))
+        {
+            <div><strong>Email:</strong> @email</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(address))
+        {
+            <div><strong>Dia chi:</strong> @address</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(order.OrderNote))
+        {
+            <div><strong>Ghi chu:</strong> @order.OrderNote</div>
+        }
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width:50%">San pham</th>
+                <th style="width:10%">SL</th>
+                <th style="width:20%" class="right">Don gia</th>
+                <th style="width:20%" class="right">Thanh tien</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var it in order.OrderDetails)
+            {
+                var name = string.IsNullOrWhiteSpace(it.ProductName) ? ("#P" + it.ProductID) : it.ProductName;
+                var line = it.Quantity * it.UnitPrice;
+                <tr>
+                    <td>@name</td>
+                    <td>@it.Quantity</td>
+                    <td class="right">@it.UnitPrice.ToString("N0") ₫</td>
+                    <td class="right">@line.ToString("N0") ₫</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3" class="right">Tam tinh</td>
+                <td class="right">@subtotal.ToString("N0") ₫</td>
+            </tr>
+            <tr>
+                <td colspan="3" class="right">Phi van chuyen</td>
+                <td class="right">@order.ShippingFee.ToString("N0") ₫</td>
+            </tr>
+            <tr>
+                <td colspan="3" class="right"><strong>Tong cong</strong></td>
+                <td class="right"><strong>@order.TotalAmount.ToString("N0") ₫</strong></td>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>

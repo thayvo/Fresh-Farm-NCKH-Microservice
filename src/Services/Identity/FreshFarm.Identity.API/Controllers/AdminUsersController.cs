@@ -10,7 +10,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 
 [ApiController]
 [Route("auth/admin/users")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOnly")]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "AdminOnly")]
 public sealed class AdminUsersController : ControllerBase
 {
     private readonly FreshFarmIdentityDBContext _db;
@@ -23,7 +23,13 @@ public sealed class AdminUsersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? search = null, [FromQuery] int take = 5000)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? search = null,
+        [FromQuery] int take = 5000,
+        [FromQuery] string? userType = "all",
+        [FromQuery] bool? isActive = null,
+        [FromQuery] DateTime? createdFrom = null,
+        [FromQuery] DateTime? createdTo = null)
     {
         if (take <= 0)
         {
@@ -35,9 +41,33 @@ public sealed class AdminUsersController : ControllerBase
             take = 10000;
         }
 
-        var query = _db.Users
-            .AsNoTracking()
-            .Where(u => u.UserRoles.Any(ur => ur.Role.RoleName != "Customer"));
+        var normalizedType = NormalizeUserType(userType);
+        var query = _db.Users.AsNoTracking().AsQueryable();
+
+        query = normalizedType switch
+        {
+            "admin" => query.Where(u => u.UserRoles.Any(ur => ur.Role.RoleName == "Admin")),
+            "seller" => query.Where(u => u.UserRoles.Any(ur => ur.Role.RoleName == "Seller")),
+            "buyer" => query.Where(u => u.UserRoles.Any(ur => ur.Role.RoleName == "Customer")),
+            _ => query
+        };
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(u => u.IsActive == isActive.Value);
+        }
+
+        if (createdFrom.HasValue)
+        {
+            var createdFromUtc = createdFrom.Value.Date;
+            query = query.Where(u => u.CreatedAt >= createdFromUtc);
+        }
+
+        if (createdTo.HasValue)
+        {
+            var createdToExclusive = createdTo.Value.Date.AddDays(1);
+            query = query.Where(u => u.CreatedAt < createdToExclusive);
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -67,7 +97,6 @@ public sealed class AdminUsersController : ControllerBase
                     .Select(s => (DateTime?)s.CreatedAt)
                     .FirstOrDefault(),
                 role = u.UserRoles
-                    .Where(ur => ur.Role.RoleName != "Customer")
                     .OrderBy(ur => ur.Role.RoleName)
                     .Select(ur => new
                     {
@@ -104,7 +133,7 @@ public sealed class AdminUsersController : ControllerBase
     {
         var roles = await _db.Roles
             .AsNoTracking()
-            .Where(r => r.IsActive && r.RoleName != "Customer")
+            .Where(r => r.IsActive)
             .OrderBy(r => r.RoleName)
             .Select(r => new
             {
@@ -117,12 +146,165 @@ public sealed class AdminUsersController : ControllerBase
         return Ok(roles);
     }
 
+    private static string NormalizeUserType(string? userType)
+    {
+        if (string.IsNullOrWhiteSpace(userType))
+        {
+            return "all";
+        }
+
+        var normalized = userType.Trim().ToLowerInvariant();
+        return normalized is "admin" or "seller" or "buyer" ? normalized : "all";
+    }
+
+    [HttpGet("metrics")]
+    public async Task<IActionResult> GetMetrics(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var todayStart = now.Date;
+        var nextDay = todayStart.AddDays(1);
+        var sevenDaysStart = todayStart.AddDays(-6);
+        var warnings = new List<string>();
+
+        try
+        {
+            var sellerRoleIdTask = _db.Roles
+                .AsNoTracking()
+                .Where(r => r.RoleName == "Seller")
+                .Select(r => (int?)r.RoleId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var buyerRoleIdTask = _db.Roles
+                .AsNoTracking()
+                .Where(r => r.RoleName == "Customer")
+                .Select(r => (int?)r.RoleId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var totalUsersTask = _db.Users
+                .AsNoTracking()
+                .CountAsync(cancellationToken);
+
+            var newUsersTodayTask = _db.Users
+                .AsNoTracking()
+                .CountAsync(u => u.CreatedAt >= todayStart && u.CreatedAt < nextDay, cancellationToken);
+
+            var newUsersSevenDaysTask = _db.Users
+                .AsNoTracking()
+                .CountAsync(u => u.CreatedAt >= sevenDaysStart && u.CreatedAt < nextDay, cancellationToken);
+
+            await Task.WhenAll(
+                sellerRoleIdTask,
+                buyerRoleIdTask,
+                totalUsersTask,
+                newUsersTodayTask,
+                newUsersSevenDaysTask);
+
+            var sellerRoleId = sellerRoleIdTask.Result;
+            var buyerRoleId = buyerRoleIdTask.Result;
+
+            var totalSellersTask = sellerRoleId.HasValue
+                ? _db.UserRoles.AsNoTracking().CountAsync(ur => ur.RoleId == sellerRoleId.Value, cancellationToken)
+                : Task.FromResult(0);
+
+            var newSellersSevenDaysTask = sellerRoleId.HasValue
+                ? _db.UserRoles
+                    .AsNoTracking()
+                    .Where(ur => ur.RoleId == sellerRoleId.Value)
+                    .Join(
+                        _db.Users.AsNoTracking().Where(u => u.CreatedAt >= sevenDaysStart && u.CreatedAt < nextDay),
+                        ur => ur.UserId,
+                        u => u.UserId,
+                        (ur, u) => ur.UserId)
+                    .Distinct()
+                    .CountAsync(cancellationToken)
+                : Task.FromResult(0);
+
+            var totalBuyersTask = buyerRoleId.HasValue
+                ? _db.UserRoles.AsNoTracking().CountAsync(ur => ur.RoleId == buyerRoleId.Value, cancellationToken)
+                : Task.FromResult(0);
+
+            var newBuyersSevenDaysTask = buyerRoleId.HasValue
+                ? _db.UserRoles
+                    .AsNoTracking()
+                    .Where(ur => ur.RoleId == buyerRoleId.Value)
+                    .Join(
+                        _db.Users.AsNoTracking().Where(u => u.CreatedAt >= sevenDaysStart && u.CreatedAt < nextDay),
+                        ur => ur.UserId,
+                        u => u.UserId,
+                        (ur, u) => ur.UserId)
+                    .Distinct()
+                    .CountAsync(cancellationToken)
+                : Task.FromResult(0);
+
+            var trafficToday = 0;
+            var activeSessions = 0;
+
+            try
+            {
+                var trafficTodayTask = _db.UserSessions
+                    .AsNoTracking()
+                    .CountAsync(s => s.CreatedAt >= todayStart && s.CreatedAt < nextDay, cancellationToken);
+
+                var activeSessionsTask = _db.UserSessions
+                    .AsNoTracking()
+                    .CountAsync(s => s.RevokedAt == null && s.ExpiresAt > now, cancellationToken);
+
+                await Task.WhenAll(
+                    totalSellersTask,
+                    newSellersSevenDaysTask,
+                    totalBuyersTask,
+                    newBuyersSevenDaysTask,
+                    trafficTodayTask,
+                    activeSessionsTask);
+
+                trafficToday = trafficTodayTask.Result;
+                activeSessions = activeSessionsTask.Result;
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"UserSessions fallback: {ex.GetType().Name}");
+                await Task.WhenAll(totalSellersTask, newSellersSevenDaysTask, totalBuyersTask, newBuyersSevenDaysTask);
+            }
+
+            return Ok(new
+            {
+                totalUsers = totalUsersTask.Result,
+                newUsersToday = newUsersTodayTask.Result,
+                newUsers7Days = newUsersSevenDaysTask.Result,
+                totalSellers = totalSellersTask.Result,
+                newSellers7Days = newSellersSevenDaysTask.Result,
+                totalBuyers = totalBuyersTask.Result,
+                newBuyers7Days = newBuyersSevenDaysTask.Result,
+                trafficToday,
+                activeSessions,
+                warnings
+            });
+        }
+        catch (Exception ex)
+        {
+            warnings.Add($"Metrics fallback: {ex.GetType().Name}");
+            return Ok(new
+            {
+                totalUsers = 0,
+                newUsersToday = 0,
+                newUsers7Days = 0,
+                totalSellers = 0,
+                newSellers7Days = 0,
+                totalBuyers = 0,
+                newBuyers7Days = 0,
+                trafficToday = 0,
+                activeSessions = 0,
+                warnings
+            });
+        }
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([FromRoute] int id)
     {
         var row = await _db.Users
             .AsNoTracking()
-            .Where(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName != "Customer"))
+            .Where(u => u.UserId == id)
             .Select(u => new
             {
                 userId = u.UserId,
@@ -139,7 +321,6 @@ public sealed class AdminUsersController : ControllerBase
                     .Select(s => (DateTime?)s.CreatedAt)
                     .FirstOrDefault(),
                 role = u.UserRoles
-                    .Where(ur => ur.Role.RoleName != "Customer")
                     .OrderBy(ur => ur.Role.RoleName)
                     .Select(ur => new
                     {
@@ -153,7 +334,7 @@ public sealed class AdminUsersController : ControllerBase
 
         if (row is null)
         {
-            return NotFound(new { message = "Khong tim thay quan tri vien." });
+            return NotFound(new { message = "Khong tim thay nguoi dung." });
         }
 
         return Ok(new
@@ -187,6 +368,14 @@ public sealed class AdminUsersController : ControllerBase
             return BadRequest(new { message = normalized.error });
         }
 
+        var role = await _db.Roles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.RoleId == normalized.roleId && r.IsActive);
+        if (role is null)
+        {
+            return BadRequest(new { message = "Role khong hop le hoac khong ton tai." });
+        }
+
         var duplicateUserName = await _db.Users.AnyAsync(u => u.UserName == normalized.userName);
         if (duplicateUserName)
         {
@@ -208,68 +397,47 @@ public sealed class AdminUsersController : ControllerBase
             }
         }
 
-        Role? selectedRole = null;
-        if (normalized.roleId > 0)
+        var now = DateTime.UtcNow;
+        var user = new User
         {
-            selectedRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleId == normalized.roleId && r.IsActive && r.RoleName != "Customer");
-            if (selectedRole is null)
-            {
-                return BadRequest(new { message = "Role khong hop le." });
-            }
-        }
+            UserName = normalized.userName,
+            FullName = normalized.fullName,
+            Email = normalized.email,
+            Phone = normalized.phone,
+            Avatar = normalized.avatar,
+            IsActive = normalized.isActive,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 
-        await using var tran = await _db.Database.BeginTransactionAsync();
-        try
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        _db.UserRoles.Add(new UserRole
         {
-            var now = DateTime.UtcNow;
-            var user = new User
-            {
-                UserName = normalized.userName,
-                FullName = normalized.fullName,
-                Email = normalized.email,
-                Phone = normalized.phone,
-                Avatar = normalized.avatar,
-                IsActive = normalized.isActive,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
+            UserId = user.UserId,
+            RoleId = normalized.roleId,
+            CreatedAt = now
+        });
 
-            _db.Users.Add(user);
-            await _db.SaveChangesAsync();
-
-            _db.UserAuths.Add(new UserAuth
-            {
-                UserId = user.UserId,
-                PasswordHash = _passwordHasher.HashPassword(user, normalized.password),
-                FailedCount = 0,
-                UpdatedAt = now
-            });
-
-            if (selectedRole is not null)
-            {
-                _db.UserRoles.Add(new UserRole
-                {
-                    UserId = user.UserId,
-                    RoleId = selectedRole.RoleId,
-                    CreatedAt = now
-                });
-            }
-
-            await _db.SaveChangesAsync();
-            await tran.CommitAsync();
-
-            return Ok(new
-            {
-                success = true,
-                message = "Them quan tri vien thanh cong.",
-                userId = user.UserId
-            });
-        }
-        catch (Exception ex)
+        _db.UserAuths.Add(new UserAuth
         {
-            await tran.RollbackAsync();
-            return BadRequest(new { message = "Khong the them quan tri vien.", detail = ex.Message });
-        }
+            UserId = user.UserId,
+            PasswordHash = _passwordHasher.HashPassword(user, normalized.password),
+            FailedCount = 0,
+            LockedUntil = null,
+            Mfasecret = string.Empty,
+            UpdatedAt = now
+        });
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            success = true,
+            message = "Tao nguoi dung thanh cong.",
+            userId = user.UserId
+        });
     }
 
     [HttpPut("{id:int}")]
@@ -284,11 +452,11 @@ public sealed class AdminUsersController : ControllerBase
             .Include(u => u.UserAuth)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName != "Customer"));
+            .FirstOrDefaultAsync(u => u.UserId == id);
 
         if (user is null)
         {
-            return NotFound(new { message = "Khong tim thay quan tri vien." });
+            return NotFound(new { message = "Khong tim thay nguoi dung." });
         }
 
         var normalized = NormalizeUpdateRequest(request);
@@ -318,14 +486,12 @@ public sealed class AdminUsersController : ControllerBase
             }
         }
 
-        Role? selectedRole = null;
-        if (normalized.roleId > 0)
+        var role = await _db.Roles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.RoleId == normalized.roleId && r.IsActive);
+        if (role is null)
         {
-            selectedRole = await _db.Roles.FirstOrDefaultAsync(r => r.RoleId == normalized.roleId && r.IsActive && r.RoleName != "Customer");
-            if (selectedRole is null)
-            {
-                return BadRequest(new { message = "Role khong hop le." });
-            }
+            return BadRequest(new { message = "Role khong hop le hoac khong ton tai." });
         }
 
         var now = DateTime.UtcNow;
@@ -337,6 +503,21 @@ public sealed class AdminUsersController : ControllerBase
         user.Avatar = normalized.avatar;
         user.IsActive = normalized.isActive;
         user.UpdatedAt = now;
+
+        var currentAssignedRoles = user.UserRoles
+            .ToList();
+
+        var hasTargetRole = currentAssignedRoles.Any(ur => ur.RoleId == normalized.roleId);
+        if (!hasTargetRole)
+        {
+            _db.UserRoles.RemoveRange(currentAssignedRoles);
+            user.UserRoles.Add(new UserRole
+            {
+                UserId = user.UserId,
+                RoleId = normalized.roleId,
+                CreatedAt = now
+            });
+        }
 
         if (!string.IsNullOrWhiteSpace(normalized.newPassword))
         {
@@ -354,72 +535,50 @@ public sealed class AdminUsersController : ControllerBase
             user.UserAuth.UpdatedAt = now;
         }
 
-        var currentAdminRoles = user.UserRoles.Where(ur => ur.Role.RoleName != "Customer").ToList();
-        if (currentAdminRoles.Count > 0)
-        {
-            _db.UserRoles.RemoveRange(currentAdminRoles);
-        }
-
-        if (selectedRole is not null)
-        {
-            _db.UserRoles.Add(new UserRole
-            {
-                UserId = user.UserId,
-                RoleId = selectedRole.RoleId,
-                CreatedAt = now
-            });
-        }
-
         await _db.SaveChangesAsync();
 
-        return Ok(new { success = true, message = "Cap nhat quan tri vien thanh cong." });
+        return Ok(new { success = true, message = "Cap nhat ho so thanh cong." });
     }
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete([FromRoute] int id)
     {
-        if (TryGetCurrentUserId(out var currentUserId) && currentUserId == id)
+        if (!TryGetCurrentUserId(out var currentUserId))
         {
-            return BadRequest(new { message = "Khong the tu xoa tai khoan dang dang nhap." });
+            return Unauthorized(new { message = "Khong xac dinh duoc nguoi dung dang dang nhap." });
+        }
+
+        if (id == currentUserId)
+        {
+            return BadRequest(new { message = "Khong the xoa chinh tai khoan dang dang nhap." });
         }
 
         var user = await _db.Users
-            .Include(u => u.UserAuth)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
-            .Include(u => u.UserSessions)
-            .Include(u => u.AddressBook)
-            .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName != "Customer"));
+            .FirstOrDefaultAsync(u => u.UserId == id);
 
         if (user is null)
         {
-            return NotFound(new { message = "Khong tim thay quan tri vien." });
+            return NotFound(new { message = "Khong tim thay nguoi dung." });
         }
 
-        if (user.UserAuth is not null)
+        user.IsActive = false;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        var sessions = await _db.UserSessions.Where(s => s.UserId == id).ToListAsync();
+        if (sessions.Count > 0)
         {
-            _db.UserAuths.Remove(user.UserAuth);
+            _db.UserSessions.RemoveRange(sessions);
         }
 
-        if (user.UserRoles.Count > 0)
-        {
-            _db.UserRoles.RemoveRange(user.UserRoles);
-        }
-
-        if (user.UserSessions.Count > 0)
-        {
-            _db.UserSessions.RemoveRange(user.UserSessions);
-        }
-
-        if (user.AddressBook is not null)
-        {
-            _db.AddressBooks.Remove(user.AddressBook);
-        }
-
-        _db.Users.Remove(user);
         await _db.SaveChangesAsync();
 
-        return Ok(new { success = true, message = "Xoa quan tri vien thanh cong." });
+        return Ok(new
+        {
+            success = true,
+            message = "Da vo hieu hoa tai khoan nguoi dung."
+        });
     }
 
     private static (bool isValid, string? error, string userName, string fullName, string email, string password, string? phone, string? avatar, bool isActive, int roleId)

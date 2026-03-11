@@ -1,0 +1,505 @@
+@model FreshFarm.Web.Bff.Areas.Admin.Models.RiskCenterPageViewModel
+@{
+    ViewData["Title"] = "Risk Center";
+
+    string ToneClass(string severity)
+    {
+        return (severity ?? string.Empty).ToLowerInvariant() switch
+        {
+            "critical" => "tone-critical",
+            "high" => "tone-high",
+            "medium" => "tone-medium",
+            "low" => "tone-low",
+            _ => "tone-neutral"
+        };
+    }
+}
+
+<section class="risk-console">
+    <div class="risk-hero mb-4">
+        <div>
+            <p class="eyebrow text-uppercase mb-2">Cross-cutting controls</p>
+            <h1 class="fw-bold mb-2">Risk center</h1>
+            <p class="mb-0 opacity-75">Heuristic fraud queue cho voucher abuse va return spike, co decision log de bat dau lane 7.7A.</p>
+        </div>
+        <div class="hero-chip">Phase 7.7A MVP</div>
+    </div>
+
+    @if (TempData["Success"] is string successMessage)
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+    @if (TempData["Error"] is string errorMessage)
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+    @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
+    {
+        <div class="alert alert-warning">@pageError</div>
+    }
+    @if (ViewBag.DetailError is string detailError && !string.IsNullOrWhiteSpace(detailError))
+    {
+        <div class="alert alert-warning">@detailError</div>
+    }
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card">
+                <span class="metric-label">Total cases</span>
+                <strong>@Model.Overview.TotalCases</strong>
+                <small>@Model.Overview.OpenCases open</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card">
+                <span class="metric-label">Pending review</span>
+                <strong>@Model.Overview.ReviewCases</strong>
+                <small>@Model.Overview.EscalatedCases escalated</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card">
+                <span class="metric-label">High severity</span>
+                <strong>@Model.Overview.HighSeverityCases</strong>
+                <small>@Model.Overview.DecisionsLast7d decisions / 7 ngay</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card">
+                <span class="metric-label">Case mix</span>
+                <strong>@Model.Overview.VoucherAbuseCases</strong>
+                <small>@Model.Overview.ReturnSpikeCases return spike</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 align-items-start">
+        <div class="col-xl-7">
+            <div class="panel-card mb-4">
+                <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h2 class="h5 mb-1">Risk queue</h2>
+                        <p class="text-muted mb-0">Loc theo case type, status va severity de triage nhanh nhung tin hieu dang noi len.</p>
+                    </div>
+                    <form method="post" asp-action="SyncHeuristics" asp-controller="Risk" asp-area="Admin">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="q" value="@Model.Query" />
+                        <input type="hidden" name="type" value="@Model.Type" />
+                        <input type="hidden" name="status" value="@Model.Status" />
+                        <input type="hidden" name="severity" value="@Model.Severity" />
+                        <input type="hidden" name="riskCaseId" value="@Model.SelectedCaseId" />
+                        <button type="submit" class="btn btn-outline-primary">Dong bo heuristic</button>
+                    </form>
+                </div>
+
+                <form method="get" asp-action="Index" asp-controller="Risk" asp-area="Admin" class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo title, summary, reference..." />
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="type">
+                            @foreach (var option in Model.TypeOptions)
+                            {
+                                <option value="@option.Value" selected="@(option.Value == Model.Type)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="status">
+                            @foreach (var option in Model.StatusOptions)
+                            {
+                                <option value="@option.Value" selected="@(option.Value == Model.Status)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="severity">
+                            @foreach (var option in Model.SeverityOptions)
+                            {
+                                <option value="@option.Value" selected="@(option.Value == Model.Severity)">@option.Text</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button class="btn btn-primary" type="submit">Loc</button>
+                    </div>
+                </form>
+
+                <div class="table-responsive">
+                    <table class="table align-middle risk-table">
+                        <thead>
+                            <tr>
+                                <th>Case</th>
+                                <th>Links</th>
+                                <th>Signals</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Rows.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">Chua co risk case nao khop bo loc hien tai.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var item in Model.Rows)
+                                {
+                                    <tr class="@(Model.SelectedCaseId == item.RiskCaseId ? "is-selected" : string.Empty)">
+                                        <td>
+                                            <div class="fw-semibold">@item.Title</div>
+                                            <div class="small text-muted">@item.CaseType.Replace("_", " ")</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.Summary))
+                                            {
+                                                <div class="small text-muted mt-1">@item.Summary</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (item.SellerId.HasValue)
+                                            {
+                                                <div class="small">Seller #@item.SellerId</div>
+                                            }
+                                            @if (item.BuyerId.HasValue)
+                                            {
+                                                <div class="small">Buyer #@item.BuyerId</div>
+                                            }
+                                            @if (item.OrderId.HasValue)
+                                            {
+                                                <div class="small">Order #@item.OrderId</div>
+                                            }
+                                            @if (item.VoucherCouponId.HasValue)
+                                            {
+                                                <div class="small">Coupon #@item.VoucherCouponId</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold">@item.SignalCount signal</div>
+                                            <div class="small text-muted">@(item.LastSignalAt?.ToLocalTime().ToString("dd/MM HH:mm") ?? "-")</div>
+                                        </td>
+                                        <td>
+                                            <span class="status-pill @ToneClass(item.Severity)">@item.Severity</span>
+                                            <div class="small text-muted mt-1">@item.Status.Replace("_", " ")</div>
+                                            @if (item.IsEscalated)
+                                            {
+                                                <div class="small text-danger">Escalated</div>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-riskCaseId="@item.RiskCaseId" asp-route-q="@Model.Query" asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-severity="@Model.Severity">Chi tiet</a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-card">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Recent signals</h2>
+                    <p class="text-muted mb-0">Canh nhanh nhung case moi cap nhat de ca team growth va ops khong bo sot.</p>
+                </div>
+
+                @if (Model.Overview.Recent.Count == 0)
+                {
+                    <div class="text-muted">Chua co recent case.</div>
+                }
+                else
+                {
+                    <div class="detail-stack">
+                        @foreach (var item in Model.Overview.Recent)
+                        {
+                            <div class="detail-item">
+                                <div>
+                                    <div class="fw-semibold">@item.Title</div>
+                                    <div class="small text-muted">@item.CaseType.Replace("_", " ") | @item.Status.Replace("_", " ")</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="status-pill @ToneClass(item.Severity)">@item.Severity</div>
+                                    <div class="small text-muted mt-1">@item.SignalCount signal</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="panel-card sticky-panel">
+                <div class="panel-head">
+                    <h2 class="h5 mb-1">Case detail</h2>
+                    <p class="text-muted mb-0">Timeline toi gian gon de admin ra quyet dinh nhanh va de lai audit decision co ban.</p>
+                </div>
+
+                @if (Model.SelectedCase is null)
+                {
+                    <div class="text-muted">Chon mot case de xem chi tiet.</div>
+                }
+                else
+                {
+                    <div class="case-detail-head mb-3">
+                        <div>
+                            <div class="section-label">@Model.SelectedCase.CaseType.Replace("_", " ")</div>
+                            <h3 class="h5 mb-1">@Model.SelectedCase.Title</h3>
+                            <div class="small text-muted">@Model.SelectedCase.ReferenceKey</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="status-pill @ToneClass(Model.SelectedCase.Severity)">@Model.SelectedCase.Severity</div>
+                            <div class="small text-muted mt-1">@Model.SelectedCase.Status.Replace("_", " ")</div>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(Model.SelectedCase.Summary))
+                    {
+                        <div class="detail-item mb-3">
+                            <div class="small">@Model.SelectedCase.Summary</div>
+                        </div>
+                    }
+
+                    <div class="meta-grid mb-4">
+                        <div class="meta-item"><span class="section-label">Seller</span><strong>@(Model.SelectedCase.SellerId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Buyer</span><strong>@(Model.SelectedCase.BuyerId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Order</span><strong>@(Model.SelectedCase.OrderId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Voucher</span><strong>@(Model.SelectedCase.VoucherCode ?? Model.SelectedCase.VoucherCouponId?.ToString() ?? "-")</strong></div>
+                    </div>
+
+                    <div class="section-label">Signals</div>
+                    @if (Model.SelectedCase.Signals.Count == 0)
+                    {
+                        <div class="text-muted small mb-4">Chua co signal chi tiet.</div>
+                    }
+                    else
+                    {
+                        <div class="detail-stack mb-4">
+                            @foreach (var signal in Model.SelectedCase.Signals.Take(4))
+                            {
+                                <div class="detail-item">
+                                    <div>
+                                        <strong>@signal.SignalType.Replace("_", " ")</strong>
+                                        <div class="small text-muted">@signal.SignalCode | @signal.Source</div>
+                                    </div>
+                                    <div class="small text-end text-muted">@signal.Score.ToString("N1") pts<br />@signal.TriggeredAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (Model.SelectedCase.VoucherAbuseCases.Count > 0)
+                    {
+                        <div class="section-label">Voucher abuse trail</div>
+                        <div class="detail-stack mb-4">
+                            @foreach (var abuse in Model.SelectedCase.VoucherAbuseCases.Take(3))
+                            {
+                                <div class="detail-item">
+                                    <div>
+                                        <strong>@abuse.AbuseType.Replace("_", " ")</strong>
+                                        <div class="small text-muted">Coupon #@abuse.CouponId | Buyer #@(abuse.BuyerId?.ToString() ?? "-")</div>
+                                    </div>
+                                    <div class="small text-end text-muted">@(abuse.SuspectedBenefitAmount?.ToString("N0") ?? "0") đ</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <div class="section-label">Decision log</div>
+                    @if (Model.SelectedCase.Decisions.Count == 0)
+                    {
+                        <div class="text-muted small mb-3">Chua co decision nao.</div>
+                    }
+                    else
+                    {
+                        <div class="detail-stack mb-4">
+                            @foreach (var decision in Model.SelectedCase.Decisions.Take(4))
+                            {
+                                <div class="detail-item">
+                                    <div>
+                                        <strong>@decision.DecisionType.Replace("_", " ")</strong>
+                                        <div class="small text-muted">@decision.Notes</div>
+                                    </div>
+                                    <div class="small text-end text-muted">@decision.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <form method="post" asp-action="SubmitDecision" asp-controller="Risk" asp-area="Admin" class="row g-3">
+                        @Html.AntiForgeryToken()
+                        <input asp-for="DecisionEditor.RiskCaseId" type="hidden" />
+                        <input type="hidden" name="q" value="@Model.Query" />
+                        <input type="hidden" name="type" value="@Model.Type" />
+                        <input type="hidden" name="status" value="@Model.Status" />
+                        <input type="hidden" name="severity" value="@Model.Severity" />
+                        <div class="col-12">
+                            <label asp-for="DecisionEditor.DecisionType" class="form-label">Decision</label>
+                            <select asp-for="DecisionEditor.DecisionType" class="form-select">
+                                @foreach (var option in Model.SelectedCase.DecisionOptions)
+                                {
+                                    <option value="@option.Value">@option.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="DecisionEditor.Notes" class="form-label">Notes</label>
+                            <textarea asp-for="DecisionEditor.Notes" class="form-control" rows="3" placeholder="Ghi chu quyet dinh hoac handoff tiep theo..."></textarea>
+                        </div>
+                        <div class="col-12 d-grid">
+                            <button type="submit" class="btn btn-primary">Ghi nhan decision</button>
+                        </div>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    .risk-console .risk-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem 1.75rem;
+        border-radius: 1.5rem;
+        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #38bdf8 100%);
+        color: #fff;
+        box-shadow: 0 24px 50px rgba(15, 23, 42, .22);
+    }
+
+    .risk-console .hero-chip {
+        padding: .5rem .85rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,.15);
+        font-weight: 700;
+    }
+
+    .risk-console .eyebrow {
+        letter-spacing: .18em;
+        font-weight: 700;
+    }
+
+    .risk-console .metric-card,
+    .risk-console .panel-card {
+        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+        border: 1px solid rgba(15,23,42,.08);
+        border-radius: 1.25rem;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+    }
+
+    .risk-console .metric-card {
+        padding: 1.25rem;
+        min-height: 128px;
+    }
+
+    .risk-console .metric-card strong {
+        display: block;
+        font-size: 2rem;
+        line-height: 1.1;
+        color: #0f172a;
+    }
+
+    .risk-console .metric-label,
+    .risk-console .section-label {
+        display: block;
+        text-transform: uppercase;
+        letter-spacing: .12em;
+        font-size: .75rem;
+        color: #64748b;
+        margin-bottom: .5rem;
+    }
+
+    .risk-console .panel-card {
+        padding: 1.5rem;
+    }
+
+    .risk-console .panel-head {
+        margin-bottom: 1rem;
+    }
+
+    .risk-console .risk-table th {
+        font-size: .8rem;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #6b7280;
+    }
+
+    .risk-console .risk-table .is-selected {
+        background: rgba(59,130,246,.06);
+    }
+
+    .risk-console .status-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: .35rem .75rem;
+        border-radius: 999px;
+        font-size: .8rem;
+        font-weight: 700;
+        text-transform: capitalize;
+    }
+
+    .risk-console .tone-critical {
+        background: rgba(153, 27, 27, .12);
+        color: #991b1b;
+    }
+
+    .risk-console .tone-high {
+        background: rgba(220, 38, 38, .12);
+        color: #b91c1c;
+    }
+
+    .risk-console .tone-medium {
+        background: rgba(245, 158, 11, .16);
+        color: #b45309;
+    }
+
+    .risk-console .tone-low {
+        background: rgba(34, 197, 94, .14);
+        color: #15803d;
+    }
+
+    .risk-console .tone-neutral {
+        background: rgba(59, 130, 246, .12);
+        color: #1d4ed8;
+    }
+
+    .risk-console .detail-stack {
+        display: grid;
+        gap: .85rem;
+    }
+
+    .risk-console .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        padding: .9rem 1rem;
+        border-radius: 1rem;
+        background: rgba(15, 23, 42, .03);
+    }
+
+    .risk-console .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    .risk-console .meta-item {
+        padding: .9rem 1rem;
+        border-radius: 1rem;
+        background: rgba(59,130,246,.04);
+    }
+
+    .risk-console .sticky-panel {
+        position: sticky;
+        top: 1rem;
+    }
+
+    @@media (max-width: 1199.98px) {
+        .risk-console .sticky-panel {
+            position: static;
+        }
+    }
+</style>

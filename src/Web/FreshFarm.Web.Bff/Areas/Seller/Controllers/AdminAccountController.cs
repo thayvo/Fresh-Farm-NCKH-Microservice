@@ -88,11 +88,21 @@ public class AdminAccountController : LegacySellerControllerBase
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!roleValues.Contains("Seller", StringComparer.OrdinalIgnoreCase))
+        var hasSellerRole = roleValues.Contains("Seller", StringComparer.OrdinalIgnoreCase);
+        var hasAdminRole = roleValues.Contains("Admin", StringComparer.OrdinalIgnoreCase);
+
+        if (!hasSellerRole && !hasAdminRole)
         {
-            ModelState.AddModelError(string.Empty, "Tai khoan khong co quyen Seller.");
+            ModelState.AddModelError(string.Empty, "Tai khoan khong co quyen Seller hoac Admin.");
             return View(vm);
         }
+
+        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        HttpContext.Session.Remove(AccessTokenSessionKey);
+        Session.Remove("ADMIN_ID");
+        Session.Remove("ADMIN_NAME");
+        Session.Remove("ADMIN_ROLEID");
+        Response.Cookies.Delete("ADMIN_ID");
 
         HttpContext.Session.SetString(AccessTokenSessionKey, auth.AccessToken);
 
@@ -135,8 +145,11 @@ public class AdminAccountController : LegacySellerControllerBase
 
         var claims = new List<Claim>
         {
+            new(JwtRegisteredClaimNames.Sub, userIdText),
+            new("sub", userIdText),
             new(ClaimTypes.NameIdentifier, userIdText),
-            new(ClaimTypes.Name, userName)
+            new(ClaimTypes.Name, userName),
+            new("ff_access_token", auth.AccessToken)
         };
 
         foreach (var role in roleValues)
@@ -157,14 +170,28 @@ public class AdminAccountController : LegacySellerControllerBase
             IsPersistent = vm.RememberMe
         };
 
-        if (vm.RememberMe)
+        if (auth.ExpiredAtUtc > DateTime.UtcNow)
+        {
+            authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
+        }
+        else if (vm.RememberMe)
         {
             authProperties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7);
         }
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-        return RedirectToLocal(normalizedReturnUrl);
+        if (!string.IsNullOrWhiteSpace(normalizedReturnUrl) && Url.IsLocalUrl(normalizedReturnUrl))
+        {
+            return Redirect(normalizedReturnUrl);
+        }
+
+        if (hasAdminRole)
+        {
+            return RedirectToAction("Dashboard", "Home", new { area = "Admin" });
+        }
+
+        return RedirectToAction("Dashboard", "Home", new { area = "Seller" });
     }
 
     [HttpPost]
@@ -203,6 +230,11 @@ public class AdminAccountController : LegacySellerControllerBase
         if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
             return Redirect(returnUrl);
+        }
+
+        if (User.IsInRole("Admin"))
+        {
+            return RedirectToAction("Dashboard", "Home", new { area = "Admin" });
         }
 
         return RedirectToAction("Dashboard", "Home", new { area = "Seller" });
