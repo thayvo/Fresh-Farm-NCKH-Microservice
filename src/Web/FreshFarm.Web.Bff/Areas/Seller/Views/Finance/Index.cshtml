@@ -340,6 +340,10 @@
                     </h5>
                     <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total bản ghi theo phạm vi hiện tại</div>
                 </div>
+                @if (areaName == "Admin")
+                {
+                    <div class="small text-muted">Admin co the thao tac truc tiep tren payout/refund/return ngay tai day.</div>
+                }
             </div>
 
             <div class="table-responsive">
@@ -375,13 +379,17 @@
                                 <th>Thời gian</th>
                             }
                             <th>Trạng thái</th>
+                            @if (areaName == "Admin")
+                            {
+                                <th>Thao tác</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
                         @if (Model.Rows.Count == 0)
                         {
                             <tr>
-                                <td colspan="10" class="text-center text-muted py-5">Chưa có dữ liệu trong phạm vi lọc hiện tại.</td>
+                                <td colspan="11" class="text-center text-muted py-5">Chưa có dữ liệu trong phạm vi lọc hiện tại.</td>
                             </tr>
                         }
                         else
@@ -471,6 +479,44 @@
                                         </td>
                                     }
                                     <td><span class="finance-status @statusClass">@row.Status</span></td>
+                                    @if (areaName == "Admin")
+                                    {
+                                        <td>
+                                            <form method="post" action="@Url.Action("TakeAction", "Finance", new { area = areaName })" class="d-grid gap-2">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="section" value="@Model.Section" />
+                                                <input type="hidden" name="recordId" value="@row.RecordId" />
+                                                <input type="hidden" name="q" value="@Model.Query" />
+                                                <input type="hidden" name="status" value="@Model.Status" />
+                                                <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                                                <input type="hidden" name="page" value="@Model.Page" />
+                                                <input type="text" class="form-control form-control-sm" name="note" placeholder="Ghi chú nội bộ..." />
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @if (Model.Section == "payouts")
+                                                    {
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
+                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill" name="actionName" value="hold">Giữ</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" name="actionName" value="reject">Lỗi</button>
+                                                    }
+                                                    else if (Model.Section == "refunds")
+                                                    {
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
+                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="approve">Duyệt</button>
+                                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill" name="actionName" value="resolve">Đóng</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" name="actionName" value="reject">Từ chối</button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
+                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="approve">Duyệt</button>
+                                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill" name="actionName" value="resolve">Đóng</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" name="actionName" value="reject">Từ chối</button>
+                                                    }
+                                                </div>
+                                            </form>
+                                        </td>
+                                    }
                                 </tr>
                             }
                         }

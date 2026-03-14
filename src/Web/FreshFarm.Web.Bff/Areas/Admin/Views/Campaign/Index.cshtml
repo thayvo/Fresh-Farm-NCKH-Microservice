@@ -5,15 +5,15 @@
     string selectedType = Model.SelectedCampaign?.CampaignType ?? Model.Editor.CampaignType;
 }
 
-<section class="campaign-console">
-    <div class="page-header mb-4">
+<section class="campaign-console ff-admin-shell">
+    <div class="page-header ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow text-uppercase mb-2">Growth ops</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Growth ops</p>
             <h1 class="fw-bold mb-2">Campaign center</h1>
-            <p class="text-muted mb-0">Van hanh voucher san, flash sale va readiness cho seller participation trong cung mot lane Admin.</p>
+            <p class="mb-0 opacity-75">Van hanh voucher san, flash sale va readiness cho seller participation trong cung mot lane Admin.</p>
         </div>
         <div class="header-note">
-            <span class="badge rounded-pill bg-info-subtle text-info-emphasis">Phase 7.7 MVP</span>
+            <span class="ff-admin-chip">Phase 7.7 MVP</span>
         </div>
     </div>
 
@@ -36,28 +36,28 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Campaign</span>
                 <strong>@Model.Overview.TotalCampaigns</strong>
                 <small>@Model.Overview.RunningCampaigns dang chay</small>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Dang ky seller</span>
                 <strong>@Model.Overview.RegistrationOpenCampaigns</strong>
                 <small>@Model.Overview.PendingParticipations cho duyet</small>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Product slots</span>
                 <strong>@Model.Overview.TotalSlots</strong>
                 <small>@Model.Overview.LiveSlots dang live</small>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Budget</span>
                 <strong>@Model.Overview.TotalBudget.ToString("N0") đ</strong>
                 <small>@Model.Overview.ApprovedParticipations seller duoc duyet</small>
@@ -67,7 +67,7 @@
 
     <div class="row g-4 align-items-start">
         <div class="col-xl-8">
-            <div class="panel-card mb-4">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
                         <h2 class="h5 mb-1">Danh sach campaign</h2>
@@ -163,7 +163,7 @@
                 </div>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card ff-admin-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Campaign sap dien ra</h2>
                     <p class="text-muted mb-0">Theo doi campaign den han chot dang ky de khong trep nhiep team growth.</p>
@@ -192,7 +192,7 @@
                 </div>
             </div>
 
-            <div class="panel-card mt-4">
+            <div class="panel-card ff-admin-card mt-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Ads finance overview</h2>
                     <p class="text-muted mb-0">Theo doi so du wallet, reserve budget va cac ads campaign dang chay theo seller.</p>
@@ -200,28 +200,28 @@
 
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
-                        <div class="metric-card compact">
+                        <div class="metric-card ff-admin-card compact">
                             <span class="metric-label">Wallet</span>
                             <strong>@Model.AdsOverview.WalletCount</strong>
                             <small>@Model.AdsOverview.ActiveWalletCount active</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="metric-card compact">
+                        <div class="metric-card ff-admin-card compact">
                             <span class="metric-label">Tong so du</span>
                             <strong>@Model.AdsOverview.TotalBalance.ToString("N0") đ</strong>
                             <small>@Model.AdsOverview.TotalAvailable.ToString("N0") đ kha dung</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="metric-card compact">
+                        <div class="metric-card ff-admin-card compact">
                             <span class="metric-label">Reserve</span>
                             <strong>@Model.AdsOverview.TotalReserved.ToString("N0") đ</strong>
                             <small>@Model.AdsOverview.RunningAdsCampaigns ads dang chay</small>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="metric-card compact">
+                        <div class="metric-card ff-admin-card compact">
                             <span class="metric-label">Topup / Spend</span>
                             <strong>@Model.AdsOverview.TotalTopup.ToString("N0") đ</strong>
                             <small>@Model.AdsOverview.TotalSpend.ToString("N0") đ da chi</small>
@@ -313,7 +313,7 @@
         </div>
 
         <div class="col-xl-4">
-            <div class="panel-card mb-4 sticky-panel">
+            <div class="panel-card ff-admin-card mb-4 sticky-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">@(Model.SelectedCampaign is null ? "Tao campaign moi" : "Cap nhat campaign")</h2>
                     <p class="text-muted mb-0">MVP tap trung vao voucher san, flash sale va da noi them ads wallet overview co ban.</p>
@@ -402,7 +402,7 @@
 
             @if (Model.SelectedCampaign is not null)
             {
-                <div class="panel-card">
+                <div class="panel-card ff-admin-card">
                     <div class="panel-head">
                         <h2 class="h5 mb-1">Seller participation</h2>
                         <p class="text-muted mb-0">Doc nhanh queue seller dang ky va product slot da nhet vao campaign.</p>
@@ -452,7 +452,7 @@
                 </div>
             }
 
-            <div class="panel-card mt-4">
+            <div class="panel-card ff-admin-card mt-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Ads wallet actions</h2>
                     <p class="text-muted mb-0">Topup, spend ledger va tao ads campaign MVP cho seller ma khong can roi campaign center.</p>
@@ -579,16 +579,11 @@
 
     .campaign-console .eyebrow {
         letter-spacing: .18em;
-        color: #0d6efd;
-        font-weight: 700;
     }
 
     .campaign-console .metric-card,
     .campaign-console .panel-card {
-        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,248,255,.96));
-        border: 1px solid rgba(13,110,253,.12);
-        border-radius: 1.25rem;
-        box-shadow: 0 20px 45px rgba(13,110,253,.08);
+        border: 1px solid var(--ff-border);
     }
 
     .campaign-console .metric-card {
@@ -681,7 +676,7 @@
         gap: 1rem;
         padding: .9rem 1rem;
         border-radius: 1rem;
-        background: rgba(13,110,253,.04);
+        background: rgba(37,99,235,.05);
     }
 
     .campaign-console .sticky-panel {

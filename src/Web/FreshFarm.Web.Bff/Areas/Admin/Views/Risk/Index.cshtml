@@ -15,14 +15,14 @@
     }
 }
 
-<section class="risk-console">
-    <div class="risk-hero mb-4">
+<section class="risk-console ff-admin-shell">
+    <div class="risk-hero ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow text-uppercase mb-2">Cross-cutting controls</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Cross-cutting controls</p>
             <h1 class="fw-bold mb-2">Risk center</h1>
             <p class="mb-0 opacity-75">Heuristic fraud queue cho voucher abuse va return spike, co decision log de bat dau lane 7.7A.</p>
         </div>
-        <div class="hero-chip">Phase 7.7A MVP</div>
+        <div class="hero-chip ff-admin-chip">Phase 7.7A MVP</div>
     </div>
 
     @if (TempData["Success"] is string successMessage)
@@ -44,28 +44,28 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Total cases</span>
                 <strong>@Model.Overview.TotalCases</strong>
                 <small>@Model.Overview.OpenCases open</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Pending review</span>
                 <strong>@Model.Overview.ReviewCases</strong>
                 <small>@Model.Overview.EscalatedCases escalated</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">High severity</span>
                 <strong>@Model.Overview.HighSeverityCases</strong>
                 <small>@Model.Overview.DecisionsLast7d decisions / 7 ngay</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="metric-card">
+            <div class="metric-card ff-admin-card">
                 <span class="metric-label">Case mix</span>
                 <strong>@Model.Overview.VoucherAbuseCases</strong>
                 <small>@Model.Overview.ReturnSpikeCases return spike</small>
@@ -75,7 +75,7 @@
 
     <div class="row g-4 align-items-start">
         <div class="col-xl-7">
-            <div class="panel-card mb-4">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
                         <h2 class="h5 mb-1">Risk queue</h2>
@@ -197,7 +197,7 @@
                 </div>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card ff-admin-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Recent signals</h2>
                     <p class="text-muted mb-0">Canh nhanh nhung case moi cap nhat de ca team growth va ops khong bo sot.</p>
@@ -229,7 +229,7 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="panel-card sticky-panel">
+            <div class="panel-card ff-admin-card sticky-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Case detail</h2>
                     <p class="text-muted mb-0">Timeline toi gian gon de admin ra quyet dinh nhanh va de lai audit decision co ban.</p>
@@ -362,31 +362,14 @@
         justify-content: space-between;
         align-items: center;
         gap: 1rem;
-        padding: 1.5rem 1.75rem;
-        border-radius: 1.5rem;
-        background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #38bdf8 100%);
-        color: #fff;
-        box-shadow: 0 24px 50px rgba(15, 23, 42, .22);
     }
 
     .risk-console .hero-chip {
-        padding: .5rem .85rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,.15);
-        font-weight: 700;
-    }
-
-    .risk-console .eyebrow {
-        letter-spacing: .18em;
-        font-weight: 700;
     }
 
     .risk-console .metric-card,
     .risk-console .panel-card {
-        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
-        border: 1px solid rgba(15,23,42,.08);
-        border-radius: 1.25rem;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+        border: 1px solid var(--ff-border);
     }
 
     .risk-console .metric-card {

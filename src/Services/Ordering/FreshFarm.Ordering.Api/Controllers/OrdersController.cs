@@ -786,7 +786,13 @@ public sealed class OrdersController : ControllerBase
             return false;
         }
 
-        return CanonicalStatuses.TryGetValue(status.Trim(), out normalized);
+        if (!CanonicalStatuses.TryGetValue(status.Trim(), out var canonicalStatus) || string.IsNullOrWhiteSpace(canonicalStatus))
+        {
+            return false;
+        }
+
+        normalized = canonicalStatus;
+        return true;
     }
 
     private static bool CanChangeStatus(string currentStatus, string newStatus)

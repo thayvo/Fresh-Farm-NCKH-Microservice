@@ -1,0 +1,1444 @@
+@{
+    Layout = null;
+    var productId = ViewData["ProductId"] is int idValue ? idValue : 0;
+    var keyword = ViewData["SearchKeyword"]?.ToString() ?? string.Empty;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isBuyerEligible = isAuthenticated && !User.IsInRole("Seller") && !User.IsInRole("Admin");
+    var signInUrl = Url.Action("SignIn", "Account", new { returnUrl = $"/products/{productId}" }) ?? $"/account/signin?returnUrl=%2Fproducts%2F{productId}";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chi tiết sản phẩm - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        :root {
+            --brand-primary: #16a34a;
+            --brand-deep: #166534;
+            --brand-orange: #f97316;
+            --border-soft: #e5e7eb;
+            --surface-soft: #f8fafc;
+            --primary-green: #28a745;
+        }
+
+        body {
+            font-family: "Inter", sans-serif;
+            background:
+                radial-gradient(circle at top right, rgba(249, 115, 22, .14), transparent 28%),
+                linear-gradient(180deg, #f8fafc 0%, #ffffff 40%, #f8fafc 100%);
+            color: #0f172a;
+        }
+
+        .promo-bar {
+            background: linear-gradient(90deg, #18a85f 0%, #0b8f4d 100%);
+            color: #fff;
+            font-size: .875rem;
+        }
+
+        .promo-inner {
+            min-height: 28px;
+        }
+
+        .promo-links a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .promo-links a:hover {
+            text-decoration: underline;
+        }
+
+        .header-main-shell {
+            background: #fff;
+            padding: 14px 0 12px;
+            border-bottom: 1px solid #e8eaee;
+        }
+
+        .header-main-wrap {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .header-brand-wrap {
+            flex: 0 0 auto;
+        }
+
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-grid;
+            place-items: center;
+            background: linear-gradient(135deg, #22c55e, #15803d);
+            color: #fff;
+            font-weight: 800;
+            box-shadow: 0 12px 24px rgba(34, 197, 94, .22);
+        }
+
+        .brand-text {
+            color: #166534;
+            font-weight: 900;
+            letter-spacing: .12em;
+        }
+
+        .brand-sub {
+            color: #64748b;
+            font-size: .78rem;
+        }
+
+        .header-search-wrap {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .header-search-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-search-input {
+            min-height: 48px;
+            border-radius: 16px;
+            border: 1px solid #d1d5db;
+            box-shadow: none;
+            padding-left: 16px;
+        }
+
+        .header-search-input:focus {
+            border-color: #22c55e;
+            box-shadow: 0 0 0 .2rem rgba(34, 197, 94, .12);
+        }
+
+        .header-search-btn {
+            min-height: 48px;
+            padding-inline: 20px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border: 0;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .header-search-btn:hover {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+            color: #fff;
+        }
+
+        .header-search-keywords {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .header-search-keywords a {
+            color: #64748b;
+            text-decoration: none;
+            font-size: .9rem;
+        }
+
+        .header-search-keywords a:hover {
+            color: #f97316;
+        }
+
+        .header-actions-wrap {
+            flex: 0 0 auto;
+        }
+
+        .header-cart-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: #166534;
+            font-weight: 700;
+        }
+
+        .header-cart-link:hover {
+            color: #f97316;
+        }
+
+        .navbar-main {
+            background: #fff;
+            border-top: 1px solid #ebedf0;
+            border-bottom: 1px solid #ebedf0;
+        }
+
+        .navbar-main .nav-link {
+            position: relative;
+            color: #334155;
+            font-weight: 600;
+            transition: color .2s ease;
+        }
+
+        .navbar-main .nav-link:hover,
+        .navbar-main .nav-link.active {
+            color: var(--brand-primary);
+        }
+
+        .footer-link {
+            color: #ccc;
+            text-decoration: none;
+            display: block;
+            margin-bottom: .4rem;
+            transition: color .2s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--brand-primary);
+        }
+
+        .social-icon {
+            color: #ccc;
+            font-size: 1.3rem;
+            transition: color .2s ease, transform .2s ease;
+        }
+
+        .social-icon:hover {
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .page-shell {
+            padding: 28px 0 48px;
+        }
+
+        .crumb-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .crumb-link {
+            color: var(--brand-deep);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .crumb-link:hover {
+            color: var(--brand-orange);
+        }
+
+        .detail-shell {
+            background: rgba(255, 255, 255, .94);
+            border: 1px solid rgba(226, 232, 240, .95);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, .08);
+            overflow: hidden;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: minmax(320px, 1.05fr) minmax(0, 1.15fr);
+        }
+
+        .detail-media {
+            background: linear-gradient(160deg, rgba(22, 163, 74, .12), rgba(255, 255, 255, .96) 45%, rgba(249, 115, 22, .08));
+            padding: 28px;
+            border-right: 1px solid rgba(226, 232, 240, .95);
+        }
+
+        .detail-image-frame {
+            background: #fff;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, .95);
+            box-shadow: 0 20px 50px rgba(15, 23, 42, .08);
+        }
+
+        .detail-image {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .detail-panel {
+            padding: 28px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--brand-primary);
+            background: rgba(22, 163, 74, .08);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: .84rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .product-title {
+            font-size: clamp(1.8rem, 2.8vw, 2.5rem);
+            line-height: 1.12;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: .9rem;
+            color: #334155;
+        }
+
+        .price-row {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .price-main {
+            font-size: clamp(2rem, 3vw, 2.8rem);
+            line-height: 1;
+            font-weight: 900;
+            color: #ef4444;
+        }
+
+        .unit-text {
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+            color: #475569;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: .9rem;
+        }
+
+        .status-pill.ok {
+            color: #166534;
+            background: rgba(34, 197, 94, .14);
+        }
+
+        .status-pill.warn {
+            color: #9a3412;
+            background: rgba(249, 115, 22, .14);
+        }
+
+        .status-pill.danger {
+            color: #991b1b;
+            background: rgba(239, 68, 68, .14);
+        }
+
+        .stock-panel {
+            display: grid;
+            gap: 6px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(22, 163, 74, .18);
+            background: linear-gradient(135deg, rgba(34, 197, 94, .08), rgba(255, 255, 255, .96));
+            margin-bottom: 16px;
+        }
+
+        .stock-panel.low-stock {
+            border-color: rgba(249, 115, 22, .24);
+            background: linear-gradient(135deg, rgba(249, 115, 22, .1), rgba(255, 255, 255, .96));
+        }
+
+        .stock-panel.out-of-stock {
+            border-color: rgba(239, 68, 68, .24);
+            background: linear-gradient(135deg, rgba(239, 68, 68, .08), rgba(255, 255, 255, .96));
+        }
+
+        .stock-panel-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: .98rem;
+            font-weight: 800;
+            color: #166534;
+        }
+
+        .stock-panel.low-stock .stock-panel-title {
+            color: #c2410c;
+        }
+
+        .stock-panel.out-of-stock .stock-panel-title {
+            color: #b91c1c;
+        }
+
+        .stock-panel-detail {
+            color: #475569;
+            font-size: .95rem;
+            line-height: 1.6;
+        }
+
+        .freshness-panel {
+            display: grid;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(13, 148, 136, .18);
+            background: linear-gradient(135deg, rgba(204, 251, 241, .72), rgba(255, 255, 255, .96));
+            margin-bottom: 16px;
+        }
+
+        .freshness-panel-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #0f766e;
+            font-size: .98rem;
+            font-weight: 800;
+        }
+
+        .freshness-panel-text {
+            color: #475569;
+            font-size: .94rem;
+            line-height: 1.65;
+        }
+
+        .freshness-panel-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .freshness-panel-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: .76rem;
+            font-weight: 800;
+            color: #0f766e;
+            background: rgba(255, 255, 255, .86);
+        }
+
+        .freshness-panel-badge.pack {
+            color: #7c2d12;
+        }
+
+        .freshness-panel-badge.origin {
+            color: #1d4ed8;
+        }
+
+        .summary-text {
+            color: #334155;
+            font-size: 1rem;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .cta-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .btn-detail-primary,
+        .btn-detail-secondary,
+        .btn-detail-ghost {
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-weight: 700;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .btn-detail-primary {
+            background: var(--brand-orange);
+            color: #fff;
+            border: 0;
+        }
+
+        .btn-detail-primary:hover {
+            background: #ea580c;
+            color: #fff;
+        }
+
+        .btn-detail-secondary {
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid #fdba74;
+        }
+
+        .btn-detail-secondary:hover {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .btn-detail-ghost {
+            background: #fff;
+            color: var(--brand-deep);
+            border: 1px solid var(--border-soft);
+        }
+
+        .btn-detail-ghost:hover {
+            color: var(--brand-orange);
+            border-color: #fdba74;
+        }
+
+        .btn-detail-ghost.has-unread {
+            background: #fff1f2;
+            color: #be123c;
+            border-color: #fda4af;
+        }
+
+        .section-card {
+            background: #fff;
+            border: 1px solid var(--border-soft);
+            border-radius: 18px;
+            padding: 22px;
+            margin-top: 18px;
+        }
+
+        .section-card h2 {
+            font-size: 1.05rem;
+            font-weight: 800;
+            margin-bottom: 14px;
+        }
+
+        .detail-facts {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .fact-tile {
+            background: var(--surface-soft);
+            border: 1px solid var(--border-soft);
+            border-radius: 14px;
+            padding: 14px;
+        }
+
+        .fact-label {
+            color: #64748b;
+            font-size: .84rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .fact-value {
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .product-description {
+            color: #334155;
+            line-height: 1.75;
+            white-space: pre-line;
+        }
+
+        .offer-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .offer-card {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 14px;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .06), rgba(249, 115, 22, .05));
+            border: 1px solid rgba(226, 232, 240, .95);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .offer-card.is-primary {
+            border-color: rgba(22, 163, 74, .28);
+            box-shadow: 0 12px 28px rgba(22, 163, 74, .08);
+        }
+
+        .offer-guide {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding: 16px 18px;
+            border-radius: 16px;
+            border: 1px solid rgba(22, 163, 74, .18);
+            background: linear-gradient(135deg, rgba(220, 252, 231, .78), rgba(255, 255, 255, .96));
+        }
+
+        .offer-guide.low-stock {
+            border-color: rgba(249, 115, 22, .24);
+            background: linear-gradient(135deg, rgba(255, 237, 213, .82), rgba(255, 255, 255, .96));
+        }
+
+        .offer-guide.out-of-stock {
+            border-color: rgba(239, 68, 68, .24);
+            background: linear-gradient(135deg, rgba(254, 226, 226, .82), rgba(255, 255, 255, .96));
+        }
+
+        .offer-guide-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            color: #166534;
+        }
+
+        .offer-guide.low-stock .offer-guide-title {
+            color: #c2410c;
+        }
+
+        .offer-guide.out-of-stock .offer-guide-title {
+            color: #b91c1c;
+        }
+
+        .offer-guide-text {
+            color: #475569;
+            font-size: .94rem;
+            line-height: 1.65;
+        }
+
+        .offer-guide-list {
+            margin: 0;
+            padding-left: 1.1rem;
+            color: #334155;
+            font-size: .92rem;
+        }
+
+        .offer-guide-list li + li {
+            margin-top: 4px;
+        }
+
+        .offer-avatar,
+        .offer-avatar-fallback {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            object-fit: cover;
+            display: grid;
+            place-items: center;
+            background: #dcfce7;
+            color: var(--brand-deep);
+            font-weight: 800;
+            font-size: 1rem;
+        }
+
+        .offer-shop-name {
+            font-size: 1rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .offer-shop-line {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .offer-shop-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: .76rem;
+            font-weight: 800;
+            color: #166534;
+            background: rgba(34, 197, 94, .12);
+        }
+
+        .offer-meta {
+            color: #64748b;
+            font-size: .9rem;
+            line-height: 1.55;
+        }
+
+        .offer-trust-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .offer-trust-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: .74rem;
+            font-weight: 800;
+            color: #166534;
+            background: rgba(220, 252, 231, .95);
+        }
+
+        .offer-trust-badge.new {
+            color: #9a3412;
+            background: rgba(255, 237, 213, .95);
+        }
+
+        .offer-trust-badge.address {
+            color: #1d4ed8;
+            background: rgba(219, 234, 254, .95);
+        }
+
+        .offer-price {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #ef4444;
+            margin-bottom: 8px;
+            text-align: right;
+        }
+
+        .offer-action {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 138px;
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            color: var(--brand-deep);
+            border: 1px solid var(--border-soft);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .offer-action:hover {
+            color: var(--brand-orange);
+            border-color: #fdba74;
+        }
+
+        .btn-detail-primary.is-disabled,
+        .btn-detail-secondary.is-disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            pointer-events: none;
+            box-shadow: none;
+        }
+
+        .offer-state {
+            color: #64748b;
+            font-size: .95rem;
+        }
+
+        .state-box {
+            background: #fff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            padding: 42px 24px;
+            text-align: center;
+            color: #64748b;
+        }
+
+        @@media (max-width: 991.98px) {
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .detail-media {
+                border-right: 0;
+                border-bottom: 1px solid rgba(226, 232, 240, .95);
+            }
+        }
+
+        @@media (max-width: 767.98px) {
+            .header-main-wrap,
+            .header-search-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .header-actions-wrap {
+                width: 100%;
+            }
+
+            .header-cart-link {
+                justify-content: center;
+            }
+
+            .page-shell {
+                padding-top: 18px;
+            }
+
+            .detail-media,
+            .detail-panel {
+                padding: 18px;
+            }
+
+            .cta-row,
+            .detail-facts {
+                grid-template-columns: 1fr;
+            }
+
+            .offer-card {
+                grid-template-columns: 1fr;
+            }
+
+            .offer-price {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_PromoBarLegacy")
+    @await Html.PartialAsync("_HeaderLegacy")
+    @await Html.PartialAsync("_NavLegacy")
+
+    <main class="container page-shell">
+        <div class="crumb-row">
+            <a class="crumb-link" href="@(string.IsNullOrWhiteSpace(keyword) ? "/search" : $"/search?q={Uri.EscapeDataString(keyword)}")">
+                <i class="bi bi-arrow-left"></i> Quay lại tìm kiếm
+            </a>
+            <div class="text-muted small">Chi tiết sản phẩm công khai</div>
+        </div>
+
+        <div id="productLoading" class="state-box">
+            <div class="spinner-border text-success mb-3" role="status"></div>
+            <div>Đang tải thông tin sản phẩm...</div>
+        </div>
+
+        <div id="productError" class="state-box d-none"></div>
+        <div id="productDetailRoot" class="d-none"></div>
+    </main>
+
+    <form id="productAntiForgeryForm" class="d-none" method="post">
+        @Html.AntiForgeryToken()
+    </form>
+
+    @await Html.PartialAsync("_FooterLegacy")
+
+    <script>
+        (() => {
+            const productId = @productId;
+            const searchKeyword = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(keyword));
+            const isAuthenticated = @(isAuthenticated ? "true" : "false");
+            const isBuyerEligible = @(isBuyerEligible ? "true" : "false");
+            const signInUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(signInUrl));
+            const endpoint = `/bff/products/${productId}`;
+            const offersEndpoint = `/bff/products/${productId}/offers`;
+            const antiForgeryToken = document.querySelector("#productAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
+            const loadingNode = document.getElementById("productLoading");
+            const errorNode = document.getElementById("productError");
+            const rootNode = document.getElementById("productDetailRoot");
+            const headerSearchInput = document.getElementById("headerSearchInput");
+            let chatSummaryTimer = 0;
+
+            const escapeHtml = (value) => (value ?? "")
+                .toString()
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#39;");
+
+            const toNumber = (value, fallback = 0) => {
+                const numeric = Number(value);
+                return Number.isFinite(numeric) ? numeric : fallback;
+            };
+
+            const vnd = (value) => `${toNumber(value, 0).toLocaleString("vi-VN")} đ`;
+
+            const resolveImageUrl = (raw) => {
+                const imageFileName = (raw.imageFileName ?? raw.ImageFileName ?? "").toString().trim();
+                if (!imageFileName) {
+                    return "/Images/no-image.png";
+                }
+
+                if (/^(https?:)?\/\//i.test(imageFileName) || imageFileName.startsWith("/")) {
+                    return imageFileName;
+                }
+
+                return `/Images/${imageFileName}`;
+            };
+
+            const normalizeProduct = (raw) => {
+                const infos = Array.isArray(raw.productInfos ?? raw.ProductInfos)
+                    ? (raw.productInfos ?? raw.ProductInfos)
+                    : [];
+                const firstInfo = infos[0] ?? {};
+
+                return {
+                    productId: toNumber(raw.productId ?? raw.ProductId, 0),
+                    productName: (raw.productName ?? raw.ProductName ?? "Nông sản chưa đặt tên").toString(),
+                    primarySellerId: toNumber(raw.primarySellerId ?? raw.PrimarySellerId, 0),
+                    sku: (raw.sku ?? raw.Sku ?? "").toString(),
+                    price: toNumber(raw.price ?? raw.Price, 0),
+                    status: Boolean(raw.status ?? raw.Status),
+                    stockQuantity: toNumber(raw.stockQuantity ?? raw.StockQuantity, 0),
+                    image: resolveImageUrl(raw),
+                    categoryName: (raw.categoryName ?? raw.CategoryName ?? "Chưa phân loại").toString(),
+                    unitName: (raw.unitName ?? raw.UnitName ?? "đơn vị").toString(),
+                    unitSymbol: (raw.unitSymbol ?? raw.UnitSymbol ?? "").toString(),
+                    shortDescription: (raw.shortDescription ?? raw.ShortDescription ?? "").toString().trim(),
+                    longDescription: (raw.longDescription ?? raw.LongDescription ?? "").toString().trim(),
+                    weight: (firstInfo.weight ?? firstInfo.Weight ?? "").toString().trim(),
+                    origin: (firstInfo.origin ?? firstInfo.Origin ?? "").toString().trim(),
+                    standard: (firstInfo.standard ?? firstInfo.Standard ?? "").toString().trim(),
+                    preservation: (firstInfo.preservation ?? firstInfo.Preservation ?? "").toString().trim()
+                };
+            };
+
+            const resolveAvailability = (stockQuantity) => {
+                const stock = toNumber(stockQuantity, 0);
+                if (stock <= 0) return "out-of-stock";
+                if (stock <= 10) return "low-stock";
+                return "in-stock";
+            };
+
+            const getAvailabilityMeta = (stockQuantity) => {
+                const stock = toNumber(stockQuantity, 0);
+                const key = resolveAvailability(stock);
+                if (key === "out-of-stock") {
+                    return {
+                        key,
+                        statusClass: "danger",
+                        icon: "bi-x-circle",
+                        label: "Hết hàng",
+                        detail: "Sản phẩm này đang tạm hết hàng. Bạn vẫn có thể vào shop để xem thêm lựa chọn thay thế."
+                    };
+                }
+
+                if (key === "low-stock") {
+                    return {
+                        key,
+                        statusClass: "warn",
+                        icon: "bi-exclamation-circle",
+                        label: "Sắp hết hàng",
+                        detail: `Hiện chỉ còn khoảng ${stock.toLocaleString("vi-VN")} ${stock === 1 ? "đơn vị" : "đơn vị"} khả dụng. Nếu phù hợp bạn nên đặt sớm.`
+                    };
+                }
+
+                return {
+                    key,
+                    statusClass: "ok",
+                    icon: "bi-check-circle",
+                    label: "Còn hàng",
+                    detail: `Hiện còn khoảng ${stock.toLocaleString("vi-VN")} đơn vị sẵn sàng cho đơn mới.`
+                };
+            };
+
+            const getFreshnessSignals = (product) => {
+                const signals = [];
+                const preservation = (product?.preservation ?? "").toString().trim();
+                const origin = (product?.origin ?? "").toString().trim();
+                const weight = (product?.weight ?? "").toString().trim();
+                const normalizedPreservation = preservation
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+
+                if (origin) {
+                    signals.push({ key: "origin", icon: "bi-geo-alt", label: "Xuất xứ rõ ràng" });
+                }
+
+                if (normalizedPreservation.includes("lanh")) {
+                    signals.push({ key: "fresh", icon: "bi-snow", label: "Ưu tiên chuỗi lạnh" });
+                } else if (normalizedPreservation.includes("mat")) {
+                    signals.push({ key: "fresh", icon: "bi-thermometer-snow", label: "Giữ mát khi giao" });
+                } else if (normalizedPreservation.includes("kho")) {
+                    signals.push({ key: "fresh", icon: "bi-box-seam", label: "Bảo quản khô ráo" });
+                } else if (preservation) {
+                    signals.push({ key: "fresh", icon: "bi-shield-check", label: "Có hướng dẫn bảo quản" });
+                }
+
+                if (weight) {
+                    signals.push({ key: "pack", icon: "bi-bag-check", label: "Quy cách rõ ràng" });
+                }
+
+                return signals.slice(0, 3);
+            };
+
+            const renderFreshnessPanel = (product) => {
+                const signals = getFreshnessSignals(product);
+                if (signals.length === 0) {
+                    return "";
+                }
+
+                return `
+                    <div class="freshness-panel">
+                        <div class="freshness-panel-title">
+                            <i class="bi bi-truck"></i>
+                            <span>Gợi ý giao và bảo quản</span>
+                        </div>
+                        <div class="freshness-panel-text">
+                            FreshFarm đang hiển thị các tín hiệu thực tế từ dữ liệu sản phẩm để bạn dễ trao đổi với shop trước khi chốt đơn.
+                        </div>
+                        <div class="freshness-panel-badges">
+                            ${signals.map((signal) => `
+                                <span class="freshness-panel-badge ${signal.key}">
+                                    <i class="bi ${signal.icon}"></i>
+                                    <span>${escapeHtml(signal.label)}</span>
+                                </span>
+                            `).join("")}
+                        </div>
+                    </div>
+                `;
+            };
+
+            const buildCheckoutUrl = (product, qty = 1) => {
+                const query = new URLSearchParams({
+                    productId: String(product.productId),
+                    productName: product.productName,
+                    unitPrice: String(product.price),
+                    unitSymbol: product.unitName,
+                    quantity: String(Math.max(1, qty))
+                });
+                return "/checkout?" + query.toString();
+            };
+
+            const buildShopUrl = (sellerId) => {
+                const normalizedSellerId = toNumber(sellerId, 0);
+                return normalizedSellerId > 0 ? `/shop/${normalizedSellerId}` : "";
+            };
+
+            const buildShopChatUrl = (sellerId) => {
+                const shopUrl = buildShopUrl(sellerId);
+                return shopUrl ? `${shopUrl}#shop-chat` : "";
+            };
+
+            const loadChatSummary = async (sellerId) => {
+                if (!isAuthenticated || !isBuyerEligible || toNumber(sellerId, 0) <= 0) {
+                    return null;
+                }
+
+                try {
+                    const response = await fetch(`/bff/support-chat/sellers/${sellerId}/conversation`, {
+                        headers: { "Accept": "application/json" }
+                    });
+
+                    const text = await response.text();
+                    const payload = text ? JSON.parse(text) : null;
+                    if (!response.ok) {
+                        return null;
+                    }
+
+                    return payload?.conversation ?? null;
+                } catch {
+                    return null;
+                }
+            };
+
+            const applyPrimaryChatState = (conversation) => {
+                const primaryChatCta = document.getElementById("primaryChatCta");
+                if (!(primaryChatCta instanceof HTMLAnchorElement) || !conversation) {
+                    return;
+                }
+
+                primaryChatCta.classList.remove("has-unread");
+
+                if (conversation.hasUnread) {
+                    primaryChatCta.textContent = "Xem tin nhắn mới";
+                    primaryChatCta.classList.add("has-unread");
+                    return;
+                }
+
+                if (conversation.lastTime) {
+                    primaryChatCta.textContent = "Mở cuộc trò chuyện";
+                    return;
+                }
+
+                primaryChatCta.textContent = "Chat với shop";
+            };
+
+            const startPrimaryChatPolling = (sellerId) => {
+                if (!isBuyerEligible || toNumber(sellerId, 0) <= 0 || chatSummaryTimer) {
+                    return;
+                }
+
+                chatSummaryTimer = window.setInterval(() => {
+                    if (document.hidden) {
+                        return;
+                    }
+
+                    void loadChatSummary(sellerId).then((conversation) => {
+                        applyPrimaryChatState(conversation);
+                    });
+                }, 12000);
+            };
+
+            const formatDate = (value) => {
+                if (!value) {
+                    return "Chưa rõ thời gian";
+                }
+
+                const date = new Date(value);
+                return Number.isNaN(date.getTime())
+                    ? "Chưa rõ thời gian"
+                    : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+            };
+
+            const parseDate = (value) => {
+                if (!value) {
+                    return null;
+                }
+
+                const parsed = new Date(value);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            };
+
+            const getOfferTrustSignals = (offer) => {
+                const signals = [];
+                const joinedAt = parseDate(offer.joinedAt ?? offer.JoinedAt);
+                const now = new Date();
+                const daysActive = joinedAt ? Math.floor((now.getTime() - joinedAt.getTime()) / 86400000) : null;
+                const addressText = (offer.addressSummary ?? offer.AddressSummary ?? "").toString().trim();
+                const hasAddress = !!addressText && !/^chưa cập nhật/i.test(addressText);
+
+                if (typeof daysActive === "number" && daysActive >= 180) {
+                    signals.push({ key: "stable", icon: "bi-patch-check", label: "Hoạt động lâu" });
+                } else if (typeof daysActive === "number" && daysActive <= 90) {
+                    signals.push({ key: "new", icon: "bi-stars", label: "Mới tham gia" });
+                }
+
+                if (hasAddress) {
+                    signals.push({ key: "address", icon: "bi-geo-alt", label: "Có địa chỉ shop" });
+                }
+
+                return signals.slice(0, 2);
+            };
+
+            const renderOfferTrustBadges = (offer) => {
+                const signals = getOfferTrustSignals(offer);
+                if (signals.length === 0) {
+                    return "";
+                }
+
+                return `
+                    <div class="offer-trust-badges">
+                        ${signals.map((signal) => `
+                            <span class="offer-trust-badge ${signal.key}">
+                                <i class="bi ${signal.icon}"></i>
+                                <span>${escapeHtml(signal.label)}</span>
+                            </span>
+                        `).join("")}
+                    </div>
+                `;
+            };
+
+            const resolveAvatar = (value) => {
+                const raw = (value ?? "").toString().trim();
+                if (!raw) {
+                    return "";
+                }
+
+                if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("/")) {
+                    return raw;
+                }
+
+                return `/Images/${raw}`;
+            };
+
+            const submitAddToCart = (product, qty = 1) => {
+                if (!antiForgeryToken || product.productId <= 0) {
+                    return;
+                }
+
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/cart/add";
+                form.style.display = "none";
+
+                const addField = (name, value) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = String(value ?? "");
+                    form.appendChild(input);
+                };
+
+                addField("__RequestVerificationToken", antiForgeryToken);
+                addField("ProductId", product.productId);
+                addField("ProductName", product.productName);
+                addField("UnitPrice", product.price);
+                addField("UnitSymbol", product.unitName);
+                addField("Quantity", Math.max(1, toNumber(qty, 1)));
+
+                document.body.appendChild(form);
+                form.submit();
+            };
+
+            const redirectToSearch = (keyword) => {
+                const normalizedKeyword = (keyword ?? "").toString().trim();
+                const targetUrl = normalizedKeyword
+                    ? `/search?q=${encodeURIComponent(normalizedKeyword)}`
+                    : "/search";
+                window.location.href = targetUrl;
+            };
+
+            const showError = (message) => {
+                loadingNode.classList.add("d-none");
+                rootNode.classList.add("d-none");
+                errorNode.classList.remove("d-none");
+                errorNode.innerHTML = `
+                    <div class="fw-bold mb-2">Không tải được sản phẩm</div>
+                    <div>${escapeHtml(message)}</div>
+                `;
+            };
+
+            const renderOffers = (product, offers) => {
+                const offersNode = document.getElementById("sellerOfferList");
+                if (!(offersNode instanceof HTMLElement)) {
+                    return;
+                }
+
+                const availability = getAvailabilityMeta(product.stockQuantity);
+                const canPurchase = availability.key !== "out-of-stock";
+                const guideHtml = `
+                    <div class="offer-guide ${availability.key}">
+                        <div class="offer-guide-title">
+                            <i class="bi ${availability.icon}"></i>
+                            <span>${escapeHtml(canPurchase ? "Chọn shop phù hợp để đặt mua" : "Sản phẩm chính đang tạm hết hàng" )}</span>
+                        </div>
+                        <div class="offer-guide-text">
+                            ${escapeHtml(canPurchase
+                                ? "FreshFarm đang hiển thị các shop công khai có bán cùng sản phẩm này. Bạn có thể ưu tiên shop chính, hoặc nhắn shop để hỏi thêm về thời gian giao và chất lượng lô hàng."
+                                : "Bạn vẫn có thể vào shop hoặc nhắn shop để hỏi thời điểm nhập lại hàng, lô thay thế, hoặc các sản phẩm tương tự đang còn bán.")}
+                        </div>
+                        <ul class="offer-guide-list">
+                            <li>${escapeHtml(canPurchase ? "Shop được gắn nhãn 'Shop chính của sản phẩm' là shop đang gắn trực tiếp với PDP hiện tại." : "Ưu tiên nhắn shop trước khi quyết định mua để xác nhận khả năng cung ứng.")}</li>
+                            <li>Vào shop để xem thêm mặt hàng cùng seller nếu bạn muốn so sánh nhanh.</li>
+                        </ul>
+                    </div>
+                `;
+
+                if (!Array.isArray(offers) || offers.length === 0) {
+                    offersNode.innerHTML = `${guideHtml}<div class='offer-state'>Chưa có thêm shop công khai nào khác cho sản phẩm này.</div>`;
+                    return;
+                }
+
+                offersNode.innerHTML = guideHtml + offers
+                    .map((offer) => {
+                        const avatarUrl = resolveAvatar(offer.avatar ?? offer.Avatar);
+                        const shopName = (offer.shopName ?? offer.ShopName ?? `Seller #${offer.sellerId ?? offer.SellerId}`).toString();
+                        const address = (offer.addressSummary ?? offer.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động").toString();
+                        const activeSince = formatDate(offer.activeSinceUtc ?? offer.ActiveSinceUtc);
+                        const joinedAt = formatDate(offer.joinedAt ?? offer.JoinedAt);
+                        const sellerIdValue = toNumber(offer.sellerId ?? offer.SellerId, 0);
+                        const isPrimarySeller = sellerIdValue > 0 && sellerIdValue === toNumber(product.primarySellerId, 0);
+
+                        return `
+                            <article class="offer-card${isPrimarySeller ? " is-primary" : ""}">
+                                ${avatarUrl
+                                    ? `<img src="${avatarUrl}" alt="${escapeHtml(shopName)}" class="offer-avatar" />`
+                                    : `<div class="offer-avatar-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
+                                <div>
+                                    <div class="offer-shop-line">
+                                        <div class="offer-shop-name">${escapeHtml(shopName)}</div>
+                                        ${isPrimarySeller ? `<span class="offer-shop-badge"><i class="bi bi-stars"></i> Shop chính của sản phẩm</span>` : ""}
+                                    </div>
+                                    <div class="offer-meta">
+                                        <div><i class="bi bi-geo-alt"></i> ${escapeHtml(address)}</div>
+                                        <div><i class="bi bi-shop"></i> Seller ID #${sellerIdValue}</div>
+                                        <div><i class="bi bi-calendar-check"></i> Bán từ ${escapeHtml(activeSince)} · Tham gia ${escapeHtml(joinedAt)}</div>
+                                    </div>
+                                    ${renderOfferTrustBadges(offer)}
+                                </div>
+                                <div>
+                                    <div class="offer-price">${vnd(product.price)}</div>
+                                    ${canPurchase
+                                        ? `<a href="${buildCheckoutUrl(product)}" class="offer-action mb-2">${isPrimarySeller ? "Mua từ shop chính" : "Chọn mua"}</a>`
+                                        : `<a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Hỏi shop chính" : "Hỏi shop này"}</a>`}
+                                    <a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Nhắn shop chính" : "Nhắn shop"}</a>
+                                    <a href="${buildShopUrl(sellerIdValue)}" class="offer-action">Vào shop</a>
+                                </div>
+                            </article>
+                        `;
+                    })
+                    .join("");
+            };
+
+            const loadOffers = async (product) => {
+                try {
+                    const response = await fetch(offersEndpoint, { headers: { "Accept": "application/json" } });
+                    const text = await response.text();
+                    const payload = text ? JSON.parse(text) : [];
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                    }
+
+                    renderOffers(product, payload);
+                } catch {
+                    renderOffers(product, []);
+                }
+            };
+
+            const renderProduct = (product) => {
+                const summary = product.shortDescription || "Sản phẩm đang được hiển thị trên marketplace FreshFarm. Thông tin chi tiết đang được chuẩn hóa dần theo dữ liệu thật.";
+                const longDescription = product.longDescription || product.shortDescription || "Chưa có mô tả chi tiết cho sản phẩm này.";
+                const availability = getAvailabilityMeta(product.stockQuantity);
+                const statusClass = availability.statusClass;
+                const statusText = availability.label;
+                const canPurchase = availability.key !== "out-of-stock";
+                const backUrl = searchKeyword ? `/search?q=${encodeURIComponent(searchKeyword)}` : "/search";
+                const primaryShopUrl = buildShopUrl(product.primarySellerId);
+                const primaryChatUrl = buildShopChatUrl(product.primarySellerId);
+                const primaryChatLabel = primaryShopUrl
+                    ? (isBuyerEligible ? "Chat với shop" : (isAuthenticated ? "Xem shop đang bán" : "Đăng nhập để chat"))
+                    : "Quay lại tìm kiếm";
+
+                rootNode.innerHTML = `
+                    <section class="detail-shell">
+                        <div class="detail-grid">
+                            <div class="detail-media">
+                                <div class="detail-image-frame">
+                                    <img src="${product.image}" alt="${escapeHtml(product.productName)}" class="detail-image" />
+                                </div>
+                            </div>
+                            <div class="detail-panel">
+                                <div class="eyebrow"><i class="bi bi-flower1"></i> Nông sản công khai trên FreshFarm</div>
+                                <h1 class="product-title">${escapeHtml(product.productName)}</h1>
+                                <div class="meta-row">
+                                    <span class="meta-chip"><i class="bi bi-grid"></i> ${escapeHtml(product.categoryName)}</span>
+                                    <span class="meta-chip"><i class="bi bi-box-seam"></i> ${escapeHtml(product.unitName)}</span>
+                                    <span class="meta-chip"><i class="bi bi-upc-scan"></i> ${escapeHtml(product.sku || "Chưa có SKU")}</span>
+                                </div>
+                                <div class="price-row">
+                                    <div class="price-main">${vnd(product.price)}</div>
+                                    <div class="unit-text">/ ${escapeHtml(product.unitName)}</div>
+                                </div>
+                                <div class="status-row">
+                                    <span class="status-pill ${statusClass}"><i class="bi ${availability.icon}"></i> ${escapeHtml(statusText)}</span>
+                                    <span class="status-pill ${product.status ? "ok" : "warn"}"><i class="bi bi-patch-check"></i> ${product.status ? "Đang hiển thị" : "Đang ẩn"}</span>
+                                </div>
+                                <div class="stock-panel ${availability.key}">
+                                    <div class="stock-panel-title">
+                                        <i class="bi ${availability.icon}"></i>
+                                        <span>${escapeHtml(availability.label)}</span>
+                                    </div>
+                                    <div class="stock-panel-detail">${escapeHtml(availability.detail)}</div>
+                                </div>
+                                ${renderFreshnessPanel(product)}
+                                <div class="summary-text">${escapeHtml(summary)}</div>
+                                <div class="cta-row">
+                                    ${canPurchase
+                                        ? `<a href="${buildCheckoutUrl(product)}" class="btn-detail-primary">Mua ngay</a>`
+                                        : `<button type="button" class="btn-detail-primary is-disabled" disabled>Tạm hết hàng</button>`}
+                                    <button type="button" id="addToCartBtn" class="btn-detail-secondary${canPurchase ? "" : " is-disabled"}" ${canPurchase ? "" : "disabled"}>Thêm vào giỏ</button>
+                                    ${primaryChatUrl
+                                        ? `<a href="${isBuyerEligible ? primaryChatUrl : (isAuthenticated ? primaryShopUrl : signInUrl)}" id="primaryChatCta" class="btn-detail-ghost">${primaryChatLabel}</a>`
+                                        : `<a href="${backUrl}" class="btn-detail-ghost">Quay lại tìm kiếm</a>`}
+                                </div>
+                                <div class="section-card">
+                                    <h2>Thông tin nông sản</h2>
+                                    <div class="detail-facts">
+                                        <div class="fact-tile">
+                                            <div class="fact-label">Xuất xứ</div>
+                                            <div class="fact-value">${escapeHtml(product.origin || "Chưa cập nhật")}</div>
+                                        </div>
+                                        <div class="fact-tile">
+                                            <div class="fact-label">Chuẩn nông sản</div>
+                                            <div class="fact-value">${escapeHtml(product.standard || "Chưa cập nhật")}</div>
+                                        </div>
+                                        <div class="fact-tile">
+                                            <div class="fact-label">Khối lượng</div>
+                                            <div class="fact-value">${escapeHtml(product.weight || "Chưa cập nhật")}</div>
+                                        </div>
+                                        <div class="fact-tile">
+                                            <div class="fact-label">Bảo quản</div>
+                                            <div class="fact-value">${escapeHtml(product.preservation || "Chưa cập nhật")}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="section-card">
+                        <h2>Mô tả chi tiết</h2>
+                        <div class="product-description">${escapeHtml(longDescription)}</div>
+                    </section>
+                    <section class="section-card">
+                        <h2>Nhiều shop cùng bán</h2>
+                        <div class="offer-state mb-3">FreshFarm đang gom các seller đang hoạt động cho cùng sản phẩm này.</div>
+                        <div id="sellerOfferList" class="offer-list">
+                            <div class="offer-state">Đang tải danh sách shop...</div>
+                        </div>
+                    </section>
+                `;
+
+                rootNode.classList.remove("d-none");
+                loadingNode.classList.add("d-none");
+                errorNode.classList.add("d-none");
+
+                const addToCartBtn = document.getElementById("addToCartBtn");
+                if (addToCartBtn instanceof HTMLButtonElement) {
+                    addToCartBtn.addEventListener("click", () => submitAddToCart(product));
+                }
+
+                void loadOffers(product);
+
+                if (isBuyerEligible && product.primarySellerId > 0) {
+                    void loadChatSummary(product.primarySellerId).then((conversation) => {
+                        applyPrimaryChatState(conversation);
+                    });
+                    startPrimaryChatPolling(product.primarySellerId);
+                }
+            };
+
+            if (!Number.isInteger(productId) || productId <= 0) {
+                showError("ID sản phẩm không hợp lệ.");
+                return;
+            }
+
+            if (headerSearchInput instanceof HTMLInputElement && searchKeyword && !headerSearchInput.value.trim()) {
+                headerSearchInput.value = searchKeyword;
+            }
+
+            document.querySelectorAll("[data-header-keyword]").forEach((link) => {
+                link.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    redirectToSearch(link.getAttribute("data-header-keyword") || "");
+                });
+            });
+
+            fetch(endpoint, { headers: { "Accept": "application/json" } })
+                .then(async (response) => {
+                    const text = await response.text();
+                    let payload = null;
+
+                    try {
+                        payload = text ? JSON.parse(text) : null;
+                    } catch {
+                        payload = null;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                    }
+
+                    return payload;
+                })
+                .then((payload) => renderProduct(normalizeProduct(payload)))
+                .catch((error) => showError(error?.message || "Không thể tải dữ liệu sản phẩm."));
+        })();
+    </script>
+</body>
+</html>

@@ -6,6 +6,8 @@ public sealed class MerchantManagementPageViewModel
 
     public string Status { get; set; } = "all";
 
+    public string Queue { get; set; } = "all";
+
     public int Page { get; set; } = 1;
 
     public int PageSize { get; set; } = 20;
@@ -19,6 +21,8 @@ public sealed class MerchantManagementPageViewModel
     public MerchantStatsViewModel Stats { get; set; } = new();
 
     public List<MerchantOptionViewModel> StatusOptions { get; set; } = new();
+
+    public List<MerchantOptionViewModel> QueueOptions { get; set; } = new();
 
     public List<MerchantListItemViewModel> Merchants { get; set; } = new();
 
@@ -36,6 +40,12 @@ public sealed class MerchantStatsViewModel
     public int ReviewNeeded { get; set; }
 
     public int MissingAddress { get; set; }
+
+    public int ApprovalQueue { get; set; }
+
+    public int ProfileFixQueue { get; set; }
+
+    public int DormantQueue { get; set; }
 }
 
 public sealed class MerchantOptionViewModel
@@ -78,6 +88,12 @@ public class MerchantListItemViewModel
     public List<MerchantFlagViewModel> Flags { get; set; } = new();
 
     public int? DaysSinceLastLogin { get; set; }
+
+    public string QueueBucket { get; set; } = string.Empty;
+
+    public string RecommendedAction { get; set; } = string.Empty;
+
+    public int IssueCount { get; set; }
 }
 
 public class MerchantDetailViewModel : MerchantListItemViewModel
@@ -91,6 +107,8 @@ public class MerchantDetailViewModel : MerchantListItemViewModel
     public string? Ward { get; set; }
 
     public string ComplianceSummary { get; set; } = string.Empty;
+
+    public List<string> NextSteps { get; set; } = new();
 }
 
 public sealed class MerchantFlagViewModel

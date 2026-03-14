@@ -26,6 +26,7 @@ public sealed class AdminMerchantsController : ControllerBase
     public async Task<IActionResult> Get(
         [FromQuery] string? search = null,
         [FromQuery] string? status = null,
+        [FromQuery] string? queue = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize,
         CancellationToken cancellationToken = default)
@@ -33,6 +34,7 @@ public sealed class AdminMerchantsController : ControllerBase
         page = page < 1 ? 1 : page;
         pageSize = pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, MaxPageSize);
         var normalizedStatus = NormalizeStatus(status);
+        var normalizedQueue = NormalizeQueue(queue);
 
         var sellerRoleId = await _db.Roles
             .AsNoTracking()
@@ -92,6 +94,10 @@ public sealed class AdminMerchantsController : ControllerBase
         var items = sellers
             .Select(MapMerchantCard)
             .Where(x => MatchesStatus(x, normalizedStatus))
+            .Where(x => MatchesQueue(x, normalizedQueue))
+            .OrderByDescending(x => x.PriorityScore)
+            .ThenByDescending(x => x.ProfileScore)
+            .ThenByDescending(x => x.CreatedAt)
             .ToList();
 
         var total = items.Count;
@@ -118,12 +124,16 @@ public sealed class AdminMerchantsController : ControllerBase
                 ActiveSellers = items.Count(x => x.IsActive),
                 SuspendedSellers = items.Count(x => !x.IsActive),
                 ReviewNeeded = items.Count(x => string.Equals(x.ComplianceStatus, "review", StringComparison.OrdinalIgnoreCase)),
-                MissingAddress = items.Count(x => x.Flags.Any(f => string.Equals(f.Code, "missing-address", StringComparison.OrdinalIgnoreCase)))
+                MissingAddress = items.Count(x => x.Flags.Any(f => string.Equals(f.Code, "missing-address", StringComparison.OrdinalIgnoreCase))),
+                ApprovalQueue = items.Count(x => string.Equals(x.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase)),
+                ProfileFixQueue = items.Count(x => string.Equals(x.QueueBucket, "profile_fix", StringComparison.OrdinalIgnoreCase)),
+                DormantQueue = items.Count(x => string.Equals(x.QueueBucket, "dormant", StringComparison.OrdinalIgnoreCase))
             },
             Filters = new MerchantFiltersDto
             {
                 Search = search?.Trim() ?? string.Empty,
                 Status = normalizedStatus,
+                Queue = normalizedQueue,
                 StatusOptions =
                 [
                     new MerchantOptionDto("all", "Tất cả"),
@@ -131,6 +141,15 @@ public sealed class AdminMerchantsController : ControllerBase
                     new MerchantOptionDto("review", "Cần rà soát"),
                     new MerchantOptionDto("suspended", "Đang tạm khóa"),
                     new MerchantOptionDto("stale", "Lâu không hoạt động")
+                ],
+                QueueOptions =
+                [
+                    new MerchantOptionDto("all", "Tất cả queue"),
+                    new MerchantOptionDto("approval", "Chờ duyệt"),
+                    new MerchantOptionDto("profile_fix", "Bổ sung hồ sơ"),
+                    new MerchantOptionDto("dormant", "Ngủ đông"),
+                    new MerchantOptionDto("suspended", "Đang khóa"),
+                    new MerchantOptionDto("review", "Rà soát tay")
                 ]
             },
             Merchants = paged
@@ -239,7 +258,7 @@ public sealed class AdminMerchantsController : ControllerBase
         return new MerchantListItemDto
         {
             SellerId = row.SellerId,
-            ShopName = string.IsNullOrWhiteSpace(row.FullName) ? row.UserName : row.FullName,
+            ShopName = string.IsNullOrWhiteSpace(row.FullName) ? (row.UserName ?? $"Seller #{row.SellerId}") : row.FullName,
             UserName = row.UserName,
             FullName = row.FullName,
             Email = row.Email,
@@ -253,7 +272,11 @@ public sealed class AdminMerchantsController : ControllerBase
             ProfileScore = profileScore,
             ComplianceStatus = complianceStatus,
             Flags = flags,
-            DaysSinceLastLogin = daysSinceLastLogin
+            DaysSinceLastLogin = daysSinceLastLogin,
+            QueueBucket = DetermineQueueBucket(row, flags, profileScore),
+            RecommendedAction = BuildRecommendedAction(row, flags, profileScore),
+            IssueCount = flags.Count,
+            PriorityScore = CalculatePriorityScore(row, flags, profileScore)
         };
     }
 
@@ -282,8 +305,90 @@ public sealed class AdminMerchantsController : ControllerBase
             ComplianceStatus = card.ComplianceStatus,
             Flags = card.Flags,
             DaysSinceLastLogin = card.DaysSinceLastLogin,
-            ComplianceSummary = BuildComplianceSummary(card)
+            ComplianceSummary = BuildComplianceSummary(card),
+            QueueBucket = card.QueueBucket,
+            RecommendedAction = card.RecommendedAction,
+            IssueCount = card.IssueCount,
+            PriorityScore = card.PriorityScore,
+            NextSteps = BuildNextSteps(card)
         };
+    }
+
+    private static string DetermineQueueBucket(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
+    {
+        if (!row.IsActive)
+        {
+            return "suspended";
+        }
+
+        if (flags.Any(f => f.Code is "missing-phone" or "missing-email" or "missing-address"))
+        {
+            return "profile_fix";
+        }
+
+        if (flags.Any(f => f.Code == "stale-login"))
+        {
+            return "dormant";
+        }
+
+        if (profileScore >= 80)
+        {
+            return "approval";
+        }
+
+        return "review";
+    }
+
+    private static string BuildRecommendedAction(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
+    {
+        if (!row.IsActive)
+        {
+            return "Rà soát lý do khóa và chỉ mở lại khi seller xác nhận tiếp tục vận hành.";
+        }
+
+        if (flags.Any(f => f.Code is "missing-phone" or "missing-email" or "missing-address"))
+        {
+            return "Yêu cầu seller bổ sung hồ sơ liên hệ và địa chỉ hoạt động trước khi đẩy quyền tăng trưởng.";
+        }
+
+        if (flags.Any(f => f.Code == "stale-login"))
+        {
+            return "Liên hệ seller để xác nhận shop còn hoạt động trước khi duyệt campaign hoặc traffic.";
+        }
+
+        if (profileScore >= 80)
+        {
+            return "Có thể đưa vào queue chờ duyệt/whitelist cho campaign nội bộ ở mức MVP.";
+        }
+
+        return "Rà soát thủ công hồ sơ seller trước khi mở rộng quyền hoặc campaign.";
+    }
+
+    private static int CalculatePriorityScore(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
+    {
+        if (!row.IsActive)
+        {
+            return 100;
+        }
+
+        var score = 0;
+        if (flags.Any(f => f.Code == "missing-address"))
+        {
+            score += 35;
+        }
+
+        if (flags.Any(f => f.Code is "missing-phone" or "missing-email"))
+        {
+            score += 20;
+        }
+
+        if (flags.Any(f => f.Code == "stale-login"))
+        {
+            score += 15;
+        }
+
+        score += Math.Max(0, 100 - profileScore);
+        return score;
     }
 
     private static List<MerchantFlagDto> BuildFlags(MerchantProjection row)
@@ -388,6 +493,19 @@ public sealed class AdminMerchantsController : ControllerBase
         };
     }
 
+    private static bool MatchesQueue(MerchantListItemDto item, string queue)
+    {
+        return queue switch
+        {
+            "approval" => string.Equals(item.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase),
+            "profile_fix" => string.Equals(item.QueueBucket, "profile_fix", StringComparison.OrdinalIgnoreCase),
+            "dormant" => string.Equals(item.QueueBucket, "dormant", StringComparison.OrdinalIgnoreCase),
+            "suspended" => string.Equals(item.QueueBucket, "suspended", StringComparison.OrdinalIgnoreCase),
+            "review" => string.Equals(item.QueueBucket, "review", StringComparison.OrdinalIgnoreCase),
+            _ => true
+        };
+    }
+
     private static string BuildAddressSummary(MerchantProjection row)
     {
         var parts = new[]
@@ -424,6 +542,44 @@ public sealed class AdminMerchantsController : ControllerBase
         return "Seller cần bổ sung hoặc xác nhận lại các mục: " + string.Join("; ", card.Flags.Select(x => x.Label)) + ".";
     }
 
+    private static List<string> BuildNextSteps(MerchantListItemDto card)
+    {
+        var steps = new List<string>();
+
+        if (!card.IsActive)
+        {
+            steps.Add("Xác minh lý do tạm khóa với đội vận hành hoặc CS.");
+            steps.Add("Chỉ mở lại seller khi hồ sơ và trạng thái vận hành đã rõ.");
+        }
+
+        if (card.Flags.Any(f => f.Code is "missing-phone" or "missing-email"))
+        {
+            steps.Add("Yêu cầu bổ sung thông tin liên hệ chính.");
+        }
+
+        if (card.Flags.Any(f => f.Code == "missing-address"))
+        {
+            steps.Add("Yêu cầu cập nhật địa chỉ hoạt động hoặc kho xử lý đơn.");
+        }
+
+        if (card.Flags.Any(f => f.Code == "stale-login"))
+        {
+            steps.Add("Kiểm tra seller còn đăng nhập và xử lý đơn trong 30 ngày gần đây hay không.");
+        }
+
+        if (steps.Count == 0 && string.Equals(card.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add("Có thể đưa seller vào queue ưu tiên cho campaign hoặc onboarding nâng cao.");
+        }
+
+        if (steps.Count == 0)
+        {
+            steps.Add("Rà soát thủ công thêm để xác nhận seller sẵn sàng vận hành.");
+        }
+
+        return steps;
+    }
+
     private static string NormalizeStatus(string? status)
     {
         if (string.IsNullOrWhiteSpace(status))
@@ -433,6 +589,19 @@ public sealed class AdminMerchantsController : ControllerBase
 
         var normalized = status.Trim().ToLowerInvariant();
         return normalized is "all" or "ready" or "review" or "suspended" or "stale"
+            ? normalized
+            : "all";
+    }
+
+    private static string NormalizeQueue(string? queue)
+    {
+        if (string.IsNullOrWhiteSpace(queue))
+        {
+            return "all";
+        }
+
+        var normalized = queue.Trim().ToLowerInvariant();
+        return normalized is "all" or "approval" or "profile_fix" or "dormant" or "suspended" or "review"
             ? normalized
             : "all";
     }
@@ -479,13 +648,18 @@ public sealed class AdminMerchantsController : ControllerBase
         public int SuspendedSellers { get; set; }
         public int ReviewNeeded { get; set; }
         public int MissingAddress { get; set; }
+        public int ApprovalQueue { get; set; }
+        public int ProfileFixQueue { get; set; }
+        public int DormantQueue { get; set; }
     }
 
     public sealed class MerchantFiltersDto
     {
         public string Search { get; set; } = string.Empty;
         public string Status { get; set; } = "all";
+        public string Queue { get; set; } = "all";
         public List<MerchantOptionDto> StatusOptions { get; set; } = new();
+        public List<MerchantOptionDto> QueueOptions { get; set; } = new();
     }
 
     public sealed record MerchantOptionDto(string Value, string Text);
@@ -508,6 +682,10 @@ public sealed class AdminMerchantsController : ControllerBase
         public string ComplianceStatus { get; set; } = string.Empty;
         public List<MerchantFlagDto> Flags { get; set; } = new();
         public int? DaysSinceLastLogin { get; set; }
+        public string QueueBucket { get; set; } = string.Empty;
+        public string RecommendedAction { get; set; } = string.Empty;
+        public int IssueCount { get; set; }
+        public int PriorityScore { get; set; }
     }
 
     public sealed class MerchantDetailDto : MerchantListItemDto
@@ -517,6 +695,7 @@ public sealed class AdminMerchantsController : ControllerBase
         public string? District { get; set; }
         public string? Ward { get; set; }
         public string ComplianceSummary { get; set; } = string.Empty;
+        public List<string> NextSteps { get; set; } = new();
     }
 
     public sealed record MerchantFlagDto(string Code, string Label, string Tone);

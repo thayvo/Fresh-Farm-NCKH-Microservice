@@ -2,6 +2,7 @@ using FreshFarm.Ordering.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace FreshFarm.Ordering.Api.Controllers;
 
@@ -160,6 +161,31 @@ public sealed class DisputesAdminController : ControllerBase
             "returns" => await BuildReturnDetailsAsync(id, cancellationToken),
             "refunds" => await BuildRefundDetailsAsync(id, cancellationToken),
             _ => BadRequest(new { message = "Loại case không hợp lệ." })
+        };
+    }
+
+    [HttpPost("actions")]
+    public async Task<IActionResult> TakeAction([FromBody] DisputeActionRequest? request, CancellationToken cancellationToken = default)
+    {
+        if (request is null || request.CaseId <= 0)
+        {
+            return BadRequest(new { success = false, message = "Payload action khong hop le." });
+        }
+
+        var caseType = NormalizeSection(request.CaseType);
+        var actionName = NormalizeAction(request.ActionName);
+        var note = TrimNote(request.Note);
+        if (caseType == "all" || actionName == "all")
+        {
+            return BadRequest(new { success = false, message = "Loai case hoac action khong hop le." });
+        }
+
+        return caseType switch
+        {
+            "support" => await HandleSupportActionAsync(request.CaseId, actionName, note, cancellationToken),
+            "returns" => await HandleReturnActionAsync(request.CaseId, actionName, note, cancellationToken),
+            "refunds" => await HandleRefundActionAsync(request.CaseId, actionName, note, cancellationToken),
+            _ => BadRequest(new { success = false, message = "Loai case khong duoc ho tro." })
         };
     }
 
@@ -554,6 +580,160 @@ public sealed class DisputesAdminController : ControllerBase
         });
     }
 
+    private async Task<IActionResult> HandleSupportActionAsync(int conversationId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var conversation = await _db.SupportConversations.FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
+        if (conversation is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay case ho tro." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                conversation.Status = "pending";
+                conversation.ClosedAt = null;
+                await MarkBuyerMessagesAsReadAsync(conversationId, cancellationToken);
+                break;
+            case "resolve":
+                conversation.Status = "closed";
+                conversation.ClosedAt = DateTime.UtcNow;
+                await MarkBuyerMessagesAsReadAsync(conversationId, cancellationToken);
+                break;
+            case "reopen":
+                conversation.Status = "open";
+                conversation.ClosedAt = null;
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho support case." });
+        }
+
+        var actorUserId = GetActorUserId();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "dispute_center",
+            $"support_{actionName}",
+            "support_case",
+            conversationId,
+            $"Admin {GetActionLabel(actionName)} support case #{conversationId}.",
+            actorUserId,
+            new { caseType = "support", actionName, note });
+        AdminAuditLogger.AddModeration(_db, actionLog, "support_case", conversationId, actionName, note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetActionLabel(actionName)} case ho tro #{conversationId}." });
+    }
+
+    private async Task<IActionResult> HandleReturnActionAsync(int returnId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var request = await _db.ReturnRequests.FirstOrDefaultAsync(x => x.ReturnId == returnId, cancellationToken);
+        if (request is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay case doi tra." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                request.Status = "review";
+                break;
+            case "approve":
+                request.Status = "approved";
+                request.ApprovedAt ??= DateTime.UtcNow;
+                request.Resolution = string.IsNullOrWhiteSpace(note) ? "Approved by admin dispute center." : note;
+                break;
+            case "reject":
+                request.Status = "rejected";
+                request.CompletedAt = DateTime.UtcNow;
+                request.Resolution = string.IsNullOrWhiteSpace(note) ? "Rejected by admin dispute center." : note;
+                break;
+            case "resolve":
+                request.Status = "resolved";
+                request.ApprovedAt ??= DateTime.UtcNow;
+                request.CompletedAt = DateTime.UtcNow;
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    request.Resolution = note;
+                }
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho return case." });
+        }
+
+        var actorUserId = GetActorUserId();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "dispute_center",
+            $"return_{actionName}",
+            "return_case",
+            returnId,
+            $"Admin {GetActionLabel(actionName)} return case #{returnId}.",
+            actorUserId,
+            new { caseType = "returns", actionName, note, sellerId = request.SellerId, request.RefundAmount });
+        AdminAuditLogger.AddModeration(_db, actionLog, "return_case", returnId, actionName, note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetActionLabel(actionName)} return #{returnId}." });
+    }
+
+    private async Task<IActionResult> HandleRefundActionAsync(int refundId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var refund = await _db.RefundTransactions.FirstOrDefaultAsync(x => x.RefundId == refundId, cancellationToken);
+        if (refund is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay refund case." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                refund.Status = "review";
+                break;
+            case "approve":
+                refund.Status = "approved";
+                refund.ProcessedAt ??= DateTime.UtcNow;
+                break;
+            case "reject":
+                refund.Status = "rejected";
+                refund.ProcessedAt = DateTime.UtcNow;
+                break;
+            case "resolve":
+                refund.Status = "processed";
+                refund.ProcessedAt = DateTime.UtcNow;
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho refund case." });
+        }
+
+        var actorUserId = GetActorUserId();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "dispute_center",
+            $"refund_{actionName}",
+            "refund_case",
+            refundId,
+            $"Admin {GetActionLabel(actionName)} refund case #{refundId}.",
+            actorUserId,
+            new { caseType = "refunds", actionName, note, refund.Amount, refund.ReferenceCode });
+        AdminAuditLogger.AddModeration(_db, actionLog, "refund_case", refundId, actionName, note, actorUserId);
+        AdminAuditLogger.AddSettlement(_db, actionLog, $"refund_{actionName}", "refund_case", refundId, null, refund.Amount, note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetActionLabel(actionName)} refund #{refundId}." });
+    }
+
+    private async Task MarkBuyerMessagesAsReadAsync(int conversationId, CancellationToken cancellationToken)
+    {
+        var unreadMessages = await _db.SupportMessages
+            .Where(x => x.ConversationId == conversationId && x.SenderType == 0 && !x.IsRead)
+            .ToListAsync(cancellationToken);
+
+        foreach (var message in unreadMessages)
+        {
+            message.IsRead = true;
+        }
+    }
+
     private async Task<List<CaseQueueRow>> BuildSupportRowsAsync(int? sellerId, CancellationToken cancellationToken)
     {
         var conversations = await _db.SupportConversations
@@ -819,6 +999,50 @@ public sealed class DisputesAdminController : ControllerBase
         };
     }
 
+    private static string NormalizeAction(string? actionName)
+    {
+        var normalized = (actionName ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "acknowledge" => "acknowledge",
+            "approve" => "approve",
+            "reject" => "reject",
+            "resolve" => "resolve",
+            "reopen" => "reopen",
+            _ => "all"
+        };
+    }
+
+    private static string GetActionLabel(string actionName)
+    {
+        return actionName switch
+        {
+            "acknowledge" => "nhan xu ly",
+            "approve" => "phe duyet",
+            "reject" => "tu choi",
+            "resolve" => "dong",
+            "reopen" => "mo lai",
+            _ => actionName
+        };
+    }
+
+    private static string? TrimNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        var trimmed = note.Trim();
+        return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
+    }
+
+    private int? GetActorUserId()
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return int.TryParse(raw, out var actorUserId) ? actorUserId : null;
+    }
+
     private static string GetSupportQueueStatus(string? sourceStatus, bool hasUnreadBuyerMessage, DateTime startedAt, DateTime? lastBuyerMessageAt)
     {
         if (string.Equals(sourceStatus, "Closed", StringComparison.OrdinalIgnoreCase))
@@ -897,5 +1121,13 @@ public sealed class DisputesAdminController : ControllerBase
         public bool IsSlaBreached { get; init; }
         public DateTime CreatedAt { get; init; }
         public DateTime? UpdatedAt { get; init; }
+    }
+
+    public sealed class DisputeActionRequest
+    {
+        public string? CaseType { get; set; }
+        public int CaseId { get; set; }
+        public string? ActionName { get; set; }
+        public string? Note { get; set; }
     }
 }

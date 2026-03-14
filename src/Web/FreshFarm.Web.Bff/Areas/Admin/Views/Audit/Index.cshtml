@@ -1,13 +1,13 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.AuditCenterPageViewModel
 
-<section class="audit-console">
-    <div class="audit-hero mb-4">
+<section class="audit-console ff-admin-shell">
+    <div class="audit-hero ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow text-uppercase mb-2">Cross-cutting controls</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Cross-cutting controls</p>
             <h1 class="fw-bold mb-2">Audit center</h1>
             <p class="mb-0 opacity-75">Theo doi admin action log, moderation audit va settlement audit cho cac lane marketplace moi.</p>
         </div>
-        <div class="hero-chip">7.7A Audit MVP</div>
+        <div class="hero-chip ff-admin-chip">7.7A Audit MVP</div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))

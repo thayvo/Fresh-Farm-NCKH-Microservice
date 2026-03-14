@@ -1,0 +1,107 @@
+:root {
+    --ff-primary: #2563eb;
+    --ff-primary-strong: #1d4ed8;
+    --ff-primary-soft: #60a5fa;
+    --ff-accent: #7dd3fc;
+    --ff-ink: #0f172a;
+    --ff-muted: #64748b;
+    --ff-surface: rgba(255, 255, 255, 0.98);
+    --ff-surface-soft: rgba(248, 250, 252, 0.96);
+    --ff-border: rgba(15, 23, 42, 0.08);
+    --ff-gloss: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+    --ff-shell-bg:
+        radial-gradient(circle at top right, rgba(125, 211, 252, 0.24), transparent 30%),
+        linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+    --ff-hero-bg: linear-gradient(135deg, var(--ff-primary-strong) 0%, var(--ff-primary) 55%, var(--ff-accent) 100%);
+    --ff-card-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+    --ff-hero-shadow: 0 24px 50px rgba(37, 99, 235, .22);
+}
+
+body.admin-theme {
+    background: #eef5ff;
+    color: var(--ff-ink);
+}
+
+.ff-admin-shell {
+    min-height: 100vh;
+    padding: 1.5rem;
+    background: var(--ff-shell-bg);
+}
+
+.ff-admin-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    padding: 2rem;
+    color: #fff;
+    background: var(--ff-hero-bg);
+    box-shadow: var(--ff-hero-shadow);
+}
+
+.ff-admin-hero::after {
+    content: "";
+    position: absolute;
+    inset: -20% auto auto 40%;
+    width: 35%;
+    height: 180%;
+    background: var(--ff-gloss);
+    transform: rotate(18deg);
+    pointer-events: none;
+}
+
+.ff-admin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .45rem .85rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,.16);
+    color: #fff;
+    font-size: .82rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+
+.ff-admin-card {
+    border: 0;
+    border-radius: 1.5rem;
+    background: linear-gradient(180deg, var(--ff-surface), var(--ff-surface-soft));
+    box-shadow: var(--ff-card-shadow);
+}
+
+.ff-admin-panel {
+    border: 1px solid var(--ff-border);
+    border-radius: 1.25rem;
+    background: rgba(255,255,255,.7);
+}
+
+.ff-admin-kicker {
+    color: rgba(255,255,255,.78);
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.ff-admin-muted {
+    color: var(--ff-muted);
+}
+
+.ff-admin-gloss-hover {
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+
+.ff-admin-gloss-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 38px rgba(37, 99, 235, .16);
+}
+
+@media (max-width: 991.98px) {
+    .ff-admin-shell {
+        padding: 1rem;
+    }
+
+    .ff-admin-hero {
+        padding: 1.5rem;
+    }
+}

@@ -182,6 +182,31 @@ public sealed class FinanceAdminController : ControllerBase
         });
     }
 
+    [HttpPost("actions")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> TakeAction([FromBody] FinanceActionRequest? request, CancellationToken cancellationToken = default)
+    {
+        if (request is null || request.RecordId <= 0)
+        {
+            return BadRequest(new { success = false, message = "Payload tai chinh khong hop le." });
+        }
+
+        var section = NormalizeSection(request.Section);
+        var actionName = NormalizeFinanceAction(request.ActionName);
+        var note = TrimNote(request.Note);
+        if (actionName == "all")
+        {
+            return BadRequest(new { success = false, message = "Action tai chinh khong hop le." });
+        }
+
+        return section switch
+        {
+            "refunds" => await HandleRefundActionAsync(request.RecordId, actionName, note, cancellationToken),
+            "returns" => await HandleReturnActionAsync(request.RecordId, actionName, note, cancellationToken),
+            _ => await HandlePayoutActionAsync(request.RecordId, actionName, note, cancellationToken)
+        };
+    }
+
     private IQueryable<SellerOrder>? BuildScopedSellerOrdersQuery(int? sellerId)
     {
         var query = _db.SellerOrders.AsNoTracking().AsQueryable();
@@ -257,6 +282,149 @@ public sealed class FinanceAdminController : ControllerBase
         return scopedSellerId.HasValue
             ? query.Where(x => x.Order.SellerOrders.Any(so => so.SellerId == scopedSellerId.Value))
             : null;
+    }
+
+    private async Task<IActionResult> HandlePayoutActionAsync(int payoutId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var payout = await _db.Payouts.FirstOrDefaultAsync(x => x.PayoutId == payoutId, cancellationToken);
+        if (payout is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay payout." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                payout.Status = "processing";
+                break;
+            case "release":
+                payout.Status = "paid";
+                payout.PaidAt = DateTime.UtcNow;
+                break;
+            case "hold":
+                payout.Status = "queued";
+                break;
+            case "reject":
+                payout.Status = "failed";
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho payout." });
+        }
+
+        var actorUserId = TryGetSellerIdFromToken();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "finance_console",
+            $"payout_{actionName}",
+            "payout",
+            payoutId,
+            $"Admin {GetFinanceActionLabel(actionName)} payout #{payoutId}.",
+            actorUserId,
+            new { section = "payouts", actionName, note, payout.SellerId, payout.AmountNet, payout.AmountGross });
+        AdminAuditLogger.AddSettlement(_db, actionLog, $"payout_{actionName}", "payout", payoutId, payout.SellerId, payout.AmountNet ?? (payout.AmountGross - payout.FeeAmount), note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetFinanceActionLabel(actionName)} payout #{payoutId}." });
+    }
+
+    private async Task<IActionResult> HandleRefundActionAsync(int refundId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var refund = await _db.RefundTransactions.FirstOrDefaultAsync(x => x.RefundId == refundId, cancellationToken);
+        if (refund is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay refund." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                refund.Status = "review";
+                break;
+            case "approve":
+                refund.Status = "approved";
+                refund.ProcessedAt ??= DateTime.UtcNow;
+                break;
+            case "reject":
+                refund.Status = "rejected";
+                refund.ProcessedAt = DateTime.UtcNow;
+                break;
+            case "resolve":
+                refund.Status = "processed";
+                refund.ProcessedAt = DateTime.UtcNow;
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho refund." });
+        }
+
+        var actorUserId = TryGetSellerIdFromToken();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "finance_console",
+            $"refund_{actionName}",
+            "refund",
+            refundId,
+            $"Admin {GetFinanceActionLabel(actionName)} refund #{refundId}.",
+            actorUserId,
+            new { section = "refunds", actionName, note, refund.Amount, refund.ReferenceCode });
+        AdminAuditLogger.AddSettlement(_db, actionLog, $"refund_{actionName}", "refund", refundId, null, refund.Amount, note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetFinanceActionLabel(actionName)} refund #{refundId}." });
+    }
+
+    private async Task<IActionResult> HandleReturnActionAsync(int returnId, string actionName, string? note, CancellationToken cancellationToken)
+    {
+        var returnRequest = await _db.ReturnRequests.FirstOrDefaultAsync(x => x.ReturnId == returnId, cancellationToken);
+        if (returnRequest is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay return." });
+        }
+
+        switch (actionName)
+        {
+            case "acknowledge":
+                returnRequest.Status = "review";
+                break;
+            case "approve":
+                returnRequest.Status = "approved";
+                returnRequest.ApprovedAt ??= DateTime.UtcNow;
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    returnRequest.Resolution = note;
+                }
+                break;
+            case "reject":
+                returnRequest.Status = "rejected";
+                returnRequest.CompletedAt = DateTime.UtcNow;
+                returnRequest.Resolution = string.IsNullOrWhiteSpace(note) ? "Rejected by finance console." : note;
+                break;
+            case "resolve":
+                returnRequest.Status = "resolved";
+                returnRequest.ApprovedAt ??= DateTime.UtcNow;
+                returnRequest.CompletedAt = DateTime.UtcNow;
+                if (!string.IsNullOrWhiteSpace(note))
+                {
+                    returnRequest.Resolution = note;
+                }
+                break;
+            default:
+                return BadRequest(new { success = false, message = "Action nay khong ap dung cho return." });
+        }
+
+        var actorUserId = TryGetSellerIdFromToken();
+        var actionLog = AdminAuditLogger.AddAction(
+            _db,
+            "finance_console",
+            $"return_{actionName}",
+            "return",
+            returnId,
+            $"Admin {GetFinanceActionLabel(actionName)} return #{returnId}.",
+            actorUserId,
+            new { section = "returns", actionName, note, returnRequest.SellerId, returnRequest.RefundAmount });
+        AdminAuditLogger.AddSettlement(_db, actionLog, $"return_{actionName}", "return", returnId, returnRequest.SellerId, returnRequest.RefundAmount, note, actorUserId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Ok(new { success = true, message = $"Da {GetFinanceActionLabel(actionName)} return #{returnId}." });
     }
 
     private async Task<int> CountPayoutRowsAsync(
@@ -578,6 +746,46 @@ public sealed class FinanceAdminController : ControllerBase
         return string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
     }
 
+    private static string NormalizeFinanceAction(string? actionName)
+    {
+        var normalized = (actionName ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "acknowledge" => "acknowledge",
+            "approve" => "approve",
+            "reject" => "reject",
+            "resolve" => "resolve",
+            "release" => "release",
+            "hold" => "hold",
+            _ => "all"
+        };
+    }
+
+    private static string GetFinanceActionLabel(string actionName)
+    {
+        return actionName switch
+        {
+            "acknowledge" => "nhan xu ly",
+            "approve" => "phe duyet",
+            "reject" => "tu choi",
+            "resolve" => "dong",
+            "release" => "chi tra",
+            "hold" => "giu lai",
+            _ => actionName
+        };
+    }
+
+    private static string? TrimNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        var trimmed = note.Trim();
+        return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
+    }
+
     private static IReadOnlyList<object> BuildStatusOptions(string section)
     {
         return section switch
@@ -623,4 +831,12 @@ public sealed class FinanceAdminController : ControllerBase
     }
 
     private sealed record SellerLookupRow(int? SellerId, string SellerLabel);
+
+    public sealed class FinanceActionRequest
+    {
+        public string? Section { get; set; }
+        public int RecordId { get; set; }
+        public string? ActionName { get; set; }
+        public string? Note { get; set; }
+    }
 }

@@ -23,11 +23,6 @@
         --admin-bg-2: #dbeafe;
     }
 
-    body {
-        background: linear-gradient(135deg, var(--admin-bg-1) 0%, var(--admin-bg-2) 70%, #bfdbfe 100%);
-        min-height: 100vh;
-    }
-
     @@keyframes fadeInUp {
         from {
             opacity: 0;
@@ -57,13 +52,8 @@
     }
 
     .admin-hero {
-        background: linear-gradient(130deg, var(--admin-blue-1) 0%, var(--admin-blue-2) 52%, var(--admin-blue-3) 100%);
-        border-radius: 1.5rem;
-        color: #fff;
         position: relative;
         overflow: hidden;
-        padding: 2rem;
-        box-shadow: 0 22px 55px rgba(37, 99, 235, .36);
         animation: fadeInUp .45s ease-out;
     }
 
@@ -89,10 +79,7 @@
     }
 
     .metric-card {
-        border-radius: 1.25rem;
-        border: 1px solid rgba(148, 163, 184, .28);
-        background: linear-gradient(160deg, rgba(255,255,255,.96), rgba(239,246,255,.96));
-        box-shadow: 0 14px 35px rgba(30, 64, 175, .14);
+        border: 1px solid var(--ff-border);
         padding: 1rem 1.1rem;
         transition: transform .2s ease, box-shadow .2s ease;
         animation: fadeInUp .55s ease-out;
@@ -126,10 +113,7 @@
     }
 
     .chart-card {
-        border-radius: 1.35rem;
-        border: 1px solid rgba(148, 163, 184, .25);
-        background: rgba(255, 255, 255, .96);
-        box-shadow: 0 18px 45px rgba(30, 64, 175, .14);
+        border: 1px solid var(--ff-border);
         animation: fadeInUp .65s ease-out;
     }
 
@@ -163,8 +147,8 @@
     }
 </style>
 
-<main class="container-fluid py-4">
-    <section class="admin-hero mb-4">
+<main class="container-fluid py-4 ff-admin-shell">
+    <section class="admin-hero ff-admin-hero mb-4">
         <div class="position-relative" style="z-index:1;">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div class="d-flex align-items-center gap-3">
@@ -194,28 +178,28 @@
 
     <section class="row g-3 mb-3">
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">GMV toàn sàn</div>
                 <div class="metric-value">@Vnd(Model.Gmv)</div>
                 <div class="metric-sub">Tổng giá trị giao dịch tích lũy</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Doanh thu sàn</div>
                 <div class="metric-value">@Vnd(Model.PlatformRevenue)</div>
                 <div class="metric-sub">Hoa hồng thu được</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Đơn mới hôm nay</div>
                 <div class="metric-value">@Model.NewOrdersToday</div>
                 <div class="metric-sub">Tổng đơn: @Model.TotalOrders</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Tỷ lệ hủy đơn</div>
                 <div class="metric-value">@Model.CancelRate.ToString("N2", vi)%</div>
                 <div class="metric-sub">Đơn hủy: @Model.CancelledOrders</div>
@@ -225,28 +209,28 @@
 
     <section class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Traffic hôm nay</div>
                 <div class="metric-value">@Model.TrafficToday</div>
                 <div class="metric-sub">Phiên hoạt động: @Model.ActiveSessions</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">User mới hôm nay</div>
                 <div class="metric-value">@Model.NewUsersToday</div>
                 <div class="metric-sub">7 ngày: @Model.NewUsers7Days</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Seller</div>
                 <div class="metric-value">@Model.TotalSellers</div>
                 <div class="metric-sub">Mở mới 7 ngày: @Model.NewSellers7Days</div>
             </div>
         </div>
         <div class="col-12 col-md-6 col-xl-3">
-            <div class="metric-card h-100">
+            <div class="metric-card ff-admin-card h-100">
                 <div class="metric-label">Buyer</div>
                 <div class="metric-value">@Model.TotalBuyers</div>
                 <div class="metric-sub">Mới 7 ngày: @Model.NewBuyers7Days</div>
@@ -254,7 +238,7 @@
         </div>
     </section>
 
-    <section class="chart-card">
+    <section class="chart-card ff-admin-card">
         <div class="chart-header d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div>
                 <h5 class="mb-1 fw-bold text-primary">Xu hướng giao dịch 7 ngày</h5>

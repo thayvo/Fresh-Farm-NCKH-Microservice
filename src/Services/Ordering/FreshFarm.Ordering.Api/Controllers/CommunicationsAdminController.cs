@@ -243,10 +243,10 @@ public sealed class CommunicationsAdminController : ControllerBase
             return Conflict(new { success = false, message = "Template trung event/channel/locale/ten da ton tai." });
         }
 
-        var isCreate = existing is null;
-        if (isCreate)
+        CommunicationTemplate persistedTemplate;
+        if (existing is null)
         {
-            existing = new CommunicationTemplate
+            persistedTemplate = new CommunicationTemplate
             {
                 TemplateName = templateName,
                 EventType = eventType,
@@ -259,11 +259,12 @@ public sealed class CommunicationsAdminController : ControllerBase
                 LastEditedByUserId = actorUserId,
                 CreatedAt = DateTime.UtcNow
             };
-            _db.CommunicationTemplates.Add(existing);
+            _db.CommunicationTemplates.Add(persistedTemplate);
         }
         else
         {
-            var current = existing!;
+            persistedTemplate = existing;
+            var current = persistedTemplate;
             current.TemplateName = templateName;
             current.EventType = eventType;
             current.Channel = channel;
@@ -275,13 +276,14 @@ public sealed class CommunicationsAdminController : ControllerBase
             current.LastEditedByUserId = actorUserId;
             current.UpdatedAt = DateTime.UtcNow;
         }
+        var isCreate = existing is null;
 
         AdminAuditLogger.AddAction(
             _db,
             "communications_governance",
             isCreate ? "create_template" : "update_template",
             "communication_template",
-            existing.CommunicationTemplateId > 0 ? existing.CommunicationTemplateId : null,
+            persistedTemplate.CommunicationTemplateId > 0 ? persistedTemplate.CommunicationTemplateId : null,
             $"{(isCreate ? "Tao" : "Cap nhat")} template {templateName} cho {eventType}/{channel}.",
             actorUserId,
             new { templateName, eventType, channel, locale, request.IsActive });
@@ -365,10 +367,10 @@ public sealed class CommunicationsAdminController : ControllerBase
         }
 
         var actorUserId = GetActorUserId();
-        var isCreate = existing is null;
-        if (isCreate)
+        NotificationPolicyRule persistedPolicy;
+        if (existing is null)
         {
-            existing = new NotificationPolicyRule
+            persistedPolicy = new NotificationPolicyRule
             {
                 EventType = eventType,
                 Channel = channel,
@@ -381,11 +383,12 @@ public sealed class CommunicationsAdminController : ControllerBase
                 Notes = TrimOrNull(request.Notes, 1000),
                 CreatedAt = DateTime.UtcNow
             };
-            _db.NotificationPolicyRules.Add(existing);
+            _db.NotificationPolicyRules.Add(persistedPolicy);
         }
         else
         {
-            var current = existing!;
+            persistedPolicy = existing;
+            var current = persistedPolicy;
             current.EventType = eventType;
             current.Channel = channel;
             current.AudienceType = audienceType;
@@ -397,13 +400,14 @@ public sealed class CommunicationsAdminController : ControllerBase
             current.Notes = TrimOrNull(request.Notes, 1000);
             current.UpdatedAt = DateTime.UtcNow;
         }
+        var isCreate = existing is null;
 
         AdminAuditLogger.AddAction(
             _db,
             "communications_governance",
             isCreate ? "create_policy" : "update_policy",
             "notification_policy",
-            existing.NotificationPolicyRuleId > 0 ? existing.NotificationPolicyRuleId : null,
+            persistedPolicy.NotificationPolicyRuleId > 0 ? persistedPolicy.NotificationPolicyRuleId : null,
             $"{(isCreate ? "Tao" : "Cap nhat")} policy {eventType}/{channel}/{audienceType}.",
             actorUserId,
             new { eventType, channel, audienceType, request.CommunicationTemplateId, request.IsEnabled, cooldownMinutes, deliveryMode, priority });
@@ -460,10 +464,10 @@ public sealed class CommunicationsAdminController : ControllerBase
             cancellationToken);
 
         var actorUserId = GetActorUserId();
-        var isCreate = existing is null;
-        if (isCreate)
+        NotificationPreference persistedPreference;
+        if (existing is null)
         {
-            existing = new NotificationPreference
+            persistedPreference = new NotificationPreference
             {
                 UserId = request.UserId,
                 EventType = eventType,
@@ -473,22 +477,24 @@ public sealed class CommunicationsAdminController : ControllerBase
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-            _db.NotificationPreferences.Add(existing);
+            _db.NotificationPreferences.Add(persistedPreference);
         }
         else
         {
-            var current = existing!;
+            persistedPreference = existing;
+            var current = persistedPreference;
             current.IsOptedIn = request.IsOptedIn;
             current.Source = source;
             current.UpdatedAt = DateTime.UtcNow;
         }
+        var isCreate = existing is null;
 
         AdminAuditLogger.AddAction(
             _db,
             "communications_governance",
             isCreate ? "create_preference" : "update_preference",
             "notification_preference",
-            existing.NotificationPreferenceId > 0 ? existing.NotificationPreferenceId : null,
+            persistedPreference.NotificationPreferenceId > 0 ? persistedPreference.NotificationPreferenceId : null,
             $"{(request.IsOptedIn ? "Opt-in" : "Opt-out")} user {request.UserId} cho {eventType}/{channel}.",
             actorUserId,
             new { request.UserId, eventType, channel, request.IsOptedIn, source });

@@ -50,6 +50,52 @@ public sealed class CategoriesController : ControllerBase
         return Ok(categories);
     }
 
+    [HttpGet("public")]
+    public async Task<IActionResult> GetPublic([FromQuery] string? search)
+    {
+        var query = _db.Categories
+            .AsNoTracking()
+            .Where(c => c.IsActive)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var keyword = search.Trim();
+            query = query.Where(c =>
+                c.CategoryName.Contains(keyword) ||
+                (c.Description != null && c.Description.Contains(keyword)) ||
+                (c.Slug != null && c.Slug.Contains(keyword)));
+        }
+
+        var publicProductCounts = _db.Products
+            .AsNoTracking()
+            .Where(p => p.Status && !p.IsManuallyDisabled)
+            .GroupBy(p => p.CategoryId)
+            .Select(group => new
+            {
+                CategoryId = group.Key,
+                ProductCount = group.Count()
+            });
+
+        var categories = await query
+            .OrderBy(c => c.CategoryName)
+            .Select(c => new
+            {
+                c.CategoryId,
+                c.CategoryName,
+                c.Description,
+                c.ImageCategoriesName,
+                c.Slug,
+                ProductCount = publicProductCounts
+                    .Where(group => group.CategoryId == c.CategoryId)
+                    .Select(group => (int?)group.ProductCount)
+                    .FirstOrDefault() ?? 0
+            })
+            .ToListAsync();
+
+        return Ok(categories);
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([FromRoute] int id)
     {

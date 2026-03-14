@@ -4,26 +4,10 @@
 }
 
 <style>
-    .notification-shell {
-        min-height: 100vh;
-        background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
-        padding: 1.5rem;
-    }
-
-    .notification-hero {
-        background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%);
-        border-radius: 1.75rem;
-        color: #fff;
-        padding: 2rem;
-        box-shadow: 0 24px 50px rgba(29, 78, 216, .22);
-    }
-
     .notification-card,
     .notification-filter-card,
     .notification-table-card {
         border: 0;
-        border-radius: 1.5rem;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
     }
 
     .notification-type {
@@ -66,11 +50,11 @@
     }
 </style>
 
-<main class="notification-shell">
-    <div class="notification-hero mb-4">
+<main class="notification-shell ff-admin-shell">
+    <div class="notification-hero ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4">
             <div>
-                <div class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">Toàn sàn</div>
+                <div class="ff-admin-chip mb-3">Toàn sàn</div>
                 <h1 class="fw-bold mb-2">Trung tâm thông báo</h1>
                 <p class="mb-0 opacity-75">Theo dõi thông báo đơn hàng đã gửi cho khách, rà thông báo chưa đọc và xử lý nhanh theo phạm vi toàn sàn.</p>
             </div>

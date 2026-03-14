@@ -23,21 +23,34 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpGet("conversations")]
     public async Task<IActionResult> Conversations(CancellationToken cancellationToken = default)
     {
-        var scopedOrders = BuildScopedOrdersQuery();
-        if (scopedOrders is null)
+        var actorId = TryGetActorIdFromToken();
+        if (!User.IsInRole("Admin") && !actorId.HasValue)
         {
             return Unauthorized(new { ok = false, message = "Không xác định được phạm vi hội thoại." });
         }
 
-        var sellerUserIds = await scopedOrders
-            .AsNoTracking()
-            .Select(o => o.UserId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+        var scopedOrders = BuildScopedOrdersQuery();
+        var sellerUserIds = scopedOrders is null
+            ? new List<int>()
+            : await scopedOrders
+                .AsNoTracking()
+                .Select(o => o.UserId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
 
-        var conversations = await _db.SupportConversations
+        var conversationsQuery = _db.SupportConversations
             .AsNoTracking()
-            .Where(x => x.UserId.HasValue && sellerUserIds.Contains(x.UserId.Value))
+            .AsQueryable();
+
+        if (!User.IsInRole("Admin"))
+        {
+            var sellerId = actorId!.Value;
+            conversationsQuery = conversationsQuery.Where(x =>
+                x.AdminId == sellerId ||
+                (x.UserId.HasValue && sellerUserIds.Contains(x.UserId.Value)));
+        }
+
+        var conversations = await conversationsQuery
             .OrderByDescending(x => x.StartedAt)
             .ToListAsync(cancellationToken);
 
@@ -53,12 +66,14 @@ public sealed class SupportChatAdminController : ControllerBase
             .Distinct()
             .ToList();
 
-        var latestOrdersByUser = await scopedOrders
-            .AsNoTracking()
-            .Where(o => userIds.Contains(o.UserId))
-            .GroupBy(o => o.UserId)
-            .Select(g => g.OrderByDescending(x => x.OrderDate).First())
-            .ToDictionaryAsync(x => x.UserId, cancellationToken);
+        var latestOrdersByUser = scopedOrders is null
+            ? new Dictionary<int, Order>()
+            : await scopedOrders
+                .AsNoTracking()
+                .Where(o => userIds.Contains(o.UserId))
+                .GroupBy(o => o.UserId)
+                .Select(g => g.OrderByDescending(x => x.OrderDate).First())
+                .ToDictionaryAsync(x => x.UserId, cancellationToken);
 
         var payload = conversations
             .Select(conversation =>
@@ -154,12 +169,6 @@ public sealed class SupportChatAdminController : ControllerBase
     [HttpGet("conversations/{conversationId:int}/details")]
     public async Task<IActionResult> ConversationDetails([FromRoute] int conversationId, CancellationToken cancellationToken = default)
     {
-        var scopedOrders = BuildScopedOrdersQuery();
-        if (scopedOrders is null)
-        {
-            return Unauthorized(new { ok = false, message = "Không xác định được phạm vi hội thoại." });
-        }
-
         var conversation = await _db.SupportConversations
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.ConversationId == conversationId, cancellationToken);
@@ -169,27 +178,36 @@ public sealed class SupportChatAdminController : ControllerBase
             return NotFound(new { ok = false, message = "Khong tim thay hoi thoai." });
         }
 
+        var scopedOrders = BuildScopedOrdersQuery();
         var userId = conversation.UserId ?? 0;
-        var latestOrder = await scopedOrders
-            .AsNoTracking()
-            .Where(o => o.UserId == userId)
-            .OrderByDescending(o => o.OrderDate)
-            .FirstOrDefaultAsync(cancellationToken);
+        var latestOrder = scopedOrders is null
+            ? null
+            : await scopedOrders
+                .AsNoTracking()
+                .Where(o => o.UserId == userId)
+                .OrderByDescending(o => o.OrderDate)
+                .FirstOrDefaultAsync(cancellationToken);
 
-        var orders = await scopedOrders
-            .AsNoTracking()
-            .Where(o => o.UserId == userId)
-            .OrderByDescending(o => o.OrderDate)
-            .Take(5)
-            .Select(o => new
-            {
-                orderId = o.OrderId,
-                orderCode = "#" + o.OrderId.ToString("D6"),
-                orderDate = o.OrderDate,
-                totalAmount = o.TotalAmount,
-                status = o.Status
-            })
-            .ToListAsync(cancellationToken);
+        var orders = new List<object>();
+        if (scopedOrders is not null)
+        {
+            var rawOrders = await scopedOrders
+                .AsNoTracking()
+                .Where(o => o.UserId == userId)
+                .OrderByDescending(o => o.OrderDate)
+                .Take(5)
+                .Select(o => new
+                {
+                    orderId = o.OrderId,
+                    orderCode = "#" + o.OrderId.ToString("D6"),
+                    orderDate = o.OrderDate,
+                    totalAmount = o.TotalAmount,
+                    status = o.Status
+                })
+                .ToListAsync(cancellationToken);
+
+            orders = rawOrders.Select(x => (object)x).ToList();
+        }
 
         var profile = new
         {
@@ -384,13 +402,36 @@ public sealed class SupportChatAdminController : ControllerBase
 
     private async Task<bool> CanAccessConversationAsync(int conversationId, CancellationToken cancellationToken)
     {
-        var userId = await _db.SupportConversations
+        if (User.IsInRole("Admin"))
+        {
+            return await _db.SupportConversations
+                .AsNoTracking()
+                .AnyAsync(x => x.ConversationId == conversationId, cancellationToken);
+        }
+
+        var actorId = TryGetActorIdFromToken();
+        if (!actorId.HasValue)
+        {
+            return false;
+        }
+
+        var conversation = await _db.SupportConversations
             .AsNoTracking()
             .Where(x => x.ConversationId == conversationId)
-            .Select(x => x.UserId)
+            .Select(x => new { x.UserId, x.AdminId })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (!userId.HasValue || userId.Value <= 0)
+        if (conversation is null)
+        {
+            return false;
+        }
+
+        if (conversation.AdminId.HasValue && conversation.AdminId.Value == actorId.Value)
+        {
+            return true;
+        }
+
+        if (!conversation.UserId.HasValue || conversation.UserId.Value <= 0)
         {
             return false;
         }
@@ -403,7 +444,7 @@ public sealed class SupportChatAdminController : ControllerBase
 
         return await scopedOrders
             .AsNoTracking()
-            .AnyAsync(o => o.UserId == userId.Value, cancellationToken);
+            .AnyAsync(o => o.UserId == conversation.UserId.Value, cancellationToken);
     }
 
     public sealed class SendSupportMessageRequest

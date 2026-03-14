@@ -1,13 +1,13 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.CatalogReadinessPageViewModel
 
-<section class="catalog-readiness-shell">
-    <div class="hero-card mb-4">
+<section class="catalog-readiness-shell ff-admin-shell">
+    <div class="hero-card ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow text-uppercase mb-2">7.7A Search readiness MVP</p>
+            <p class="eyebrow ff-admin-kicker mb-2">7.7A Search readiness MVP</p>
             <h1 class="fw-bold mb-2">Catalog readiness</h1>
             <p class="mb-0 opacity-75">Theo doi required attributes theo danh muc, readiness queue cua san pham va sync nhanh tu ProductInfo de giam data debt.</p>
         </div>
-        <div class="hero-chip">Sprint D</div>
+        <div class="hero-chip ff-admin-chip">Sprint D</div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
@@ -26,18 +26,18 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Categories</span><strong>@Model.Stats.TotalCategories</strong><small>danh muc co trong catalog</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Attributes</span><strong>@Model.Stats.TotalAttributes</strong><small>@Model.Stats.RequiredAttributes bat buoc</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Ready</span><strong>@Model.Stats.ProductsReady</strong><small>san pham da du readiness</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Missing</span><strong>@Model.Stats.ProductsMissing</strong><small>san pham con thieu</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Facets</span><strong>@Model.Stats.FacetAttributes</strong><small>attribute co facet flag</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Categories</span><strong>@Model.Stats.TotalCategories</strong><small>danh muc co trong catalog</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Attributes</span><strong>@Model.Stats.TotalAttributes</strong><small>@Model.Stats.RequiredAttributes bat buoc</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Ready</span><strong>@Model.Stats.ProductsReady</strong><small>san pham da du readiness</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Missing</span><strong>@Model.Stats.ProductsMissing</strong><small>san pham con thieu</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Facets</span><strong>@Model.Stats.FacetAttributes</strong><small>attribute co facet flag</small></div></div>
         <div class="col-md-6 col-xl-2">
             <form method="post" asp-action="SyncProductInfo" asp-controller="CatalogReadiness" asp-area="Admin" class="h-100">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="q" value="@Model.Query" />
                 <input type="hidden" name="state" value="@Model.State" />
                 <input type="hidden" name="categoryId" value="@Model.CategoryId" />
-                <button class="metric-card sync-card w-100 border-0 text-start" type="submit">
+                <button class="metric-card ff-admin-card sync-card w-100 border-0 text-start" type="submit">
                     <span class="metric-label">Sync</span>
                     <strong><i class="bi bi-arrow-repeat"></i></strong>
                     <small>weight, origin, standard, preservation</small>
@@ -46,7 +46,7 @@
         </div>
     </div>
 
-    <div class="panel-card mb-4">
+    <div class="panel-card ff-admin-card mb-4">
         <div class="panel-head">
             <h2 class="h5 mb-1">Bo loc readiness</h2>
             <p class="text-muted mb-0">Tap trung vao queue san pham chua du required attributes truoc khi mo rong sang synonym/tag/search facet sau.</p>
@@ -101,7 +101,7 @@
 
     <div class="row g-4">
         <div class="col-xl-7">
-            <div class="panel-card mb-4">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Readiness queue</h2>
                     <p class="text-muted mb-0">Danh sach san pham dang bi thieu thuoc tinh bat buoc theo category definition.</p>
@@ -168,7 +168,7 @@
                 </div>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card ff-admin-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Category attribute registry</h2>
                     <p class="text-muted mb-0">Cap nhat nhanh required/facet/input type de chuan hoa search readiness theo tung category.</p>
@@ -256,7 +256,7 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="panel-card sticky-panel">
+            <div class="panel-card ff-admin-card sticky-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Tao category attribute moi</h2>
                     <p class="text-muted mb-0">Dung de bo sung nhanh readiness cho category chua co khung attribute.</p>
@@ -338,18 +338,9 @@
         justify-content: space-between;
         align-items: center;
         gap: 1rem;
-        padding: 1.75rem;
-        border-radius: 1.5rem;
-        background: linear-gradient(135deg, #082f49 0%, #0f766e 42%, #d97706 100%);
-        color: #fff;
-        box-shadow: 0 24px 50px rgba(8, 47, 73, .22);
     }
 
     .catalog-readiness-shell .hero-chip {
-        padding: .5rem .85rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,.14);
-        font-weight: 700;
     }
 
     .catalog-readiness-shell .eyebrow,
@@ -360,10 +351,7 @@
 
     .catalog-readiness-shell .metric-card,
     .catalog-readiness-shell .panel-card {
-        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
-        border: 1px solid rgba(15,23,42,.08);
-        border-radius: 1.25rem;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+        border: 1px solid var(--ff-border);
     }
 
     .catalog-readiness-shell .metric-card {

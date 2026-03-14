@@ -20,30 +20,101 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? name)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? name,
+        [FromQuery] int? sellerId = null,
+        [FromQuery] int[]? categoryIds = null,
+        [FromQuery] string[]? origins = null,
+        [FromQuery] string[]? standards = null,
+        [FromQuery] string[]? units = null)
     {
-        var sellerId = TryGetCurrentSellerId();
+        var currentSellerId = TryGetCurrentSellerId();
 
         var query = _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Unit)
+            .Include(p => p.ProductInfos)
             .AsQueryable();
 
-        if (sellerId.HasValue)
+        if (currentSellerId.HasValue)
         {
             var ownedProductIds = _db.SellerProducts
                 .AsNoTracking()
-                .Where(sp => sp.SellerId == sellerId.Value && sp.IsActive)
+                .Where(sp => sp.SellerId == currentSellerId.Value && sp.IsActive)
                 .Select(sp => sp.ProductId);
 
             query = query.Where(p => ownedProductIds.Contains(p.ProductId));
+        }
+        else
+        {
+            query = query.Where(p => p.Status && !p.IsManuallyDisabled);
+
+            if (sellerId.HasValue && sellerId.Value > 0)
+            {
+                var publicSellerProductIds = _db.SellerProducts
+                    .AsNoTracking()
+                    .Where(sp => sp.SellerId == sellerId.Value && sp.IsActive)
+                    .Select(sp => sp.ProductId);
+
+                query = query.Where(p => publicSellerProductIds.Contains(p.ProductId));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(name))
         {
             var keyword = name.Trim();
-            query = query.Where(p => p.ProductName.Contains(keyword));
+            query = query.Where(p =>
+                p.ProductName.Contains(keyword) ||
+                p.Category.CategoryName.Contains(keyword) ||
+                p.ProductInfos.Any(info =>
+                    (info.Origin != null && info.Origin.Contains(keyword)) ||
+                    (info.Standard != null && info.Standard.Contains(keyword))));
+        }
+
+        var normalizedCategoryIds = (categoryIds ?? Array.Empty<int>())
+            .Where(id => id > 0)
+            .Distinct()
+            .ToArray();
+
+        if (normalizedCategoryIds.Length > 0)
+        {
+            query = query.Where(p => normalizedCategoryIds.Contains(p.CategoryId));
+        }
+
+        var normalizedOrigins = (origins ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLower())
+            .Distinct()
+            .ToArray();
+
+        if (normalizedOrigins.Length > 0)
+        {
+            query = query.Where(p => p.ProductInfos.Any(info =>
+                info.Origin != null && normalizedOrigins.Contains(info.Origin.ToLower())));
+        }
+
+        var normalizedStandards = (standards ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLower())
+            .Distinct()
+            .ToArray();
+
+        if (normalizedStandards.Length > 0)
+        {
+            query = query.Where(p => p.ProductInfos.Any(info =>
+                info.Standard != null && normalizedStandards.Contains(info.Standard.ToLower())));
+        }
+
+        var normalizedUnits = (units ?? Array.Empty<string>())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim().ToLower())
+            .Distinct()
+            .ToArray();
+
+        if (normalizedUnits.Length > 0)
+        {
+            query = query.Where(p => normalizedUnits.Contains(p.Unit.UnitName.ToLower()));
         }
 
         var result = await query
@@ -65,7 +136,28 @@ public sealed class ProductsController : ControllerBase
                 CategoryName = p.Category.CategoryName,
                 UnitId = p.UnitId,
                 UnitName = p.Unit.UnitName,
-                UnitSymbol = p.Unit.Symbol
+                UnitSymbol = p.Unit.Symbol,
+                Origin = p.ProductInfos
+                    .OrderBy(info => info.InfoId)
+                    .Select(info => info.Origin)
+                    .FirstOrDefault(),
+                Standard = p.ProductInfos
+                    .OrderBy(info => info.InfoId)
+                    .Select(info => info.Standard)
+                    .FirstOrDefault(),
+                Preservation = p.ProductInfos
+                    .OrderBy(info => info.InfoId)
+                    .Select(info => info.Preservation)
+                    .FirstOrDefault(),
+                Weight = p.ProductInfos
+                    .OrderBy(info => info.InfoId)
+                    .Select(info => info.Weight)
+                    .FirstOrDefault(),
+                PrimarySellerId = _db.SellerProducts
+                    .Where(sp => sp.ProductId == p.ProductId && sp.IsActive)
+                    .OrderBy(sp => sp.CreatedAt)
+                    .Select(sp => (int?)sp.SellerId)
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
@@ -95,7 +187,7 @@ public sealed class ProductsController : ControllerBase
             .Include(p => p.ProductInfos)
             .FirstOrDefaultAsync(p => p.ProductId == id);
 
-        if (product is null)
+        if (product is null || (!sellerId.HasValue && (!product.Status || product.IsManuallyDisabled)))
         {
             return NotFound(new { message = "Không tìm thấy sản phẩm." });
         }
@@ -118,6 +210,12 @@ public sealed class ProductsController : ControllerBase
             UnitId = product.UnitId,
             UnitName = product.Unit.UnitName,
             UnitSymbol = product.Unit.Symbol,
+            PrimarySellerId = await _db.SellerProducts
+                .AsNoTracking()
+                .Where(sp => sp.ProductId == product.ProductId && sp.IsActive)
+                .OrderBy(sp => sp.CreatedAt)
+                .Select(sp => (int?)sp.SellerId)
+                .FirstOrDefaultAsync(),
             ProductInfos = product.ProductInfos.Select(info => new
             {
                 info.Weight,
@@ -240,9 +338,10 @@ public sealed class ProductsController : ControllerBase
 
         if (!isAdmin)
         {
+            var sellerScopeId = sellerId!.Value;
             var owned = await _db.SellerProducts
                 .AsNoTracking()
-                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerScopeId && sp.IsActive);
             if (!owned)
             {
                 return NotFound(new { message = "Không tìm thấy sản phẩm." });
@@ -342,8 +441,9 @@ public sealed class ProductsController : ControllerBase
         SellerProduct? ownership = null;
         if (!isAdmin)
         {
+            var sellerScopeId = sellerId!.Value;
             ownership = await _db.SellerProducts
-                .FirstOrDefaultAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+                .FirstOrDefaultAsync(sp => sp.ProductId == id && sp.SellerId == sellerScopeId && sp.IsActive);
             if (ownership is null)
             {
                 return NotFound(new { message = "Không tìm thấy sản phẩm." });
@@ -417,9 +517,10 @@ public sealed class ProductsController : ControllerBase
 
         if (!isAdmin)
         {
+            var sellerScopeId = sellerId!.Value;
             var owned = await _db.SellerProducts
                 .AsNoTracking()
-                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerScopeId && sp.IsActive);
             if (!owned)
             {
                 return NotFound(new { message = "Không tìm thấy sản phẩm." });

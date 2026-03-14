@@ -86,6 +86,58 @@ public sealed class DisputeController : LegacySellerControllerBase
         return View(model);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TakeAction(
+        string? caseType,
+        int caseId,
+        string? actionName,
+        string? note,
+        string? q,
+        string? section,
+        string? status,
+        int? sellerId,
+        string? selectedCaseType,
+        int? selectedCaseId,
+        int page = 1)
+    {
+        if (caseId <= 0 || string.IsNullOrWhiteSpace(caseType) || string.IsNullOrWhiteSpace(actionName))
+        {
+            TempData["ErrorMessage"] = "Thong tin case/action khong hop le.";
+            return RedirectToAction(nameof(Index), new { q, section, status, sellerId, selectedCaseType, selectedCaseId, page });
+        }
+
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.PostAsJsonAsync("/api/orders/admin/disputes/actions", new
+            {
+                caseType,
+                caseId,
+                actionName,
+                note
+            });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Da cap nhat case." : "Khong the cap nhat case.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Loi khi cap nhat case: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new
+        {
+            q,
+            section,
+            status,
+            sellerId,
+            selectedCaseType = caseType ?? selectedCaseType,
+            selectedCaseId = caseId > 0 ? caseId : selectedCaseId,
+            page
+        });
+    }
+
     private async Task LoadDetailsAsync(HttpClient client, DisputeCenterPageViewModel model)
     {
         var endpoint = $"/api/orders/admin/disputes/details?type={Uri.EscapeDataString(model.SelectedCaseType)}&id={model.SelectedCaseId}";

@@ -1,13 +1,13 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.FreshOpsPageViewModel
 
-<section class="fresh-ops-shell">
-    <div class="hero-card mb-4">
+<section class="fresh-ops-shell ff-admin-shell">
+    <div class="hero-card ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow text-uppercase mb-2">7.7A Fresh-goods MVP</p>
+            <p class="eyebrow ff-admin-kicker mb-2">7.7A Fresh-goods MVP</p>
             <h1 class="fw-bold mb-2">Fresh ops center</h1>
             <p class="mb-0 opacity-75">Theo doi lot, HSD, trace code, FEFO queue va quality recall cho nong san/thuc pham tuoi.</p>
         </div>
-        <div class="hero-chip">Lot + Recall</div>
+        <div class="hero-chip ff-admin-chip">Lot + Recall</div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
@@ -24,15 +24,15 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Lots</span><strong>@Model.Stats.TotalLots</strong><small>dang theo doi</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Soon</span><strong>@Model.Stats.ExpiringSoonLots</strong><small>sap het han</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Expired</span><strong>@Model.Stats.ExpiredLots</strong><small>can xu ly</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Recall</span><strong>@Model.Stats.OpenRecalls</strong><small>case dang mo</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">Trace</span><strong>@Model.Stats.TraceCoverage%</strong><small>lot co trace code</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card"><span class="metric-label">FEFO</span><strong>@Model.FefoQueue.Count</strong><small>queue uu tien xuat</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Lots</span><strong>@Model.Stats.TotalLots</strong><small>dang theo doi</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Soon</span><strong>@Model.Stats.ExpiringSoonLots</strong><small>sap het han</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Expired</span><strong>@Model.Stats.ExpiredLots</strong><small>can xu ly</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Recall</span><strong>@Model.Stats.OpenRecalls</strong><small>case dang mo</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Trace</span><strong>@Model.Stats.TraceCoverage%</strong><small>lot co trace code</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">FEFO</span><strong>@Model.FefoQueue.Count</strong><small>queue uu tien xuat</small></div></div>
     </div>
 
-    <div class="panel-card mb-4">
+    <div class="panel-card ff-admin-card mb-4">
         <div class="panel-head">
             <h2 class="h5 mb-1">Bo loc van hanh</h2>
             <p class="text-muted mb-0">Tap trung vao seller, lot status va keyword de triage nhanh data freshness.</p>
@@ -87,7 +87,7 @@
 
     <div class="row g-4">
         <div class="col-xl-7">
-            <div class="panel-card mb-4">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">FEFO queue</h2>
                     <p class="text-muted mb-0">Danh sach lot sap den HSD de uu tien xuat truoc trong MVP nay.</p>
@@ -118,7 +118,7 @@
                 </div>
             </div>
 
-            <div class="panel-card mb-4">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Fresh lots</h2>
                     <p class="text-muted mb-0">Lo hang co HSD, farm/origin, trace code va ton con lai de admin theo doi.</p>
@@ -174,7 +174,7 @@
                 </div>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card ff-admin-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Quality recalls</h2>
                     <p class="text-muted mb-0">Case recall de boi loi quality issue, contamination hoac source mismatch.</p>
@@ -217,7 +217,7 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="panel-card mb-4 sticky-panel">
+            <div class="panel-card ff-admin-card mb-4 sticky-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Tao fresh lot</h2>
                     <p class="text-muted mb-0">Nhap lot co HSD, trace code va ton kho de bat dau theo doi FEFO.</p>
@@ -263,7 +263,7 @@
                 </form>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card ff-admin-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Tao recall case</h2>
                     <p class="text-muted mb-0">Mo quality recall theo product hoac lot khi can thu hoi/giu hang.</p>
@@ -314,10 +314,10 @@
 </section>
 
 <style>
-    .fresh-ops-shell .hero-card { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1.75rem; border-radius:1.5rem; background:linear-gradient(135deg,#14532d 0%,#0f766e 45%,#f59e0b 100%); color:#fff; box-shadow:0 24px 50px rgba(20,83,45,.22); }
-    .fresh-ops-shell .hero-chip { padding:.5rem .85rem; border-radius:999px; background:rgba(255,255,255,.14); font-weight:700; }
+    .fresh-ops-shell .hero-card { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+    .fresh-ops-shell .hero-chip { }
     .fresh-ops-shell .eyebrow, .fresh-ops-shell .metric-label { letter-spacing:.14em; font-weight:700; }
-    .fresh-ops-shell .metric-card, .fresh-ops-shell .panel-card { background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(248,250,252,.96)); border:1px solid rgba(15,23,42,.08); border-radius:1.25rem; box-shadow:0 18px 40px rgba(15,23,42,.08); }
+    .fresh-ops-shell .metric-card, .fresh-ops-shell .panel-card { border:1px solid var(--ff-border); }
     .fresh-ops-shell .metric-card { padding:1.2rem; min-height:132px; }
     .fresh-ops-shell .metric-card strong { display:block; font-size:1.9rem; color:#0f172a; line-height:1.1; }
     .fresh-ops-shell .panel-card { padding:1.5rem; }

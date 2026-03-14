@@ -1,5 +1,15 @@
 @{
     var current = (ViewContext.RouteData.Values["controller"]?.ToString() ?? string.Empty).ToLowerInvariant();
+    var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
+    var categoryUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
+        ? "#section-categories"
+        : "/#section-categories";
+    var suggestUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
+        ? "#section-suggest"
+        : "/#section-suggest";
+    var featuredUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
+        ? "#section-featured"
+        : "/#section-featured";
 }
 <nav class="navbar navbar-expand-lg navbar-main">
     <div class="container">
@@ -9,9 +19,9 @@
         <div class="collapse navbar-collapse" id="mainNavigation">
             <ul class="navbar-nav mx-auto fw-medium">
                 <li class="nav-item"><a class="nav-link @(current == "home" ? "active" : string.Empty)" href="/">Trang Chủ</a></li>
-                <li class="nav-item"><a class="nav-link" href="#section-categories">Danh mục</a></li>
-                <li class="nav-item"><a class="nav-link" href="#section-suggest">Gợi Ý Hôm Nay</a></li>
-                <li class="nav-item"><a class="nav-link" href="#section-featured">Sản phẩm nổi bật</a></li>
+                <li class="nav-item"><a class="nav-link" href="@categoryUrl">Danh mục</a></li>
+                <li class="nav-item"><a class="nav-link" href="@suggestUrl">Gợi Ý Hôm Nay</a></li>
+                <li class="nav-item"><a class="nav-link" href="@featuredUrl">Sản phẩm nổi bật</a></li>
                 <li class="nav-item"><a class="nav-link" href="/account/orders">Lịch sử đơn</a></li>
             </ul>
         </div>

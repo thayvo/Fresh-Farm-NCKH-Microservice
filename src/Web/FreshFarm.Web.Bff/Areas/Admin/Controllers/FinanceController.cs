@@ -68,6 +68,38 @@ public sealed class FinanceController : LegacySellerControllerBase
         return RenderView(model);
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TakeAction(string? section, int recordId, string? actionName, string? note, string? q, string? status, int? sellerId, int page = 1)
+    {
+        if (recordId <= 0 || string.IsNullOrWhiteSpace(actionName))
+        {
+            TempData["ErrorMessage"] = "Thong tin thao tac tai chinh khong hop le.";
+            return RedirectToAction(nameof(Index), new { section, q, status, sellerId, page });
+        }
+
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.PostAsJsonAsync("/api/orders/admin/finance/actions", new
+            {
+                section,
+                recordId,
+                actionName,
+                note
+            });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Da cap nhat trung tam tai chinh." : "Khong the cap nhat trung tam tai chinh.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Loi khi cap nhat trung tam tai chinh: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new { section, q, status, sellerId, page });
+    }
+
     private IActionResult RenderView(FinanceConsolePageViewModel model)
     {
         ViewData["AreaName"] = "Admin";

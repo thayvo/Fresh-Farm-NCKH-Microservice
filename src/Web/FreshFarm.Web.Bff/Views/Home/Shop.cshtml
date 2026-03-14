@@ -1,0 +1,218 @@
+@{
+    Layout = null;
+    var sellerId = ViewData["SellerId"] is int idValue ? idValue : 0;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isBuyerEligible = isAuthenticated && !User.IsInRole("Seller") && !User.IsInRole("Admin");
+    var signInUrl = Url.Action("SignIn", "Account", new { returnUrl = $"/shop/{sellerId}#shop-chat" }) ?? $"/account/signin?returnUrl=%2Fshop%2F{sellerId}%23shop-chat";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gian hàng - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        :root { --ff-green:#16a34a; --ff-orange:#f97316; --ff-border:#e5e7eb; --ff-soft:#f8fafc; }
+        body { font-family:"Inter",sans-serif; background:linear-gradient(180deg,#f8fafc 0%,#ffffff 45%,#f8fafc 100%); color:#0f172a; }
+        .page-shell { padding:28px 0 48px; }
+        .back-link { display:inline-flex; align-items:center; gap:8px; margin-bottom:16px; color:#166534; text-decoration:none; font-weight:700; }
+        .shop-hero { background:linear-gradient(135deg,rgba(22,163,74,.12),rgba(249,115,22,.08)); border:1px solid #dbeafe; border-radius:24px; padding:22px; display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center; margin-bottom:18px; }
+        .shop-avatar,.shop-fallback { width:88px; height:88px; border-radius:24px; object-fit:cover; display:grid; place-items:center; background:#dcfce7; color:#166534; font-size:1.6rem; font-weight:900; }
+        .shop-name { font-size:clamp(1.8rem,3vw,2.5rem); font-weight:900; margin-bottom:8px; }
+        .shop-meta { display:flex; flex-wrap:wrap; gap:10px; color:#475569; }
+        .meta-chip { background:#fff; border:1px solid var(--ff-border); border-radius:999px; padding:8px 12px; }
+        .grid-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+        .grid-head h2 { margin:0; font-size:1.25rem; font-weight:900; }
+        .shop-chat-card { background:#fff; border:1px solid var(--ff-border); border-radius:22px; box-shadow:0 18px 40px rgba(15,23,42,.05); padding:18px; margin-bottom:18px; }
+        .shop-chat-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+        .shop-chat-head h2 { margin:0; font-size:1.15rem; font-weight:900; }
+        .shop-chat-kicker { color:#166534; font-size:.9rem; font-weight:700; }
+        .shop-chat-shell { display:grid; gap:14px; }
+        .shop-chat-toolbar { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+        .shop-chat-title { font-size:1rem; font-weight:800; }
+        .shop-chat-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:4px 9px; border-radius:999px; background:#fee2e2; color:#b91c1c; font-size:.72rem; font-weight:800; vertical-align:middle; }
+        .shop-chat-subtitle { color:#64748b; font-size:.9rem; }
+        .shop-chat-messages { background:#f8fafc; border:1px solid var(--ff-border); border-radius:18px; padding:14px; min-height:220px; max-height:360px; overflow:auto; display:grid; gap:10px; }
+        .shop-chat-message { display:flex; }
+        .shop-chat-message.buyer { justify-content:flex-end; }
+        .shop-chat-message.seller { justify-content:flex-start; }
+        .shop-chat-bubble { max-width:min(100%, 480px); border-radius:18px; padding:12px 14px; box-shadow:0 10px 24px rgba(15,23,42,.05); }
+        .shop-chat-bubble.buyer { background:#dcfce7; color:#14532d; }
+        .shop-chat-bubble.seller { background:#fff; border:1px solid var(--ff-border); color:#0f172a; }
+        .shop-chat-actor { font-size:.78rem; font-weight:800; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em; }
+        .shop-chat-time { margin-top:8px; color:#64748b; font-size:.8rem; }
+        .shop-chat-reply { border-left:3px solid #86efac; padding-left:10px; margin-bottom:8px; color:#334155; font-size:.88rem; }
+        .shop-chat-reply-label { font-size:.76rem; font-weight:800; text-transform:uppercase; margin-bottom:2px; }
+        .shop-chat-compose { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:end; }
+        .shop-chat-input { width:100%; border:1px solid var(--ff-border); border-radius:16px; padding:12px 14px; resize:vertical; min-height:88px; }
+        .shop-chat-input:focus { outline:none; border-color:#16a34a; box-shadow:0 0 0 4px rgba(22,163,74,.12); }
+        .shop-chat-send,.shop-chat-signin { display:inline-flex; justify-content:center; align-items:center; border-radius:14px; padding:12px 16px; border:0; background:#16a34a; color:#fff; text-decoration:none; font-weight:800; min-width:130px; }
+        .shop-chat-send:hover,.shop-chat-signin:hover { background:#15803d; color:#fff; }
+        .shop-chat-send:disabled { opacity:.65; cursor:not-allowed; }
+        .shop-chat-prompt { background:linear-gradient(135deg,rgba(22,163,74,.08),rgba(249,115,22,.08)); border:1px dashed #bbf7d0; border-radius:18px; padding:18px; color:#334155; }
+        .shop-chat-prompt-title { font-size:1rem; font-weight:900; margin-bottom:6px; color:#14532d; }
+        .shop-chat-empty { color:#64748b; text-align:center; padding:28px 16px; }
+        .product-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+        .product-card { background:#fff; border:1px solid var(--ff-border); border-radius:18px; overflow:hidden; box-shadow:0 18px 40px rgba(15,23,42,.05); }
+        .product-thumb { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; }
+        .product-body { padding:14px; display:grid; gap:8px; }
+        .product-name { font-size:1rem; font-weight:800; color:#0f172a; text-decoration:none; min-height:46px; }
+        .product-name:hover { color:#ea580c; }
+        .product-meta { color:#64748b; font-size:.9rem; }
+        .product-price { color:#ef4444; font-size:1.18rem; font-weight:900; }
+        .product-link { display:inline-flex; justify-content:center; align-items:center; border-radius:12px; padding:10px 12px; border:1px solid #fdba74; background:#fff7ed; color:#9a3412; text-decoration:none; font-weight:800; }
+        .product-link:hover { background:#ffedd5; color:#9a3412; }
+        .state-box { background:#fff; border:1px dashed #cbd5e1; border-radius:18px; padding:38px 22px; text-align:center; color:#64748b; }
+        @@media (max-width: 1199.98px) { .product-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+        @@media (max-width: 991.98px) { .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @@media (max-width: 767.98px) { .shop-hero { grid-template-columns:1fr; } .product-grid { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+    @await Html.PartialAsync("_PromoBarLegacy")
+    @await Html.PartialAsync("_HeaderLegacy")
+    @await Html.PartialAsync("_NavLegacy")
+    <main class="container page-shell">
+        <a class="back-link" href="/shop"><i class="bi bi-arrow-left"></i> Quay lại khám phá shop</a>
+        <div id="shopLoading" class="state-box">
+            <div class="spinner-border text-success mb-3" role="status"></div>
+            <div>Đang tải gian hàng...</div>
+        </div>
+        <div id="shopError" class="state-box d-none"></div>
+        <div id="shopRoot" class="d-none"></div>
+    </main>
+    <form id="shopChatAntiForgeryForm" class="d-none" method="post">
+        @Html.AntiForgeryToken()
+    </form>
+    <script src="~/js/public-shop-chat.js"></script>
+    <script>
+        (() => {
+            const sellerId = @sellerId;
+            const isAuthenticated = @(isAuthenticated ? "true" : "false");
+            const isBuyerEligible = @(isBuyerEligible ? "true" : "false");
+            const signInUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(signInUrl));
+            const shopEndpoint = `/bff/shops/${sellerId}`;
+            const productsEndpoint = `/bff/products?sellerId=${sellerId}`;
+            const antiForgeryToken = document.querySelector("#shopChatAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
+            const loadingNode = document.getElementById("shopLoading");
+            const errorNode = document.getElementById("shopError");
+            const rootNode = document.getElementById("shopRoot");
+
+            const escapeHtml = (value) => (value ?? "").toString().replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+            const resolveAvatar = (value) => {
+                const raw = (value ?? "").toString().trim();
+                if (!raw) return "";
+                if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("/")) return raw;
+                return `/Images/${raw}`;
+            };
+            const resolveImage = (value) => {
+                const raw = (value ?? "").toString().trim();
+                if (!raw) return "/Images/no-image.png";
+                if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("/")) return raw;
+                return `/Images/${raw}`;
+            };
+            const vnd = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
+            const formatDate = (value) => {
+                if (!value) return "Chưa rõ";
+                const date = new Date(value);
+                return Number.isNaN(date.getTime()) ? "Chưa rõ" : date.toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric" });
+            };
+            const showError = (message) => {
+                loadingNode.classList.add("d-none");
+                rootNode.classList.add("d-none");
+                errorNode.classList.remove("d-none");
+                errorNode.innerHTML = `<div class="fw-bold mb-2">Không tải được gian hàng</div><div>${escapeHtml(message)}</div>`;
+            };
+
+            Promise.all([
+                fetch(shopEndpoint, { headers: { "Accept": "application/json" } }),
+                fetch(productsEndpoint, { headers: { "Accept": "application/json" } })
+            ])
+            .then(async ([shopResp, productsResp]) => {
+                const shopPayload = await shopResp.json();
+                const productsPayload = await productsResp.json();
+                if (!shopResp.ok) throw new Error(shopPayload?.message || `HTTP ${shopResp.status}`);
+                if (!productsResp.ok) throw new Error(productsPayload?.message || `HTTP ${productsResp.status}`);
+
+                return {
+                    shop: shopPayload,
+                    products: Array.isArray(productsPayload) ? productsPayload : []
+                };
+            })
+            .then(({ shop, products }) => {
+                const avatar = resolveAvatar(shop.avatar ?? shop.Avatar);
+                const shopName = (shop.shopName ?? shop.ShopName ?? "Shop chưa đặt tên").toString();
+                const address = (shop.addressSummary ?? shop.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động").toString();
+                const joinedAt = formatDate(shop.joinedAt ?? shop.JoinedAt);
+
+                rootNode.innerHTML = `
+                    <section class="shop-hero">
+                        ${avatar ? `<img src="${avatar}" alt="${escapeHtml(shopName)}" class="shop-avatar" />` : `<div class="shop-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
+                        <div>
+                            <div class="shop-name">${escapeHtml(shopName)}</div>
+                            <div class="shop-meta">
+                                <span class="meta-chip"><i class="bi bi-person-badge"></i> @@${escapeHtml(shop.userName ?? shop.UserName ?? "")}</span>
+                                <span class="meta-chip"><i class="bi bi-geo-alt"></i> ${escapeHtml(address)}</span>
+                                <span class="meta-chip"><i class="bi bi-calendar-check"></i> Tham gia ${escapeHtml(joinedAt)}</span>
+                                <span class="meta-chip"><i class="bi bi-shop"></i> Seller ID #${Number(shop.sellerId ?? shop.SellerId ?? sellerId)}</span>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="shop-chat-card" id="shop-chat">
+                        <div class="shop-chat-head">
+                            <div>
+                                <div class="shop-chat-kicker">Buyer-seller chat</div>
+                                <h2>Trao đổi trực tiếp với shop</h2>
+                            </div>
+                            <div class="text-muted">Hỏi xuất xứ, lịch giao, đóng gói hoặc độ tươi trước khi mua.</div>
+                        </div>
+                        <div id="publicShopChat"></div>
+                    </section>
+                    <section>
+                        <div class="grid-head">
+                            <h2>Sản phẩm đang bán</h2>
+                            <div class="text-muted">${products.length.toLocaleString("vi-VN")} sản phẩm công khai</div>
+                        </div>
+                        ${products.length === 0 ? `<div class="state-box">Shop này chưa có sản phẩm công khai.</div>` : `<div class="product-grid">
+                            ${products.map((product) => `
+                                <article class="product-card">
+                                    <img src="${resolveImage(product.imageFileName ?? product.ImageFileName)}" alt="${escapeHtml(product.productName ?? product.ProductName ?? "")}" class="product-thumb" />
+                                    <div class="product-body">
+                                        <a class="product-name" href="/products/${Number(product.productId ?? product.ProductId ?? 0)}">${escapeHtml(product.productName ?? product.ProductName ?? "Sản phẩm")}</a>
+                                        <div class="product-meta">${escapeHtml(product.categoryName ?? product.CategoryName ?? "Chưa phân loại")} · ${escapeHtml(product.unitName ?? product.UnitName ?? "đơn vị")}</div>
+                                        <div class="product-meta">${escapeHtml(product.origin ?? product.Origin ?? "Chưa có xuất xứ")}</div>
+                                        <div class="product-price">${vnd(product.price ?? product.Price ?? 0)}</div>
+                                        <a class="product-link" href="/products/${Number(product.productId ?? product.ProductId ?? 0)}">Xem sản phẩm</a>
+                                    </div>
+                                </article>
+                            `).join("")}
+                        </div>`}
+                    </section>
+                `;
+
+                loadingNode.classList.add("d-none");
+                errorNode.classList.add("d-none");
+                rootNode.classList.remove("d-none");
+
+                if (window.PublicShopChat && typeof window.PublicShopChat.init === "function") {
+                    window.PublicShopChat.init({
+                        rootId: "publicShopChat",
+                        sellerId,
+                        isAuthenticated,
+                        isBuyerEligible,
+                        signInUrl,
+                        antiForgeryToken,
+                        conversationUrl: `/bff/support-chat/sellers/${sellerId}/conversation`,
+                        messagesUrlTemplate: "/bff/support-chat/conversations/__id__/messages",
+                        sendUrlTemplate: "/bff/support-chat/conversations/__id__/messages",
+                        markReadUrlTemplate: "/bff/support-chat/conversations/__id__/mark-read"
+                    });
+                }
+            })
+            .catch((error) => showError(error?.message || "Không thể tải dữ liệu shop."));
+        })();
+    </script>
+</body>
+</html>

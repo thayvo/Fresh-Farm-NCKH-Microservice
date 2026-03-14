@@ -4,42 +4,19 @@
 }
 
 <style>
-    .moderation-shell {
-        min-height: 100vh;
-        background: linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
-        padding: 1.5rem;
-    }
-
     .hero-card {
-        background: linear-gradient(135deg, #1d4ed8 0%, #60a5fa 100%);
-        border-radius: 1.75rem;
-        color: #fff;
-        padding: 2rem;
-        box-shadow: 0 24px 50px rgba(29, 78, 216, .22);
+        display: block;
     }
 
     .hero-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: .4rem;
-        padding: .45rem .85rem;
-        border-radius: 999px;
-        background: rgba(255,255,255,.18);
-        font-weight: 600;
-        font-size: .9rem;
     }
 
     .stat-card {
-        border: 0;
-        border-radius: 1.25rem;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
         height: 100%;
     }
 
     .filter-card, .table-card {
-        border: 0;
-        border-radius: 1.5rem;
-        box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        border: 1px solid var(--ff-border);
     }
 
     .risk-badge {
@@ -125,11 +102,11 @@
     }
 </style>
 
-<main class="moderation-shell">
-    <div class="hero-card mb-4">
+<main class="moderation-shell ff-admin-shell">
+    <div class="hero-card ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-center">
             <div>
-                <div class="hero-pill mb-3">
+                <div class="hero-pill ff-admin-chip mb-3">
                     <i class="bi bi-shield-check"></i>
                     <span>Catalog moderation MVP</span>
                 </div>
@@ -156,7 +133,7 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Tổng sản phẩm</div>
                     <div class="display-6 fw-bold">@Model.TotalProducts</div>
@@ -164,7 +141,7 @@
             </div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Bị gắn cờ</div>
                     <div class="display-6 fw-bold text-primary">@Model.FlaggedProducts</div>
@@ -172,7 +149,7 @@
             </div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Rủi ro cao</div>
                     <div class="display-6 fw-bold text-danger">@Model.HighRiskProducts</div>
@@ -180,7 +157,7 @@
             </div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Sản phẩm ẩn</div>
                     <div class="display-6 fw-bold text-warning">@Model.HiddenProducts</div>
@@ -188,7 +165,7 @@
             </div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Sạch</div>
                     <div class="display-6 fw-bold text-success">@Model.CleanProducts</div>
@@ -196,7 +173,7 @@
             </div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card stat-card">
+            <div class="card stat-card ff-admin-card">
                 <div class="card-body">
                     <div class="text-muted small">Keywords</div>
                     <div class="fw-semibold">@string.Join(", ", Model.KeywordSuggestions.Take(3))</div>
@@ -205,7 +182,7 @@
         </div>
     </div>
 
-    <div class="card filter-card mb-4">
+    <div class="card filter-card ff-admin-card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3">
                 <div class="col-lg-4">
@@ -284,7 +261,7 @@
         </div>
     </div>
 
-    <div class="card table-card">
+    <div class="card table-card ff-admin-card">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-modern align-middle mb-0">

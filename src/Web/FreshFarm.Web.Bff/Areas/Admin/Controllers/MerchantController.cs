@@ -28,12 +28,13 @@ public sealed class MerchantController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? q = null, string? status = null, int page = 1, int? selectedSellerId = null)
+    public async Task<IActionResult> Index(string? q = null, string? status = null, string? queue = null, int page = 1, int? selectedSellerId = null)
     {
         var model = new MerchantManagementPageViewModel
         {
             Query = q?.Trim() ?? string.Empty,
             Status = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant(),
+            Queue = string.IsNullOrWhiteSpace(queue) ? "all" : queue.Trim().ToLowerInvariant(),
             Page = page < 1 ? 1 : page,
             SelectedSellerId = selectedSellerId > 0 ? selectedSellerId : null
         };
@@ -65,9 +66,18 @@ public sealed class MerchantController : LegacySellerControllerBase
                 ActiveSellers = payload.Stats?.ActiveSellers ?? 0,
                 SuspendedSellers = payload.Stats?.SuspendedSellers ?? 0,
                 ReviewNeeded = payload.Stats?.ReviewNeeded ?? 0,
-                MissingAddress = payload.Stats?.MissingAddress ?? 0
+                MissingAddress = payload.Stats?.MissingAddress ?? 0,
+                ApprovalQueue = payload.Stats?.ApprovalQueue ?? 0,
+                ProfileFixQueue = payload.Stats?.ProfileFixQueue ?? 0,
+                DormantQueue = payload.Stats?.DormantQueue ?? 0
             };
             model.StatusOptions = payload.Filters?.StatusOptions?.Select(x => new MerchantOptionViewModel
+            {
+                Value = x.Value ?? string.Empty,
+                Text = x.Text ?? string.Empty
+            }).ToList() ?? new List<MerchantOptionViewModel>();
+            model.Queue = payload.Filters?.Queue ?? model.Queue;
+            model.QueueOptions = payload.Filters?.QueueOptions?.Select(x => new MerchantOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
@@ -94,12 +104,12 @@ public sealed class MerchantController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(int sellerId, bool isActive, string? q, string? status, int page = 1, int? selectedSellerId = null)
+    public async Task<IActionResult> UpdateStatus(int sellerId, bool isActive, string? q, string? status, string? queue, int page = 1, int? selectedSellerId = null)
     {
         if (sellerId <= 0)
         {
             TempData["ErrorMessage"] = "Seller không hợp lệ.";
-            return RedirectToAction(nameof(Index), new { q, status, page, selectedSellerId });
+            return RedirectToAction(nameof(Index), new { q, status, queue, page, selectedSellerId });
         }
 
         try
@@ -120,6 +130,7 @@ public sealed class MerchantController : LegacySellerControllerBase
         {
             q,
             status,
+            queue,
             page,
             selectedSellerId = selectedSellerId > 0 ? selectedSellerId : sellerId
         });
@@ -163,7 +174,11 @@ public sealed class MerchantController : LegacySellerControllerBase
             ComplianceStatus = payload.ComplianceStatus ?? string.Empty,
             Flags = payload.Flags?.Select(MapFlag).ToList() ?? new List<MerchantFlagViewModel>(),
             DaysSinceLastLogin = payload.DaysSinceLastLogin,
-            ComplianceSummary = payload.ComplianceSummary ?? string.Empty
+            QueueBucket = payload.QueueBucket ?? string.Empty,
+            RecommendedAction = payload.RecommendedAction ?? string.Empty,
+            IssueCount = payload.IssueCount,
+            ComplianceSummary = payload.ComplianceSummary ?? string.Empty,
+            NextSteps = payload.NextSteps?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()).ToList() ?? new List<string>()
         };
     }
 
@@ -200,7 +215,10 @@ public sealed class MerchantController : LegacySellerControllerBase
             ProfileScore = item.ProfileScore,
             ComplianceStatus = item.ComplianceStatus ?? string.Empty,
             Flags = item.Flags?.Select(MapFlag).ToList() ?? new List<MerchantFlagViewModel>(),
-            DaysSinceLastLogin = item.DaysSinceLastLogin
+            DaysSinceLastLogin = item.DaysSinceLastLogin,
+            QueueBucket = item.QueueBucket ?? string.Empty,
+            RecommendedAction = item.RecommendedAction ?? string.Empty,
+            IssueCount = item.IssueCount
         };
     }
 
@@ -230,6 +248,11 @@ public sealed class MerchantController : LegacySellerControllerBase
         if (!string.IsNullOrWhiteSpace(model.Status))
         {
             query.Add($"status={Uri.EscapeDataString(model.Status)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.Queue))
+        {
+            query.Add($"queue={Uri.EscapeDataString(model.Queue)}");
         }
 
         return "/auth/admin/merchants?" + string.Join("&", query);
@@ -314,13 +337,18 @@ public sealed class MerchantController : LegacySellerControllerBase
         public int SuspendedSellers { get; set; }
         public int ReviewNeeded { get; set; }
         public int MissingAddress { get; set; }
+        public int ApprovalQueue { get; set; }
+        public int ProfileFixQueue { get; set; }
+        public int DormantQueue { get; set; }
     }
 
     private sealed class MerchantFiltersApiDto
     {
         public string? Search { get; set; }
         public string? Status { get; set; }
+        public string? Queue { get; set; }
         public List<MerchantOptionApiDto>? StatusOptions { get; set; }
+        public List<MerchantOptionApiDto>? QueueOptions { get; set; }
     }
 
     private sealed class MerchantOptionApiDto
@@ -347,6 +375,9 @@ public sealed class MerchantController : LegacySellerControllerBase
         public string? ComplianceStatus { get; set; }
         public List<MerchantFlagApiDto>? Flags { get; set; }
         public int? DaysSinceLastLogin { get; set; }
+        public string? QueueBucket { get; set; }
+        public string? RecommendedAction { get; set; }
+        public int IssueCount { get; set; }
     }
 
     private class MerchantDetailApiDto : MerchantListItemApiDto
@@ -356,6 +387,7 @@ public sealed class MerchantController : LegacySellerControllerBase
         public string? District { get; set; }
         public string? Ward { get; set; }
         public string? ComplianceSummary { get; set; }
+        public List<string>? NextSteps { get; set; }
     }
 
     private sealed class MerchantFlagApiDto

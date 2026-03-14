@@ -24,44 +24,32 @@
         "warning" => "text-bg-warning",
         _ => "text-bg-secondary"
     };
+
+    string QueueBadge(string queue) => (queue ?? string.Empty).ToLowerInvariant() switch
+    {
+        "approval" => "bg-success-subtle text-success",
+        "profile_fix" => "bg-warning-subtle text-warning",
+        "dormant" => "bg-secondary-subtle text-secondary",
+        "suspended" => "bg-danger-subtle text-danger",
+        _ => "bg-info-subtle text-info"
+    };
+
+    string QueueText(string queue) => (queue ?? string.Empty).ToLowerInvariant() switch
+    {
+        "approval" => "Chờ duyệt",
+        "profile_fix" => "Bổ sung hồ sơ",
+        "dormant" => "Ngủ đông",
+        "suspended" => "Đang khóa",
+        _ => "Rà soát tay"
+    };
 }
 
 <style>
-    .merchant-shell {
-        min-height: 100vh;
-        padding: 1.5rem;
-        background:
-            radial-gradient(circle at top right, rgba(125, 211, 252, 0.35), transparent 30%),
-            linear-gradient(180deg, #edf7ff 0%, #f8fbff 100%);
-    }
-
-    .merchant-hero {
-        border-radius: 1.75rem;
-        padding: 2rem;
-        color: #fff;
-        background: linear-gradient(135deg, #0f4c81 0%, #2563eb 50%, #7dd3fc 100%);
-        box-shadow: 0 24px 54px rgba(37, 99, 235, 0.22);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .merchant-hero::after {
-        content: "";
-        position: absolute;
-        inset: -20% auto auto 40%;
-        width: 35%;
-        height: 180%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
-        transform: rotate(18deg);
-    }
-
     .merchant-card,
     .merchant-filter-card,
     .merchant-list-card,
     .merchant-detail-card {
         border: 0;
-        border-radius: 1.5rem;
-        box-shadow: 0 16px 34px rgba(15, 23, 42, .08);
     }
 
     .merchant-row {
@@ -113,18 +101,13 @@
         gap: 1rem;
     }
 
-    @@media (max-width: 991.98px) {
-        .merchant-shell {
-            padding: 1rem;
-        }
-    }
 </style>
 
-<main class="merchant-shell">
-    <section class="merchant-hero mb-4">
+<main class="merchant-shell ff-admin-shell">
+    <section class="merchant-hero ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
             <div>
-                <div class="badge rounded-pill text-bg-light text-primary px-3 py-2 mb-3">Sprint C · Merchant lifecycle & compliance</div>
+                <div class="ff-admin-chip mb-3">Sprint C · Merchant lifecycle & compliance</div>
                 <h1 class="fw-bold mb-2">Lane merchant compliance</h1>
                 <p class="mb-0 opacity-75">Rà seller theo mức đầy đủ hồ sơ, hoạt động gần đây và trạng thái vận hành để chuẩn bị cho các module compliance sâu hơn.</p>
             </div>
@@ -167,6 +150,15 @@
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Thiếu địa chỉ</div><div class="display-6 fw-bold text-primary">@Model.Stats.MissingAddress</div></div></div>
         </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Queue chờ duyệt</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Bổ sung hồ sơ</div><div class="display-6 fw-bold text-warning">@Model.Stats.ProfileFixQueue</div></div></div>
+        </div>
+        <div class="col-md-6 col-xl">
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Seller ngủ đông</div><div class="display-6 fw-bold text-secondary">@Model.Stats.DormantQueue</div></div></div>
+        </div>
     </div>
 
     <div class="card merchant-filter-card mb-4">
@@ -176,7 +168,7 @@
                     <label class="form-label fw-semibold">Tìm kiếm seller</label>
                     <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tên shop, username, email, số điện thoại..." />
                 </div>
-                <div class="col-md-4 col-lg-3">
+                <div class="col-md-4 col-lg-2">
                     <label class="form-label fw-semibold">Trạng thái compliance</label>
                     <select class="form-select" name="status">
                         @foreach (var option in Model.StatusOptions)
@@ -192,7 +184,23 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-4 col-lg-2 d-flex gap-2">
+                <div class="col-md-4 col-lg-2">
+                    <label class="form-label fw-semibold">Queue vận hành</label>
+                    <select class="form-select" name="queue">
+                        @foreach (var option in Model.QueueOptions)
+                        {
+                            if (string.Equals(option.Value, Model.Queue, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4 col-lg-1 d-flex gap-2">
                     <button type="submit" class="btn btn-primary rounded-pill px-4 flex-fill">
                         <i class="bi bi-funnel me-2"></i>Lọc
                     </button>
@@ -226,7 +234,7 @@
                             {
                                 var selected = Model.SelectedSellerId == merchant.SellerId;
                                 <a class="merchant-row text-decoration-none text-reset p-3 @(selected ? "is-selected" : string.Empty)"
-                                   href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, page = Model.Page, selectedSellerId = merchant.SellerId })">
+                                   href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, page = Model.Page, selectedSellerId = merchant.SellerId })">
                                     <div class="d-flex gap-3">
                                         @if (!string.IsNullOrWhiteSpace(merchant.Avatar))
                                         {
@@ -241,14 +249,17 @@
                                                 <div>
                                                     <div class="fw-bold">@merchant.ShopName</div>
                                                     <div class="text-muted small">@merchant.UserName · Seller ID #@merchant.SellerId</div>
+                                                    <div class="small mt-1 text-muted">Ưu tiên xử lý: @merchant.RecommendedAction</div>
                                                 </div>
                                                 <div class="d-flex gap-2 align-items-center">
+                                                    <span class="badge rounded-pill @QueueBadge(merchant.QueueBucket)">@QueueText(merchant.QueueBucket)</span>
                                                     <span class="badge rounded-pill @ComplianceBadge(merchant.ComplianceStatus)">@ComplianceText(merchant.ComplianceStatus)</span>
                                                     <span class="merchant-score">@merchant.ProfileScore</span>
                                                 </div>
                                             </div>
                                             <div class="small mt-2 text-muted">@merchant.Email · @(string.IsNullOrWhiteSpace(merchant.Phone) ? "Chưa có SĐT" : merchant.Phone)</div>
                                             <div class="small text-muted">@merchant.AddressSummary</div>
+                                            <div class="small text-muted mt-1">Số cờ rà soát: <strong>@merchant.IssueCount</strong></div>
                                             <div class="merchant-flags mt-2">
                                                 @foreach (var flag in merchant.Flags.Take(4))
                                                 {
@@ -272,7 +283,7 @@
                                     @for (var i = 1; i <= Model.TotalPages; i++)
                                     {
                                         <li class="page-item @(i == Model.Page ? "active" : string.Empty)">
-                                            <a class="page-link" href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, page = i, selectedSellerId = Model.SelectedSellerId })">@i</a>
+                                            <a class="page-link" href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, page = i, selectedSellerId = Model.SelectedSellerId })">@i</a>
                                         </li>
                                     }
                                 </ul>
@@ -310,6 +321,7 @@
                             <div>
                                 <div class="fw-bold fs-5">@Model.Details.ShopName</div>
                                 <div class="text-muted small">@Model.Details.UserName · Seller ID #@Model.Details.SellerId</div>
+                                <span class="badge rounded-pill mt-2 @QueueBadge(Model.Details.QueueBucket)">@QueueText(Model.Details.QueueBucket)</span>
                                 <span class="badge rounded-pill mt-2 @ComplianceBadge(Model.Details.ComplianceStatus)">@ComplianceText(Model.Details.ComplianceStatus)</span>
                             </div>
                         </div>
@@ -360,11 +372,30 @@
                             <div>@Model.Details.ComplianceSummary</div>
                         </div>
 
+                        <div class="p-3 bg-light rounded-4 mb-3">
+                            <div class="text-muted small mb-1">Khuyến nghị vận hành</div>
+                            <div class="fw-semibold">@Model.Details.RecommendedAction</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="text-muted small mb-2">Checklist bước tiếp theo</div>
+                            <div class="d-flex flex-column gap-2">
+                                @foreach (var step in Model.Details.NextSteps)
+                                {
+                                    <div class="d-flex gap-2 align-items-start">
+                                        <i class="bi bi-check2-circle text-primary"></i>
+                                        <span>@step</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
                         <form method="post" action="@Url.Action("UpdateStatus", "Merchant", new { area = "Admin" })" class="d-grid gap-2">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
                             <input type="hidden" name="q" value="@Model.Query" />
                             <input type="hidden" name="status" value="@Model.Status" />
+                            <input type="hidden" name="queue" value="@Model.Queue" />
                             <input type="hidden" name="page" value="@Model.Page" />
                             <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
                             <input type="hidden" name="isActive" value="@((!Model.Details.IsActive).ToString().ToLowerInvariant())" />

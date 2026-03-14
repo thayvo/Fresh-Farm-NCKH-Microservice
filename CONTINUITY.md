@@ -3,6 +3,7 @@
 - **Goal** (incl. success criteria):
   - Hoan tat Seller area service-first on dinh runtime tren .NET 8 (khong con EF legacy trong BFF Seller).
   - Khoi tao lane Admin theo phong cach UI Seller (xanh duong + hieu ung quet anh sang), thiet ke/pham vi chuan theo cac san TMĐT.
+  - Moi uu tien: day manh lane user-facing marketplace theo chuan san TMĐT nong san (search san pham, kham pha shop, hien thi da nguoi ban, chat buyer-seller).
   - Success criteria hien tai: Seller pages chay dung data, khong 404/binding error, report/export on dinh, DB schema khop microservices; Admin UI thong nhat theme Seller.
 - **Constraints/Assumptions**:
   - Giu UI/UX hien co cua views Seller (chi sua model/route/binding/controller mapping).
@@ -16,6 +17,13 @@
   - Lot 4.5.6 `final3-import` la buoc migration du lieu mot lan (bootstrap/backfill), KHONG phai phu thuoc bat buoc khi runtime microservices.
   - Theo user: tam thoi BO QUA import du lieu `final3`, uu tien hoan tat runtime multi-seller truoc.
   - Da xac minh moi truong hien tai co `dotnet` (`C:\Program Files\dotnet\dotnet.exe`), co the build verify lai cac lane dang migrate.
+  - Theo user: sau khi da co mot moc Admin kha on, tam dung mo rong Admin va quay lai lane user-facing truoc.
+  - Theo user (turn moi nhat): tiep tuc thuc thi theo roadmap da chot, bat dau bang `U1 search / PLP that`.
+  - Thu tu uu tien moi cho user-facing:
+    - `product search / PLP`,
+    - `shop discovery + multi-seller`,
+    - `buyer-seller chat box`,
+    - sau do moi harden/expand tiep.
   - Hien tiep tuc roadmap theo `Phase 7.7 Growth ops`:
     - `Campaigns MVP` (voucher san + flash sale) da xong khung service-first.
     - `Ads wallet` + `ads finance overview` da duoc noi vao `Campaign center`.
@@ -24,8 +32,431 @@
     - Da mo rong tiep `7.7A` voi `Catalog readiness MVP`.
     - Da mo rong tiep `7.7A` voi `Fresh-goods operations MVP`.
     - Da mo rong tiep `7.7A` voi `Communications governance MVP`.
+  - Sau khi scaffold xong `7.7A`, uu tien hien tai la hardening warning/runtime drift gan nhat truoc khi mo module roadmap moi.
 - **State**:
   - *Done*:
+    - Da mo rong them `preset giao nhanh gan` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them preset `Noi thanh trong ngay` vao strip `Chon nhanh theo nhu cau`,
+        - preset nay uu tien bucket `ward-level` de user loc nhom shop co dia chi giao chi tiet nhat,
+        - da tiep tuc harden logic preset de URL/share-link va thao tac bo preset van sach state.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` hieu them preset `same-day-urban`,
+        - neu URL chi mang `preset=same-day-urban` ma chua co `deliveryScopes` thi BFF tu ap filter `ward-level`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong them `preset giao theo dia ban` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them preset `Uu tien noi tinh` vao strip `Chon nhanh theo nhu cau`,
+        - preset nay uu tien filter `district-level + ward-level` de user tim cac shop co dia chi giao gan hon,
+        - da harden logic preset de khi bo preset thi cac filter/sort do preset sinh ra cung duoc don sach hon.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong `search / PLP` voi filter `Pham vi giao` theo dia ban:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` nhan them `deliveryScopes`,
+        - BFF suy luan scope giao tu `addressSummary` cua shop de chia bucket `province-level / district-level / ward-level`,
+        - tra them facet `availableDeliveryScopes` va ap filter scope truoc pagination de URL search chia se lai on dinh.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them nhom filter `Pham vi giao`,
+        - sync URL qua `deliveryScope=...`,
+        - them chip remove rieng cho filter giao dia ban,
+        - card san pham gio hien them badge `Tinh/thanh ro / Toi quan-huyen / Toi xa-phuong` dua tren dia chi shop cong khai.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong them `preset/filter marketplace` cho PLP search voi preset `Shop dang tin`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - bo sung preset `Shop dang tin` vao strip `Chon nhanh theo nhu cau`,
+        - preset moi duoc sync vao `state + URL (?preset=trusted-shop) + active chips` giong cac preset search khac.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` hieu them preset `trusted-shop`,
+        - BFF dung trust signals san co cua shop (`joinedAt`, `addressSummary`, `productCount`) de loc seller truoc khi paginate,
+        - facet `availableShops` van duoc hydrate tren cung contract de UI PLP giu duoc context shop/filter.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da bo sung `preset/filter marketplace` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them strip `Chon nhanh theo nhu cau`,
+        - ho tro preset `Uu tien con hang`, `Hang tuoi de chon`, `San pham moi`, `Ban chay`, `Gia de mua`,
+        - preset da duoc sync vao `state + URL (?preset=...) + active chips`,
+        - user co the apply/bo preset nhanh ma van giu nguyen flow filter server-side hien tai.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da bo sung `freshness / giao va bao quan signals` cho lane user-facing:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them `search-freshness-badge` du tren field that nhu `origin`, `preservation`, `weight`,
+        - PLP gio hien duoc cac signal nhu `Xuat xu ro rang`, `Uu tien chuoi lanh`, `Giu mat khi giao`, `Bao quan kho rao`, `Quy cach ro rang`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+        - them `freshness-panel` trong hero PDP,
+        - panel `Goi y giao va bao quan` giup buyer hieu cach trao doi voi shop dua tren du lieu that cua san pham.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da bo sung `shop badge / trust signals` cho lane user-facing:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - dung du lieu san co trong `availableShops` (`joinedAt`, `addressSummary`, `productCount`) de sinh badge nhu `Hoat dong lau`, `Moi tham gia`, `Nhieu mat hang`, `Co dia chi shop`,
+        - product card tren PLP gio hien them thong tin shop va trust badges,
+        - bo loc `Shop dang ban` cung hien trust badges nho de de quyet dinh hon.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+        - khoi `Nhieu shop cung ban` gio hien them trust badges theo `joinedAt/addressSummary`,
+        - thong diep shop tren PDP va Search da thong nhat hon.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da chot them UX cho khoi `Nhieu shop cung ban` tren PDP:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+        - them `offer-guide` de huong dan user nen mua/chat/shop theo trang thai ton kho hien tai,
+        - danh dau `Shop chinh cua san pham` khi `sellerId` trung `PrimarySellerId`,
+        - CTA trong tung offer card gio ro hon theo ngu canh:
+          - con hang: `Mua tu shop chinh` hoac `Chon mua`,
+          - het hang: doi thanh `Hoi shop chinh` / `Hoi shop nay`,
+          - giu lai `Nhan shop` va `Vao shop` de user de tiep tuc kham pha.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da dong bo logic ton kho sang `U2 - Product Detail Page`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+        - them helper `resolveAvailability()` + `getAvailabilityMeta()` theo 3 muc `in-stock / low-stock / out-of-stock`,
+        - hero PDP gio hien `stock-panel` chi tiet hon thay vi chi badge co/hay-khong,
+        - CTA mua duoc harden: san pham het hang se hien `Tam het hang` va disable `Them vao gio`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da dong bo them thong diep ton kho sang khoi `San pham lien quan` tren PLP:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them `shop-related-stock` cho cac related cards,
+        - `renderRelatedSection()` gio dung chung `getAvailabilityMeta(product)` voi grid chinh,
+        - khach xem PLP co the nhin nhanh `Con hang / Sap het hang / Het hang` ca o ket qua chinh lan san pham lien quan.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da day them badge ton kho len card san pham o PLP:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them `search-stock-badge` voi 3 trang thai `Con hang / Sap het / Het hang`,
+        - card san pham gio hien nhanh ton kho theo `stockQuantity`/`availabilityKey`,
+        - wording badge co them detail ngan (`San`, `Con khoang`, `Tam thoi chua the mua ngay`) de user nhin nhanh ma khong can mo PDP.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep PLP search voi filter `Tinh trang hang`:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` nhan them `availability`,
+        - BFF map `StockQuantity` thanh 3 bucket: `in-stock`, `low-stock`, `out-of-stock`,
+        - tra them facet `availableAvailability` kem count de UI render bo loc that.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them nhom filter `Tinh trang hang`,
+        - sync URL qua `availability=...`,
+        - them chip remove rieng cho `Ton kho`,
+        - normalize product co them `stockQuantity` va `availabilityKey`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+    - Da day tiep PLP search theo huong marketplace bang facet `Shop dang ban`:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` nhan them `sellerIds`,
+        - BFF build `availableShops` tu `PrimarySellerId` cua ket qua search va hydrate ten shop bang `Identity /auth/public/merchants?sellerIds=...`,
+        - filter shop duoc ap dung truoc sort/pagination de URL search co the chia se lai on dinh.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them nhom filter `Shop dang ban`,
+        - parse/sync URL voi `seller=...` va van doc duoc `shop=...` de tranh vo link cu,
+        - them chip `Shop: ...` de bo tung seller rieng,
+        - `clear all` reset ca state seller filter.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+    - Da harden them `U1 - search / PLP` de bo loc danh muc hoan chinh hon thay vi chi suy ra tu payload san pham:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/CategoriesController.cs`
+        - them `GET /api/categories/public` tra ve danh muc active public kem `ProductCount`.
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
+        - public search da nhan them `categoryIds`,
+        - category filter duoc ap dung server-side thay vi chi loc client-side.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/products` da proxy them `categoryIds`,
+        - them `GET /bff/categories` bridge den public category contract.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - sidebar `Theo danh muc` gio doc tu public category endpoint, khong con phu thuoc payload product dang rong,
+        - them strip `Chon nhanh danh muc` o dau trang search,
+        - co state `danh muc dang chon` + chip bo loc de bo nhanh,
+        - sync URL voi `?q=...&category=...`,
+        - khi keyword trung khop ten/slug danh muc thi search auto hydrate danh muc do.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da day tiep bo loc search `Xuất xứ / Đơn vị / Chuẩn nông sản` theo huong server-aware:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
+        - `GET /api/products` nhan them `origins`, `standards`, `units`,
+        - query duoc filter server-side theo `ProductInfos.Origin`, `ProductInfos.Standard`, `Unit.UnitName`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/products` da proxy them `origins`, `standards`, `units`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - parse state filter tu URL (`origin`, `standard`, `unit`),
+        - checkbox `Xuất xứ / Đơn vị / Chuẩn nông sản` duoc check lai theo URL hien tai,
+        - moi lan tick bo loc nay se `syncUrl()` + `reloadProducts()` thay vi chi loc tam tren client.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep PLP search UX o `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`:
+      - `Khoảng giá`, `Đánh giá tối thiểu`, `Sắp xếp`, `Trang hiện tại` gio duoc sync vao URL (`minPrice`, `maxPrice`, `minRating`, `sort`, `page`).
+      - Page load se hydrate lai gia/đánh giá/sort tu URL hien co.
+      - Them pagination co `prev/next` + page buttons; grid chi render `12` san pham moi trang.
+      - Moi filter/sort chinh se reset ve trang `1` de tranh state lech.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da bo sung khung `filter dang ap dung` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - doi `activeCategorySummary` thanh `activeFilterSummary`,
+        - render chip cho:
+          - `Danh mục`,
+          - `Xuất xứ`,
+          - `Đơn vị`,
+          - `Chuẩn nông sản`,
+          - `Khoảng giá`,
+          - `Đánh giá`,
+          - `Sắp xếp`.
+        - moi chip co action remove rieng, bo la sync lai URL/state ngay.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da tach contract search rieng o BFF de PLP co phan trang/facets on dinh hon ma khong anh huong `/bff/products` cu:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - them `GET /bff/product-search`,
+        - BFF fetch Catalog products theo bo loc service-first,
+        - ap `minPrice / maxPrice / minRating / sort`,
+        - tra envelope gom `items`, `totalCount`, `page`, `pageSize`, `totalPages`, `availableLocations`, `availableUnits`, `availableStandards`, `relatedItems`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - chuyen tu `/bff/products` sang `/bff/product-search`,
+        - dung facets/related/pagination meta tu contract moi thay vi tu suy ra moi noi mot kieu,
+        - pagination hien tai da di theo payload server-side cua BFF search contract.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+    - Da fix root cause khien sidebar `Theo danh muc` o trang tim kiem hien `Chua co danh muc kha dung`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml` dung payload `/bff/products` de suy ra category filters (`new Set(products.map(p => p.categoryName))`).
+      - Khi user click danh muc tu homepage, flow moi dieu huong dung sang `/search?q=<ten-danh-muc>`.
+      - Tuy nhien `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs` truoc do chi search theo `ProductName.Contains(keyword)`.
+      - Ket qua: query nhu `Trai cay`, `Rau la`... khong khop ten san pham => API tra danh sach rong => sidebar category tren search cung rong du DB van co 7 danh muc active.
+      - Da mo rong public search de match them:
+        - `Category.CategoryName`,
+        - `ProductInfos.Origin`,
+        - `ProductInfos.Standard`.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+    - Da doi flow click cua card `Danh muc` o trang chu:
+      - Truoc do `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` click card danh muc khong chuyen trang, ma goi lai `loadHomeProducts(keyword)` tren cung homepage.
+      - Khi request/runtime o homepage gap loi, user thay ngay trang chu roi vao state rong (`Chua co du lieu danh muc / goi y / san pham`), tao cam giac "bam danh muc ra trang rong".
+      - Da doi sang flow dung hon cho marketplace:
+        - click card danh muc se dieu huong sang `/search?q=<ten-danh-muc>`,
+        - khong con phu thuoc homepage dynamic state de loc tai cho.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da xac minh truc tiep CSDL Catalog local co du lieu danh muc:
+      - Connection string dev Catalog API tro toi `LAPTOP-D3S57BE5\DEVSQL`, DB `FreshFarmCatalogDB`.
+      - Query `dbo.Categories` bang `sqlcmd` tra `CategoryCount = 7`.
+      - 7 danh muc hien co deu active:
+        - `Rau la`,
+        - `Rau an hoa / than / mam`,
+        - `Rau an qua`,
+        - `Cu & re`,
+        - `Nam`,
+        - `Rau thom & gia vi`,
+        - `Trai cay`.
+      - Query `dbo.Products` cung xac nhan co nhieu san pham public gan voi cac `CategoryId` nay.
+    - Da harden trang chu user-facing khi `Danh muc / Goi y / Noi bat` cung luc hien rong:
+      - Xac minh `GET https://localhost:7085/bff/products` va `GET http://localhost:5100/bff/products` deu tra du lieu product binh thuong.
+      - Nguyen nhan kha nang cao: `renderSuggestions()` khoi tao `Swiper` trong cung `try` cua `loadHomeProducts()`, nen neu CDN script `Swiper` khong load/bi block thi toan bo page roi vao `catch` va xoa ca `Danh muc`, `Goi y`, `San pham noi bat`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` da duoc harden:
+        - them fallback `suggestion-fallback-grid`,
+        - neu `window.Swiper` khong san sang thi van render danh sach goi y dang grid tinh,
+        - khong con lam hong ca page khi rieng carousel script loi.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da fix loi hien thi khung `Danh muc` o trang chu theo screenshot user gui:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` truoc do de `category-scroll-wrapper` sat mep va moi card dung them `me-4`, khien item dau/cuoi de bi cat, nhat la khi nut prev/next de len tren.
+      - Da them `category-container` padding de card khong an vao nut dieu huong, doi wrapper sang `gap` + hide scrollbar, bo `me-4`, va cho `category-name` hien thi 2 dong thay vi truncate 1 dong qua som.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da fix them loi nav user-facing `Danh muc / Goi y / San pham noi bat`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_NavLegacy.cshtml` truoc do dung anchor noi bo `#section-*`, chi hop le o trang chu.
+      - Tren `PDP/Search/Shop`, bam vao cac muc nay khong co section tuong ung nen gay flow loi/khong hien thi nhu user bao.
+      - Da doi sang route thong minh:
+        - o `Home/Index` giu anchor noi bo,
+        - o cac trang khac se dieu huong ve `/#section-categories`, `/#section-suggest`, `/#section-featured`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden lai `U2 - Product Detail Page` sau khi user bao trang chi tiet bi vo shell:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml` truoc do chi render partial `Promo/Header/Nav` nhung thieu CSS legacy tuong ung, khien shell user-facing bi vo visual/interaction so voi `Home/Search`.
+      - Da bo sung lai cac style chung cho `promo/header/nav/footer`, them `_FooterLegacy`, va noi lai header keyword redirect ve `/search?q=...`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da ra soat them cac CTA user-facing co nguy co dieu huong sai sau bug `Xem chi tiet`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` da xac nhan ca 2 CTA `Xem chi tiet` deu tro ve `buildProductUrl(...)`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml` da xac nhan `Xem chi tiet` tro ve PDP, `Mua ngay` moi tro checkout.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml` da xac nhan chi cac CTA mua (`Mua ngay`, `Chon mua`) moi tro checkout.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`, `Views/Account/OrderHistory.cshtml`, `Views/Checkout/Success.cshtml` da xac nhan dieu huong dung.
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml` chi co CTA `Mua ngay`, khong co CTA `Xem chi tiet` bi misroute.
+      - Ket luan: chua tim thay loi user-facing tuong tu nao khac ngoai regression `Home/Index` da fix.
+    - Da bat dau `U1 - search / PLP that` cho lane user-facing:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`:
+        - public search nay chi tra ve product dang public (`Status = true`, `!IsManuallyDisabled`) khi khong co seller token,
+        - bo sung metadata that tu `ProductInfos`: `Origin`, `Standard`, `Preservation`, `Weight`,
+        - da cleanup 3 warning nullable cu trong cung controller.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`:
+        - bo fake marketplace signals sinh tu `productId` (`rating`, `sold`, `location`, `certifications`),
+        - doi sang doc du lieu that neu API co tra ve,
+        - filter `Chuẩn nông sản` duoc render dong tu payload that,
+        - wording `Nơi bán` duoc doi thanh `Xuất xứ`,
+        - fallback anh doi sang uu tien `ImageFileName` that roi moi ve `/Images/no-image.png`.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da fix regression user-facing o `Home/Index`:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` truoc do van tro CTA `Xem chi tiết` sang `/checkout`,
+      - da doi CTA nay ve PDP qua `/products/{id}`,
+      - giu nguyen `Mua ngay` tro sang checkout.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo buoc dau cua `U2 - Product Detail Page`:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/HomeController.cs` da co route public `/products/{id}` va alias `/product/{id}`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs` da them `GET /bff/products/{id}` de proxy product detail tu Catalog API.
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs` da chan public access vao product an/disabled o `GET /api/products/{id}`.
+      - Da tao view moi `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`:
+        - fetch du lieu that tu `/bff/products/{id}`,
+        - hien thi gia/ton kho/xuat xu/chuan/bao quan/mo ta,
+        - giu duoc `Mua ngay`, `Them vao gio`, va `Quay lai tim kiem`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml` da noi cac diem dieu huong sang PDP:
+        - card image,
+        - ten san pham,
+        - CTA `Xem chi tiet`,
+        - khoi `San pham lien quan`.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong tiep `U2` voi khoi `nhieu shop cung ban` bang du lieu that:
+      - Catalog API:
+        - them `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductOffersController.cs`,
+        - public endpoint `GET /api/products/{productId}/offers` doc `SellerProducts` active cho san pham dang public.
+      - Identity API:
+        - them `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`,
+        - public endpoint `GET /auth/public/merchants?sellerIds=...` tra ve shop card toi gian (`ShopName`, `Avatar`, `AddressSummary`, `JoinedAt`) cho seller dang active.
+      - BFF:
+        - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs` da them `GET /bff/products/{id}/offers`,
+        - BFF ghep `Catalog offers` + `Identity public merchants` thanh payload cho PDP.
+      - PDP:
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml` da co section `Nhiều shop cùng bán`,
+        - hien shop avatar/ten/dia chi/thoi gian tham gia va CTA `Chọn mua`.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.API.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity\` -> PASS (`10 warning` cu o auth DTO, `0 error`).
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo `U3 - shop discovery / shop page`:
+      - Identity API:
+        - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs` da ho tro:
+          - list public merchants co `q/page/pageSize`,
+          - detail public merchant theo `sellerId`.
+      - Catalog API:
+        - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs` da cho phep public filter `sellerId` de doc san pham cong khai theo shop.
+      - BFF:
+        - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs` da them:
+          - `GET /bff/shops`,
+          - `GET /bff/shops/{sellerId}`,
+          - va support `sellerId` tren `GET /bff/products`.
+      - Web:
+        - `src/Web/FreshFarm.Web.Bff/Controllers/HomeController.cs` da co route `/shop` va `/shop/{sellerId}`.
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Shops.cshtml` la trang kham pha shop public.
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml` la gian hang public cua seller, doc shop profile + san pham cong khai.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.API.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity\` -> PASS (`10 warning` cu o auth DTO, `0 error`).
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong tiep `Admin theme contract` sang 2 man lon con lai:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Shipping/ManageShipping.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/User/ManageUsers.cshtml`
+      - Patch nay moi chuan hoa lop ngoai `ff-admin-shell / ff-admin-hero / ff-admin-card` de giam lap theme va giu an toan cho cac luong modal/AJAX lon.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong tiep `Admin theme contract` sang 2 man `Status`:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Status/Status.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Status/StatusType.cshtml`
+      - Hai man nay da bat dau dung `ff-admin-shell / ff-admin-hero / ff-admin-card` de dong bo voi lane Admin da refactor truoc do; giu nguyen modal/AJAX flow hien co.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong tiep `Admin theme contract` sang them 4 man Admin:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Risk/Index.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/CatalogReadiness/Index.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/FreshOps/Index.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Campaign/Index.cshtml`
+      - Cac man nay da chuyen sang dung contract chung `ff-admin-shell / ff-admin-hero / ff-admin-card / ff-admin-chip` va cat bot CSS lap lai cho hero/card surfaces.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong tiep `Admin theme contract` sang them 2 man Admin nua:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/CatalogModeration/Index.cshtml`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Home/Dashboard.cshtml`
+      - Dashboard va moderation nay da bat dau tai su dung `ff-admin-shell / ff-admin-hero / ff-admin-card`; van giu lai mot so animation/charts/chip chuyenn biet.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da hoan tat buoc dau `Admin theme contract` theo roadmap 7.1:
+      - Tao stylesheet chung `src/Web/FreshFarm.Web.Bff/wwwroot/admin/css/theme.css`.
+      - Dinh nghia CSS variables/utility chung:
+        - `--ff-primary`, `--ff-accent`, `--ff-gloss`, ...
+        - `ff-admin-shell`, `ff-admin-hero`, `ff-admin-chip`, `ff-admin-card`, `ff-admin-panel`, `ff-admin-kicker`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml` da nap `~/admin/css/theme.css` va them body class `admin-theme`.
+      - Da bat dau ap contract vao cac man Admin moi:
+        - `Areas/Admin/Views/Merchant/Index.cshtml`
+        - `Areas/Admin/Views/Dispute/Index.cshtml`
+        - `Areas/Admin/Views/Communication/Index.cshtml`
+        - `Areas/Admin/Views/Notification/Index.cshtml`
+        - `Areas/Admin/Views/Audit/Index.cshtml`
+      - Muc tieu dat duoc:
+        - giam lap lai CSS `shell/hero/card`,
+        - dong bo visual language Admin theo gradient xanh + gloss utility,
+        - tao nen tang de refactor tiep cac man `Risk/CatalogReadiness/FreshOps/...`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (con warning Razor cu ngoai scope patch).
+    - Da mo rong tiep lane Admin `Finance/Settlement`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs` da them endpoint `POST /api/orders/admin/finance/actions`.
+      - Finance action flow MVP da duoc noi vao 3 section:
+        - `payouts`: `acknowledge / release / hold / reject`,
+        - `refunds`: `acknowledge / approve / reject / resolve`,
+        - `returns`: `acknowledge / approve / reject / resolve`.
+      - Cac action cap nhat truc tiep status nguon (`Payout`, `RefundTransaction`, `ReturnRequest`) va ghi audit qua `AdminActionLog` + `SettlementAudit`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs` da them bridge `TakeAction`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml` (render cho Admin area) da bo sung cot `Thao tac`, o `ghi chu noi bo`, va nut xu ly ngay tren tung dong.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (con warning Razor cu ngoai scope patch).
+    - Da mo rong tiep lane Admin `Dispute & CS`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/DisputesAdminController.cs` da them endpoint `POST /api/orders/admin/disputes/actions`.
+      - Action flow MVP da duoc noi vao 3 loai case:
+        - `support`: `acknowledge / resolve / reopen`,
+        - `returns`: `acknowledge / approve / reject / resolve`,
+        - `refunds`: `acknowledge / approve / reject / resolve`.
+      - Cac action cap nhat truc tiep status nguon (`SupportConversation`, `ReturnRequest`, `RefundTransaction`) va ghi `AdminActionLog/ModerationAudit` (refund co them `SettlementAudit`).
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs` da them bridge `TakeAction`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Dispute/Index.cshtml` da bo sung form thao tac ngay trong `Arbitration center` + `ghi chu quyet dinh` + flash message.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (con warning Razor cu ngoai scope patch).
+    - Da mo rong tiep lane Admin `Merchant lifecycle & compliance`:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminMerchantsController.cs` bo sung merchant queue heuristics:
+        - filter `queue`,
+        - bucket `approval/profile_fix/dormant/suspended/review`,
+        - `recommendedAction`, `issueCount`, `nextSteps`,
+        - stats queue de admin uu tien xu ly.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/MerchantController.cs` + `Areas/Admin/Models/MerchantAdminModels.cs` da map payload queue moi.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Merchant/Index.cshtml` da nang cap thanh queue van hanh:
+        - them filter `Queue van hanh`,
+        - them KPI `Cho duyet / Bo sung ho so / Seller ngu dong`,
+        - list row hien `recommended action` + `issue count`,
+        - detail panel hien `khuyen nghi van hanh` + `checklist buoc tiep theo`.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.API.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity\` -> PASS (con warning cu o DTO auth/register, khong phai do patch merchant).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (con warning Razor cu ngoai scope patch).
+    - Da harden `Communications governance MVP` sau khi scaffold xong:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CommunicationsAdminController.cs` da tach bien persisted entity cho 3 luong `template/policy/preference` de lam ro null-flow.
+      - Da patch them `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs` (`TryNormalizeStatus`) de tranh nullability warning `CS8601`.
+      - Build lai `src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj` PASS (`0 warning`, `0 error`).
+    - Da ra soat lane public/user-facing hien tai:
+      - `HomeController.Search` render trang `/search`, du lieu doc qua `BffCatalogController -> GET /bff/products`.
+      - `Catalog ProductsController.Get` hien chi tra ve metadata co ban cua product/category/unit; chua tra ve seller/shop, location, rating, sold, certifications that.
+      - `Views/Home/Search.cshtml` dang gia lap marketplace data tu `productId`:
+        - `rating`, `sold`, `location`, `certifications` deu la synthetic/fallback tu front-end.
+        - khoi `shop-related` hien thuc chat dang render `san pham lien quan`, chua phai `shop` that.
+      - Nut `Xem chi tiet` o public home/search hien dan thang sang `/checkout`; chua co product detail page (PDP) dung nghia.
+      - He thong chat hien co xoay quanh `SupportConversation/SupportMessage` cho seller/admin; chua co lane BFF/UI rieng cho buyer chat shop.
+      - Identity da co du lieu nen merchant/shop o lane admin (`AdminMerchantsController` co `ShopName`, avatar, phone, addressSummary, compliance/profile score), co the tai su dung de mo public read-only shop discovery sau nay.
     - Da thuc hien "feasibility check" cho roadmap Admin marketplace theo 6 nhom user yeu cau:
       - Dashboard analytics, Users, Catalog moderation, Orders/Logistics, Disputes/CS, Campaigns.
       - Da danh dau ro module nao "lam ngay" va module nao "can bo sung schema/API".
@@ -459,9 +890,59 @@
         - Backfill thong tin user bang `Identity /auth/admin/users/{id}` va merge theo `userId`.
       - Build verify:
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\`
+    - Da mo buoc dau `U4 - buyer-seller chat` theo MVP cho buyer da dang nhap:
+      - Ordering API:
+        - them `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatBuyerController.cs`,
+        - them buyer endpoints cho `conversation/messages/mark-read` theo `sellerId`,
+        - them batch endpoint `GET /api/orders/support-chat/summaries?sellerIds=...` de doc conversation summary theo nhieu seller tren cung man,
+        - tam thoi gan thread voi seller qua `SupportConversation.AdminId` de tranh mo schema moi.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatAdminController.cs` da mo rong seller scope:
+        - seller thay duoc thread moi qua `AdminId == sellerId`,
+        - admin van xem duoc toan bo conversation,
+        - thread cu theo order ownership van giu duoc.
+      - BFF:
+        - them `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`,
+        - route `bff/support-chat/*` proxy token/session sang Ordering,
+        - co them `GET /bff/support-chat/summaries?sellerIds=...` cho search/PLP,
+        - chan seller/admin dung lane buyer-chat public.
+      - Web:
+        - them `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`,
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml` da co khung chat `#shop-chat` cho buyer,
+        - anonymous thay CTA dang nhap, seller/admin thay thong bao lane nay danh cho buyer,
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml` da deep-link CTA sang `Chat với shop`,
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml` da co CTA `Nhắn shop`,
+        - offer card trong PDP da co them CTA `Nhắn shop`,
+        - shop chat header da hien badge `Tin mới` + lan trao doi gan nhat,
+        - PDP CTA co the doi thanh `Xem tin nhắn mới` neu shop da phan hoi,
+        - search/PLP co the doi CTA thanh `Xem tin nhắn mới` va hint `Shop vừa phản hồi bạn`,
+        - search/PLP va PDP da co polling summary nhe khi tab dang mo de CTA chat tu refresh.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-    - Workspace hien build on dinh sau `Campaigns`, `Ads wallet`, `Risk center`, `Audit center`, `Catalog readiness`, `Fresh ops`, va `Communications governance`.
-    - `Fresh ops` da verify SQL tren DB that; `Communications governance` cung da duoc user apply CSDL.
+    - Dang tiep tuc lane user-facing sau khi da chot mot moc Admin kha on.
+    - `U1 search / PLP` da co them filter `Shop dang ban` o muc URL/API/UI; search contract hien tai da bao gom `items + pagination + facets + relatedItems + availableShops`.
+    - `U1 search / PLP` vua duoc bo sung them filter `Tinh trang hang` (`Con hang / Sap het / Het hang`) dua tren `StockQuantity`.
+    - `U1 search / PLP` da co them filter `Pham vi giao` theo muc do dia chi cong khai cua shop (`Tinh/thanh ro / Toi quan-huyen / Toi xa-phuong`) va preset `Uu tien noi tinh` + `Noi thanh trong ngay`.
+    - Card san pham o PLP va khoi `San pham lien quan` da hien badge/trang thai ton kho; PLP/PDP dong bo them `shop trust signals`, `freshness/giao-bao-quan signals`, va PLP da co them `preset nhu cau` gom `Uu tien con hang / Hang tuoi de chon / Shop dang tin / Uu tien noi tinh / Noi thanh trong ngay / San pham moi / Ban chay / Gia de mua`.
+    - `U2 PDP` da dung cung 3 muc ton kho, khong con mo CTA mua khi san pham het hang, va khoi `Nhieu shop cung ban` da ro hon ve `shop chinh / trust badges / nhan shop / vao shop`; hero cung co them panel `Goi y giao va bao quan`.
+    - `U1 search / PLP` da khong con day product card sang `/checkout`; search dang noi sang PDP that.
+    - `U2 PDP` da co route/view + khoi `nhieu shop cung ban`; shop card dang doc du lieu cong khai tu `Identity` va ownership tu `Catalog`.
+    - `U3` da co `/shop` va `/shop/{sellerId}` doc du lieu that.
+    - Da noi them deep-link shop/chat trong product flow:
+      - public product payload co `PrimarySellerId`,
+      - search card co link `Xem shop đang bán`,
+      - PDP co CTA `Chat với shop`,
+      - offer card trong khoi `Nhiều shop cùng bán` co nut `Vào shop`.
+    - `U4` da co MVP buyer-seller chat tren shop page:
+      - lane chat dang dung cho buyer da dang nhap,
+      - shop page co the tao/load thread, xem tin nhan, gui tin, polling refresh,
+      - seller side co the thay va tra loi bang support chat hien co,
+      - search card va offer card da co them deep-link `Nhắn shop`,
+      - buyer da thay duoc unread/status co ban o shop page, PDP, va search/PLP,
+      - near-realtime hien tai dung polling summary, chua dung SignalR buyer rieng.
+    - Search page van con filter `rating` theo nguong, nhung rating hien chi hien khi payload that co du lieu.
+    - Workspace hien build on dinh sau `Campaigns`, `Ads wallet`, `Risk center`, `Audit center`, `Catalog readiness`, `Fresh ops`, `Communications governance`, va patch `U1/U2/U3`.
     - Da hoan tat patch code `Campaigns + Ads wallet MVP` cho lane Admin:
       - Ordering API co schema/model/controller `Campaign`, `CampaignSellerParticipation`, `CampaignProductSlot`, `SellerAdsWallet`, `AdsTopup`, `AdsSpendLedger`, `AdsCampaign`.
       - BFF Admin co lane `/Admin/Campaign/Index` + `Campaign center` + `ads finance overview` + form thao tac `topup/spend/create ads campaign`.
@@ -528,6 +1009,30 @@
       - Hien `HTTP status` + body snippet de de triage loi schema/API.
       - Seed fallback options cho bo loc khi API list fail.
   - *Next*:
+    - Tiep tuc harden PLP sau khi facet shop da xong:
+      - co the dua tiep cac signal marketplace khac len search/PDP nhu `seller response`, `featured seasonal produce`, `giao nhanh noi thanh`,
+      - co the mo rong preset/facet tiep theo theo huong `shop phan hoi nhanh`, `hang theo mua`, `uu tien co san trong ngay`.
+      - can nhac them facet/preset tiep theo cho marketplace (`availability`, `freshness`, `response speed`) neu user tiep tuc uu tien lane user-facing,
+      - neu can scale sau do, co the chuyen them mot phan filter count/pagination sang contract server-side sau hon nua.
+    - Harden `U4`:
+      - can nhac SignalR/realtime that cho buyer neu muon nang cap sau MVP,
+      - danh gia co can tach schema/field `SellerId` rieng cho chat public trong phase sau hay khong,
+      - can nhac refresh thong minh hon cho search/PLP neu muon day chat CTA theo tung card trong phase sau.
+    - Sau khi xong mot moc user-facing co the demo duoc, quay lai lane Admin voi:
+      - `Dispute & CS`: assign/SLA/evidence.
+      - `Finance/Settlement`: bulk action/export/doi soat sau action.
+    - Uu tien roadmap user-facing:
+      - Phase U1: chuan hoa search payload/API cho product list + filter nong san that.
+      - Phase U2: bo sung product detail page + module `nhieu shop cung ban`.
+      - Phase U3: mo public shop discovery (`/shop`, `/shop/{sellerId}`) + search theo shop.
+      - Phase U4: mo buyer-seller chat box dua tren `SupportConversation/SupportMessage` voi lane/public scope rieng.
+      - Phase U5: harden UX TMĐT nong san (origin, standard, freshness, delivery promise, seller badge).
+    - Chot roadmap thuc thi theo thu tu:
+      - (1) apply/verify DB cho cac module `7.7/7.7A` con UNCONFIRMED,
+      - (2) smoke/retest toan bo lane Admin moi,
+      - (3) cleanup warning/runtime drift uu tien cao,
+      - (4) quay lai cac module Sprint B/C con mo,
+      - (5) khoa DoD va regression gate truoc khi mo phase ke tiep.
     - User/apply DB scripts neu muon bat runtime `Risk center`:
       - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.delta.sql`
       - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-09.7.7a.risk-center.verify.sql`
@@ -690,6 +1195,9 @@
     - Neu van `401` o Report/Coupon/Status: trace token/auth policy o Ordering/Identity APIs.
     - Sau 4.5.6 on dinh: tiep tuc lot 4.6 (re-check binding/route toan bo Seller views).
     - Thu thap reference UI Admin (Shopee/Amazon) tu user hoac tai lieu noi bo; chot guideline UI Admin khop theme Seller.
+    - Chon buoc roadmap tiep theo giua:
+      - quay lai lane `buyer/public marketplace` theo uu tien user,
+      - hoac tiep tuc mo rong admin lane sau khi hardening `7.7A` da sach build.
 - **Open questions** (UNCONFIRMED if needed):
   - Da xac nhan user da yeu cau bat dau ngay; Sprint A buoc 1 (Dashboard global) da duoc implement.
   - Da xac nhan user chon huong (A): skip import final3 tam thoi, lam runtime multi-seller truoc.
@@ -803,6 +1311,18 @@
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{CouponController,StatusController,ShippingController,SupportChatController,UserController,SettingController,ReviewController,ProductController,CategoryController,WarehouseController,LoyaltyController,HomeController,DeliveryController,CustomerController,FeedbackController,UnitController}.cs`
   - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/User/ManageUsers.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/HomeController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Shops.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductOffersController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatBuyerController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Warehouse/ImportCart.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FeedbackController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Feedback/Index.cshtml`

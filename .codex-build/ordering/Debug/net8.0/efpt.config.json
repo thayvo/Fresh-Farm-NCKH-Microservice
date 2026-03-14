@@ -19,6 +19,34 @@
    "T4TemplatePath": null,
    "Tables": [
       {
+         "Name": "[dbo].[AdminActionLog]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsCampaign]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsSpendLedger]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsTopup]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Campaign]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CampaignProductSlot]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CampaignSellerParticipation]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[CancelReasons]",
          "ObjectType": 0
       },
@@ -28,6 +56,10 @@
       },
       {
          "Name": "[dbo].[CartItem]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CommunicationTemplate]",
          "ObjectType": 0
       },
       {
@@ -63,7 +95,23 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[ModerationAudit]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[NotificationPolicyRule]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[NotificationPreference]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[OrderDetail]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[OrderDetailInvalidProductArchive]",
          "ObjectType": 0
       },
       {
@@ -111,11 +159,31 @@
          "ObjectType": 0
       },
       {
+         "Name": "[dbo].[RiskCase]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RiskDecision]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RiskSignal]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SellerAdsWallet]",
+         "ObjectType": 0
+      },
+      {
          "Name": "[dbo].[SellerOrderItems]",
          "ObjectType": 0
       },
       {
          "Name": "[dbo].[SellerOrders]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SettlementAudit]",
          "ObjectType": 0
       },
       {
@@ -148,6 +216,10 @@
       },
       {
          "Name": "[dbo].[SupportMessages]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[VoucherAbuseCase]",
          "ObjectType": 0
       },
       {
