@@ -45,14 +45,14 @@ public sealed class MerchantController : LegacySellerControllerBase
             var response = await client.GetAsync(BuildListEndpoint(model));
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải lane merchant compliance.");
+                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải lane nhà bán hàng.");
                 return View(model);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<MerchantListApiResponse>(JsonOptions);
             if (payload is null)
             {
-                ViewBag.Error = "Không đọc được dữ liệu merchant compliance.";
+                ViewBag.Error = "Không đọc được dữ liệu nhà bán hàng.";
                 return View(model);
             }
 
@@ -96,7 +96,7 @@ public sealed class MerchantController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            ViewBag.Error = "Lỗi khi tải merchant compliance: " + ex.Message;
+            ViewBag.Error = "Lỗi khi tải vòng đời nhà bán hàng: " + ex.Message;
         }
 
         return View(model);
@@ -108,7 +108,7 @@ public sealed class MerchantController : LegacySellerControllerBase
     {
         if (sellerId <= 0)
         {
-            TempData["ErrorMessage"] = "Seller không hợp lệ.";
+            TempData["ErrorMessage"] = "Nhà bán hàng không hợp lệ.";
             return RedirectToAction(nameof(Index), new { q, status, queue, page, selectedSellerId });
         }
 
@@ -118,12 +118,12 @@ public sealed class MerchantController : LegacySellerControllerBase
             var response = await client.PatchAsJsonAsync($"/auth/admin/merchants/{sellerId}/status", new { isActive });
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
                 response.IsSuccessStatusCode
-                    ? await ReadApiSuccessAsync(response, isActive ? "Đã mở lại seller." : "Đã tạm khóa seller.")
-                    : await ReadApiErrorAsync(response, "Không thể cập nhật seller.");
+                    ? await ReadApiSuccessAsync(response, isActive ? "Đã mở lại nhà bán hàng." : "Đã tạm khóa nhà bán hàng.")
+                    : await ReadApiErrorAsync(response, "Không thể cập nhật nhà bán hàng.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Lỗi khi cập nhật seller: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật nhà bán hàng: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), new
@@ -141,14 +141,14 @@ public sealed class MerchantController : LegacySellerControllerBase
         var response = await client.GetAsync($"/auth/admin/merchants/{model.SelectedSellerId}");
         if (!response.IsSuccessStatusCode)
         {
-            ViewBag.DetailError = await ReadApiErrorAsync(response, "Không thể tải chi tiết seller.");
+            ViewBag.DetailError = await ReadApiErrorAsync(response, "Không thể tải chi tiết nhà bán hàng.");
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<MerchantDetailApiDto>(JsonOptions);
         if (payload is null)
         {
-            ViewBag.DetailError = "Không đọc được chi tiết seller.";
+            ViewBag.DetailError = "Không đọc được chi tiết nhà bán hàng.";
             return;
         }
 

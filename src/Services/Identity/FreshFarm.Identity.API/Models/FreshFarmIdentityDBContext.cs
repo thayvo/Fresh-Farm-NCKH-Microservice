@@ -21,6 +21,8 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
     public virtual DbSet<RolePermission> RolePermissions { get; set; }
 
+    public virtual DbSet<SellerStoreSetting> SellerStoreSettings { get; set; }
+
     public virtual DbSet<StoreSetting> StoreSettings { get; set; }
 
     public virtual DbSet<User> Users { get; set; }
@@ -132,6 +134,68 @@ public partial class FreshFarmIdentityDBContext : DbContext
             entity.HasOne(d => d.Role).WithMany(p => p.RolePermissions)
                 .HasForeignKey(d => d.RoleId)
                 .HasConstraintName("FK_RolePermissions_Roles");
+        });
+
+        modelBuilder.Entity<SellerStoreSetting>(entity =>
+        {
+            entity.HasIndex(e => e.UserId, "UX_SellerStoreSettings_UserId").IsUnique();
+
+            entity.Property(e => e.AdminNotificationEmail)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_CreatedAt");
+            entity.Property(e => e.DefaultShippingFee)
+                .HasDefaultValue(30000m)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_DefaultShippingFee")
+                .HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.FreeShippingThreshold)
+                .HasDefaultValue(500000m)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_FreeShippingThreshold")
+                .HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.GhnDistrictName).HasMaxLength(150);
+            entity.Property(e => e.GhnPickupAddress).HasMaxLength(500);
+            entity.Property(e => e.GhnPickupName).HasMaxLength(150);
+            entity.Property(e => e.GhnPickupPhone).HasMaxLength(20);
+            entity.Property(e => e.GhnProvinceName).HasMaxLength(150);
+            entity.Property(e => e.GhnWardCode).HasMaxLength(50);
+            entity.Property(e => e.GhnWardName).HasMaxLength(150);
+            entity.Property(e => e.IsCodenabled)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_IsCODEnabled")
+                .HasColumnName("IsCODEnabled");
+            entity.Property(e => e.IsEmailCancelledEnabled)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_IsEmailCancelledEnabled");
+            entity.Property(e => e.IsEmailDeliveredEnabled)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_IsEmailDeliveredEnabled");
+            entity.Property(e => e.IsEmailNewOrderEnabled)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_IsEmailNewOrderEnabled");
+            entity.Property(e => e.StoreAddress)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(e => e.StoreEmail)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(e => e.StoreName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(e => e.StorePhone)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(e => e.UpdatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerStoreSettings_UpdatedAt");
+
+            entity.HasOne(d => d.User).WithOne(p => p.SellerStoreSetting)
+                .HasForeignKey<SellerStoreSetting>(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_SellerStoreSettings_Users");
         });
 
         modelBuilder.Entity<StoreSetting>(entity =>

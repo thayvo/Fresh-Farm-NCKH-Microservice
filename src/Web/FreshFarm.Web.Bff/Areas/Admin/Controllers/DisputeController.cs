@@ -93,6 +93,9 @@ public sealed class DisputeController : LegacySellerControllerBase
         int caseId,
         string? actionName,
         string? note,
+        string? assigneeLabel,
+        int? slaHours,
+        string? evidenceNote,
         string? q,
         string? section,
         string? status,
@@ -115,7 +118,10 @@ public sealed class DisputeController : LegacySellerControllerBase
                 caseType,
                 caseId,
                 actionName,
-                note
+                note,
+                assigneeLabel,
+                slaHours,
+                evidenceNote
             });
 
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
@@ -196,12 +202,36 @@ public sealed class DisputeController : LegacySellerControllerBase
                 PaymentStatus = payload.AfterSales.PaymentStatus ?? string.Empty,
                 ReferenceCode = payload.AfterSales.ReferenceCode ?? string.Empty
             },
+            Assignment = payload.Assignment is null ? null : new DisputeAssignmentViewModel
+            {
+                OwnerLabel = payload.Assignment.OwnerLabel ?? string.Empty,
+                AssignedAt = payload.Assignment.AssignedAt
+            },
+            Sla = payload.Sla is null ? null : new DisputeSlaViewModel
+            {
+                TargetResolutionAt = payload.Sla.TargetResolutionAt,
+                Source = payload.Sla.Source ?? string.Empty,
+                IsBreached = payload.Sla.IsBreached
+            },
             Timeline = payload.Timeline?.Select(x => new DisputeTimelineItemViewModel
             {
                 Label = x.Label ?? string.Empty,
                 Value = x.Value,
                 Tone = x.Tone ?? string.Empty
             }).ToList() ?? new List<DisputeTimelineItemViewModel>(),
+            ActivityItems = payload.ActivityItems?.Select(x => new DisputeActivityItemViewModel
+            {
+                Label = x.Label ?? string.Empty,
+                Summary = x.Summary ?? string.Empty,
+                CreatedAt = x.CreatedAt,
+                ActorUserId = x.ActorUserId
+            }).ToList() ?? new List<DisputeActivityItemViewModel>(),
+            EvidenceItems = payload.EvidenceItems?.Select(x => new DisputeEvidenceItemViewModel
+            {
+                Note = x.Note ?? string.Empty,
+                CreatedAt = x.CreatedAt,
+                ActorUserId = x.ActorUserId
+            }).ToList() ?? new List<DisputeEvidenceItemViewModel>(),
             Messages = payload.Messages?.Select(x => new DisputeMessageViewModel
             {
                 Sender = x.Sender ?? string.Empty,
@@ -268,6 +298,9 @@ public sealed class DisputeController : LegacySellerControllerBase
             OrderId = x.OrderId,
             Amount = x.Amount,
             UnreadCount = x.UnreadCount,
+            AssignedOwner = x.AssignedOwner ?? string.Empty,
+            TargetResolutionAt = x.TargetResolutionAt,
+            EvidenceCount = x.EvidenceCount,
             IsSlaBreached = x.IsSlaBreached,
             CreatedAt = x.CreatedAt,
             UpdatedAt = x.UpdatedAt

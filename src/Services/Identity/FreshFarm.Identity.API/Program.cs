@@ -1,4 +1,6 @@
 using FreshFarm.Identity.Api.Models;
+using FreshFarm.Identity.Api.Options;
+using FreshFarm.Identity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -9,9 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDataProtection();
 builder.Services.AddDbContext<FreshFarmIdentityDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityDB")));
 builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<User>, Microsoft.AspNetCore.Identity.PasswordHasher<User>>();
+builder.Services.Configure<PasswordResetOptions>(builder.Configuration.GetSection(PasswordResetOptions.SectionName));
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
+builder.Services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -44,6 +51,12 @@ builder.Services.AddAuthorization(options =>
     {
         policy.RequireAuthenticatedUser();
         policy.RequireRole("Admin");
+    });
+
+    options.AddPolicy("SellerOrAdmin", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireRole("Seller", "Admin");
     });
 });
 

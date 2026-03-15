@@ -46,6 +46,33 @@ public sealed class SellerSettingViewModel
     [StringLength(150, ErrorMessage = "Email admin toi da 150 ky tu")]
     public string AdminNotificationEmail { get; set; } = string.Empty;
 
+    [StringLength(150, ErrorMessage = "Tên người lấy hàng GHN tối đa 150 ký tự")]
+    public string? GhnPickupName { get; set; }
+
+    [StringLength(20, ErrorMessage = "Số điện thoại GHN tối đa 20 ký tự")]
+    public string? GhnPickupPhone { get; set; }
+
+    [StringLength(500, ErrorMessage = "Địa chỉ lấy hàng GHN tối đa 500 ký tự")]
+    public string? GhnPickupAddress { get; set; }
+
+    public int? GhnProvinceId { get; set; }
+
+    [StringLength(150, ErrorMessage = "Tên tỉnh/thành GHN tối đa 150 ký tự")]
+    public string? GhnProvinceName { get; set; }
+
+    public int? GhnDistrictId { get; set; }
+
+    [StringLength(150, ErrorMessage = "Tên quận/huyện GHN tối đa 150 ký tự")]
+    public string? GhnDistrictName { get; set; }
+
+    [StringLength(50, ErrorMessage = "Mã phường/xã GHN tối đa 50 ký tự")]
+    public string? GhnWardCode { get; set; }
+
+    [StringLength(150, ErrorMessage = "Tên phường/xã GHN tối đa 150 ký tự")]
+    public string? GhnWardName { get; set; }
+
+    public bool HasGhnOrigin { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

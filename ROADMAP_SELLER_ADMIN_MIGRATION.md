@@ -5,7 +5,68 @@
 - Khong xoa code legacy Seller hien co.
 - Migrate dan tung module, khong lam big-bang.
 
+## Cap nhat uu tien (2026-03-15)
+- Truoc khi quay lai mo rong lane Admin tiep, chen them mot nhip `Auth recovery hardening` cho user-facing account:
+  1. `Forgot password` tu BFF.
+  2. `Reset password` qua email.
+  3. Cau hinh SMTP/Gmail sender cho Identity API.
+- Ly do:
+  - Repo hien moi co `signin/signup/profile/address` MVP.
+  - `Google login`, `2FA`, va kenh gui email that chua duoc implement.
+  - Du lieu migrate `final3` co user co the can reset password, nen `password recovery` co gia tri van hanh cao hon social login/2FA o thoi diem hien tai.
+- Sau khi lane nay on dinh moi quay lai roadmap Admin dang dang do.
+- Trang thai hien tai:
+  - [x] Da code xong `Forgot password` + `Reset password` tren BFF/Identity API.
+  - [x] Da them token reset co han dung + SMTP sender skeleton.
+  - [x] `dotnet build` cho `FreshFarm.Identity.Api` va `FreshFarm.Web.Bff` deu PASS.
+  - [x] Da cau hinh Gmail/SMTP tam thoi + `ResetUrlBase` qua `ngrok` de test email ngoai doi.
+  - [x] User bao da test xong luong auth recovery.
+
 ## Trang thai hien tai
+- Nguyen tac lane Admin:
+  - Khi quay lai module Admin nao, uu tien doi toan bo text moi duoc cham vao sang tieng Viet co dau day du, dong bo.
+- Lo trinh GHN sandbox:
+  - Pha 1: ket noi va tinh phi van chuyen GHN sandbox.
+    - [x] Noi `Token` + `ShopId` va xac minh ket noi GHN.
+    - [x] Them endpoint test `TestGhnSandbox`.
+    - [x] Them service preview phi van chuyen.
+    - [x] Tu dong doc dia chi shop GHN de fallback `FromDistrictId` / `FromWardCode`.
+    - [x] Them endpoint tra cuu quận/huyện, phường/xã GHN de test tung buoc.
+    - [ ] Chot test fee that voi dia chi nhan mau.
+  - Pha 2: lay leadtime / thoi gian giao du kien.
+    - [x] Them service preview leadtime GHN sandbox.
+    - [x] Them endpoint `PreviewGhnLeadTime`.
+    - [ ] Chot test leadtime that voi dia chi nhan mau.
+  - Pha 3: tao don GHN sandbox sau khi order noi bo tao thanh cong.
+    - [x] Them service tao don GHN sandbox.
+    - [x] Them endpoint `CreateGhnSandboxOrder` de test tao don.
+    - [ ] Chot test tao don that voi dia chi nhan mau.
+  - Pha 4: dong bo van hanh Shipping/Admin voi ma van don, tra cuu trang thai va harden UI tieng Viet.
+    - [x] Them service tra cuu chi tiet don GHN sandbox.
+    - [x] Them endpoint `GetGhnSandboxOrder`.
+    - [x] Doi nhan trang thai GHN sang tieng Viet co dau cho lane Admin.
+    - [x] Noi panel GHN truc tiep vao `Admin/Shipping/ManageShipping`.
+    - [x] Khoi phuc bang danh sach Shipping/Admin sau khi va loi EF translate.
+  - Pha 5: chuan hoa dia chi shop theo tung seller de dung origin dung shop.
+    - [x] Them schema `SellerStoreSettings` de luu thong tin shop + origin GHN theo `UserId`.
+    - [x] Mo rong `Identity API` route `/auth/admin/settings/store`:
+      - Admin tiep tuc doc/ghi settings toan san.
+      - Seller doc/ghi settings rieng cua chinh minh.
+    - [x] Trang `Seller/Setting/Index` da co bo chon tinh/quận/phường GHN va luu xuong DB.
+    - [x] Trang `Seller/Shipping/ManageShipping` da co panel GHN rieng, doc origin cua seller tu DB thay vi dung origin global.
+    - [ ] User can apply SQL delta/verify cho `IdentityDB` va retest luong Seller GHN end-to-end.
+    - [ ] Chot test tra cuu don that bang `orderCode` hoac `clientOrderCode`.
+  - Pha 6: khoa luong van chuyen theo don hang that (huong production).
+    - Nguyen tac nghiep vu:
+      - Van don phai duoc tao tu don hang noi bo da ton tai.
+      - Seller khong duoc tao van don roi khong gan `OrderId` o ban production.
+      - Form nhap tay hien tai chi la cong cu test/hardening tam thoi de mo khoa tich hop van chuyen.
+    - Viec can lam tiep:
+      - [ ] Rang buoc tao van don tu dong don da chon trong danh sach, khong cho submit neu chua bind `OrderId`.
+      - [ ] An hoac bo duong di "tao van don roi" sau khi luong bind `OrderId` on dinh.
+      - [ ] Luu `orderCode`, `clientOrderCode`, `status`, `phi van chuyen`, `thoi gian tao` vao du lieu shipping/order noi bo.
+      - [ ] Hien trang thai van don da luu ngay tren dong don hang cua Seller/Admin.
+      - [ ] Chot lai UI theo ngon nguoi dung, giam field test khong can thiet sau khi luong that chay on.
 - Da bat che do mac dinh: khong compile `Areas/Seller/**` de tranh gay build.
 - Co the bat lai Seller legacy tam thoi bang:
   - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:EnableLegacySeller=true`

@@ -28,13 +28,14 @@ public sealed class FinanceController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? section = null, string? q = null, string? status = null, int? sellerId = null, int page = 1)
+    public async Task<IActionResult> Index(string? section = null, string? q = null, string? status = null, string? followUpBucket = null, int? sellerId = null, int page = 1)
     {
         var model = new FinanceConsolePageViewModel
         {
             Section = NormalizeSection(section),
             Query = q ?? string.Empty,
             Status = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant(),
+            FollowUpBucket = NormalizeFollowUpBucket(followUpBucket),
             SellerId = sellerId,
             Page = page < 1 ? 1 : page,
             ShowSellerFilter = true
@@ -43,7 +44,7 @@ public sealed class FinanceController : LegacySellerControllerBase
         try
         {
             var client = CreateOrderingClient();
-            var endpoint = BuildEndpoint(model.Section, model.Query, model.Status, model.SellerId, model.Page, model.PageSize);
+            var endpoint = BuildEndpoint(model.Section, model.Query, model.Status, model.FollowUpBucket, model.SellerId, model.Page, model.PageSize);
             var response = await client.GetAsync(endpoint);
             if (!response.IsSuccessStatusCode)
             {
@@ -70,12 +71,12 @@ public sealed class FinanceController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> TakeAction(string? section, int recordId, string? actionName, string? note, string? q, string? status, int? sellerId, int page = 1)
+    public async Task<IActionResult> TakeAction(string? section, int recordId, string? actionName, string? note, string? assigneeLabel, DateTime? followUpAt, string? q, string? status, string? followUpBucket, int? sellerId, int page = 1)
     {
         if (recordId <= 0 || string.IsNullOrWhiteSpace(actionName))
         {
-            TempData["ErrorMessage"] = "Thong tin thao tac tai chinh khong hop le.";
-            return RedirectToAction(nameof(Index), new { section, q, status, sellerId, page });
+            TempData["ErrorMessage"] = "Thông tin thao tác tài chính không hợp lệ.";
+            return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
         }
 
         try
@@ -86,18 +87,81 @@ public sealed class FinanceController : LegacySellerControllerBase
                 section,
                 recordId,
                 actionName,
-                note
+                note,
+                assigneeLabel,
+                followUpAt
             });
 
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
-                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Da cap nhat trung tam tai chinh." : "Khong the cap nhat trung tam tai chinh.");
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã cập nhật trung tâm tài chính." : "Không thể cập nhật trung tâm tài chính.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi cap nhat trung tam tai chinh: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật trung tâm tài chính: " + ex.Message;
         }
 
-        return RedirectToAction(nameof(Index), new { section, q, status, sellerId, page });
+        return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TakeBulkAction(string? section, List<int>? recordIds, string? actionName, string? note, string? assigneeLabel, DateTime? followUpAt, string? q, string? status, string? followUpBucket, int? sellerId, int page = 1)
+    {
+        if (recordIds is null || recordIds.Count == 0 || string.IsNullOrWhiteSpace(actionName))
+        {
+            TempData["ErrorMessage"] = "Cần chọn bản ghi và thao tác hàng loạt hợp lệ.";
+            return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
+        }
+
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.PostAsJsonAsync("/api/orders/admin/finance/bulk-actions", new
+            {
+                section,
+                recordIds,
+                actionName,
+                note,
+                assigneeLabel,
+                followUpAt
+            });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã xử lý lô tài chính." : "Không thể xử lý lô tài chính.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi xử lý thao tác hàng loạt: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Export(string? section = null, string? q = null, string? status = null, string? followUpBucket = null, int? sellerId = null)
+    {
+        try
+        {
+            var client = CreateOrderingClient();
+            var endpoint = BuildExportEndpoint(section, q, status, followUpBucket, sellerId);
+            var response = await client.GetAsync(endpoint);
+            if (!response.IsSuccessStatusCode)
+            {
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể xuất dữ liệu tài chính.");
+                return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId });
+            }
+
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+                ?? response.Content.Headers.ContentDisposition?.FileName
+                ?? $"finance-{NormalizeSection(section)}.csv";
+            return File(bytes, "text/csv; charset=utf-8", fileName.Trim('"'));
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi xuất dữ liệu tài chính: " + ex.Message;
+            return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId });
+        }
     }
 
     private IActionResult RenderView(FinanceConsolePageViewModel model)
@@ -122,12 +186,13 @@ public sealed class FinanceController : LegacySellerControllerBase
         return client;
     }
 
-    private static string BuildEndpoint(string section, string q, string status, int? sellerId, int page, int pageSize)
+    private static string BuildEndpoint(string section, string q, string status, string followUpBucket, int? sellerId, int page, int pageSize)
     {
         var query = new List<string>
         {
             $"section={Uri.EscapeDataString(section)}",
             $"status={Uri.EscapeDataString(status)}",
+            $"followUpBucket={Uri.EscapeDataString(NormalizeFollowUpBucket(followUpBucket))}",
             $"page={page}",
             $"pageSize={pageSize}"
         };
@@ -155,6 +220,7 @@ public sealed class FinanceController : LegacySellerControllerBase
         model.TotalPages = payload.TotalPages <= 0 ? 1 : payload.TotalPages;
         model.Query = payload.Filters?.Q ?? model.Query;
         model.Status = payload.Filters?.Status ?? model.Status;
+        model.FollowUpBucket = NormalizeFollowUpBucket(payload.Filters?.FollowUpBucket);
         model.SellerId = payload.Filters?.SellerId;
         model.Stats = new FinanceConsoleStatsViewModel
         {
@@ -165,7 +231,10 @@ public sealed class FinanceController : LegacySellerControllerBase
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,
             OpenRefunds = payload.Stats?.OpenRefunds ?? 0,
-            SellerCount = payload.Stats?.SellerCount ?? 0
+            SellerCount = payload.Stats?.SellerCount ?? 0,
+            OverdueFollowUps = payload.Stats?.OverdueFollowUps ?? 0,
+            DueSoonFollowUps = payload.Stats?.DueSoonFollowUps ?? 0,
+            NoFollowUpCount = payload.Stats?.NoFollowUpCount ?? 0
         };
         model.SectionCounts = new FinanceSectionCountsViewModel
         {
@@ -209,9 +278,53 @@ public sealed class FinanceController : LegacySellerControllerBase
                 CreatedAt = x.CreatedAt,
                 ScheduledAt = x.ScheduledAt,
                 ProcessedAt = x.ProcessedAt,
-                PaidAt = x.PaidAt
+                PaidAt = x.PaidAt,
+                ReconciliationStatus = x.ReconciliationStatus ?? string.Empty,
+                NextStep = x.NextStep ?? string.Empty,
+                AssignedOwner = x.AssignedOwner ?? string.Empty,
+                ExportedAt = x.ExportedAt,
+                FollowUpAt = x.FollowUpAt,
+                FollowUpNote = x.FollowUpNote ?? string.Empty,
+                ReminderSentAt = x.ReminderSentAt,
+                ReminderNote = x.ReminderNote ?? string.Empty,
+                PriorityKey = x.PriorityKey ?? string.Empty,
+                PriorityLabel = x.PriorityLabel ?? string.Empty,
+                PriorityReason = x.PriorityReason ?? string.Empty,
+                LastActionSummary = x.LastActionSummary ?? string.Empty
             })
             .ToList() ?? new List<FinanceConsoleRowViewModel>();
+        model.OwnerSummary = payload.OwnerSummary?
+            .Select(x => new FinanceOwnerSummaryViewModel
+            {
+                OwnerLabel = x.OwnerLabel ?? string.Empty,
+                ItemCount = x.ItemCount,
+                OverdueCount = x.OverdueCount,
+                DueSoonCount = x.DueSoonCount,
+                NoFollowUpCount = x.NoFollowUpCount
+            })
+            .ToList() ?? new List<FinanceOwnerSummaryViewModel>();
+    }
+
+    private static string BuildExportEndpoint(string? section, string? q, string? status, string? followUpBucket, int? sellerId)
+    {
+        var query = new List<string>
+        {
+            $"section={Uri.EscapeDataString(NormalizeSection(section))}",
+            $"status={Uri.EscapeDataString(string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant())}",
+            $"followUpBucket={Uri.EscapeDataString(NormalizeFollowUpBucket(followUpBucket))}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query.Add($"q={Uri.EscapeDataString(q)}");
+        }
+
+        if (sellerId.HasValue && sellerId.Value > 0)
+        {
+            query.Add($"sellerId={sellerId.Value}");
+        }
+
+        return "/api/orders/admin/finance/export?" + string.Join("&", query);
     }
 
     private static string NormalizeSection(string? section)
@@ -222,6 +335,19 @@ public sealed class FinanceController : LegacySellerControllerBase
             "refunds" => "refunds",
             "returns" => "returns",
             _ => "payouts"
+        };
+    }
+
+    private static string NormalizeFollowUpBucket(string? followUpBucket)
+    {
+        var normalized = (followUpBucket ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "overdue" => "overdue",
+            "due-soon" or "due_soon" => "due-soon",
+            "no-follow-up" or "no_follow_up" or "unscheduled" => "no-follow-up",
+            "scheduled" => "scheduled",
+            _ => "all"
         };
     }
 
@@ -249,3 +375,4 @@ public sealed class FinanceController : LegacySellerControllerBase
         return fallback;
     }
 }
+

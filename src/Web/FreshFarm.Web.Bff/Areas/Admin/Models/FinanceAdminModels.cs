@@ -8,6 +8,8 @@ public sealed class FinanceConsolePageViewModel
 
     public string Status { get; set; } = "all";
 
+    public string FollowUpBucket { get; set; } = "all";
+
     public int? SellerId { get; set; }
 
     public int Page { get; set; } = 1;
@@ -31,6 +33,10 @@ public sealed class FinanceConsolePageViewModel
     public List<FinanceOptionViewModel> StatusOptions { get; set; } = new();
 
     public List<FinanceConsoleRowViewModel> Rows { get; set; } = new();
+
+    public List<FinanceOwnerSummaryViewModel> OwnerSummary { get; set; } = new();
+
+    public string BulkActionName { get; set; } = string.Empty;
 }
 
 public sealed class FinanceConsoleStatsViewModel
@@ -50,6 +56,12 @@ public sealed class FinanceConsoleStatsViewModel
     public int OpenRefunds { get; set; }
 
     public int SellerCount { get; set; }
+
+    public int OverdueFollowUps { get; set; }
+
+    public int DueSoonFollowUps { get; set; }
+
+    public int NoFollowUpCount { get; set; }
 }
 
 public sealed class FinanceSectionCountsViewModel
@@ -66,6 +78,19 @@ public sealed class FinanceOptionViewModel
     public string Value { get; set; } = string.Empty;
 
     public string Text { get; set; } = string.Empty;
+}
+
+public sealed class FinanceOwnerSummaryViewModel
+{
+    public string OwnerLabel { get; set; } = string.Empty;
+
+    public int ItemCount { get; set; }
+
+    public int OverdueCount { get; set; }
+
+    public int DueSoonCount { get; set; }
+
+    public int NoFollowUpCount { get; set; }
 }
 
 public sealed class FinanceConsoleRowViewModel
@@ -109,6 +134,30 @@ public sealed class FinanceConsoleRowViewModel
     public DateTime? ProcessedAt { get; set; }
 
     public DateTime? PaidAt { get; set; }
+
+    public string ReconciliationStatus { get; set; } = string.Empty;
+
+    public string NextStep { get; set; } = string.Empty;
+
+    public string AssignedOwner { get; set; } = string.Empty;
+
+    public DateTime? ExportedAt { get; set; }
+
+    public DateTime? FollowUpAt { get; set; }
+
+    public string FollowUpNote { get; set; } = string.Empty;
+
+    public DateTime? ReminderSentAt { get; set; }
+
+    public string ReminderNote { get; set; } = string.Empty;
+
+    public string PriorityKey { get; set; } = string.Empty;
+
+    public string PriorityLabel { get; set; } = string.Empty;
+
+    public string PriorityReason { get; set; } = string.Empty;
+
+    public string LastActionSummary { get; set; } = string.Empty;
 }
 
 internal sealed class FinanceConsoleApiResponse
@@ -132,6 +181,8 @@ internal sealed class FinanceConsoleApiResponse
     public FinanceFiltersApiDto? Filters { get; set; }
 
     public List<FinanceConsoleRowApiDto>? Rows { get; set; }
+
+    public List<FinanceOwnerSummaryApiDto>? OwnerSummary { get; set; }
 }
 
 internal sealed class FinanceConsoleStatsApiDto
@@ -151,6 +202,12 @@ internal sealed class FinanceConsoleStatsApiDto
     public int OpenRefunds { get; set; }
 
     public int SellerCount { get; set; }
+
+    public int OverdueFollowUps { get; set; }
+
+    public int DueSoonFollowUps { get; set; }
+
+    public int NoFollowUpCount { get; set; }
 }
 
 internal sealed class FinanceSectionCountsApiDto
@@ -168,6 +225,8 @@ internal sealed class FinanceFiltersApiDto
 
     public string? Status { get; set; }
 
+    public string? FollowUpBucket { get; set; }
+
     public int? SellerId { get; set; }
 
     public List<FinanceOptionApiDto>? SellerOptions { get; set; }
@@ -180,6 +239,19 @@ internal sealed class FinanceOptionApiDto
     public string? Value { get; set; }
 
     public string? Text { get; set; }
+}
+
+internal sealed class FinanceOwnerSummaryApiDto
+{
+    public string? OwnerLabel { get; set; }
+
+    public int ItemCount { get; set; }
+
+    public int OverdueCount { get; set; }
+
+    public int DueSoonCount { get; set; }
+
+    public int NoFollowUpCount { get; set; }
 }
 
 internal sealed class FinanceConsoleRowApiDto
@@ -223,4 +295,29 @@ internal sealed class FinanceConsoleRowApiDto
     public DateTime? ProcessedAt { get; set; }
 
     public DateTime? PaidAt { get; set; }
+
+    public string? ReconciliationStatus { get; set; }
+
+    public string? NextStep { get; set; }
+
+    public string? AssignedOwner { get; set; }
+
+    public DateTime? ExportedAt { get; set; }
+
+    public DateTime? FollowUpAt { get; set; }
+
+    public string? FollowUpNote { get; set; }
+
+    public DateTime? ReminderSentAt { get; set; }
+
+    public string? ReminderNote { get; set; }
+
+    public string? PriorityKey { get; set; }
+
+    public string? PriorityLabel { get; set; }
+
+    public string? PriorityReason { get; set; }
+
+    public string? LastActionSummary { get; set; }
 }
+

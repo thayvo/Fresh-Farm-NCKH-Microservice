@@ -13,6 +13,7 @@
             section,
             q = Model.Query,
             status = Model.Status,
+            followUpBucket = Model.FollowUpBucket,
             sellerId = Model.ShowSellerFilter ? Model.SellerId : null,
             page = page ?? 1
         }) ?? "#";
@@ -20,6 +21,7 @@
 
     string FormatMoney(decimal? value) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:#,0} đ", value ?? 0m);
     string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-";
+    bool IsOverdue(DateTime? value) => value.HasValue && value.Value < DateTime.UtcNow;
 }
 
 <style>
@@ -121,6 +123,29 @@
     .finance-table-card table th {
         vertical-align: middle;
     }
+
+    .finance-recon {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: .3rem .75rem;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .finance-ops-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        border-radius: 999px;
+        padding: .28rem .7rem;
+        background: #f8fafc;
+        color: #334155;
+        font-size: .76rem;
+        font-weight: 700;
+    }
 </style>
 
 <main class="finance-shell">
@@ -129,7 +154,7 @@
             <div>
                 <div class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">@scopeLabel</div>
                 <h1 class="fw-bold mb-2">Tài chính & đối soát</h1>
-                <p class="mb-0 opacity-75">Theo dõi payout, refund và return theo cùng một luồng để chốt vận hành marketplace trước khi mở rộng settlement schema.</p>
+                <p class="mb-0 opacity-75">Theo dõi chi trả, hoàn tiền và đổi trả trong cùng một luồng để chốt vận hành sàn trước khi mở rộng nghiệp vụ đối soát.</p>
             </div>
             <div class="text-lg-end">
                 <div class="small opacity-75">Phạm vi hiện tại</div>
@@ -157,7 +182,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">GMV theo seller-order</div>
+                    <div class="finance-stat-label">GMV theo đơn của người bán</div>
                     <div class="fs-3 fw-bold">@FormatMoney(Model.Stats.GrossMerchandiseValue)</div>
                 </div>
             </div>
@@ -165,7 +190,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Thanh toán đã capture</div>
+                    <div class="finance-stat-label">Thanh toán đã ghi nhận</div>
                     <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.CapturedPayments)</div>
                 </div>
             </div>
@@ -181,7 +206,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Payout chờ xử lý</div>
+                    <div class="finance-stat-label">Chi trả chờ xử lý</div>
                     <div class="fs-3 fw-bold text-warning">@FormatMoney(Model.Stats.PendingPayoutAmount)</div>
                 </div>
             </div>
@@ -189,7 +214,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Giá trị refund</div>
+                    <div class="finance-stat-label">Giá trị hoàn tiền</div>
                     <div class="fs-3 fw-bold text-danger">@FormatMoney(Model.Stats.RefundedAmount)</div>
                 </div>
             </div>
@@ -197,7 +222,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Return đang mở</div>
+                    <div class="finance-stat-label">Yêu cầu đổi trả đang mở</div>
                     <div class="fs-3 fw-bold">@Model.Stats.OpenReturns</div>
                 </div>
             </div>
@@ -205,7 +230,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Refund đang mở</div>
+                    <div class="finance-stat-label">Yêu cầu hoàn tiền đang mở</div>
                     <div class="fs-3 fw-bold">@Model.Stats.OpenRefunds</div>
                 </div>
             </div>
@@ -213,7 +238,7 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Seller trong phạm vi</div>
+                    <div class="finance-stat-label">Người bán trong phạm vi</div>
                     <div class="fs-3 fw-bold">@Model.Stats.SellerCount</div>
                 </div>
             </div>
@@ -226,7 +251,7 @@
                 <input type="hidden" name="section" value="@Model.Section" />
                 <div class="col-lg-4">
                     <label class="form-label fw-semibold">Tìm kiếm</label>
-                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Mã record, order, provider ref, lý do..." />
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Mã bản ghi, mã đơn, mã tham chiếu, lý do..." />
                 </div>
                 <div class="col-md-4 col-lg-3">
                     <label class="form-label fw-semibold">Trạng thái</label>
@@ -244,18 +269,63 @@
                         }
                     </select>
                 </div>
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-semibold">Nhóm theo dõi</label>
+                    <select class="form-select" name="followUpBucket">
+                        @if (Model.FollowUpBucket == "all")
+                        {
+                            <option value="all" selected>Tất cả mốc theo dõi</option>
+                        }
+                        else
+                        {
+                            <option value="all">Tất cả mốc theo dõi</option>
+                        }
+                        @if (Model.FollowUpBucket == "overdue")
+                        {
+                            <option value="overdue" selected>Quá hạn</option>
+                        }
+                        else
+                        {
+                            <option value="overdue">Quá hạn</option>
+                        }
+                        @if (Model.FollowUpBucket == "due-soon")
+                        {
+                            <option value="due-soon" selected>Sắp đến hạn 48h</option>
+                        }
+                        else
+                        {
+                            <option value="due-soon">Sắp đến hạn 48h</option>
+                        }
+                        @if (Model.FollowUpBucket == "no-follow-up")
+                        {
+                            <option value="no-follow-up" selected>Chưa đặt mốc theo dõi</option>
+                        }
+                        else
+                        {
+                            <option value="no-follow-up">Chưa đặt mốc theo dõi</option>
+                        }
+                        @if (Model.FollowUpBucket == "scheduled")
+                        {
+                            <option value="scheduled" selected>Đã có lịch theo dõi</option>
+                        }
+                        else
+                        {
+                            <option value="scheduled">Đã có lịch theo dõi</option>
+                        }
+                    </select>
+                </div>
                 @if (Model.ShowSellerFilter)
                 {
-                    <div class="col-md-4 col-lg-3">
-                        <label class="form-label fw-semibold">Seller</label>
+                    <div class="col-md-4 col-lg-2">
+                        <label class="form-label fw-semibold">Người bán</label>
                         <select class="form-select" name="sellerId">
                             @if (!Model.SellerId.HasValue)
                             {
-                                <option value="" selected>Tất cả seller</option>
+                                <option value="" selected>Tất cả người bán</option>
                             }
                             else
                             {
-                                <option value="">Tất cả seller</option>
+                                <option value="">Tất cả người bán</option>
                             }
 
                             @foreach (var option in Model.SellerOptions)
@@ -289,9 +359,9 @@
             <a class="finance-section-link @(Model.Section == "payouts" ? "active" : string.Empty)" href="@BuildSectionLink("payouts")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Payout</div>
+                        <div class="finance-pill mb-3">Chi trả</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Payouts</div>
-                        <div class="text-muted">Đợt đối soát / chi trả seller đang theo dõi</div>
+                        <div class="text-muted">Các đợt đối soát hoặc chi trả người bán đang được theo dõi</div>
                     </div>
                 </div>
             </a>
@@ -300,9 +370,9 @@
             <a class="finance-section-link @(Model.Section == "refunds" ? "active" : string.Empty)" href="@BuildSectionLink("refunds")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Refund</div>
+                        <div class="finance-pill mb-3">Hoàn tiền</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Refunds</div>
-                        <div class="text-muted">Giao dịch hoàn tiền cần đối chiếu với order và payment txn</div>
+                        <div class="text-muted">Các giao dịch hoàn tiền cần đối chiếu với đơn hàng và thanh toán</div>
                     </div>
                 </div>
             </a>
@@ -311,14 +381,85 @@
             <a class="finance-section-link @(Model.Section == "returns" ? "active" : string.Empty)" href="@BuildSectionLink("returns")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Return</div>
+                        <div class="finance-pill mb-3">Đổi trả</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Returns</div>
-                        <div class="text-muted">Yêu cầu đổi trả liên quan tới refund và hậu mãi</div>
+                        <div class="text-muted">Các yêu cầu đổi trả liên quan tới hoàn tiền và hậu mãi</div>
                     </div>
                 </div>
             </a>
         </div>
     </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.FollowUpBucket == "overdue" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "overdue", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">Quá hạn</div>
+                        <div class="display-6 fw-bold text-danger">@Model.Stats.OverdueFollowUps</div>
+                        <div class="text-muted">Các bản ghi đã quá mốc theo dõi, nên ưu tiên xử lý ngay.</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.FollowUpBucket == "due-soon" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "due-soon", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">48h tới</div>
+                        <div class="display-6 fw-bold text-warning">@Model.Stats.DueSoonFollowUps</div>
+                        <div class="text-muted">Các trường hợp sắp tới hạn theo dõi, phù hợp để chủ động chốt đối soát.</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-4">
+            <a class="finance-section-link @(Model.FollowUpBucket == "no-follow-up" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "no-follow-up", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
+                <div class="card finance-section-card h-100">
+                    <div class="card-body">
+                        <div class="finance-pill mb-3">Chưa đặt mốc</div>
+                        <div class="display-6 fw-bold">@Model.Stats.NoFollowUpCount</div>
+                        <div class="text-muted">Các bản ghi chưa có mốc theo dõi để phụ trách viên lên lịch đối soát tiếp theo.</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    @if (areaName == "Admin" && Model.OwnerSummary.Count > 0)
+    {
+        <div class="card finance-card mb-4">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="finance-stat-label">Bảng theo dõi phụ trách</div>
+                        <div class="h5 mb-0">Phân bổ hàng chờ theo người phụ trách trong phạm vi lọc hiện tại</div>
+                    </div>
+                    <div class="small text-muted">Top 6 người phụ trách theo mức độ quá hạn</div>
+                </div>
+                <div class="row g-3">
+                    @foreach (var owner in Model.OwnerSummary)
+                    {
+                        <div class="col-md-6 col-xl-4">
+                            <div class="card finance-section-card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                        <div class="fw-semibold">@owner.OwnerLabel</div>
+                                        <span class="finance-pill">@owner.ItemCount việc</span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>@owner.OverdueCount quá hạn</span>
+                                        <span class="finance-ops-chip text-warning"><i class="bi bi-hourglass-split"></i>@owner.DueSoonCount 48h tới</span>
+                                        <span class="finance-ops-chip"><i class="bi bi-calendar-x"></i>@owner.NoFollowUpCount chưa đặt mốc</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="card finance-table-card">
         <div class="card-body">
@@ -327,45 +468,117 @@
                     <h5 class="mb-1">
                         @if (Model.Section == "refunds")
                         {
-                            <span>Danh sách refund</span>
+                            <span>Danh sách hoàn tiền</span>
                         }
                         else if (Model.Section == "returns")
                         {
-                            <span>Danh sách return</span>
+                            <span>Danh sách đổi trả</span>
                         }
                         else
                         {
-                            <span>Danh sách payout</span>
+                            <span>Danh sách chi trả</span>
                         }
                     </h5>
                     <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total bản ghi theo phạm vi hiện tại</div>
                 </div>
                 @if (areaName == "Admin")
                 {
-                    <div class="small text-muted">Admin co the thao tac truc tiep tren payout/refund/return ngay tai day.</div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a class="btn btn-outline-primary rounded-pill px-3" href="@Url.Action("Export", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = Model.FollowUpBucket, sellerId = Model.SellerId })">
+                            <i class="bi bi-download me-2"></i>Xuất CSV
+                        </a>
+                        <div class="small text-muted">Quản trị viên có thể thao tác trực tiếp trên chi trả, hoàn tiền và đổi trả ngay tại đây.</div>
+                    </div>
                 }
             </div>
+
+            @if (areaName == "Admin" && Model.Rows.Count > 0)
+            {
+                <form id="bulk-finance-form" method="post" action="@Url.Action("TakeBulkAction", "Finance", new { area = areaName })" class="card border-0 bg-light mb-3">
+                    <div class="card-body">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="section" value="@Model.Section" />
+                        <input type="hidden" name="q" value="@Model.Query" />
+                        <input type="hidden" name="status" value="@Model.Status" />
+                        <input type="hidden" name="followUpBucket" value="@Model.FollowUpBucket" />
+                        <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                        <input type="hidden" name="page" value="@Model.Page" />
+                        <div class="row g-3 align-items-end">
+                            <div class="col-lg-4">
+                                <label class="form-label fw-semibold">Thao tác hàng loạt</label>
+                                <select class="form-select" name="actionName">
+                                    <option value="">Chọn thao tác hàng loạt</option>
+                                    @if (Model.Section == "payouts")
+                                    {
+                                          <option value="assign">Gán người phụ trách</option>
+                                          <option value="set-follow-up">Đặt mốc theo dõi</option>
+                                          <option value="send-reminder">Nhắc người phụ trách</option>
+                                          <option value="mark-exported">Đánh dấu đã xuất</option>
+                                          <option value="acknowledge">Nhận xử lý</option>
+                                        <option value="release">Chi trả</option>
+                                        <option value="hold">Giữ lại</option>
+                                        <option value="reject">Đánh dấu lỗi</option>
+                                    }
+                                    else
+                                    {
+                                          <option value="assign">Gán người phụ trách</option>
+                                          <option value="set-follow-up">Đặt mốc theo dõi</option>
+                                          <option value="send-reminder">Nhắc người phụ trách</option>
+                                          <option value="mark-exported">Đánh dấu đã xuất</option>
+                                          <option value="acknowledge">Nhận xử lý</option>
+                                        <option value="approve">Phê duyệt</option>
+                                        <option value="resolve">Đóng</option>
+                                        <option value="reject">Từ chối</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-lg-2">
+                                <label class="form-label fw-semibold">Người phụ trách</label>
+                                <input type="text" class="form-control" name="assigneeLabel" placeholder="Ví dụ: Điều phối tài chính - Mai" />
+                            </div>
+                            <div class="col-lg-2">
+                                <label class="form-label fw-semibold">Mốc theo dõi</label>
+                                <input type="datetime-local" class="form-control" name="followUpAt" />
+                            </div>
+                            <div class="col-lg-2">
+                                <label class="form-label fw-semibold">Ghi chú chung</label>
+                                <input type="text" class="form-control" name="note" placeholder="Ghi chú cho lo xử lý hoặc đối soát..." />
+                            </div>
+                            <div class="col-lg-2">
+                                <button type="submit" class="btn btn-primary rounded-pill px-4 w-100">Xử lý bản ghi đã chọn</button>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2">Chọn các bản ghi ở cột đầu để xử lý hàng loạt hoặc xuất ra tệp đối soát.</div>
+                    </div>
+                </form>
+            }
 
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
+                            @if (areaName == "Admin")
+                            {
+                                <th>
+                                    <input class="form-check-input" type="checkbox" id="finance-select-all" />
+                                </th>
+                            }
                             <th>Mã</th>
-                            <th>Seller</th>
+                            <th>Người bán</th>
                             <th>Order</th>
                             @if (Model.Section == "payouts")
                             {
                                 <th>Số đơn</th>
-                                <th>Gross</th>
-                                <th>Fee</th>
-                                <th>Net</th>
-                                <th>Provider</th>
+                                <th>Tổng tiền</th>
+                                <th>Phí</th>
+                                <th>Thực nhận</th>
+                                <th>Đơn vị xử lý</th>
                                 <th>Thời gian</th>
                             }
                             else if (Model.Section == "refunds")
                             {
-                                <th>Refund</th>
-                                <th>Provider/Method</th>
+                                <th>Tiền hoàn</th>
+                                <th>Đơn vị xử lý / phương thức</th>
                                 <th>Mã tham chiếu</th>
                                 <th>Lý do lỗi cũ</th>
                                 <th>Thời gian</th>
@@ -373,11 +586,13 @@
                             else
                             {
                                 <th>Sản phẩm</th>
-                                <th>Refund dự kiến</th>
+                                <th>Tiền hoàn dự kiến</th>
                                 <th>Lý do</th>
-                                <th>Resolution</th>
+                                <th>Hướng xử lý</th>
                                 <th>Thời gian</th>
                             }
+                            <th>Đối soát</th>
+                            <th>Vận hành</th>
                             <th>Trạng thái</th>
                             @if (areaName == "Admin")
                             {
@@ -389,7 +604,7 @@
                         @if (Model.Rows.Count == 0)
                         {
                             <tr>
-                                <td colspan="11" class="text-center text-muted py-5">Chưa có dữ liệu trong phạm vi lọc hiện tại.</td>
+                                <td colspan="14" class="text-center text-muted py-5">Chưa có dữ liệu trong phạm vi lọc hiện tại.</td>
                             </tr>
                         }
                         else
@@ -402,8 +617,15 @@
                                     : normalizedStatus.Contains("paid") || normalizedStatus.Contains("complete") || normalizedStatus.Contains("success") || normalizedStatus.Contains("approved") || normalizedStatus.Contains("resolve")
                                         ? "done"
                                         : "pending";
+                                var isFollowUpOverdue = IsOverdue(row.FollowUpAt);
 
                                 <tr>
+                                    @if (areaName == "Admin")
+                                    {
+                                        <td>
+                                            <input class="form-check-input finance-row-checkbox" type="checkbox" name="recordIds" value="@row.RecordId" />
+                                        </td>
+                                    }
                                     <td class="fw-semibold">#@row.RecordId</td>
                                     <td>
                                         @if (!string.IsNullOrWhiteSpace(row.SellerLabel))
@@ -450,7 +672,7 @@
                                         </td>
                                         <td>
                                             <div>@(string.IsNullOrWhiteSpace(row.ReferenceCode) ? "-" : row.ReferenceCode)</div>
-                                            <div class="small text-muted">Paid: @FormatDate(row.PaidAt)</div>
+                                            <div class="small text-muted">Đã thanh toán: @FormatDate(row.PaidAt)</div>
                                         </td>
                                         <td>
                                             <div>@(string.IsNullOrWhiteSpace(row.ReasonCode) ? "-" : row.ReasonCode)</div>
@@ -478,6 +700,55 @@
                                             <div class="small text-muted">Hoàn tất: @FormatDate(row.ProcessedAt)</div>
                                         </td>
                                     }
+                                    <td>
+                                        <div><span class="finance-recon">@row.ReconciliationStatus</span></div>
+                                        <div class="small text-muted mt-1">@row.NextStep</div>
+                                    </td>
+                                    <td>
+                                        <div class="d-grid gap-1">
+                                            @if (!string.IsNullOrWhiteSpace(row.AssignedOwner))
+                                            {
+                                                <span class="finance-ops-chip"><i class="bi bi-person-workspace"></i>@row.AssignedOwner</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="small text-muted">Chưa gán người phụ trách</span>
+                                            }
+                                            @if (row.ExportedAt.HasValue)
+                                            {
+                                                <span class="finance-ops-chip"><i class="bi bi-download"></i>@FormatDate(row.ExportedAt)</span>
+                                            }
+                                            @if (row.FollowUpAt.HasValue)
+                                            {
+                                                <span class="finance-ops-chip"><i class="bi bi-alarm"></i>@FormatDate(row.FollowUpAt)</span>
+                                                @if (isFollowUpOverdue)
+                                                {
+                                                    <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>Quá hạn</span>
+                                                }
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(row.FollowUpNote))
+                                            {
+                                                <div class="small text-muted">Theo dõi: @row.FollowUpNote</div>
+                                            }
+                                            @if (row.ReminderSentAt.HasValue)
+                                            {
+                                                <span class="finance-ops-chip"><i class="bi bi-bell"></i>@FormatDate(row.ReminderSentAt)</span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(row.ReminderNote))
+                                            {
+                                                <div class="small text-muted">Nhắc phụ trách: @row.ReminderNote</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(row.PriorityLabel))
+                                            {
+                                                <span class="finance-ops-chip @(row.PriorityKey == "critical" ? "text-danger" : row.PriorityKey == "today" ? "text-warning" : row.PriorityKey == "watch" ? "text-primary" : string.Empty)"><i class="bi bi-flag"></i>@row.PriorityLabel</span>
+                                                <div class="small text-muted">@row.PriorityReason</div>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(row.LastActionSummary))
+                                            {
+                                                <div class="small text-muted">@row.LastActionSummary</div>
+                                            }
+                                        </div>
+                                    </td>
                                     <td><span class="finance-status @statusClass">@row.Status</span></td>
                                     @if (areaName == "Admin")
                                     {
@@ -488,12 +759,19 @@
                                                 <input type="hidden" name="recordId" value="@row.RecordId" />
                                                 <input type="hidden" name="q" value="@Model.Query" />
                                                 <input type="hidden" name="status" value="@Model.Status" />
+                                                <input type="hidden" name="followUpBucket" value="@Model.FollowUpBucket" />
                                                 <input type="hidden" name="sellerId" value="@Model.SellerId" />
                                                 <input type="hidden" name="page" value="@Model.Page" />
+                                                <input type="text" class="form-control form-control-sm" name="assigneeLabel" value="@row.AssignedOwner" placeholder="Người phụ trách..." />
+                                                <input type="datetime-local" class="form-control form-control-sm" name="followUpAt" value="@(row.FollowUpAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm"))" />
                                                 <input type="text" class="form-control form-control-sm" name="note" placeholder="Ghi chú nội bộ..." />
                                                 <div class="d-flex flex-wrap gap-1">
                                                     @if (Model.Section == "payouts")
                                                     {
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="assign">Gán</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="set-follow-up">Theo dõi</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="send-reminder">Nhắc phụ trách</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="mark-exported">Xuất</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
                                                         <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill" name="actionName" value="hold">Giữ</button>
@@ -501,6 +779,10 @@
                                                     }
                                                     else if (Model.Section == "refunds")
                                                     {
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="assign">Gán</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="set-follow-up">Theo dõi</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="send-reminder">Nhắc phụ trách</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="mark-exported">Xuất</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
                                                         <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="approve">Duyệt</button>
                                                         <button type="submit" class="btn btn-sm btn-primary rounded-pill" name="actionName" value="resolve">Đóng</button>
@@ -508,6 +790,10 @@
                                                     }
                                                     else
                                                     {
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="assign">Gán</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="set-follow-up">Theo dõi</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="send-reminder">Nhắc phụ trách</button>
+                                                        <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="mark-exported">Xuất</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
                                                         <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="approve">Duyệt</button>
                                                         <button type="submit" class="btn btn-sm btn-primary rounded-pill" name="actionName" value="resolve">Đóng</button>
@@ -546,3 +832,21 @@
         </div>
     </div>
 </main>
+
+@if (areaName == "Admin" && Model.Rows.Count > 0)
+{
+    <script>
+        (() => {
+            const selectAll = document.getElementById('finance-select-all');
+            const rowCheckboxes = Array.from(document.querySelectorAll('.finance-row-checkbox'));
+            if (!selectAll || rowCheckboxes.length === 0) {
+                return;
+            }
+
+            selectAll.addEventListener('change', () => {
+                rowCheckboxes.forEach((checkbox) => checkbox.checked = selectAll.checked);
+            });
+        })();
+    </script>
+}
+

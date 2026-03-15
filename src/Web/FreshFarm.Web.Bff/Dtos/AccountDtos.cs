@@ -1,10 +1,13 @@
-﻿namespace FreshFarm.Web.Bff.Dtos
+using System.ComponentModel.DataAnnotations;
+
+namespace FreshFarm.Web.Bff.Dtos
 {
     public sealed class LoginRequestDto // Payload gui den Identity /auth/login.
     {
         public string Identifier { get; set; } = string.Empty; // Email hoac username.
         public string Password { get; set; } = string.Empty; // Mat khau.
     }
+
     public sealed class RegisterRequestDto // Payload gui den Identity /auth/register.
     {
         public string Email { get; set; } = string.Empty; // Email dang ky.
@@ -15,11 +18,40 @@
         public string ConfirmPassword { get; set; } = string.Empty; // Xac nhan mat khau.
         public string RoleName { get; set; } = "Customer"; // Mac dinh role customer.
     }
+
+    public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.
+    {
+        [Required(ErrorMessage = "Email không được để trống.")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public sealed class ResetPasswordRequestDto // Payload dat lai mat khau tu email reset.
+    {
+        [Required(ErrorMessage = "Email không được để trống.")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Token đặt lại mật khẩu là bắt buộc.")]
+        public string Token { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
+        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu mới phải từ 6 đến 100 ký tự.")]
+        public string NewPassword { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Xác nhận mật khẩu không được để trống.")]
+        [Compare(nameof(NewPassword), ErrorMessage = "Xác nhận mật khẩu không khớp.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+
     public sealed class AuthResponseDto // Body nhan ve tu Identity login.
     {
         public string AccessToken { get; set; } = string.Empty; // JWT.
         public DateTime ExpiredAtUtc { get; set; } // Han token.
     }
+
     public sealed class OrderHistoryItemDto // Item de render lich su don.
     {
         public int OrderId { get; set; } // Ma don.

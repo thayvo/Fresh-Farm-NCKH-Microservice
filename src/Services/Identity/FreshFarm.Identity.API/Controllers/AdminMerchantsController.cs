@@ -161,7 +161,7 @@ public sealed class AdminMerchantsController : ControllerBase
     {
         if (sellerId <= 0)
         {
-            return BadRequest("Seller không hợp lệ.");
+            return BadRequest("Nhà bán hàng không hợp lệ.");
         }
 
         var sellerRoleId = await _db.Roles
@@ -172,7 +172,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (!sellerRoleId.HasValue)
         {
-            return NotFound("Không tìm thấy role Seller.");
+            return NotFound("Không tìm thấy vai trò nhà bán hàng.");
         }
 
         var seller = await _db.Users
@@ -202,7 +202,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (seller is null)
         {
-            return NotFound("Không tìm thấy seller.");
+            return NotFound("Không tìm thấy nhà bán hàng.");
         }
 
         return Ok(MapMerchantDetail(seller));
@@ -213,7 +213,7 @@ public sealed class AdminMerchantsController : ControllerBase
     {
         if (sellerId <= 0)
         {
-            return BadRequest("Seller không hợp lệ.");
+            return BadRequest("Nhà bán hàng không hợp lệ.");
         }
 
         var sellerRoleId = await _db.Roles
@@ -224,7 +224,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (!sellerRoleId.HasValue)
         {
-            return NotFound("Không tìm thấy role Seller.");
+            return NotFound("Không tìm thấy vai trò nhà bán hàng.");
         }
 
         var user = await _db.Users
@@ -232,7 +232,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (user is null)
         {
-            return NotFound("Không tìm thấy seller.");
+            return NotFound("Không tìm thấy nhà bán hàng.");
         }
 
         user.IsActive = request.IsActive;
@@ -243,7 +243,7 @@ public sealed class AdminMerchantsController : ControllerBase
         {
             sellerId = user.UserId,
             isActive = user.IsActive,
-            message = user.IsActive ? "Đã mở lại seller." : "Đã tạm khóa seller."
+            message = user.IsActive ? "Đã mở lại nhà bán hàng." : "Đã tạm khóa nhà bán hàng."
         });
     }
 
@@ -258,7 +258,7 @@ public sealed class AdminMerchantsController : ControllerBase
         return new MerchantListItemDto
         {
             SellerId = row.SellerId,
-            ShopName = string.IsNullOrWhiteSpace(row.FullName) ? (row.UserName ?? $"Seller #{row.SellerId}") : row.FullName,
+            ShopName = string.IsNullOrWhiteSpace(row.FullName) ? (row.UserName ?? $"Nhà bán hàng #{row.SellerId}") : row.FullName,
             UserName = row.UserName,
             FullName = row.FullName,
             Email = row.Email,
@@ -343,17 +343,17 @@ public sealed class AdminMerchantsController : ControllerBase
     {
         if (!row.IsActive)
         {
-            return "Rà soát lý do khóa và chỉ mở lại khi seller xác nhận tiếp tục vận hành.";
+            return "Rà soát lý do khóa và chỉ mở lại khi nhà bán hàng xác nhận tiếp tục vận hành.";
         }
 
         if (flags.Any(f => f.Code is "missing-phone" or "missing-email" or "missing-address"))
         {
-            return "Yêu cầu seller bổ sung hồ sơ liên hệ và địa chỉ hoạt động trước khi đẩy quyền tăng trưởng.";
+            return "Yêu cầu nhà bán hàng bổ sung hồ sơ liên hệ và địa chỉ hoạt động trước khi đẩy quyền tăng trưởng.";
         }
 
         if (flags.Any(f => f.Code == "stale-login"))
         {
-            return "Liên hệ seller để xác nhận shop còn hoạt động trước khi duyệt campaign hoặc traffic.";
+            return "Liên hệ nhà bán hàng để xác nhận shop còn hoạt động trước khi duyệt chiến dịch hoặc traffic.";
         }
 
         if (profileScore >= 80)
@@ -361,7 +361,7 @@ public sealed class AdminMerchantsController : ControllerBase
             return "Có thể đưa vào queue chờ duyệt/whitelist cho campaign nội bộ ở mức MVP.";
         }
 
-        return "Rà soát thủ công hồ sơ seller trước khi mở rộng quyền hoặc campaign.";
+        return "Rà soát thủ công hồ sơ nhà bán hàng trước khi mở rộng quyền hoặc chiến dịch.";
     }
 
     private static int CalculatePriorityScore(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
@@ -526,20 +526,20 @@ public sealed class AdminMerchantsController : ControllerBase
     {
         if (!card.IsActive)
         {
-            return "Seller đang bị tạm khóa. Cần rà soát trước khi mở lại.";
+            return "Nhà bán hàng đang bị tạm khóa. Cần rà soát trước khi mở lại.";
         }
 
         if (string.Equals(card.ComplianceStatus, "ready", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hồ sơ seller đã đủ thông tin nền tảng để vận hành ở mức MVP.";
+            return "Hồ sơ nhà bán hàng đã đủ thông tin nền tảng để vận hành ở mức MVP.";
         }
 
         if (card.Flags.Count == 0)
         {
-            return "Seller cần rà soát thủ công trước khi đưa vào các chương trình tăng trưởng.";
+            return "Nhà bán hàng cần rà soát thủ công trước khi đưa vào các chương trình tăng trưởng.";
         }
 
-        return "Seller cần bổ sung hoặc xác nhận lại các mục: " + string.Join("; ", card.Flags.Select(x => x.Label)) + ".";
+        return "Nhà bán hàng cần bổ sung hoặc xác nhận lại các mục: " + string.Join("; ", card.Flags.Select(x => x.Label)) + ".";
     }
 
     private static List<string> BuildNextSteps(MerchantListItemDto card)
@@ -549,7 +549,7 @@ public sealed class AdminMerchantsController : ControllerBase
         if (!card.IsActive)
         {
             steps.Add("Xác minh lý do tạm khóa với đội vận hành hoặc CS.");
-            steps.Add("Chỉ mở lại seller khi hồ sơ và trạng thái vận hành đã rõ.");
+            steps.Add("Chỉ mở lại nhà bán hàng khi hồ sơ và trạng thái vận hành đã rõ.");
         }
 
         if (card.Flags.Any(f => f.Code is "missing-phone" or "missing-email"))
@@ -564,17 +564,17 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (card.Flags.Any(f => f.Code == "stale-login"))
         {
-            steps.Add("Kiểm tra seller còn đăng nhập và xử lý đơn trong 30 ngày gần đây hay không.");
+            steps.Add("Kiểm tra nhà bán hàng còn đăng nhập và xử lý đơn trong 30 ngày gần đây hay không.");
         }
 
         if (steps.Count == 0 && string.Equals(card.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("Có thể đưa seller vào queue ưu tiên cho campaign hoặc onboarding nâng cao.");
+            steps.Add("Có thể đưa nhà bán hàng vào hàng chờ ưu tiên cho chiến dịch hoặc onboarding nâng cao.");
         }
 
         if (steps.Count == 0)
         {
-            steps.Add("Rà soát thủ công thêm để xác nhận seller sẵn sàng vận hành.");
+            steps.Add("Rà soát thủ công thêm để xác nhận nhà bán hàng sẵn sàng vận hành.");
         }
 
         return steps;

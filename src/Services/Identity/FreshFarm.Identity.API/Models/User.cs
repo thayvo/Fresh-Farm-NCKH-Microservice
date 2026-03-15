@@ -27,6 +27,8 @@ public partial class User
 
     public virtual AddressBook AddressBook { get; set; }
 
+    public virtual SellerStoreSetting SellerStoreSetting { get; set; }
+
     public virtual UserAuth UserAuth { get; set; }
 
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();

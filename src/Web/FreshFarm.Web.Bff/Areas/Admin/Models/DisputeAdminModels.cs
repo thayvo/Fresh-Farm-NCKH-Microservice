@@ -54,6 +54,9 @@ public sealed class DisputeQueueRowViewModel
     public int? OrderId { get; set; }
     public decimal? Amount { get; set; }
     public int UnreadCount { get; set; }
+    public string AssignedOwner { get; set; } = string.Empty;
+    public DateTime? TargetResolutionAt { get; set; }
+    public int EvidenceCount { get; set; }
     public bool IsSlaBreached { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -74,10 +77,27 @@ public sealed class DisputeCaseDetailsViewModel
     public DisputeSellerViewModel? Seller { get; set; }
     public DisputeOrderViewModel? Order { get; set; }
     public DisputeAfterSalesViewModel? AfterSales { get; set; }
+    public DisputeAssignmentViewModel? Assignment { get; set; }
+    public DisputeSlaViewModel? Sla { get; set; }
     public List<DisputeTimelineItemViewModel> Timeline { get; set; } = new();
+    public List<DisputeActivityItemViewModel> ActivityItems { get; set; } = new();
+    public List<DisputeEvidenceItemViewModel> EvidenceItems { get; set; } = new();
     public List<DisputeMessageViewModel> Messages { get; set; } = new();
     public List<DisputeOrderViewModel> RelatedOrders { get; set; } = new();
     public List<DisputeRelatedCaseViewModel> RelatedCases { get; set; } = new();
+}
+
+public sealed class DisputeAssignmentViewModel
+{
+    public string OwnerLabel { get; set; } = string.Empty;
+    public DateTime? AssignedAt { get; set; }
+}
+
+public sealed class DisputeSlaViewModel
+{
+    public DateTime? TargetResolutionAt { get; set; }
+    public string Source { get; set; } = string.Empty;
+    public bool IsBreached { get; set; }
 }
 
 public sealed class DisputePersonViewModel
@@ -139,6 +159,21 @@ public sealed class DisputeRelatedCaseViewModel
     public DateTime? CreatedAt { get; set; }
 }
 
+public sealed class DisputeActivityItemViewModel
+{
+    public string Label { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public DateTime? CreatedAt { get; set; }
+    public int? ActorUserId { get; set; }
+}
+
+public sealed class DisputeEvidenceItemViewModel
+{
+    public string Note { get; set; } = string.Empty;
+    public DateTime? CreatedAt { get; set; }
+    public int? ActorUserId { get; set; }
+}
+
 internal sealed class DisputeQueueApiResponse
 {
     public int Page { get; set; }
@@ -195,6 +230,9 @@ internal sealed class DisputeQueueRowApiDto
     public int? OrderId { get; set; }
     public decimal? Amount { get; set; }
     public int UnreadCount { get; set; }
+    public string? AssignedOwner { get; set; }
+    public DateTime? TargetResolutionAt { get; set; }
+    public int EvidenceCount { get; set; }
     public bool IsSlaBreached { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -215,10 +253,27 @@ internal sealed class DisputeDetailsApiDto
     public DisputeSellerApiDto? Seller { get; set; }
     public DisputeOrderApiDto? Order { get; set; }
     public DisputeAfterSalesApiDto? AfterSales { get; set; }
+    public DisputeAssignmentApiDto? Assignment { get; set; }
+    public DisputeSlaApiDto? Sla { get; set; }
     public List<DisputeTimelineApiDto>? Timeline { get; set; }
+    public List<DisputeActivityApiDto>? ActivityItems { get; set; }
+    public List<DisputeEvidenceApiDto>? EvidenceItems { get; set; }
     public List<DisputeMessageApiDto>? Messages { get; set; }
     public List<DisputeOrderApiDto>? RelatedOrders { get; set; }
     public List<DisputeRelatedCaseApiDto>? RelatedCases { get; set; }
+}
+
+internal sealed class DisputeAssignmentApiDto
+{
+    public string? OwnerLabel { get; set; }
+    public DateTime? AssignedAt { get; set; }
+}
+
+internal sealed class DisputeSlaApiDto
+{
+    public DateTime? TargetResolutionAt { get; set; }
+    public string? Source { get; set; }
+    public bool IsBreached { get; set; }
 }
 
 internal sealed class DisputePersonApiDto
@@ -278,4 +333,19 @@ internal sealed class DisputeRelatedCaseApiDto
     public string? Status { get; set; }
     public decimal? Amount { get; set; }
     public DateTime? CreatedAt { get; set; }
+}
+
+internal sealed class DisputeActivityApiDto
+{
+    public string? Label { get; set; }
+    public string? Summary { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public int? ActorUserId { get; set; }
+}
+
+internal sealed class DisputeEvidenceApiDto
+{
+    public string? Note { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public int? ActorUserId { get; set; }
 }

@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -20,15 +21,369 @@ public class ShippingController : LegacySellerControllerBase
     private static readonly string[] PaidStatuses = { "Đã thanh toán", "Da thanh toan", "Hoàn tất", "Hoan tat" };
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IGhnSandboxService _ghnSandboxService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public ShippingController(IHttpClientFactory httpClientFactory)
+    public ShippingController(IHttpClientFactory httpClientFactory, IGhnSandboxService ghnSandboxService)
     {
         _httpClientFactory = httpClientFactory;
+        _ghnSandboxService = ghnSandboxService;
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> TestGhnSandbox(CancellationToken cancellationToken)
+    {
+        var result = await _ghnSandboxService.TestConnectionAsync(cancellationToken);
+        return Json(new
+        {
+            success = result.Success,
+            configured = _ghnSandboxService.IsConfigured,
+            assumedShopId = result.ShopId,
+            provinceCount = result.ProvinceCount,
+            sampleProvinces = result.SampleProvinces,
+            shop = result.ShopProfile is null
+                ? null
+                : new
+                {
+                    shopId = result.ShopProfile.ShopId,
+                    shopName = result.ShopProfile.ShopName,
+                    phone = result.ShopProfile.Phone,
+                    districtId = result.ShopProfile.DistrictId,
+                    wardCode = result.ShopProfile.WardCode,
+                    address = result.ShopProfile.Address,
+                    usesConfiguredOrigin = result.ShopProfile.UsesConfiguredOrigin,
+                    note = result.ShopProfile.Message
+                },
+            message = result.Message
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnShopProfile(CancellationToken cancellationToken)
+    {
+        var result = await _ghnSandboxService.GetShopProfileAsync(cancellationToken);
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            shopName = result.ShopName,
+            phone = result.Phone,
+            districtId = result.DistrictId,
+            wardCode = result.WardCode,
+            address = result.Address,
+            usesConfiguredOrigin = result.UsesConfiguredOrigin,
+            message = result.Message
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnProvinces(CancellationToken cancellationToken)
+    {
+        var items = await _ghnSandboxService.GetProvincesAsync(cancellationToken);
+        return Json(new
+        {
+            success = true,
+            count = items.Count,
+            items
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnDistricts(int provinceId, CancellationToken cancellationToken)
+    {
+        if (provinceId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu mã tỉnh/thành GHN."
+            });
+        }
+
+        var items = await _ghnSandboxService.GetDistrictsAsync(provinceId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            provinceId,
+            count = items.Count,
+            items
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnWards(int districtId, CancellationToken cancellationToken)
+    {
+        if (districtId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu mã quận/huyện GHN."
+            });
+        }
+
+        var items = await _ghnSandboxService.GetWardsAsync(districtId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            districtId,
+            count = items.Count,
+            items
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> PreviewGhnFee([FromQuery] PreviewGhnFeeRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu dữ liệu yêu cầu tính phí GHN."
+            });
+        }
+
+        var result = await _ghnSandboxService.CalculateFeeAsync(new GhnSandboxFeeRequest
+        {
+            ToDistrictId = request.ToDistrictId,
+            ToWardCode = request.ToWardCode ?? string.Empty,
+            ServiceTypeId = request.ServiceTypeId,
+            Height = request.Height,
+            Length = request.Length,
+            Width = request.Width,
+            Weight = request.Weight,
+            InsuranceValue = request.InsuranceValue,
+            ItemName = request.ItemName ?? string.Empty,
+            ItemQuantity = request.ItemQuantity
+        }, cancellationToken);
+
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            serviceId = result.ServiceId,
+            serviceName = result.ServiceName,
+            totalFee = result.TotalFee,
+            mainServiceFee = result.MainServiceFee,
+            insuranceFee = result.InsuranceFee,
+            fromDistrictId = result.FromDistrictId,
+            fromWardCode = result.FromWardCode,
+            message = result.Message
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> PreviewGhnLeadTime([FromQuery] PreviewGhnLeadTimeRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu dữ liệu yêu cầu leadtime GHN."
+            });
+        }
+
+        var result = await _ghnSandboxService.CalculateLeadTimeAsync(new GhnSandboxLeadTimeRequest
+        {
+            ToDistrictId = request.ToDistrictId,
+            ToWardCode = request.ToWardCode ?? string.Empty,
+            ServiceTypeId = request.ServiceTypeId
+        }, cancellationToken);
+
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            serviceId = result.ServiceId,
+            serviceName = result.ServiceName,
+            fromDistrictId = result.FromDistrictId,
+            fromWardCode = result.FromWardCode,
+            leadTimeUnix = result.LeadTimeUnix,
+            leadTime = result.LeadTime?.ToString("O"),
+            orderDateUnix = result.OrderDateUnix,
+            orderDate = result.OrderDate?.ToString("O"),
+            message = result.Message
+        });
+    }
+
+    [HttpPost]
+    public async Task<JsonResult> CreateGhnSandboxOrder([FromBody] CreateGhnSandboxOrderRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu dữ liệu yêu cầu tạo đơn GHN."
+            });
+        }
+
+        var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
+        {
+            ToName = request.ToName ?? string.Empty,
+            ToPhone = request.ToPhone ?? string.Empty,
+            ToAddress = request.ToAddress ?? string.Empty,
+            ToDistrictId = request.ToDistrictId,
+            ToWardCode = request.ToWardCode ?? string.Empty,
+            ServiceTypeId = request.ServiceTypeId,
+            ClientOrderCode = request.ClientOrderCode ?? string.Empty,
+            Content = request.Content ?? string.Empty,
+            Note = request.Note ?? string.Empty,
+            RequiredNote = request.RequiredNote ?? string.Empty,
+            PaymentTypeId = request.PaymentTypeId,
+            CodAmount = request.CodAmount,
+            InsuranceValue = request.InsuranceValue,
+            Height = request.Height,
+            Length = request.Length,
+            Width = request.Width,
+            Weight = request.Weight,
+            Items = request.Items?
+                .Select(item => new GhnSandboxOrderItemRequest
+                {
+                    Name = item.Name ?? string.Empty,
+                    Code = item.Code ?? string.Empty,
+                    Quantity = item.Quantity,
+                    Price = item.Price,
+                    Height = item.Height,
+                    Length = item.Length,
+                    Width = item.Width,
+                    Weight = item.Weight
+                })
+                .ToList() ?? new List<GhnSandboxOrderItemRequest>()
+        }, cancellationToken);
+
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            clientOrderCode = result.ClientOrderCode,
+            orderCode = result.OrderCode,
+            sortCode = result.SortCode,
+            serviceId = result.ServiceId,
+            serviceName = result.ServiceName,
+            totalFee = result.TotalFee,
+            expectedDeliveryTimeUnix = result.ExpectedDeliveryTimeUnix,
+            expectedDeliveryTime = result.ExpectedDeliveryTime?.ToString("O"),
+            fromDistrictId = result.FromDistrictId,
+            fromWardCode = result.FromWardCode,
+            message = result.Message
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> CreateGhnSandboxOrderQuick([FromQuery] CreateGhnSandboxOrderQuickRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu dữ liệu yêu cầu tạo đơn GHN."
+            });
+        }
+
+        var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
+        {
+            ToName = request.ToName ?? string.Empty,
+            ToPhone = request.ToPhone ?? string.Empty,
+            ToAddress = request.ToAddress ?? string.Empty,
+            ToDistrictId = request.ToDistrictId,
+            ToWardCode = request.ToWardCode ?? string.Empty,
+            ServiceTypeId = request.ServiceTypeId,
+            ClientOrderCode = request.ClientOrderCode ?? string.Empty,
+            Content = request.Content ?? string.Empty,
+            Note = request.Note ?? string.Empty,
+            RequiredNote = request.RequiredNote ?? string.Empty,
+            PaymentTypeId = request.PaymentTypeId,
+            CodAmount = request.CodAmount,
+            InsuranceValue = request.InsuranceValue,
+            Height = request.Height,
+            Length = request.Length,
+            Width = request.Width,
+            Weight = request.Weight,
+            Items = new List<GhnSandboxOrderItemRequest>
+            {
+                new()
+                {
+                    Name = request.ItemName ?? "Nông sản FreshFarm",
+                    Code = request.ItemCode ?? string.Empty,
+                    Quantity = request.ItemQuantity,
+                    Price = request.ItemPrice,
+                    Height = request.Height,
+                    Length = request.Length,
+                    Width = request.Width,
+                    Weight = request.Weight
+                }
+            }
+        }, cancellationToken);
+
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            clientOrderCode = result.ClientOrderCode,
+            orderCode = result.OrderCode,
+            sortCode = result.SortCode,
+            serviceId = result.ServiceId,
+            serviceName = result.ServiceName,
+            totalFee = result.TotalFee,
+            expectedDeliveryTimeUnix = result.ExpectedDeliveryTimeUnix,
+            expectedDeliveryTime = result.ExpectedDeliveryTime?.ToString("O"),
+            fromDistrictId = result.FromDistrictId,
+            fromWardCode = result.FromWardCode,
+            message = result.Message
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnSandboxOrder([FromQuery] GetGhnSandboxOrderRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu dữ liệu yêu cầu tra cứu đơn GHN."
+            });
+        }
+
+        var result = await _ghnSandboxService.GetOrderTrackingAsync(new GhnSandboxOrderTrackingRequest
+        {
+            OrderCode = request.OrderCode ?? string.Empty,
+            ClientOrderCode = request.ClientOrderCode ?? string.Empty
+        }, cancellationToken);
+
+        return Json(new
+        {
+            success = result.Success,
+            assumedShopId = result.ShopId,
+            orderCode = result.OrderCode,
+            clientOrderCode = result.ClientOrderCode,
+            status = result.Status,
+            statusLabel = result.StatusLabel,
+            serviceName = result.ServiceName,
+            toName = result.ToName,
+            toPhone = result.ToPhone,
+            toAddress = result.ToAddress,
+            codAmount = result.CodAmount,
+            totalFee = result.TotalFee,
+            createdDate = result.CreatedDate?.ToString("O"),
+            leadTime = result.LeadTime?.ToString("O"),
+            finishedDate = result.FinishedDate?.ToString("O"),
+            logs = result.Logs.Select(log => new
+            {
+                status = log.Status,
+                statusLabel = log.StatusLabel,
+                updatedAt = log.UpdatedAt?.ToString("O")
+            }),
+            message = result.Message
+        });
     }
 
     public async Task<IActionResult> ManageShipping(
@@ -53,6 +408,8 @@ public class ShippingController : LegacySellerControllerBase
         ViewBag.DeliveryStaffs = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Orders = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Provinces = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
+        ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
+        ViewBag.GhnSandboxShopId = _ghnSandboxService.ShopId;
 
         try
         {
@@ -95,6 +452,8 @@ public class ShippingController : LegacySellerControllerBase
             ViewBag.CurrentSort = data?.currentSort ?? sort;
             ViewBag.DeliveredState = data?.deliveredState ?? deliveredState;
             ViewBag.PaidStatuses = PaidStatuses;
+            ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
+            ViewBag.GhnSandboxShopId = _ghnSandboxService.ShopId;
 
             var staffs = (data?.deliveryStaffs ?? new List<DeliveryStaffDto>())
                 .Select(s => new SelectListItem
@@ -658,6 +1017,148 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? storeAddress { get; set; }
 
-        public int? deliveryStaffId { get; set; }
+    public int? deliveryStaffId { get; set; }
+    }
+
+    public sealed class PreviewGhnFeeRequest
+    {
+        public int ToDistrictId { get; set; }
+
+        public string? ToWardCode { get; set; }
+
+        public int? ServiceTypeId { get; set; }
+
+        public int Height { get; set; } = 10;
+
+        public int Length { get; set; } = 20;
+
+        public int Width { get; set; } = 20;
+
+        public int Weight { get; set; } = 500;
+
+        public int InsuranceValue { get; set; }
+
+        public string? ItemName { get; set; }
+
+        public int ItemQuantity { get; set; } = 1;
+    }
+
+    public sealed class PreviewGhnLeadTimeRequest
+    {
+        public int ToDistrictId { get; set; }
+
+        public string? ToWardCode { get; set; }
+
+        public int? ServiceTypeId { get; set; }
+    }
+
+    public sealed class CreateGhnSandboxOrderRequest
+    {
+        public string? ToName { get; set; }
+
+        public string? ToPhone { get; set; }
+
+        public string? ToAddress { get; set; }
+
+        public int ToDistrictId { get; set; }
+
+        public string? ToWardCode { get; set; }
+
+        public int? ServiceTypeId { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? Content { get; set; }
+
+        public string? Note { get; set; }
+
+        public string? RequiredNote { get; set; }
+
+        public int PaymentTypeId { get; set; } = 2;
+
+        public int CodAmount { get; set; }
+
+        public int InsuranceValue { get; set; }
+
+        public int Height { get; set; } = 10;
+
+        public int Length { get; set; } = 20;
+
+        public int Width { get; set; } = 20;
+
+        public int Weight { get; set; } = 500;
+
+        public List<CreateGhnSandboxOrderItemRequest>? Items { get; set; }
+    }
+
+    public sealed class CreateGhnSandboxOrderItemRequest
+    {
+        public string? Name { get; set; }
+
+        public string? Code { get; set; }
+
+        public int Quantity { get; set; } = 1;
+
+        public int Price { get; set; }
+
+        public int Height { get; set; } = 10;
+
+        public int Length { get; set; } = 20;
+
+        public int Width { get; set; } = 20;
+
+        public int Weight { get; set; } = 500;
+    }
+
+    public sealed class GetGhnSandboxOrderRequest
+    {
+        public string? OrderCode { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+    }
+
+    public sealed class CreateGhnSandboxOrderQuickRequest
+    {
+        public string? ToName { get; set; }
+
+        public string? ToPhone { get; set; }
+
+        public string? ToAddress { get; set; }
+
+        public int ToDistrictId { get; set; }
+
+        public string? ToWardCode { get; set; }
+
+        public int? ServiceTypeId { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? Content { get; set; }
+
+        public string? Note { get; set; }
+
+        public string? RequiredNote { get; set; }
+
+        public int PaymentTypeId { get; set; } = 2;
+
+        public int CodAmount { get; set; }
+
+        public int InsuranceValue { get; set; }
+
+        public int Height { get; set; } = 10;
+
+        public int Length { get; set; } = 20;
+
+        public int Width { get; set; } = 20;
+
+        public int Weight { get; set; } = 500;
+
+        public string? ItemName { get; set; }
+
+        public string? ItemCode { get; set; }
+
+        public int ItemQuantity { get; set; } = 1;
+
+        public int ItemPrice { get; set; }
     }
 }

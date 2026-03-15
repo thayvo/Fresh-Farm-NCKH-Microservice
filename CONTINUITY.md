@@ -1,6 +1,10 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
+  - Doi chieu `docs/Report Nhom 1.docx` voi ma nguon hien tai, chi ro:
+    - phan da lam that,
+    - phan bao cao can sua vi repo da lam bang cach khac,
+    - phan chua co/can harden neu muon dat muc bao mat hien dai hon.
   - Hoan tat Seller area service-first on dinh runtime tren .NET 8 (khong con EF legacy trong BFF Seller).
   - Khoi tao lane Admin theo phong cach UI Seller (xanh duong + hieu ung quet anh sang), thiet ke/pham vi chuan theo cac san TMĐT.
   - Moi uu tien: day manh lane user-facing marketplace theo chuan san TMĐT nong san (search san pham, kham pha shop, hien thi da nguoi ban, chat buyer-seller).
@@ -11,6 +15,11 @@
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Doi chieu bao cao an toan bao mat phai dua tren code hien tai, KHONG mac dinh moi claim trong file Word da duoc implement.
+  - Ket qua audit tach 3 nhom:
+    - da co that trong repo,
+    - khong can lam theo huong cu vi repo da lam cach khac hop ly hon,
+    - chua co / can harden neu muon dat muc bao mat hien dai hon.
   - Service-first: BFF goi `Identity/Catalog/Ordering API`, khong truy cap DB truc tiep.
   - Lot 4.5 da chot DB-backed (khong file-backed cho business state).
   - Lot 4.6 tiep tuc theo huong re-wire views -> controller/action/model binding.
@@ -19,6 +28,7 @@
   - Da xac minh moi truong hien tai co `dotnet` (`C:\Program Files\dotnet\dotnet.exe`), co the build verify lai cac lane dang migrate.
   - Theo user: sau khi da co mot moc Admin kha on, tam dung mo rong Admin va quay lai lane user-facing truoc.
   - Theo user (turn moi nhat): tiep tuc thuc thi theo roadmap da chot, bat dau bang `U1 search / PLP that`.
+  - Theo user (turn moi nhat nhat): tam dung user-facing, quay lai lane Admin.
   - Thu tu uu tien moi cho user-facing:
     - `product search / PLP`,
     - `shop discovery + multi-seller`,
@@ -33,8 +43,293 @@
     - Da mo rong tiep `7.7A` voi `Fresh-goods operations MVP`.
     - Da mo rong tiep `7.7A` voi `Communications governance MVP`.
   - Sau khi scaffold xong `7.7A`, uu tien hien tai la hardening warning/runtime drift gan nhat truoc khi mo module roadmap moi.
+  - Audit auth (2026-03-15): repo hien chi co `Auth + Account` MVP; `Google login`, `Forgot/Reset password`, `2FA`, va kenh gui Gmail/SMTP thuc te CHUA duoc implement. Neu quay lai lane auth, uu tien hop ly nhat la `password reset qua email` truoc `social login/2FA`.
+  - Theo user (2026-03-15): chen `Forgot/Reset password qua email` vao roadmap TRUOC khi quay lai mo rong Admin.
+  - Theo user (2026-03-15, turn moi nhat): truoc mat duoc phep dung Gmail ca nhan lam sender mail tam thoi cho website; URL reset se lay tu domain `ngrok`.
+  - Da cau hinh dev sender tam thoi:
+    - Gmail sender: `buikhacvinh18@gmail.com`
+    - `PasswordReset.ResetUrlBase`: `https://planklike-skiffless-judi.ngrok-free.dev/account/reset-password`
+  - Theo user (turn moi nhat): khi quay lai lane Admin, cac man hinh/message/view moi duoc cham vao phai doi sang tieng Viet CO DAU day du, dong bo.
+  - Theo user (turn moi nhat): co the noi GHN sandbox ngay du `ShopId` chua chac chan; gia dinh tam thoi da duoc thay bang `ShopId = 199591` sau khi user cung cap dung shop.
+  - Da xac nhan `ShopId GHN sandbox = 199591`; test `/Admin/Shipping/TestGhnSandbox` tra `success = true`.
+  - Lo trinh GHN duoc chia pha:
+    - `Pha 1`: tinh phi GHN sandbox.
+    - `Pha 2`: leadtime GHN.
+    - `Pha 3`: tao don GHN sau khi tao order noi bo.
+    - `Pha 4`: dong bo van hanh Shipping/Admin.
+  - Pha 1 GHN chot theo huong:
+    - tu dong doc thong tin shop sandbox de fallback dia chi gui,
+    - bo sung endpoint tra cuu quận/huyện + phường/xã de test tung buoc,
+    - chot preview fee truoc khi noi leadtime/create-order.
+  - Pha 2 GHN dang duoc noi tiep ngay sau Pha 1:
+    - preview leadtime tu cung bo origin/service resolver,
+    - test xong leadtime roi moi sang create-order.
+  - Pha 3 GHN dang duoc scaffold:
+    - tao don sandbox qua endpoint test rieng,
+    - sau khi tao don xanh moi tinh chuyen noi vao order noi bo.
+  - Pha 4 GHN dang duoc noi tiep:
+    - tra cuu chi tiet don theo `orderCode/clientOrderCode`,
+    - map trang thai GHN sang tieng Viet co dau de de van hanh Admin.
+  - User da cung cap ma origin GHN thu cong:
+    - `FromDistrictId = 1538` (`Thành phố Thủ Dầu Một`)
+    - `FromWardCode = 440108` (`Phường Phú Hòa`)
+    - `ReturnPhone = 0858863900`
+    - `ReturnAddress = So 06 Tran Van On, Phu Hoa, Thu Dau Mot, Binh Duong, Vietnam`
+  - Theo user (turn moi nhat): uu tien co endpoint test tao don GHN bang `GET` tren trinh duyet hoac tu man Admin Shipping de tranh vuong cookie/token khi goi `POST`.
+  - GHN sandbox tra mot so truong ngay gio voi dinh dang khong co dinh (`expected_delivery_time`, `created_date`, `updated_date`, `finish_date`), nen BFF can parse linh hoat tu `JsonElement` thay vi ep `long?` truc tiep.
+  - Theo user (turn moi nhat): can mo hinh dia chi shop theo tung seller cho GHN; moi seller phai co dia chi lay hang chuan rieng, khong dung chung origin global khi chay that.
+  - Da chot huong schema `SellerStoreSettings` trong `IdentityDB` de luu thong tin shop + origin GHN theo `UserId`; giu `StoreSettings` cho lane global/admin.
+  - GHN BFF service ho tro `OriginOverride` theo request de Admin/Seller dung origin rieng ma khong can doi cau hinh sandbox global.
+  - Huong dung han: khong de he thong phu thuoc cung vao GHN; ma GHN chi dong vai tro `carrier mapping`. Dia chi nghiep vu cua shop can duoc luu theo model trung lap nha van chuyen, con `ghnDistrictId/ghnWardCode` la lop adapter de goi GHN.
+  - Theo user (turn moi nhat): can dua vao roadmap nguyen tac nghiep vu van chuyen production:
+    - van don phai tao tu don hang noi bo da ton tai,
+    - khong cho seller tao van don roi khong gan `OrderId`,
+    - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Da doc `docs/Report Nhom 1.docx` va doi chieu claim bao mat voi repo hien tai.
+    - Da xac nhan cac lech chinh:
+      - repo dung `PasswordHasher/PBKDF2`, khong phai `BCrypt`;
+      - chua thay `Google OAuth`, `Rate Limiting`, `VNPAY secure flow`, `mTLS`, `chan DevTools`;
+      - XSS protection hien tai nghieng ve `output encoding` hon la regex blacklist.
+    - Da tao file bao cao doi chieu: `docs/report-nhom-1-security-review.md`.
+    - Da doc va doi chieu `docs/Report Nhom 1.docx` voi repo hien tai:
+      - Khop o muc tong quan microservices, JWT + RBAC, anti-forgery cho form web, va huong tenant ownership/IDOR hardening.
+      - Lech o cac claim implementation cu the: Google OAuth chua co runtime, mat khau dang dung ASP.NET `PasswordHasher` chu khong phai BCrypt, chua thay `RateLimiter` runtime, va luong VNPay signed callback chua du bang chung de ket luan da hoan tat.
+      - Bao cao chua cap nhat cac patch moi da co trong repo nhu forgot/reset password qua email va dia chi lay hang theo seller + panel van chuyen.
+    - Da an 2 truong seller-facing `Phí vận chuyển mặc định` va `Miễn phí vận chuyển cho đơn hàng trên` tren `Areas/Seller/Views/Setting/Index.cshtml`; giu `HiddenFor` de khong ghi de du lieu cu. Giao dien seller hien chi nhan manh dia chi lay hang, con uu dai phi ship duoc dinh huong quan ly qua ma giam gia/chinh sach thuc te.
+    - Da lam thuần nguoi dung cho panel van chuyen seller trong `Areas/Seller/Views/Shipping/ManageShipping.cshtml`:
+      - bo bớt tu ky thuat `GHN/origin/leadtime/sandbox/ShopId` tren phan hien thi chinh,
+      - doi ten nut/nhan sang cach noi nghiep vu de hon (`Tạo vận đơn`, `Ước tính phí giao hàng`, `Xem thời gian giao dự kiến`, `Địa chỉ lấy hàng`),
+      - thay hien JSON thô bang tom tat de doc cho 4 khu vuc: dia chi lay hang, uoc tinh phi, tao van don, tra cuu van don.
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_shipping_user_friendly\` -> PASS (`20 warning` cu, `0 error`).
+  - Da polish tiep giao dien `Seller/Shipping/ManageShipping`:
+      - khong con toast tu dong hien khi vua vao trang de bao "da doc dia chi lay hang",
+      - ghi chu ket qua dia chi lay hang duoc doi sang ngon ngu tu nhien,
+      - cac o nhap/select trong panel van chuyen duoc tang bo goc, do cao, bong do, focus state va readonly state de nhin mem va ro hon.
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_shipping_polish\` -> PASS (`20 warning` cu, `0 error`).
+    - Theo user (turn moi nhat): bo cac gia tri test hard-code o form tao van don seller; shop se tu nhap thong tin kich thuoc/khoi luong moi lan tao van don.
+    - Da dong bo roadmap voi quyet dinh nghiep vu moi:
+      - luong van chuyen production phai di tu don hang that,
+      - duong tao van don roi chi giu tam de test/harden,
+      - buoc tiep theo sau test seller la bind tao van don vao `OrderId` va luu ma van don/trang thai vao du lieu noi bo.
+    - Da hoan tat `Pha 5` cho GHN multi-seller theo seller:
+      - `src/Services/Identity/FreshFarm.Identity.API/Models/SellerStoreSetting.cs` + `FreshFarmIdentityDBContext.Extras.cs` them bang `SellerStoreSettings` (unique theo `UserId`) de luu thong tin shop va origin GHN cua tung seller.
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs` re-use route `/auth/admin/settings/store`:
+        - Admin tiep tuc doc/ghi `StoreSettings` global.
+        - Seller doc/ghi settings rieng cua chinh minh trong `SellerStoreSettings`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SettingController.cs` + `Views/Setting/Index.cshtml` da co bo chon tinh/quận/phường GHN va luu origin seller xuong DB.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs` + `Views/Shipping/ManageShipping.cshtml` da co panel GHN rieng cho seller, doc origin cua seller tu DB de preview phi/leadtime/tao don/tra cuu.
+      - `src/Web/FreshFarm.Web.Bff/Services/{IGhnSandboxService,GhnSandboxService}.cs` da bo sung `OriginOverride` de tao don GHN dung origin theo seller.
+      - Da them SQL docs:
+        - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.delta.sql`
+        - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.verify.sql`
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_seller_ghn\` -> PASS (`10 warning` cu/nullability, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_ghn\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - GHN sandbox da chay xanh den buoc tao don va dang harden tra cuu don:
+      - `CreateGhnSandboxOrderQuick` da tao don thanh cong voi `orderCode = LT4QAN`, `clientOrderCode = FF-1773565889`, `serviceId = 53321`, `totalFee = 49500`.
+      - `src/Web/FreshFarm.Web.Bff/Services/GhnSandboxService.cs` da doi parser tracking detail sang `JsonElement` cho `created_date`, `leadtime`, `finish_date`, `updated_date`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_tracking_datefix\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da noi GHN sandbox vao man `Admin/Shipping/ManageShipping`:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ShippingController.cs` day `GhnSandboxConfigured` + `GhnSandboxShopId` cho view.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Shipping/ManageShipping.cshtml` co them bang dieu khien GHN:
+        - lay thong tin shop,
+        - load tinh/quan/phuong GHN,
+        - preview phi,
+        - preview leadtime,
+        - tao don GHN,
+        - tra cuu van don,
+        - nut `xe tai` tren tung dong de do san nguoi nhan/dia chi vao panel.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_admin_ui\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da va loi `Unknown error` o danh sach `Admin/Shipping/ManageShipping`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ShippingAdminController.cs` khong con trộn `List/Dictionary` local (`Provinces`, `CommunesByProvince`) ben trong truy van EF.
+      - Da tach phan map ten tinh/xa ra sau `ToListAsync()`, tranh loi runtime `could not be translated` cua EF.
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_shipping_fix\` -> PASS (`0 warning`, `0 error`).
+    - Da ra soat auth/email hien tai de tra loi user:
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml` chi dang de placeholder/disabled cho `Quen mat khau`, `Google`, `Facebook`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs` + `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs` hien chi cover `signin/signup/profile/address` bang cookie + JWT, khong co endpoint external login/reset password/2FA.
+      - `src/Services/Identity/FreshFarm.Identity.API/Models/UserAuth.cs` co cot `LockedUntil` / `MFASecret`, nhung chua co logic runtime su dung trong auth flow.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SettingController.cs` + `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs` moi luu setting email/preferences; repo khong co `SMTP/MailKit/IEmailSender/BackgroundService` de gui Gmail that.
+      - `docs/SignIn-SignUp-Y-tuong.md` va `docs/auth-account.md` xac nhan social login/forgot password la pha sau khi backend san sang; tai lieu auth cu cung uu tien `Cart + Checkout` sau `Auth + Account`.
+    - Da hoan tat `Auth recovery hardening` truoc khi quay lai lane Admin:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+        - them `POST /auth/forgot-password` va `POST /auth/reset-password`,
+        - reset token co han dung, khong lo email ton tai/non-ton tai, va tu tao `UserAuth` khi gap user migrate chua co password hash.
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/PasswordResetTokenService.cs`
+        - ky/xac thuc token reset bang `DataProtection`, kem email + `SecurityStamp`/version de token cu tu vo hieu sau khi doi mat khau.
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/AccountEmailSender.cs`
+        - them kenh gui SMTP co subject/body reset password, dung cho Gmail app password hoac SMTP credentials khac.
+      - `src/Services/Identity/FreshFarm.Identity.API/Options/{PasswordResetOptions,SmtpOptions}.cs`
+        - bind cau hinh `PasswordReset` + `Smtp`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+        - them `ForgotPassword`/`ResetPassword` GET+POST, goi lai Identity API va dua thong diep thanh cong/that bai ve UI.
+      - `src/Web/FreshFarm.Web.Bff/Dtos/AccountDtos.cs`
+        - bo sung DTO/form model cho forgot/reset password.
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/{SignIn,ForgotPassword,ResetPassword}.cshtml`
+        - mo link `Quen mat khau?`, them form gui email va form dat lai mat khau.
+      - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json`
+        - them mau cau hinh `PasswordReset` + `Smtp` de noi sender Gmail/SMTP sau.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity\` -> PASS (`10 warning` cu/nullability, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong auto-priority ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - queue row gio duoc enrich them `PriorityKey`, `PriorityLabel`, `PriorityReason`,
+        - heuristic priority uu tien theo `qua han -> sap den han -> chua co owner/follow-up -> theo doi`,
+        - queue duoc sap xep lai theo priority rank truoc khi paginate de finance ops nhin thay case nong truoc.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - map them priority metadata vao row model.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - row model/API DTO bo sung `PriorityKey`, `PriorityLabel`, `PriorityReason`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - cot `Ops` hien them chip priority va ly do uu tien cho tung row,
+        - auto-priority nay song song voi owner scoreboard va follow-up queue cards.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong owner scoreboard ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - finance console tra them `ownerSummary` dua tren queue sau khi da ap filter section/status/follow-up,
+        - moi owner summary gom `itemCount`, `overdueCount`, `dueSoonCount`, `noFollowUpCount`,
+        - owner scoreboard duoc sap xep uu tien theo muc do qua han de admin nhin nhanh owner nao dang can ho tro.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - map them `ownerSummary` vao page model.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - page model/API DTO bo sung `OwnerSummary`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - them panel `Owner scoreboard` cho lane Admin,
+        - hien top owner trong pham vi loc hien tai voi so viec, qua han, 48h toi, chua dat moc.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong nhac owner cho queue qua han ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - finance action gio hieu them `send-reminder`,
+        - reminder tiep tuc di qua `AdminActionLog` / `SettlementAudit` metadata (`reminderSentAt`, `reminderNote`), khong can bang moi,
+        - row payload duoc enrich them `ReminderSentAt`, `ReminderNote` de queue doc duoc lan nhac owner gan nhat.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - map them `ReminderSentAt`, `ReminderNote` vao row model.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - row model/API DTO bo sung `ReminderSentAt`, `ReminderNote`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - bulk action va row action co them `Nhac owner`,
+        - cot `Ops` hien them chip `Qua han` cho follow-up tre han,
+        - cot `Ops` hien them lan nhac owner gan nhat + ghi chu reminder neu co.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong queue follow-up ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - `GET /api/orders/admin/finance/console` nhan them filter `followUpBucket`,
+        - queue row payout/refund/return gio duoc bucket theo `overdue / due-soon / no-follow-up / scheduled`,
+        - console stats duoc enrich them `overdueFollowUps`, `dueSoonFollowUps`, `noFollowUpCount`,
+        - pagination cho finance queue duoc chot sau khi enrich/filter follow-up de giu queue card va row state dong bo.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - bridge them `followUpBucket` cho list/action/export,
+        - map them stats bucket follow-up vao page model.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - page model / filters / stats DTO bo sung `FollowUpBucket`, `OverdueFollowUps`, `DueSoonFollowUps`, `NoFollowUpCount`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - finance console co them filter `Moc follow-up`,
+        - them 3 quick queue cards `Qua han / 48h toi / Chua dat moc`,
+        - export va row/bulk forms giu nguyen `followUpBucket` de thao tac xong khong mat ngu canh queue.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong reconciliation follow-up ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - action don va bulk gio hieu them `set-follow-up`,
+        - queue row duoc enrich them `followUpAt`, `followUpNote`,
+        - follow-up tiep tuc duoc ghi qua `AdminActionLog` + `SettlementAudit` metadata, khong can bang moi,
+        - CSV export bo sung them owner/follow-up de de doi soat offline.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - proxy them `followUpAt` cho action don/bulk,
+        - map them `FollowUpAt`, `FollowUpNote` vao row model.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - row model/API DTO bo sung `FollowUpAt`, `FollowUpNote`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - bulk form co them input `Follow-up`,
+        - row action co them nut `Follow-up` + `datetime-local`,
+        - cot `Ops` hien them moc follow-up va ghi chu doi soat neu co.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep `Finance / Settlement` theo huong owner/export operations ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - action don va bulk gio hieu them `assign` va `mark-exported`,
+        - queue row payout/refund/return duoc enrich them `assignedOwner`, `exportedAt`, `lastActionSummary`,
+        - audit metadata tiep tuc di qua `AdminActionLog` + `SettlementAudit`,
+        - export CSV da doi sang typed payload `FinanceConsoleRowPayload` de giam drift.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - proxy them `assigneeLabel` cho action don/bulk,
+        - map them `AssignedOwner`, `ExportedAt`, `LastActionSummary`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - row model/API DTO bo sung `AssignedOwner`, `ExportedAt`, `LastActionSummary`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - bulk form va row action co them owner input,
+        - lane Admin co them action `Gan owner` va `Danh dau da export`,
+        - bang hien them cot `Ops` de nhin nhanh owner/export/last action.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`0 warning`, `0 error`).
+    - Da dao sau tiep `Finance / Settlement` theo huong bulk/export/reconciliation ma khong doi schema:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/FinanceAdminController.cs`
+        - them `POST /api/orders/admin/finance/bulk-actions`,
+        - them `GET /api/orders/admin/finance/export` tra CSV,
+        - moi row payout/refund/return gio co them `reconciliationStatus` va `nextStep`,
+        - action don va bulk deu dung chung luong cap nhat settlement hien co.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - them bridge `TakeBulkAction` va `Export`,
+        - map them metadata doi soat moi cho row.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/FinanceAdminModels.cs`
+        - row model/API DTO bo sung `ReconciliationStatus`, `NextStep`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+        - lane Admin gio co nut `Export CSV`,
+        - them bulk form + checkbox chon nhieu ban ghi,
+        - bang hien them cot `Doi soat` de goi y buoc tiep theo cho payout/refund/return.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da quay lai lane Admin va dao sau `Dispute & CS` theo huong van hanh thuc te:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/DisputesAdminController.cs`
+        - bo sung action `assign`, `set-sla`, `add-evidence` tren cung dispute center,
+        - enrich queue row voi `assignedOwner`, `targetResolutionAt`, `evidenceCount`,
+        - detail payload gio tra them `assignment`, `sla`, `activityItems`, `evidenceItems`,
+        - toan bo state van hanh moi duoc luu qua `AdminActionLog` / `ModerationAudit`, khong can doi DB schema.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`
+        - proxy them `assigneeLabel`, `slaHours`, `evidenceNote`,
+        - map them metadata van hanh moi cho queue/detail.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/DisputeAdminModels.cs`
+        - them models/API DTO cho `assignment`, `sla`, `activity`, `evidence`,
+        - queue row model gio co owner/SLA/evidence count.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Dispute/Index.cshtml`
+        - queue table gio hien owner, SLA target, so bang chung,
+        - detail panel co form `Gan case / Cap nhat SLA / Luu bang chung`,
+        - bo sung `Nhat ky van hanh` va `Bang chung noi bo`.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong them `preset theo mua` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` hieu them preset `seasonal-pick`,
+        - BFF loc theo heuristic theo thang hien tai dua tren `ProductName + CategoryName + Origin`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them preset `Hang theo mua` vao strip `Chon nhanh theo nhu cau`,
+        - preset nay di theo contract server-side giong cac preset marketplace khac.
+      - Ghi chu:
+        - `Hang theo mua` hien la heuristic, KHONG phai metadata mua-vu chuan hoa tu DB.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da mo rong them `preset buyer-personalized` cho PLP search:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - them preset `Shop vua phan hoi` cho buyer da dang nhap,
+        - preset nay loc theo `chatSummaries.hasUnread` de dua nhom shop vua tra loi buyer len truoc,
+        - giu dong bo voi polling summary nhe tren PLP nen ket qua co the cap nhat lai khi shop tra loi.
+      - Ghi chu:
+        - Da chon nhan `Shop vua phan hoi` thay vi `Shop phan hoi nhanh` vi payload hien tai xac nhan duoc unread/reply that, nhung chua co metric SLA/response-time de goi la `nhanh`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
     - Da mo rong them `preset giao nhanh gan` cho PLP search:
       - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
         - them preset `Noi thanh trong ngay` vao strip `Chon nhanh theo nhu cau`,
@@ -919,105 +1214,35 @@
       - Build verify:
         - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\` -> PASS (`0 warning`, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
+    - Da harden tiep lane Admin `Merchant lifecycle & compliance` theo yeu cau text tieng Viet co dau:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Shared/_SideBar.cshtml` doi menu thanh `Nha ban hang & tuan thu`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Merchant/Index.cshtml` doi title/hero/label/list/detail sang tieng Viet co dau dong bo.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/MerchantController.cs` doi message loi/thanh cong sang tieng Viet co dau.
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminMerchantsController.cs` doi message API/fallback text sang tieng Viet co dau.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-    - Dang tiep tuc lane user-facing sau khi da chot mot moc Admin kha on.
-    - `U1 search / PLP` da co them filter `Shop dang ban` o muc URL/API/UI; search contract hien tai da bao gom `items + pagination + facets + relatedItems + availableShops`.
-    - `U1 search / PLP` vua duoc bo sung them filter `Tinh trang hang` (`Con hang / Sap het / Het hang`) dua tren `StockQuantity`.
-    - `U1 search / PLP` da co them filter `Pham vi giao` theo muc do dia chi cong khai cua shop (`Tinh/thanh ro / Toi quan-huyen / Toi xa-phuong`) va preset `Uu tien noi tinh` + `Noi thanh trong ngay`.
-    - Card san pham o PLP va khoi `San pham lien quan` da hien badge/trang thai ton kho; PLP/PDP dong bo them `shop trust signals`, `freshness/giao-bao-quan signals`, va PLP da co them `preset nhu cau` gom `Uu tien con hang / Hang tuoi de chon / Shop dang tin / Uu tien noi tinh / Noi thanh trong ngay / San pham moi / Ban chay / Gia de mua`.
-    - `U2 PDP` da dung cung 3 muc ton kho, khong con mo CTA mua khi san pham het hang, va khoi `Nhieu shop cung ban` da ro hon ve `shop chinh / trust badges / nhan shop / vao shop`; hero cung co them panel `Goi y giao va bao quan`.
-    - `U1 search / PLP` da khong con day product card sang `/checkout`; search dang noi sang PDP that.
-    - `U2 PDP` da co route/view + khoi `nhieu shop cung ban`; shop card dang doc du lieu cong khai tu `Identity` va ownership tu `Catalog`.
-    - `U3` da co `/shop` va `/shop/{sellerId}` doc du lieu that.
-    - Da noi them deep-link shop/chat trong product flow:
-      - public product payload co `PrimarySellerId`,
-      - search card co link `Xem shop đang bán`,
-      - PDP co CTA `Chat với shop`,
-      - offer card trong khoi `Nhiều shop cùng bán` co nut `Vào shop`.
-    - `U4` da co MVP buyer-seller chat tren shop page:
-      - lane chat dang dung cho buyer da dang nhap,
-      - shop page co the tao/load thread, xem tin nhan, gui tin, polling refresh,
-      - seller side co the thay va tra loi bang support chat hien co,
-      - search card va offer card da co them deep-link `Nhắn shop`,
-      - buyer da thay duoc unread/status co ban o shop page, PDP, va search/PLP,
-      - near-realtime hien tai dung polling summary, chua dung SignalR buyer rieng.
-    - Search page van con filter `rating` theo nguong, nhung rating hien chi hien khi payload that co du lieu.
-    - Workspace hien build on dinh sau `Campaigns`, `Ads wallet`, `Risk center`, `Audit center`, `Catalog readiness`, `Fresh ops`, `Communications governance`, va patch `U1/U2/U3`.
-    - Da hoan tat patch code `Campaigns + Ads wallet MVP` cho lane Admin:
-      - Ordering API co schema/model/controller `Campaign`, `CampaignSellerParticipation`, `CampaignProductSlot`, `SellerAdsWallet`, `AdsTopup`, `AdsSpendLedger`, `AdsCampaign`.
-      - BFF Admin co lane `/Admin/Campaign/Index` + `Campaign center` + `ads finance overview` + form thao tac `topup/spend/create ads campaign`.
-      - Da them SQL docs delta/verify cho schema `campaigns` va `ads wallet` trong Ordering DB.
-    - Da hoan tat `Risk center MVP` cho `7.7A Cross-cutting Marketplace Controls`:
-      - Ordering API co schema/model/controller moi: `RiskCase`, `RiskSignal`, `RiskDecision`, `VoucherAbuseCase`, `RiskAdminController`.
-      - Heuristic sync MVP tao queue tu `CouponUsageHistory` (voucher abuse) va `ReturnRequest` (return spike), co detail + decision log.
-      - BFF Admin co lane `/Admin/Risk/Index`, menu `Risk center`, queue/detail/decision form.
-      - Da them SQL docs delta/verify cho schema risk center trong Ordering DB.
-    - Da hoan tat `Audit center MVP` cho `7.7A Cross-cutting Marketplace Controls`:
-      - Ordering API co schema/model/controller moi: `AdminActionLog`, `ModerationAudit`, `SettlementAudit`, `AuditAdminController`.
-      - Da hook audit vao `CampaignsAdminController` (create/update/toggle campaign, ads topup/spend/create ads campaign) va `RiskAdminController` (sync heuristic, decision).
-      - BFF Admin co lane `/Admin/Audit/Index`, menu `Audit center`, overview + action log + moderation audit + settlement audit.
-    - Da them SQL docs delta/verify cho schema audit center trong Ordering DB.
-    - Da hoan tat `Catalog readiness MVP` cho `7.7A Search/catalog readiness`:
-      - Catalog API co `CatalogReadinessAdminController` voi `GET center`, `POST/PUT category-attributes`, `POST sync-product-info`.
-      - Catalog model/schema co `CategoryAttribute`, `ProductAttributeValue`, EF map trong `FreshFarmCatalogDBContext.Extras.cs`.
-      - BFF Admin co lane `/Admin/CatalogReadiness/Index`, menu `Catalog readiness`, readiness queue + attribute registry + form create/update + sync.
-      - Da them SQL docs delta/verify cho schema catalog readiness trong Catalog DB.
-    - Da hoan tat `Fresh-goods operations MVP` cho `7.7A Fresh-goods operations`:
-      - Catalog API co `FreshGoodsAdminController` voi `GET center`, `POST lots`, `POST recalls`, `POST recalls/{id}/resolve`.
-      - Catalog model/schema co `FreshInventoryLot`, `FreshQualityRecall`; `Product` partial duoc noi them collections lots/recalls.
-      - BFF Admin co lane `/Admin/FreshOps/Index`, menu `Fresh ops`, FEFO queue, bang lot, danh sach recall, form tao lot va tao recall.
-      - Da them SQL docs delta/verify cho schema fresh ops trong Catalog DB.
-    - User da verify SQL `Fresh ops` tren DB that:
-      - `FreshInventoryLot` va `FreshQualityRecall` ton tai; cac index verify = 1.
-      - Row count hien = 0 la hop le cho trang thai chua phat sinh lo hang/recall.
-    - Da hoan tat `Communications governance MVP` cho `7.7A Communications governance`:
-      - Ordering API co `CommunicationsAdminController` voi lane `GET center`, `POST templates`, `POST policies`, `POST preferences`, va `toggle` cho template/policy.
-      - Ordering model/schema co `CommunicationTemplate`, `NotificationPolicyRule`, `NotificationPreference`; da log action vao `AdminActionLog`.
-      - BFF Admin co lane `/Admin/Communication/Index`, menu `Comms governance`, dashboard template/policy/preference, va form tao rule.
-      - Da them SQL docs delta/verify cho schema communications governance trong Ordering DB.
-    - Da fix drift sau khi EF Power Tools regenerate context:
-      - `FreshFarmOrderingDBContext.Extras.cs` va `FreshFarmCatalogDBContext.Extras.cs` khong con khai bao trung `DbSet` da duoc generate vao context chinh.
-      - Catalog partials giu lai phan thieu thuc su can bo sung (`CategoryAttribute` navigation + `ProductAttributeValue` mapping/DbSet).
-      - Ordering/Catalog/BFF build lai PASS sau patch.
-    - Da sua script verify SQL `risk-center` va `audit-center`:
-      - Bo alias `RowCount` vi đung keyword `ROWCOUNT` cua SQL Server.
-      - Doi sang `TotalRows` de chay on dinh trong SSMS.
-    - Da sua SQL `catalog-readiness` delta:
-      - FK `CategoryAttribute -> dbo.Categories(CategoryID)`
-      - FK `ProductAttributeValue -> dbo.Products(ProductID)`
-    - Da build verify thanh cong:
-      - `src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.API.csproj`
-      - `src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj`
-      - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
-      - `src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj`
-    - Da xac minh lai workspace sau `Fresh ops`:
-      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_check2\` -> PASS, 0 warning.
-      - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog_check2\` -> PASS, 3 warning cu o `ProductsController`.
-      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_check2\` -> PASS, warning cu/nullability + MVC1000.
-    - Da build verify `Communications governance MVP`:
-      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\communications_ordering\` -> PASS, warning cu/nullability o `OrdersController` + `CommunicationsAdminController`.
-      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\communications_bff\` -> PASS, 0 warning.
-    - Da verify lai sau khi user apply CSDL communications:
-      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\post_comms_ordering\` -> PASS, 0 warning.
-      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\post_comms_bff\` -> PASS, 31 warning cu.
-    - Da bat dau cleanup warning build uu tien cao cho Web BFF:
-      - Fix `CS8073` o `Areas/Seller/Views/Unit/Edit.cshtml`.
-      - Fix nullability o `CheckoutController`, `Areas/Seller/Views/Shared/_SideBar.cshtml`, `Category/{Edit,ManageCategories}.cshtml`, `Product/{Create,Edit,ManageProducts}.cshtml`.
-      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\warning_cleanup_bff\` -> PASS, con 20 warning.
-    - Da go them blocker build co san o lane Merchant (`sealed` inheritance trong DTO/view model).
-    - Da tang thong diep loi runtime cho `/Admin/Campaign/Index` o BFF:
-      - Hien `HTTP status` + body snippet de de triage loi schema/API.
-      - Seed fallback options cho bo loc khi API list fail.
+    - Dang giai thich cho user y nghia/rui ro cua viec bo `ff_access_token` khoi auth cookie claim trong BFF.
+    - Da hoan tat file doi chieu `docs/report-nhom-1-security-review.md` va dang chot ket luan cho user.
+    - Dang doi chieu tai lieu Word `docs/Report Nhom 1.docx` voi code hien tai de kiem tra noi dung docs co khop lane auth recovery, Admin Shipping, va dia chi lay hang theo seller hay khong.
+    - Da xac nhan lane `Merchant lifecycle & compliance` da ton tai end-to-end tren `Identity API + BFF Admin`.
+    - Da harden tiep module nay de khop yeu cau UI/message tieng Viet co dau va build xanh lai tren moi truong hien tai.
+    - Dang cho user retest runtime/UI that tren `/Admin/Merchant/Index`.
   - *Next*:
-    - Tiep tuc harden PLP sau khi facet shop da xong:
-      - co the dua tiep cac signal marketplace khac len search/PDP nhu `seller response`, `featured seasonal produce`, `giao nhanh noi thanh`,
-      - co the mo rong preset/facet tiep theo theo huong `shop phan hoi nhanh`, `hang theo mua`, `uu tien co san trong ngay`.
-      - can nhac them facet/preset tiep theo cho marketplace (`availability`, `freshness`, `response speed`) neu user tiep tuc uu tien lane user-facing,
-      - neu can scale sau do, co the chuyen them mot phan filter count/pagination sang contract server-side sau hon nua.
-    - Harden `U4`:
-      - can nhac SignalR/realtime that cho buyer neu muon nang cap sau MVP,
-      - danh gia co can tach schema/field `SellerId` rieng cho chat public trong phase sau hay khong,
-      - can nhac refresh thong minh hon cho search/PLP neu muon day chat CTA theo tung card trong phase sau.
+    - Neu user muon thuc thi hardening ngay, uu tien:
+      - bo JWT khoi auth cookie claim,
+      - them rate limiting + lockout,
+      - harden cookie/security headers,
+      - sau do moi den 2FA va session/key ring production.
+    - Tong hop cac diem khop/lech giua `docs/Report Nhom 1.docx` va code hien tai, neu can thi de xuat cac muc tai lieu nen cap nhat.
+    - Admin retest `/Admin/Merchant/Index`:
+      - test filter `q/status/queue`,
+      - chon 1 nha ban hang de mo detail panel,
+      - thu `Tam khoa` / `Mo lai nha ban hang`,
+      - xac nhan sidebar/menu moi hien `Nha ban hang & tuan thu`.
+    - Neu lane Merchant on dinh, tiep tuc roadmap admin ke tiep theo la hardening/runtime retest cac module Admin da mo truoc do.
+    - Giu quy tac: text/message/view moi cham vao trong lane Admin phai dung tieng Viet co dau dong bo.
     - Sau khi xong mot moc user-facing co the demo duoc, quay lai lane Admin voi:
       - `Dispute & CS`: assign/SLA/evidence.
       - `Finance/Settlement`: bulk action/export/doi soat sau action.
@@ -1149,9 +1374,13 @@
       - Migrate `Status/StatusType`, `Reports`, `Coupons`, `Shipping`.
       - Tach endpoint: seller dung `SellerOnly`, admin dung `AdminOnly` (khong dung chung route/controller de tranh leak quyen).
       - Smoke test Admin pages uu tien: Dashboard, User, Status/StatusType, Reports, Coupons, Shipping.
-    - Chot patch tenant isolation cho module con lai:
+  - Chot patch tenant isolation cho module con lai:
       - Quy dinh module `Status/StatusType` la global hay tenant-specific; neu tenant-specific can them ownership va seller filter.
       - Danh gia `auth/admin/customers` cho seller (hien global), can endpoint scope theo order ownership hoac disable tac vu vuot pham vi.
+    - Sau khi user test seller end-to-end:
+      - khoa luong tao van don theo `OrderId`,
+      - an/bo form tao van don roi,
+      - luu `orderCode/status/fee` vao shipping/order noi bo.
     - User can retest ngay sau patch token isolation:
       - Stop/start lai `FreshFarm.Web.Bff` + APIs.
       - Dang xuat seller hien tai, xoa cookie/session trinh duyet, dang nhap lai account `tho`.
@@ -1199,6 +1428,7 @@
       - quay lai lane `buyer/public marketplace` theo uu tien user,
       - hoac tiep tuc mo rong admin lane sau khi hardening `7.7A` da sach build.
 - **Open questions** (UNCONFIRMED if needed):
+  - User co muon bien nhom hardening P0 trong file audit thanh code ngay sau turn nay khong? (UNCONFIRMED)
   - Da xac nhan user da yeu cau bat dau ngay; Sprint A buoc 1 (Dashboard global) da duoc implement.
   - Da xac nhan user chon huong (A): skip import final3 tam thoi, lam runtime multi-seller truoc.
   - UNCONFIRMED schema nguon final3 co thong tin phan bo seller ownership hay khong (neu khong co can luat mapping bo sung).
@@ -1207,6 +1437,7 @@
   - Da xac nhan user da apply catalog `SellerProducts` delta/verify tren DB that (`VerifyStatus=PASS`, `SellerProductRows=100`).
   - Da xac nhan ownership backfill Ordering sau cleanup dat PASS (`UnmappedOrderDetails=0`).
   - Build `dotnet` dang chay duoc trong moi truong hien tai; van UNCONFIRMED runtime UI/API that sau khi user retest.
+  - UNCONFIRMED DB that da apply schema `SellerStoreSettings`; can chay SQL delta/verify IdentityDB truoc khi retest lane Seller GHN.
   - UNCONFIRMED DB that da apply schema Campaign chua; can chay script delta/verify truoc khi retest runtime `/Admin/Campaign`.
   - UNCONFIRMED DB that da apply schema `Ads wallet`; can chay script delta/verify truoc khi retest topup/spend/ads campaign.
   - UNCONFIRMED DB that da apply schema `Risk center`; can chay script delta/verify truoc khi retest `/Admin/Risk`.
@@ -1215,9 +1446,22 @@
   - Da xac nhan DB that da apply schema `Fresh ops` (`verify` pass, row count = 0).
   - Da xac nhan user da apply schema `Communications governance`.
 - **Working set** (files/ids/commands):
+  - `docs/report-nhom-1-security-review.md`
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
   - `LOT_4_5_PERSISTENCE_HARDENING.md`
   - `CONTINUITY.md`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Dtos/PasswordResetDtos.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Options/PasswordResetOptions.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Options/SmtpOptions.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/PasswordResetTokenService.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/AccountEmailSender.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Dtos/AccountDtos.cs`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/ForgotPassword.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/ResetPassword.cshtml`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CampaignsAdminController.cs`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AuditAdminController.cs`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AdminAuditLogger.cs`
@@ -1244,6 +1488,7 @@
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogModerationController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ShippingController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/HomeController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/NotificationController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CommunicationController.cs`
@@ -1260,6 +1505,10 @@
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/ProductModerationModels.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/FinanceController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Services/IGhnSandboxService.cs`
+  - `src/Web/FreshFarm.Web.Bff/Services/GhnSandboxService.cs`
+  - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
+  - `src/Web/FreshFarm.Web.Bff/Program.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Campaign/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Audit/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Risk/Index.cshtml`
@@ -1304,6 +1553,9 @@
   - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-01.4.6.invalid-orderdetail-product-remediation.sql`
   - `docs/FreshFarmCatalogDb/SCHEMA_ALIGNMENT_2026-03-01.md`
   - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-02-27.4.5.4.verify.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.delta.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.verify.sql`
+  - `docs/Report Nhom 1.docx`
   - `docs/final3.sql`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/{OrderController,ReportController}.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Infrastructure/LegacySellerControllerBase.cs`
@@ -1335,7 +1587,10 @@
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/LoyaltyController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Loyalty/{Index,Users,History,Config}.cshtml`
   - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Models/SellerStoreSetting.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Models/FreshFarmIdentityDBContext.Extras.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/SettingController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Models/SettingUserSellerModels.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Setting/Index.cshtml`
   - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminCustomersController.cs`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/AdminCustomersController.cs`
@@ -1353,6 +1608,10 @@
     - `sed -n ...` de doi chieu mapping/controller/view.
     - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering\`
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff\`
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_tracking_datefix\`
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_admin_ui\`
+    - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_shipping_fix\`
+
 
 
 

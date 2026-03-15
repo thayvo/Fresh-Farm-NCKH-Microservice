@@ -133,8 +133,98 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             ModelState.AddModelError(string.Empty, $"Dang ky that bai: {errorText}"); // Show loi.
             return View(request); // O lai form.
         }
+        TempData["SuccessMessage"] = "Đăng ký thành công. Bạn có thể đăng nhập ngay.";
         return RedirectToAction(nameof(SignIn), new { returnUrl });
-        
+    }
+
+    [HttpGet("/account/forgot-password")] // Route GET quên mật khẩu.
+    [AllowAnonymous] // Cho phép user chưa login truy cập.
+    public IActionResult ForgotPassword() // Render view forgot password.
+    {
+        return View(new ForgotPasswordRequestDto()); // Trả view với model rỗng.
+    }
+
+    [HttpPost("/account/forgot-password")] // Route POST gửi yêu cầu reset.
+    [ValidateAntiForgeryToken] // Chống CSRF cho form.
+    [AllowAnonymous] // Anonymous vẫn dùng được.
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequestDto request) // Nhận email từ form.
+    {
+        if (!ModelState.IsValid) // Validate DataAnnotation.
+        {
+            return View(request); // Render lại form nếu dữ liệu sai.
+        }
+
+        request.Email = request.Email.Trim(); // Chuẩn hóa email trước khi gọi API.
+
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
+        var response = await identityClient.PostAsJsonAsync("/auth/forgot-password", new
+        {
+            email = request.Email
+        }); // Gửi yêu cầu quên mật khẩu.
+
+        if (!response.IsSuccessStatusCode) // Nếu API trả lỗi.
+        {
+            var errorText = await response.Content.ReadAsStringAsync(); // Đọc message lỗi.
+            ModelState.AddModelError(string.Empty, string.IsNullOrWhiteSpace(errorText)
+                ? "Không thể gửi email đặt lại mật khẩu lúc này."
+                : errorText); // Hiện lỗi rõ cho user.
+            return View(request); // Ở lại form.
+        }
+
+        TempData["SuccessMessage"] = "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.";
+        return RedirectToAction(nameof(ForgotPassword)); // PRG để tránh submit lại khi refresh.
+    }
+
+    [HttpGet("/account/reset-password")] // Route GET trang đặt lại mật khẩu.
+    [AllowAnonymous] // User từ email chưa login vẫn truy cập được.
+    public IActionResult ResetPassword(string? email = null, string? token = null) // Nhận email + token từ query string.
+    {
+        var model = new ResetPasswordRequestDto
+        {
+            Email = email?.Trim() ?? string.Empty,
+            Token = token ?? string.Empty
+        }; // Khởi tạo model từ query string.
+
+        if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Token)) // Nếu thiếu dữ liệu từ email.
+        {
+            ModelState.AddModelError(string.Empty, "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã bị thiếu dữ liệu.");
+        }
+
+        return View(model); // Render view reset.
+    }
+
+    [HttpPost("/account/reset-password")] // Route POST đặt lại mật khẩu.
+    [ValidateAntiForgeryToken] // Chống CSRF cho form.
+    [AllowAnonymous] // Anonymous submit reset password.
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequestDto request) // Nhận email/token/password mới.
+    {
+        if (!ModelState.IsValid) // Validate DataAnnotation.
+        {
+            return View(request); // Ở lại form nếu invalid.
+        }
+
+        request.Email = request.Email.Trim(); // Chuẩn hóa email.
+
+        var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
+        var response = await identityClient.PostAsJsonAsync("/auth/reset-password", new
+        {
+            email = request.Email,
+            token = request.Token,
+            newPassword = request.NewPassword,
+            confirmPassword = request.ConfirmPassword
+        }); // Gọi API đặt lại mật khẩu.
+
+        if (!response.IsSuccessStatusCode) // Nếu API fail.
+        {
+            var errorText = await response.Content.ReadAsStringAsync(); // Đọc body lỗi.
+            ModelState.AddModelError(string.Empty, string.IsNullOrWhiteSpace(errorText)
+                ? "Không thể đặt lại mật khẩu."
+                : errorText); // Gắn lỗi vào validation summary.
+            return View(request); // Giữ nguyên email/token để user thử lại.
+        }
+
+        TempData["SuccessMessage"] = "Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.";
+        return RedirectToAction(nameof(SignIn)); // Quay lại login sau khi reset xong.
     }
 
     [HttpPost("/account/logout")] // Route POST logout.

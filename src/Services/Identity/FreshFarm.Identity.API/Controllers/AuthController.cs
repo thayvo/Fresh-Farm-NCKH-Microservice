@@ -1,18 +1,21 @@
-﻿using FreshFarm.Identity.Api.Models;
-using FreshFarm.Identity.Api.Dtos;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Authorization; // Dùng [Authorize].
+using System.Text;
+using FreshFarm.Identity.Api.Dtos;
+using FreshFarm.Identity.Api.Models;
+using FreshFarm.Identity.Api.Options;
+using FreshFarm.Identity.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+
 namespace FreshFarm.Identity.Api.Controllers
 {
-
     [Route("auth")]
     [ApiController]
     public class AuthController : ControllerBase
@@ -20,42 +23,61 @@ namespace FreshFarm.Identity.Api.Controllers
         private readonly FreshFarmIdentityDBContext _db;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _config;
+        private readonly IPasswordResetTokenService _passwordResetTokenService;
+        private readonly IAccountEmailSender _accountEmailSender;
+        private readonly PasswordResetOptions _passwordResetOptions;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(FreshFarmIdentityDBContext db, IPasswordHasher<User> passwordHasher, IConfiguration config)
+        public AuthController(
+            FreshFarmIdentityDBContext db,
+            IPasswordHasher<User> passwordHasher,
+            IConfiguration config,
+            IPasswordResetTokenService passwordResetTokenService,
+            IAccountEmailSender accountEmailSender,
+            IOptions<PasswordResetOptions> passwordResetOptions,
+            ILogger<AuthController> logger)
         {
             _db = db;
             _passwordHasher = passwordHasher;
             _config = config;
+            _passwordResetTokenService = passwordResetTokenService;
+            _accountEmailSender = accountEmailSender;
+            _passwordResetOptions = passwordResetOptions.Value;
+            _logger = logger;
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            if(string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password))
+            if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password))
             {
                 return BadRequest("Vui lòng nhập đầy đủ Email/Username và Mật khẩu");
             }
+
             var id = request.Identifier.Trim();
             var isEmail = id.Contains("@");
             var user = await _db.Users
-                .Include(u=>u.UserAuth)
-                .Include(u=>u.UserRoles)
-                .ThenInclude(ur=>ur.Role)
+                .Include(u => u.UserAuth)
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
                 .SingleOrDefaultAsync(u => isEmail ? u.Email == id : u.UserName == id);
-            if(user?.UserAuth == null)
+
+            if (user?.UserAuth == null)
             {
                 return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
             }
-           
+
             if (!user.IsActive)
             {
                 return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
             }
+
             var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.UserAuth.PasswordHash, request.Password);
-            if(verificationResult == PasswordVerificationResult.Failed)
+            if (verificationResult == PasswordVerificationResult.Failed)
             {
-                 return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
+                return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
             }
+
             var roleNames = user.UserRoles.Select(ur => ur.Role.RoleName).ToList();
             var token = CreateToken(user, roleNames);
             return Ok(token);
@@ -73,12 +95,18 @@ namespace FreshFarm.Identity.Api.Controllers
             {
                 return BadRequest("Toàn bộ thông tin là bắt buộc nhập.");
             }
-            var existingUser = await _db.Users.AnyAsync(u=>u.Email == request.Email.Trim() || u.UserName == request.UserName.Trim() || u.Phone == request.Phone.Trim());
-            if(existingUser) 
+
+            var existingUser = await _db.Users.AnyAsync(u =>
+                u.Email == request.Email.Trim() ||
+                u.UserName == request.UserName.Trim() ||
+                u.Phone == request.Phone.Trim());
+
+            if (existingUser)
             {
-                return Conflict("Email/Phone/UserName aleady exists.");
+                return Conflict("Email, số điện thoại hoặc tên đăng nhập đã tồn tại.");
             }
-            if(request.Password != request.ConfirmPassword)
+
+            if (request.Password != request.ConfirmPassword)
             {
                 return BadRequest("Mật khẩu xác nhận không khớp.");
             }
@@ -89,6 +117,7 @@ namespace FreshFarm.Identity.Api.Controllers
             {
                 return BadRequest($"Vai trò {roleName} không tìm thấy.");
             }
+
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
@@ -101,8 +130,10 @@ namespace FreshFarm.Identity.Api.Controllers
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 };
+
                 _db.Users.Add(user);
                 await _db.SaveChangesAsync();
+
                 var hashedPassword = _passwordHasher.HashPassword(user, request.Password);
                 _db.UserAuths.Add(new UserAuth
                 {
@@ -112,14 +143,13 @@ namespace FreshFarm.Identity.Api.Controllers
                     UpdatedAt = DateTime.UtcNow
                 });
 
-
-
                 _db.UserRoles.Add(new UserRole
                 {
                     RoleId = role.RoleId,
                     UserId = user.UserId,
                     CreatedAt = DateTime.UtcNow
                 });
+
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return Ok(new { user.UserId, user.UserName, user.Email, role.RoleName });
@@ -129,8 +159,111 @@ namespace FreshFarm.Identity.Api.Controllers
                 await transaction.RollbackAsync();
                 return StatusCode(500, "Có lỗi xảy ra khi đăng kí, vui lòng thử lại");
             }
-           
         }
+
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            if (!_accountEmailSender.IsConfigured)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình kênh email đặt lại mật khẩu. Cần cập nhật SMTP hoặc Gmail sender.");
+            }
+
+            if (!TryBuildResetUrlBase(out var resetUrlBase))
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình đường dẫn ResetUrlBase cho email đặt lại mật khẩu.");
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var user = await _db.Users
+                .Include(x => x.UserAuth)
+                .SingleOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
+
+            if (user is not null && user.IsActive)
+            {
+                var token = _passwordResetTokenService.GenerateToken(user, user.UserAuth);
+                var resetUrl = QueryHelpers.AddQueryString(resetUrlBase, new Dictionary<string, string?>
+                {
+                    ["email"] = user.Email,
+                    ["token"] = token
+                });
+
+                await _accountEmailSender.SendPasswordResetEmailAsync(
+                    user.Email,
+                    user.FullName,
+                    resetUrl,
+                    ResolveTokenLifetimeMinutes(),
+                    cancellationToken);
+
+                _logger.LogInformation("Đã gửi email đặt lại mật khẩu cho userId {UserId}.", user.UserId);
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu."
+            });
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var user = await _db.Users
+                .Include(x => x.UserAuth)
+                .SingleOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
+
+            if (user is null || !user.IsActive)
+            {
+                return BadRequest("Liên kết đặt lại mật khẩu không hợp lệ.");
+            }
+
+            if (!_passwordResetTokenService.TryValidateToken(request.Token, user, user.UserAuth, out var tokenError))
+            {
+                return BadRequest(tokenError ?? "Liên kết đặt lại mật khẩu không hợp lệ.");
+            }
+
+            var now = DateTime.UtcNow;
+            var userAuth = user.UserAuth;
+            if (userAuth is null)
+            {
+                userAuth = new UserAuth
+                {
+                    UserId = user.UserId,
+                    FailedCount = 0,
+                    LockedUntil = null,
+                    Mfasecret = string.Empty,
+                    UpdatedAt = now
+                };
+                _db.UserAuths.Add(userAuth);
+            }
+
+            userAuth.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+            userAuth.FailedCount = 0;
+            userAuth.LockedUntil = null;
+            userAuth.UpdatedAt = now;
+            user.UpdatedAt = now;
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Đã đặt lại mật khẩu cho userId {UserId}.", user.UserId);
+            return Ok(new
+            {
+                success = true,
+                message = "Đặt lại mật khẩu thành công."
+            });
+        }
+
         private AuthResponse CreateToken(User user, IEnumerable<string> roles)
         {
             var jwtKey = _config["Jwt:Key"];
@@ -138,332 +271,347 @@ namespace FreshFarm.Identity.Api.Controllers
             {
                 throw new InvalidOperationException("JWT Key chưa được cấu hình.");
             }
+
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
-
-                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? ""),
-                new Claim("username", user.UserName ?? "")
-
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new Claim("username", user.UserName ?? string.Empty)
             };
+
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
             var expires = DateTime.UtcNow.AddHours(1);
             var jwt = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
-
                 claims: claims,
                 expires: expires,
-                signingCredentials: creds
-            );
+                signingCredentials: creds);
+
             return new AuthResponse
             {
                 AccessToken = new JwtSecurityTokenHandler().WriteToken(jwt),
                 ExpiredAtUtc = expires
             };
         }
-        [HttpGet("profile")] // GET /auth/profile trả thông tin profile của user đăng nhập.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Chỉ cho token JWT hợp lệ.
-        public async Task<IActionResult> GetProfile() // Action lấy profile hiện tại.
+
+        [HttpGet("profile")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> GetProfile()
         {
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // Token lỗi thì trả 401.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserId == userId); // Đọc user hiện tại.
-            if (user is null) // Không tìm thấy user.
+            var user = await _db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.UserId == userId);
+            if (user is null)
             {
-                return NotFound("Không tìm thấy tài khoản."); // Trả 404.
+                return NotFound("Không tìm thấy tài khoản.");
             }
 
-            var dto = new ProfileResponseDto // Map entity sang DTO trả về.
+            var dto = new ProfileResponseDto
             {
-                UserId = user.UserId, // Map UserId.
-                UserName = user.UserName, // Map UserName.
-                FullName = user.FullName, // Map FullName.
-                Email = user.Email, // Map Email.
-                Phone = user.Phone // Map Phone.
+                UserId = user.UserId,
+                UserName = user.UserName,
+                FullName = user.FullName,
+                Email = user.Email,
+                Phone = user.Phone
             };
 
-            return Ok(dto); // Trả 200 + dữ liệu profile.
+            return Ok(dto);
         }
 
-        [HttpPut("profile")] // PUT /auth/profile cập nhật profile.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequestDto request) // Nhận payload update profile.
+        [HttpPut("profile")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequestDto request)
         {
-            if (!ModelState.IsValid) // Chặn ngay payload sai format.
+            if (!ModelState.IsValid)
             {
-                return ValidationProblem(ModelState); // Trả lỗi validate chuẩn ASP.NET Core.
+                return ValidationProblem(ModelState);
             }
 
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // Token sai.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var user = await _db.Users.SingleOrDefaultAsync(u => u.UserId == userId); // Lấy user cần sửa.
-            if (user is null) // Nếu không tồn tại user.
+            var user = await _db.Users.SingleOrDefaultAsync(u => u.UserId == userId);
+            if (user is null)
             {
-                return NotFound("Không tìm thấy tài khoản."); // Trả 404.
+                return NotFound("Không tìm thấy tài khoản.");
             }
 
-            var normalizedEmail = request.Email.Trim(); // Chuẩn hóa email trước khi so/ghi.
-            var normalizedPhone = request.Phone.Trim(); // Chuẩn hóa phone trước khi so/ghi.
-            var normalizedFullName = request.FullName.Trim(); // Chuẩn hóa fullname.
+            var normalizedEmail = request.Email.Trim();
+            var normalizedPhone = request.Phone.Trim();
+            var normalizedFullName = request.FullName.Trim();
 
-            var emailExists = await _db.Users.AnyAsync(u => u.UserId != userId && u.Email == normalizedEmail); // Kiểm tra trùng email user khác.
-            if (emailExists) // Nếu trùng email.
+            var emailExists = await _db.Users.AnyAsync(u => u.UserId != userId && u.Email == normalizedEmail);
+            if (emailExists)
             {
-                return Conflict("Email đã được sử dụng bởi tài khoản khác."); // Trả 409.
+                return Conflict("Email đã được sử dụng bởi tài khoản khác.");
             }
 
-            var phoneExists = await _db.Users.AnyAsync(u => u.UserId != userId && u.Phone == normalizedPhone); // Kiểm tra trùng phone user khác.
-            if (phoneExists) // Nếu trùng phone.
+            var phoneExists = await _db.Users.AnyAsync(u => u.UserId != userId && u.Phone == normalizedPhone);
+            if (phoneExists)
             {
-                return Conflict("Số điện thoại đã được sử dụng bởi tài khoản khác."); // Trả 409.
+                return Conflict("Số điện thoại đã được sử dụng bởi tài khoản khác.");
             }
 
-            user.FullName = normalizedFullName; // Gán lại fullname mới.
-            user.Email = normalizedEmail; // Gán lại email mới.
-            user.Phone = normalizedPhone; // Gán lại phone mới.
-            user.UpdatedAt = DateTime.UtcNow; // Ghi timestamp cập nhật.
+            user.FullName = normalizedFullName;
+            user.Email = normalizedEmail;
+            user.Phone = normalizedPhone;
+            user.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync(); // Lưu thay đổi vào DB.
+            await _db.SaveChangesAsync();
 
-            return Ok(new ProfileResponseDto // Trả lại profile mới nhất cho client.
+            return Ok(new ProfileResponseDto
             {
-                UserId = user.UserId, // Trả UserId.
-                UserName = user.UserName, // Trả UserName.
-                FullName = user.FullName, // Trả FullName mới.
-                Email = user.Email, // Trả Email mới.
-                Phone = user.Phone // Trả Phone mới.
+                UserId = user.UserId,
+                UserName = user.UserName,
+                FullName = user.FullName,
+                Email = user.Email,
+                Phone = user.Phone
             });
         }
 
-        [HttpGet("addresses")] // GET /auth/addresses lấy danh sách địa chỉ của user.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> GetAddresses() // Action list addresses.
+        [HttpGet("addresses")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> GetAddresses()
         {
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // 401 nếu token sai.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var addresses = await _db.AddressBooks // Query bảng AddressBook.
-                .AsNoTracking() // Không tracking để đọc nhanh.
-                .Where(a => a.UserId == userId && a.IsActive) // Chỉ lấy địa chỉ active của user hiện tại.
-                .OrderByDescending(a => a.IsDefault) // Cho địa chỉ mặc định lên đầu.
-                .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt) // Sau đó sort theo mới nhất.
-                .Select(a => new AddressResponseDto // Map sang DTO trả về.
+            var addresses = await _db.AddressBooks
+                .AsNoTracking()
+                .Where(a => a.UserId == userId && a.IsActive)
+                .OrderByDescending(a => a.IsDefault)
+                .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                .Select(a => new AddressResponseDto
                 {
-                    AddressId = a.AddressId, // Map AddressId.
-                    RecipientName = a.RecipientName, // Map RecipientName.
-                    Phone = a.Phone, // Map Phone.
-                    AddressDetail = a.AddressDetail, // Map AddressDetail.
-                    Province = a.Province, // Map Province.
-                    District = a.District, // Map District.
-                    Ward = a.Ward, // Map Ward.
-                    IsDefault = a.IsDefault // Map IsDefault.
+                    AddressId = a.AddressId,
+                    RecipientName = a.RecipientName,
+                    Phone = a.Phone,
+                    AddressDetail = a.AddressDetail,
+                    Province = a.Province,
+                    District = a.District,
+                    Ward = a.Ward,
+                    IsDefault = a.IsDefault
                 })
-                .ToListAsync(); // Materialize list async.
+                .ToListAsync();
 
-            return Ok(addresses); // Trả 200 + danh sách địa chỉ.
+            return Ok(addresses);
         }
 
-        [HttpPost("addresses")] // POST /auth/addresses tạo địa chỉ mới.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> CreateAddress([FromBody] UpsertAddressRequestDto request) // Nhận payload tạo địa chỉ.
+        [HttpPost("addresses")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> CreateAddress([FromBody] UpsertAddressRequestDto request)
         {
-            if (!ModelState.IsValid) // Validate payload.
+            if (!ModelState.IsValid)
             {
-                return ValidationProblem(ModelState); // Trả lỗi validate.
+                return ValidationProblem(ModelState);
             }
 
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // 401 nếu sai.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var now = DateTime.UtcNow; // Timestamp dùng chung cho bản ghi mới.
+            var now = DateTime.UtcNow;
 
-            if (request.IsDefault) // Nếu địa chỉ mới được set mặc định.
+            if (request.IsDefault)
             {
-                var oldDefaults = await _db.AddressBooks // Lấy các địa chỉ mặc định cũ.
-                    .Where(a => a.UserId == userId && a.IsActive && a.IsDefault) // Đúng user, active, mặc định.
-                    .ToListAsync(); // Query list.
+                var oldDefaults = await _db.AddressBooks
+                    .Where(a => a.UserId == userId && a.IsActive && a.IsDefault)
+                    .ToListAsync();
 
-                foreach (var item in oldDefaults) // Duyệt từng địa chỉ mặc định cũ.
+                foreach (var item in oldDefaults)
                 {
-                    item.IsDefault = false; // Tắt cờ mặc định cũ.
-                    item.UpdatedAt = now; // Ghi timestamp cập nhật.
+                    item.IsDefault = false;
+                    item.UpdatedAt = now;
                 }
             }
 
-            var entity = new AddressBook // Tạo entity địa chỉ mới.
+            var entity = new AddressBook
             {
-                UserId = userId, // Gán user hiện tại.
-                RecipientName = request.RecipientName.Trim(), // Gán và trim RecipientName.
-                Phone = request.Phone.Trim(), // Gán và trim Phone.
-                AddressDetail = request.AddressDetail.Trim(), // Gán và trim AddressDetail.
-                Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(), // Gán Province nếu có.
-                District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(), // Gán District nếu có.
-                Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(), // Gán Ward nếu có.
-                IsDefault = request.IsDefault, // Gán cờ mặc định theo request.
-                IsActive = true, // Mặc định active.
-                CreatedAt = now, // Ngày tạo.
-                UpdatedAt = now // Ngày cập nhật ban đầu.
+                UserId = userId,
+                RecipientName = request.RecipientName.Trim(),
+                Phone = request.Phone.Trim(),
+                AddressDetail = request.AddressDetail.Trim(),
+                Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(),
+                District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(),
+                Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(),
+                IsDefault = request.IsDefault,
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
             };
 
-            _db.AddressBooks.Add(entity); // Add entity vào DbContext.
-            await _db.SaveChangesAsync(); // Lưu xuống DB.
+            _db.AddressBooks.Add(entity);
+            await _db.SaveChangesAsync();
 
-            return Ok(new AddressResponseDto // Trả lại địa chỉ vừa tạo.
+            return Ok(new AddressResponseDto
             {
-                AddressId = entity.AddressId, // Trả AddressId vừa sinh.
-                RecipientName = entity.RecipientName, // Trả RecipientName.
-                Phone = entity.Phone, // Trả Phone.
-                AddressDetail = entity.AddressDetail, // Trả AddressDetail.
-                Province = entity.Province, // Trả Province.
-                District = entity.District, // Trả District.
-                Ward = entity.Ward, // Trả Ward.
-                IsDefault = entity.IsDefault // Trả IsDefault.
+                AddressId = entity.AddressId,
+                RecipientName = entity.RecipientName,
+                Phone = entity.Phone,
+                AddressDetail = entity.AddressDetail,
+                Province = entity.Province,
+                District = entity.District,
+                Ward = entity.Ward,
+                IsDefault = entity.IsDefault
             });
         }
 
-        [HttpPut("addresses/{addressId:int}")] // PUT /auth/addresses/{id} cập nhật địa chỉ.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> UpdateAddress(int addressId, [FromBody] UpsertAddressRequestDto request) // Nhận id + payload update.
+        [HttpPut("addresses/{addressId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> UpdateAddress(int addressId, [FromBody] UpsertAddressRequestDto request)
         {
-            if (!ModelState.IsValid) // Validate payload.
+            if (!ModelState.IsValid)
             {
-                return ValidationProblem(ModelState); // Trả lỗi validation.
+                return ValidationProblem(ModelState);
             }
 
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // 401.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var entity = await _db.AddressBooks // Query địa chỉ cần sửa.
-                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive); // Chỉ cho sửa địa chỉ của chính user.
-            if (entity is null) // Không tìm thấy.
+            var entity = await _db.AddressBooks
+                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive);
+            if (entity is null)
             {
-                return NotFound("Không tìm thấy địa chỉ cần cập nhật."); // Trả 404.
+                return NotFound("Không tìm thấy địa chỉ cần cập nhật.");
             }
 
-            var now = DateTime.UtcNow; // Timestamp update.
-
-            if (request.IsDefault) // Nếu request muốn set địa chỉ này thành mặc định.
+            var now = DateTime.UtcNow;
+            if (request.IsDefault)
             {
-                var oldDefaults = await _db.AddressBooks // Lấy default cũ của user.
-                    .Where(a => a.UserId == userId && a.IsActive && a.IsDefault && a.AddressId != addressId) // Trừ chính địa chỉ đang sửa.
-                    .ToListAsync(); // Query list.
+                var oldDefaults = await _db.AddressBooks
+                    .Where(a => a.UserId == userId && a.IsActive && a.IsDefault && a.AddressId != addressId)
+                    .ToListAsync();
 
-                foreach (var item in oldDefaults) // Duyệt list default cũ.
+                foreach (var item in oldDefaults)
                 {
-                    item.IsDefault = false; // Tắt default cũ.
-                    item.UpdatedAt = now; // Cập nhật timestamp.
+                    item.IsDefault = false;
+                    item.UpdatedAt = now;
                 }
             }
 
-            entity.RecipientName = request.RecipientName.Trim(); // Cập nhật RecipientName.
-            entity.Phone = request.Phone.Trim(); // Cập nhật Phone.
-            entity.AddressDetail = request.AddressDetail.Trim(); // Cập nhật AddressDetail.
-            entity.Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(); // Cập nhật Province.
-            entity.District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(); // Cập nhật District.
-            entity.Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(); // Cập nhật Ward.
-            entity.IsDefault = request.IsDefault; // Cập nhật cờ default.
-            entity.UpdatedAt = now; // Ghi timestamp.
+            entity.RecipientName = request.RecipientName.Trim();
+            entity.Phone = request.Phone.Trim();
+            entity.AddressDetail = request.AddressDetail.Trim();
+            entity.Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim();
+            entity.District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim();
+            entity.Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim();
+            entity.IsDefault = request.IsDefault;
+            entity.UpdatedAt = now;
 
-            await _db.SaveChangesAsync(); // Lưu DB.
+            await _db.SaveChangesAsync();
 
-            return Ok(new AddressResponseDto // Trả bản ghi sau cập nhật.
+            return Ok(new AddressResponseDto
             {
-                AddressId = entity.AddressId, // Trả AddressId.
-                RecipientName = entity.RecipientName, // Trả RecipientName.
-                Phone = entity.Phone, // Trả Phone.
-                AddressDetail = entity.AddressDetail, // Trả AddressDetail.
-                Province = entity.Province, // Trả Province.
-                District = entity.District, // Trả District.
-                Ward = entity.Ward, // Trả Ward.
-                IsDefault = entity.IsDefault // Trả IsDefault.
+                AddressId = entity.AddressId,
+                RecipientName = entity.RecipientName,
+                Phone = entity.Phone,
+                AddressDetail = entity.AddressDetail,
+                Province = entity.Province,
+                District = entity.District,
+                Ward = entity.Ward,
+                IsDefault = entity.IsDefault
             });
         }
 
-        [HttpPost("addresses/{addressId:int}/set-default")] // POST /auth/addresses/{id}/set-default đặt mặc định.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> SetDefaultAddress(int addressId) // Nhận addressId cần set mặc định.
+        [HttpPost("addresses/{addressId:int}/set-default")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> SetDefaultAddress(int addressId)
         {
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // 401.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var entity = await _db.AddressBooks // Tìm địa chỉ mục tiêu.
-                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive); // Bắt buộc thuộc user.
-            if (entity is null) // Không thấy.
+            var entity = await _db.AddressBooks
+                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive);
+            if (entity is null)
             {
-                return NotFound("Không tìm thấy địa chỉ cần đặt mặc định."); // 404.
+                return NotFound("Không tìm thấy địa chỉ cần đặt mặc định.");
             }
 
-            var now = DateTime.UtcNow; // Timestamp chung.
+            var now = DateTime.UtcNow;
+            var oldDefaults = await _db.AddressBooks
+                .Where(a => a.UserId == userId && a.IsActive && a.IsDefault && a.AddressId != addressId)
+                .ToListAsync();
 
-            var oldDefaults = await _db.AddressBooks // Lấy địa chỉ mặc định cũ.
-                .Where(a => a.UserId == userId && a.IsActive && a.IsDefault && a.AddressId != addressId) // Trừ địa chỉ mới.
-                .ToListAsync(); // Query list.
-
-            foreach (var item in oldDefaults) // Duyệt default cũ.
+            foreach (var item in oldDefaults)
             {
-                item.IsDefault = false; // Tắt default cũ.
-                item.UpdatedAt = now; // Cập nhật timestamp.
+                item.IsDefault = false;
+                item.UpdatedAt = now;
             }
 
-            entity.IsDefault = true; // Set default mới.
-            entity.UpdatedAt = now; // Cập nhật timestamp.
+            entity.IsDefault = true;
+            entity.UpdatedAt = now;
 
-            await _db.SaveChangesAsync(); // Lưu DB.
-            return NoContent(); // Trả 204 theo semantics action set-default.
+            await _db.SaveChangesAsync();
+            return NoContent();
         }
 
-        [HttpDelete("addresses/{addressId:int}")] // DELETE /auth/addresses/{id} xóa mềm địa chỉ.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] // Bắt buộc JWT.
-        public async Task<IActionResult> DeleteAddress(int addressId) // Nhận id địa chỉ cần xóa.
+        [HttpDelete("addresses/{addressId:int}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IActionResult> DeleteAddress(int addressId)
         {
-            if (!TryGetCurrentUserId(out var userId)) // Lấy userId an toàn từ JWT claims.
+            if (!TryGetCurrentUserId(out var userId))
             {
-                return Unauthorized("Token không chứa user id hợp lệ."); // 401.
+                return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var entity = await _db.AddressBooks // Query địa chỉ cần xóa.
-                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive); // Chỉ xóa địa chỉ active của user.
-            if (entity is null) // Không tìm thấy.
+            var entity = await _db.AddressBooks
+                .SingleOrDefaultAsync(a => a.AddressId == addressId && a.UserId == userId && a.IsActive);
+            if (entity is null)
             {
-                return NotFound("Không tìm thấy địa chỉ cần xóa."); // 404.
+                return NotFound("Không tìm thấy địa chỉ cần xóa.");
             }
 
-            entity.IsActive = false; // Soft delete để giữ lịch sử.
-            entity.IsDefault = false; // Bỏ cờ mặc định nếu có.
-            entity.UpdatedAt = DateTime.UtcNow; // Ghi timestamp.
+            entity.IsActive = false;
+            entity.IsDefault = false;
+            entity.UpdatedAt = DateTime.UtcNow;
 
-            await _db.SaveChangesAsync(); // Lưu DB.
-            return NoContent(); // Trả 204 khi xóa thành công.
+            await _db.SaveChangesAsync();
+            return NoContent();
         }
 
-        private bool TryGetCurrentUserId(out int userId) // Lấy user id từ claim đã map hoặc claim gốc.
+        private bool TryGetCurrentUserId(out int userId)
         {
-            userId = 0; // Giá trị mặc định nếu parse thất bại.
+            userId = 0;
 
-            var rawUserId = User.FindFirstValue(JwtRegisteredClaimNames.Sub) // Claim gốc "sub" (khi không map).
-                ?? User.FindFirstValue(ClaimTypes.NameIdentifier) // Claim đã map mặc định của JwtBearer.
-                ?? User.FindFirstValue("sub"); // Fallback cứng.
+            var rawUserId = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? User.FindFirstValue("sub");
 
-            return int.TryParse(rawUserId, out userId); // Parse an toàn sang int.
+            return int.TryParse(rawUserId, out userId);
+        }
+
+        private bool TryBuildResetUrlBase(out string resetUrlBase)
+        {
+            resetUrlBase = _passwordResetOptions.ResetUrlBase?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(resetUrlBase))
+            {
+                return false;
+            }
+
+            return Uri.TryCreate(resetUrlBase, UriKind.Absolute, out _);
+        }
+
+        private int ResolveTokenLifetimeMinutes()
+        {
+            return _passwordResetOptions.TokenLifetimeMinutes <= 0
+                ? 30
+                : _passwordResetOptions.TokenLifetimeMinutes;
         }
     }
-    
 }

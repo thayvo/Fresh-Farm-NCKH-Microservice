@@ -95,6 +95,7 @@ public sealed class SettingController : LegacySellerControllerBase
         ViewData["LayoutPath"] = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
         ViewData["SettingsTitle"] = "Cài đặt hệ thống";
         ViewData["SettingsScopeLabel"] = "Toàn sàn";
+        ViewData["ShowSellerGhnSettings"] = false;
         return View("~/Areas/Seller/Views/Setting/Index.cshtml", model);
     }
 

@@ -1,6 +1,6 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.MerchantManagementPageViewModel
 @{
-    ViewBag.Title = "Merchant lifecycle & compliance";
+    ViewBag.Title = "Vòng đời nhà bán hàng";
 }
 
 @functions {
@@ -107,14 +107,14 @@
     <section class="merchant-hero ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
             <div>
-                <div class="ff-admin-chip mb-3">Sprint C · Merchant lifecycle & compliance</div>
-                <h1 class="fw-bold mb-2">Lane merchant compliance</h1>
-                <p class="mb-0 opacity-75">Rà seller theo mức đầy đủ hồ sơ, hoạt động gần đây và trạng thái vận hành để chuẩn bị cho các module compliance sâu hơn.</p>
+                <div class="ff-admin-chip mb-3">Sprint C · Vòng đời nhà bán hàng</div>
+                <h1 class="fw-bold mb-2">Vòng đời nhà bán hàng & tuân thủ</h1>
+                <p class="mb-0 opacity-75">Rà nhà bán hàng theo độ đầy đủ hồ sơ, hoạt động gần đây và trạng thái vận hành để chuẩn bị cho các bước tuân thủ sâu hơn.</p>
             </div>
             <div class="text-lg-end">
-                <div class="small opacity-75">Heuristic MVP</div>
+                <div class="small opacity-75">MVP theo heuristic</div>
                 <div class="fw-semibold">Dựa trên hồ sơ Identity hiện có</div>
-                <div class="small opacity-75">Chưa có bảng KYC riêng hoặc workflow phê duyệt nhiều bước</div>
+                <div class="small opacity-75">Chưa có bảng KYC riêng hoặc luồng phê duyệt nhiều bước</div>
             </div>
         </div>
     </section>
@@ -136,7 +136,7 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng seller</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng nhà bán hàng</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
@@ -151,13 +151,13 @@
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Thiếu địa chỉ</div><div class="display-6 fw-bold text-primary">@Model.Stats.MissingAddress</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Queue chờ duyệt</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Hàng chờ duyệt</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Bổ sung hồ sơ</div><div class="display-6 fw-bold text-warning">@Model.Stats.ProfileFixQueue</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Seller ngủ đông</div><div class="display-6 fw-bold text-secondary">@Model.Stats.DormantQueue</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Nhà bán hàng ngủ đông</div><div class="display-6 fw-bold text-secondary">@Model.Stats.DormantQueue</div></div></div>
         </div>
     </div>
 
@@ -165,11 +165,11 @@
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
                 <div class="col-lg-7">
-                    <label class="form-label fw-semibold">Tìm kiếm seller</label>
+                    <label class="form-label fw-semibold">Tìm kiếm nhà bán hàng</label>
                     <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tên shop, username, email, số điện thoại..." />
                 </div>
                 <div class="col-md-4 col-lg-2">
-                    <label class="form-label fw-semibold">Trạng thái compliance</label>
+                    <label class="form-label fw-semibold">Trạng thái tuân thủ</label>
                     <select class="form-select" name="status">
                         @foreach (var option in Model.StatusOptions)
                         {
@@ -218,14 +218,14 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h2 class="h5 mb-1">Danh sách merchant</h2>
-                            <div class="text-muted small">Trang @Model.Page / @Model.TotalPages · @Model.Total seller phù hợp bộ lọc</div>
+                            <h2 class="h5 mb-1">Danh sách nhà bán hàng</h2>
+                            <div class="text-muted small">Trang @Model.Page / @Model.TotalPages · @Model.Total nhà bán hàng phù hợp bộ lọc</div>
                         </div>
                     </div>
 
                     @if (Model.Merchants.Count == 0)
                     {
-                        <div class="alert alert-light border mb-0">Chưa có seller phù hợp bộ lọc hiện tại.</div>
+                        <div class="alert alert-light border mb-0">Chưa có nhà bán hàng phù hợp bộ lọc hiện tại.</div>
                     }
                     else
                     {
@@ -248,7 +248,7 @@
                                             <div class="d-flex flex-column flex-lg-row justify-content-between gap-2">
                                                 <div>
                                                     <div class="fw-bold">@merchant.ShopName</div>
-                                                    <div class="text-muted small">@merchant.UserName · Seller ID #@merchant.SellerId</div>
+                                                    <div class="text-muted small">@merchant.UserName · Mã nhà bán hàng #@merchant.SellerId</div>
                                                     <div class="small mt-1 text-muted">Ưu tiên xử lý: @merchant.RecommendedAction</div>
                                                 </div>
                                                 <div class="d-flex gap-2 align-items-center">
@@ -297,7 +297,7 @@
         <div class="col-xl-5">
             <div class="card merchant-detail-card">
                 <div class="card-body">
-                    <h2 class="h5 mb-3">Chi tiết compliance</h2>
+                    <h2 class="h5 mb-3">Chi tiết tuân thủ</h2>
 
                     @if (ViewBag.DetailError != null)
                     {
@@ -305,7 +305,7 @@
                     }
                     else if (Model.Details is null)
                     {
-                        <div class="alert alert-light border mb-0">Chọn một seller để xem chi tiết.</div>
+                        <div class="alert alert-light border mb-0">Chọn một nhà bán hàng để xem chi tiết.</div>
                     }
                     else
                     {
@@ -320,7 +320,7 @@
                             }
                             <div>
                                 <div class="fw-bold fs-5">@Model.Details.ShopName</div>
-                                <div class="text-muted small">@Model.Details.UserName · Seller ID #@Model.Details.SellerId</div>
+                                <div class="text-muted small">@Model.Details.UserName · Mã nhà bán hàng #@Model.Details.SellerId</div>
                                 <span class="badge rounded-pill mt-2 @QueueBadge(Model.Details.QueueBucket)">@QueueText(Model.Details.QueueBucket)</span>
                                 <span class="badge rounded-pill mt-2 @ComplianceBadge(Model.Details.ComplianceStatus)">@ComplianceText(Model.Details.ComplianceStatus)</span>
                             </div>
@@ -401,7 +401,7 @@
                             <input type="hidden" name="isActive" value="@((!Model.Details.IsActive).ToString().ToLowerInvariant())" />
                             <button type="submit" class="btn @(Model.Details.IsActive ? "btn-outline-danger" : "btn-success") rounded-pill">
                                 <i class="bi @(Model.Details.IsActive ? "bi-pause-circle" : "bi-play-circle") me-2"></i>
-                                @(Model.Details.IsActive ? "Tạm khóa seller" : "Mở lại seller")
+                                @(Model.Details.IsActive ? "Tạm khóa nhà bán hàng" : "Mở lại nhà bán hàng")
                             </button>
                         </form>
                     }

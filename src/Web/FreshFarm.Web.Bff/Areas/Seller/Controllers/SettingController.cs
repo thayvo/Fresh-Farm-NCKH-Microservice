@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,20 +18,26 @@ public class SettingController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IGhnSandboxService _ghnSandboxService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public SettingController(IHttpClientFactory httpClientFactory)
+    public SettingController(IHttpClientFactory httpClientFactory, IGhnSandboxService ghnSandboxService)
     {
         _httpClientFactory = httpClientFactory;
+        _ghnSandboxService = ghnSandboxService;
     }
 
     [HttpGet]
     public async Task<IActionResult> Index()
     {
+        ViewData["ShowSellerGhnSettings"] = true;
+        ViewData["GhnSandboxConfigured"] = _ghnSandboxService.IsConfigured;
+        ViewData["GhnSandboxShopId"] = _ghnSandboxService.ShopId?.ToString() ?? "Chưa có";
+
         try
         {
             var client = CreateAuthorizedClient("Identity");
@@ -38,7 +45,7 @@ public class SettingController : LegacySellerControllerBase
 
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiErrorAsync(response, "Loi khi tai cai dat cua hang");
+                ViewBag.Error = await ReadApiErrorAsync(response, "Lỗi khi tải cài đặt cửa hàng.");
                 return View(CreateDefaultSettings());
             }
 
@@ -47,7 +54,7 @@ public class SettingController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            ViewBag.Error = "Loi khi tai cai dat: " + ex.Message;
+            ViewBag.Error = "Lỗi khi tải cài đặt: " + ex.Message;
             return View(CreateDefaultSettings());
         }
     }
@@ -56,9 +63,13 @@ public class SettingController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Save([FromForm] SellerSettingViewModel model)
     {
+        ViewData["ShowSellerGhnSettings"] = true;
+        ViewData["GhnSandboxConfigured"] = _ghnSandboxService.IsConfigured;
+        ViewData["GhnSandboxShopId"] = _ghnSandboxService.ShopId?.ToString() ?? "Chưa có";
+
         if (!ModelState.IsValid)
         {
-            return Json(new { success = false, message = "Du lieu khong hop le" });
+            return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
         }
 
         try
@@ -70,6 +81,13 @@ public class SettingController : LegacySellerControllerBase
             model.AdminNotificationEmail = model.AdminNotificationEmail.Trim();
             model.BankTransferInstructions = model.BankTransferInstructions?.Trim();
             model.BankAccountInfo = model.BankAccountInfo?.Trim();
+            model.GhnPickupName = model.GhnPickupName?.Trim();
+            model.GhnPickupPhone = model.GhnPickupPhone?.Trim();
+            model.GhnPickupAddress = model.GhnPickupAddress?.Trim();
+            model.GhnProvinceName = model.GhnProvinceName?.Trim();
+            model.GhnDistrictName = model.GhnDistrictName?.Trim();
+            model.GhnWardCode = model.GhnWardCode?.Trim();
+            model.GhnWardName = model.GhnWardName?.Trim();
 
             var client = CreateAuthorizedClient("Identity");
             var response = await client.PutAsJsonAsync("/auth/admin/settings/store", model);
@@ -78,16 +96,71 @@ public class SettingController : LegacySellerControllerBase
                 return Json(new
                 {
                     success = false,
-                    message = await ReadApiErrorAsync(response, "Khong the luu cai dat")
+                    message = await ReadApiErrorAsync(response, $"Không thể lưu cài đặt (HTTP {(int)response.StatusCode}).")
                 });
             }
 
-            return Json(new { success = true, message = "Luu cai dat thanh cong!" });
+            return Json(new { success = true, message = "Lưu cài đặt thành công." });
         }
         catch (Exception ex)
         {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
+            return Json(new { success = false, message = "Lỗi: " + ex.Message });
         }
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnProvinces(CancellationToken cancellationToken)
+    {
+        var items = await _ghnSandboxService.GetProvincesAsync(cancellationToken);
+        return Json(new
+        {
+            success = true,
+            configured = _ghnSandboxService.IsConfigured,
+            shopId = _ghnSandboxService.ShopId,
+            items
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnDistricts(int provinceId, CancellationToken cancellationToken)
+    {
+        if (provinceId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu mã tỉnh/thành GHN."
+            });
+        }
+
+        var items = await _ghnSandboxService.GetDistrictsAsync(provinceId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            provinceId,
+            items
+        });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetGhnWards(int districtId, CancellationToken cancellationToken)
+    {
+        if (districtId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Thiếu mã quận/huyện GHN."
+            });
+        }
+
+        var items = await _ghnSandboxService.GetWardsAsync(districtId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            districtId,
+            items
+        });
     }
 
     private HttpClient CreateAuthorizedClient(string clientName)
@@ -121,6 +194,9 @@ public class SettingController : LegacySellerControllerBase
             IsEmailDeliveredEnabled = true,
             IsEmailCancelledEnabled = true,
             AdminNotificationEmail = "admin@freshfarm.vn",
+            GhnPickupName = string.Empty,
+            GhnPickupPhone = string.Empty,
+            GhnPickupAddress = string.Empty,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -141,6 +217,23 @@ public class SettingController : LegacySellerControllerBase
 
             if (root.ValueKind == JsonValueKind.Object)
             {
+                if (root.TryGetProperty("errors", out var errorsProp) && errorsProp.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var property in errorsProp.EnumerateObject())
+                    {
+                        if (property.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in property.Value.EnumerateArray())
+                            {
+                                if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                                {
+                                    return item.GetString()!;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (root.TryGetProperty("message", out var messageProp) && messageProp.ValueKind == JsonValueKind.String)
                 {
                     return messageProp.GetString() ?? fallback;
@@ -155,6 +248,11 @@ public class SettingController : LegacySellerControllerBase
                 {
                     return titleProp.GetString() ?? fallback;
                 }
+            }
+
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                return root.GetString() ?? fallback;
             }
 
             return json;

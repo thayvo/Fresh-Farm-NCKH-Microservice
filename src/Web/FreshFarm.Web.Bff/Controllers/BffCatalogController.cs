@@ -190,6 +190,11 @@ public sealed class BffCatalogController : ControllerBase
             filtered = filtered.Where(HasFreshnessSignals);
         }
 
+        if (string.Equals(normalizedPreset, "seasonal-pick", StringComparison.Ordinal))
+        {
+            filtered = filtered.Where(IsSeasonalProduct);
+        }
+
         var facetedList = filtered.ToList();
         if (normalizedAvailability.Count > 0)
         {
@@ -263,6 +268,7 @@ public sealed class BffCatalogController : ControllerBase
                 "bestseller" => "bestseller",
                 "budget" => "price-asc",
                 "fresh-pick" => "newest",
+                "seasonal-pick" => "related",
                 _ => sort
             }
             : sort;
@@ -666,6 +672,29 @@ public sealed class BffCatalogController : ControllerBase
         return !string.IsNullOrWhiteSpace(origin)
             || !string.IsNullOrWhiteSpace(preservation)
             || !string.IsNullOrWhiteSpace(weight);
+    }
+
+    private static bool IsSeasonalProduct(ProductSearchApiDto item)
+    {
+        var month = DateTime.UtcNow.AddHours(7).Month;
+        var seasonalKeywords = month switch
+        {
+            1 or 2 => new[] { "cam", "quyt", "buoi", "bap cai", "sup lo", "ca rot", "khoai tay" },
+            3 or 4 => new[] { "xoai", "dua hau", "dua luoi", "bi do", "mang tay", "dua leo" },
+            5 or 6 => new[] { "vai", "man", "dao", "xoai", "chom chom", "dua hau" },
+            7 or 8 => new[] { "nhan", "chom chom", "sau rieng", "mit", "ngo", "dua leo" },
+            9 or 10 => new[] { "buoi", "oi", "tao", "bi do", "khoai lang", "nam" },
+            _ => new[] { "cam", "quyt", "buoi", "hong", "su hao", "ca rot", "rau la" }
+        };
+
+        var haystack = string.Join(
+            " ",
+            item.ProductName ?? string.Empty,
+            item.CategoryName ?? string.Empty,
+            item.Origin ?? string.Empty);
+        var normalizedHaystack = NormalizeText(haystack);
+
+        return seasonalKeywords.Any(keyword => normalizedHaystack.Contains(keyword, StringComparison.Ordinal));
     }
 
     private static string GetDeliveryScopeKey(string? addressSummary)

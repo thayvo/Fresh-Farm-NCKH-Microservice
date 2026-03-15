@@ -1695,6 +1695,8 @@
                 { key: "trusted-shop", label: "Shop đáng tin", icon: "bi-shield-check" },
                 { key: "local-delivery", label: "Ưu tiên nội tỉnh", icon: "bi-truck" },
                 { key: "same-day-urban", label: "Nội thành trong ngày", icon: "bi-lightning-charge" },
+                ...(isBuyerEligible ? [{ key: "recent-reply", label: "Shop vừa phản hồi", icon: "bi-chat-dots" }] : []),
+                { key: "seasonal-pick", label: "Hàng theo mùa", icon: "bi-calendar-event" },
                 { key: "newest", label: "Sản phẩm mới", icon: "bi-stars" },
                 { key: "bestseller", label: "Bán chạy", icon: "bi-fire" },
                 { key: "budget", label: "Giá dễ mua", icon: "bi-cash-coin" }
@@ -1909,6 +1911,14 @@
                     case "same-day-urban":
                         state.selectedDeliveryScopes.add("ward-level");
                         state.presetDeliveryScopeKeys = new Set(["ward-level"]);
+                        state.presetAppliedSort = "related";
+                        state.sortBy = "related";
+                        break;
+                    case "recent-reply":
+                        state.presetAppliedSort = "related";
+                        state.sortBy = "related";
+                        break;
+                    case "seasonal-pick":
                         state.presetAppliedSort = "related";
                         state.sortBy = "related";
                         break;
@@ -2442,7 +2452,23 @@
                     .join("");
             };
 
-            const applyFilters = () => [...state.allProducts];
+            const applyFilters = () => {
+                let products = [...state.allProducts];
+
+                if (state.activePreset === "recent-reply") {
+                    products = products.filter((product) => {
+                        const sellerId = toNumber(product?.primarySellerId, 0);
+                        if (sellerId <= 0) {
+                            return false;
+                        }
+
+                        const summary = state.chatSummaries.get(sellerId);
+                        return summary?.hasUnread === true;
+                    });
+                }
+
+                return products;
+            };
 
             const renderResultGrid = (products) => {
                 if (products.length === 0) {

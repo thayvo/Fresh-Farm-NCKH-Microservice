@@ -115,14 +115,24 @@
                 <p class="text-muted mb-0">Đăng nhập để tiếp tục.</p>
             </div>
 
-            <form asp-action="SignIn" asp-controller="Account" method="post" class="needs-validation" novalidate>
-                @Html.AntiForgeryToken()
-                @if (!string.IsNullOrWhiteSpace(returnUrl))
+             <form asp-action="SignIn" asp-controller="Account" method="post" class="needs-validation" novalidate>
+                 @Html.AntiForgeryToken()
+                 @if (!string.IsNullOrWhiteSpace(returnUrl))
+                 {
+                     <input type="hidden" name="returnUrl" value="@returnUrl" />
+                 }
+
+                @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
                 {
-                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                    <div class="alert alert-success py-2 small mb-3">@successMessage</div>
                 }
 
-                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+                @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="alert alert-danger py-2 small mb-3">@errorMessage</div>
+                }
+
+                 <div asp-validation-summary="All" class="text-danger small mb-3"></div>
 
                 <div class="form-floating mb-3">
                     <input asp-for="Identifier"
@@ -150,7 +160,7 @@
                         <input class="form-check-input" type="checkbox" id="rememberMe" disabled />
                         <label class="form-check-label" for="rememberMe">Ghi nhớ đăng nhập</label>
                     </div>
-                    <a href="javascript:void(0)" class="small text-decoration-none text-muted">Quên mật khẩu?</a>
+                    <a asp-action="ForgotPassword" asp-controller="Account" class="small text-decoration-none">Quên mật khẩu?</a>
                 </div>
 
                 <div class="d-grid">

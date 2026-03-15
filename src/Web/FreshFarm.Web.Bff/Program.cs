@@ -52,6 +52,14 @@ builder.Services.AddHttpClient("Ordering", client => // HttpClient cho Ordering 
     client.BaseAddress = new Uri(baseUrl!); // Gan base address.
 });
 
+builder.Services.Configure<GhnSandboxOptions>(builder.Configuration.GetSection(GhnSandboxOptions.SectionName));
+builder.Services.AddHttpClient("GhnSandbox", client =>
+{
+    var baseUrl = builder.Configuration[$"{GhnSandboxOptions.SectionName}:BaseUrl"];
+    client.BaseAddress = new Uri(baseUrl!);
+});
+builder.Services.AddScoped<IGhnSandboxService, GhnSandboxService>();
+
 builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "FreshFarm.Web.Bff", Version = "v1" }); // Metadata.

@@ -50,6 +50,9 @@
     .dispute-meta-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; }
     .dispute-meta-item { background: #f8fbff; border-radius: 1rem; padding: .9rem 1rem; }
     .dispute-message { border-radius: 1rem; padding: .9rem 1rem; background: #f8fbff; }
+    .dispute-ops { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+    .dispute-ops-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .7rem; border-radius: 999px; background: #eef6ff; color: #1e3a8a; font-size: .8rem; font-weight: 600; }
+    .dispute-evidence { background: #fff; border: 1px dashed rgba(15, 23, 42, .12); border-radius: 1rem; padding: .85rem 1rem; }
 </style>
 
 <main class="dispute-shell ff-admin-shell">
@@ -166,11 +169,11 @@
                     <div class="mb-3"><h5 class="mb-1">CS queue</h5><div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total case theo bộ lọc hiện tại</div></div>
                     <div class="table-responsive">
                         <table class="table align-middle">
-                            <thead><tr><th>Case</th><th>Buyer</th><th>Seller</th><th>Order</th><th>Queue</th><th>Thời gian</th></tr></thead>
+                            <thead><tr><th>Case</th><th>Buyer</th><th>Seller</th><th>Order</th><th>Ops</th><th>Queue</th><th>Thời gian</th></tr></thead>
                             <tbody>
                                 @if (Model.Rows.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có case nào khớp bộ lọc.</td></tr>
+                                    <tr><td colspan="7" class="text-center text-muted py-5">Chưa có case nào khớp bộ lọc.</td></tr>
                                 }
                                 else
                                 {
@@ -190,6 +193,24 @@
                                             <td><div class="fw-semibold">@row.BuyerName</div><div class="small text-muted">#@row.BuyerId</div>@if (!string.IsNullOrWhiteSpace(row.BuyerPhone)) { <div class="small text-muted">@row.BuyerPhone</div> }</td>
                                             <td><div>@row.SellerLabel</div>@if (row.Amount.HasValue) { <div class="small text-muted">@row.Amount.Value.ToString("N0") đ</div> }</td>
                                             <td>@if (row.OrderId.HasValue) { <a class="text-decoration-none" href="@Url.Action("ManageOrders", "Order", new { area = "Admin", searchTerm = row.OrderId })">#@row.OrderId</a> } else { <span class="text-muted">Không có</span> }<div class="small text-muted">@row.DisplayStatus</div></td>
+                                            <td>
+                                                @if (!string.IsNullOrWhiteSpace(row.AssignedOwner))
+                                                {
+                                                    <div class="small fw-semibold">@row.AssignedOwner</div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="small text-muted">Chưa gán owner</div>
+                                                }
+                                                @if (row.TargetResolutionAt.HasValue)
+                                                {
+                                                    <div class="small text-muted">SLA: @row.TargetResolutionAt.Value.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                                }
+                                                @if (row.EvidenceCount > 0)
+                                                {
+                                                    <div class="small text-muted">@row.EvidenceCount bằng chứng</div>
+                                                }
+                                            </td>
                                             <td><span class="@BadgeClass(row.QueueStatus, row.IsSlaBreached)">@QueueLabel(row.QueueStatus, row.IsSlaBreached)</span></td>
                                             <td><div>@row.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div><div class="small text-muted">Update: @(row.UpdatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div></td>
                                         </tr>
@@ -234,6 +255,11 @@
                             <div><div class="dispute-section-pill mb-2">@Model.Details.CaseType</div><h5 class="mb-1">#@Model.Details.CaseId - @Model.Details.Title</h5><div class="text-muted small">@Model.Details.Summary</div></div>
                             <span class="@BadgeClass(Model.Details.QueueStatus, Model.Details.IsSlaBreached)">@QueueLabel(Model.Details.QueueStatus, Model.Details.IsSlaBreached)</span>
                         </div>
+                        <div class="dispute-ops mb-4">
+                            <span class="dispute-ops-chip"><i class="bi bi-person-workspace"></i>@(string.IsNullOrWhiteSpace(Model.Details.Assignment?.OwnerLabel) ? "Chưa gán owner" : Model.Details.Assignment.OwnerLabel)</span>
+                            <span class="dispute-ops-chip"><i class="bi bi-hourglass-split"></i>@(Model.Details.Sla?.TargetResolutionAt?.ToLocalTime().ToString("dd/MM HH:mm") ?? "Chưa đặt SLA")</span>
+                            <span class="dispute-ops-chip"><i class="bi bi-paperclip"></i>@Model.Details.EvidenceItems.Count bằng chứng</span>
+                        </div>
                         <div class="dispute-meta-list mb-4">
                             <div class="dispute-meta-item"><div class="small text-muted">Buyer</div><div class="fw-semibold">@Model.Details.Buyer?.FullName</div><div class="small text-muted">#@Model.Details.Buyer?.UserId</div><div class="small text-muted">@Model.Details.Buyer?.Phone</div></div>
                             <div class="dispute-meta-item"><div class="small text-muted">Seller</div><div class="fw-semibold">@Model.Details.Seller?.SellerLabel</div></div>
@@ -270,8 +296,32 @@
                                         <label class="form-label fw-semibold">Ghi chú quyết định</label>
                                         <textarea class="form-control" name="note" rows="3" placeholder="Ghi chú nội bộ hoặc quyết định xử lý..."></textarea>
                                     </div>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold">Người phụ trách</label>
+                                            <input type="text" class="form-control" name="assigneeLabel" value="@Model.Details.Assignment?.OwnerLabel" placeholder="VD: CS Lead - Linh" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold">Mốc SLA</label>
+                                            <select class="form-select" name="slaHours">
+                                                <option value="">Chọn mốc xử lý</option>
+                                                <option value="4">4 giờ</option>
+                                                <option value="8">8 giờ</option>
+                                                <option value="24">24 giờ</option>
+                                                <option value="48">48 giờ</option>
+                                                <option value="72">72 giờ</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-semibold">Bằng chứng / ghi chú nội bộ</label>
+                                            <textarea class="form-control" name="evidenceNote" rows="2" placeholder="Biên bản, ảnh, cam kết của shop, nội dung trao đổi..."></textarea>
+                                        </div>
+                                    </div>
 
                                     <div class="d-flex flex-wrap gap-2">
+                                        <button type="submit" class="btn btn-outline-secondary rounded-pill" name="actionName" value="assign">Gán case</button>
+                                        <button type="submit" class="btn btn-outline-secondary rounded-pill" name="actionName" value="set-sla">Cập nhật SLA</button>
+                                        <button type="submit" class="btn btn-outline-secondary rounded-pill" name="actionName" value="add-evidence">Lưu bằng chứng</button>
                                         @if (string.Equals(Model.Details.CaseType, "support", StringComparison.OrdinalIgnoreCase))
                                         {
                                             if (string.Equals(Model.Details.QueueStatus, "resolved", StringComparison.OrdinalIgnoreCase))
@@ -303,6 +353,43 @@
                         @if (Model.Details.Timeline.Count > 0)
                         {
                             <div class="mb-4"><h6 class="fw-bold">Timeline</h6><div class="list-group">@foreach (var item in Model.Details.Timeline.Where(x => x.Value.HasValue)) { <div class="list-group-item border-0 px-0"><div class="fw-semibold">@item.Label</div><div class="small text-muted">@item.Value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div></div> }</div></div>
+                        }
+
+                        @if (Model.Details.ActivityItems.Count > 0)
+                        {
+                            <div class="mb-4">
+                                <h6 class="fw-bold">Nhật ký vận hành</h6>
+                                <div class="list-group">
+                                    @foreach (var item in Model.Details.ActivityItems.Take(8))
+                                    {
+                                        <div class="list-group-item border-0 px-0">
+                                            <div class="d-flex justify-content-between gap-3">
+                                                <div>
+                                                    <div class="fw-semibold">@item.Label</div>
+                                                    <div class="small text-muted">@item.Summary</div>
+                                                </div>
+                                                <div class="small text-muted text-end">@item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (Model.Details.EvidenceItems.Count > 0)
+                        {
+                            <div class="mb-4">
+                                <h6 class="fw-bold">Bằng chứng nội bộ</h6>
+                                <div class="d-grid gap-2">
+                                    @foreach (var item in Model.Details.EvidenceItems.Take(6))
+                                    {
+                                        <div class="dispute-evidence">
+                                            <div class="small">@item.Note</div>
+                                            <div class="small text-muted mt-2">@item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
                         }
 
                         @if (Model.Details.Messages.Count > 0)

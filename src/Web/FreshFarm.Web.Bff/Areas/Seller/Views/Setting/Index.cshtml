@@ -5,6 +5,9 @@
     var layoutPath = ViewData["LayoutPath"] as string ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     var settingsTitle = ViewData["SettingsTitle"] as string ?? "Cài Đặt Cửa Hàng";
     var settingsScopeLabel = ViewData["SettingsScopeLabel"] as string ?? "Theo seller";
+    bool showSellerGhnSettings = ViewData["ShowSellerGhnSettings"] is bool showGhn && showGhn;
+    bool ghnSandboxConfigured = ViewData["GhnSandboxConfigured"] is bool ghnConfigured && ghnConfigured;
+    var ghnSandboxShopId = ViewData["GhnSandboxShopId"] as string ?? "Chưa có";
 
     ViewBag.Title = settingsTitle;
     Layout = layoutPath;
@@ -29,6 +32,27 @@
     .form-control:focus {
         border-color: var(--primary-green);
         box-shadow: 0 0 0 0.2rem rgba(52, 168, 83, 0.25);
+    }
+
+    .ghn-origin-card {
+        border: 1px solid rgba(13, 110, 253, 0.18);
+        border-radius: 1.25rem;
+        background: linear-gradient(135deg, rgba(239, 246, 255, 0.92) 0%, rgba(255, 255, 255, 1) 100%);
+    }
+
+    .ghn-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .4rem .8rem;
+        border-radius: 999px;
+        font-size: .82rem;
+        font-weight: 600;
+    }
+
+    .ghn-note {
+        font-size: .85rem;
+        color: #64748b;
     }
 </style>
 
@@ -161,20 +185,90 @@
                                     Các cài đặt chi tiết về khu vực và phương thức vận chuyển được quản lý tại
                                     <a href="@Url.Action("ManageShipping", "Shipping", new { area = areaName })" class="alert-link">trang quản lý vận chuyển</a>.
                                 </div>
-                                <hr />
-                                <h6 class="fw-bold">Cài đặt nhanh</h6>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Phí vận chuyển mặc định</label>
-                                    @Html.TextBoxFor(m => m.DefaultShippingFee, new { @type = "number", @step = "1000", @class = "form-control", required = "required" })
-                                    <small class="text-muted">Đơn vị: VND</small>
-                                    @Html.ValidationMessageFor(m => m.DefaultShippingFee, "", new { @class = "text-danger small" })
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-bold">Miễn phí vận chuyển cho đơn hàng trên</label>
-                                    @Html.TextBoxFor(m => m.FreeShippingThreshold, new { @type = "number", @step = "1000", @class = "form-control", required = "required" })
-                                    <small class="text-muted">Đơn vị: VND</small>
-                                    @Html.ValidationMessageFor(m => m.FreeShippingThreshold, "", new { @class = "text-danger small" })
-                                </div>
+                                @Html.HiddenFor(m => m.DefaultShippingFee)
+                                @Html.HiddenFor(m => m.FreeShippingThreshold)
+
+                                @if (showSellerGhnSettings)
+                                {
+                                    <div class="ghn-origin-card p-4 mt-4"
+                                         id="ghnOriginSection"
+                                         data-selected-province-id="@Model.GhnProvinceId"
+                                         data-selected-district-id="@Model.GhnDistrictId"
+                                         data-selected-ward-code="@Model.GhnWardCode">
+                                        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+                                            <div>
+                                                <h6 class="fw-bold mb-1 text-primary">
+                                                    <i class="bi bi-truck me-2"></i>Địa chỉ lấy hàng
+                                                </h6>
+                                                <p class="mb-0 ghn-note">Lưu sẵn địa chỉ lấy hàng của shop để tạo vận đơn nhanh hơn. Các chương trình ưu đãi phí vận chuyển sẽ được quản lý theo mã giảm giá và chính sách thực tế.</p>
+                                            </div>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <span class="ghn-chip @(ghnSandboxConfigured ? "bg-success-subtle text-success-emphasis" : "bg-danger-subtle text-danger-emphasis")">
+                                                    <i class="bi @(ghnSandboxConfigured ? "bi-check2-circle" : "bi-exclamation-triangle")"></i>
+                                                    @(ghnSandboxConfigured ? "Đã sẵn sàng kết nối vận chuyển" : "Chưa sẵn sàng kết nối vận chuyển")
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        @Html.HiddenFor(m => m.GhnProvinceName, new { id = "GhnProvinceName" })
+                                        @Html.HiddenFor(m => m.GhnDistrictName, new { id = "GhnDistrictName" })
+                                        @Html.HiddenFor(m => m.GhnWardName, new { id = "GhnWardName" })
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-bold">Họ tên người liên hệ</label>
+                                                @Html.TextBoxFor(m => m.GhnPickupName, new { @class = "form-control", placeholder = "Ví dụ: Bùi Khắc Vinh" })
+                                                @Html.ValidationMessageFor(m => m.GhnPickupName, "", new { @class = "text-danger small" })
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-bold">Số điện thoại liên hệ</label>
+                                                @Html.TextBoxFor(m => m.GhnPickupPhone, new { @class = "form-control", placeholder = "Ví dụ: 0858863900" })
+                                                @Html.ValidationMessageFor(m => m.GhnPickupPhone, "", new { @class = "text-danger small" })
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label fw-bold">Địa chỉ lấy hàng chi tiết</label>
+                                                @Html.TextBoxFor(m => m.GhnPickupAddress, new { @class = "form-control", placeholder = "Số 06 Trần Văn Ơn, Phú Hòa..." })
+                                                <div class="ghn-note mt-1">Số nhà, tên đường...</div>
+                                                @Html.ValidationMessageFor(m => m.GhnPickupAddress, "", new { @class = "text-danger small" })
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-bold">Tỉnh/Thành phố</label>
+                                                <select class="form-select" id="GhnProvinceId" name="GhnProvinceId">
+                                                    <option value="">Chọn tỉnh/thành phố</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-bold">Quận/Huyện</label>
+                                                <select class="form-select" id="GhnDistrictId" name="GhnDistrictId">
+                                                    <option value="">Chọn quận/huyện</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-bold">Phường/Xã</label>
+                                                <select class="form-select" id="GhnWardCode" name="GhnWardCode">
+                                                    <option value="">Chọn phường/xã</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-3">
+                                            @if (Model.HasGhnOrigin)
+                                            {
+                                                <span class="ghn-chip bg-success-subtle text-success-emphasis">
+                                                    <i class="bi bi-geo-alt-fill"></i>
+                                                    Đã lưu địa chỉ lấy hàng: @Model.GhnDistrictName, @Model.GhnWardName
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="ghn-chip bg-warning-subtle text-warning-emphasis">
+                                                    <i class="bi bi-exclamation-circle"></i>
+                                                    Bạn chưa lưu địa chỉ lấy hàng.
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -249,6 +343,134 @@
 @section scripts {
     <script>
         $(document).ready(function () {
+            const showSellerGhnSettings = @(showSellerGhnSettings ? "true" : "false");
+
+            if (showSellerGhnSettings) {
+                const ghnOriginSection = document.getElementById('ghnOriginSection');
+                const provinceSelect = document.getElementById('GhnProvinceId');
+                const districtSelect = document.getElementById('GhnDistrictId');
+                const wardSelect = document.getElementById('GhnWardCode');
+                const provinceNameInput = document.getElementById('GhnProvinceName');
+                const districtNameInput = document.getElementById('GhnDistrictName');
+                const wardNameInput = document.getElementById('GhnWardName');
+
+                const selectedProvinceId = ghnOriginSection?.dataset.selectedProvinceId || '';
+                const selectedDistrictId = ghnOriginSection?.dataset.selectedDistrictId || '';
+                const selectedWardCode = ghnOriginSection?.dataset.selectedWardCode || '';
+
+                const renderOptions = function (select, items, placeholder, selectedValue, valueKey) {
+                    if (!select) return;
+                    select.innerHTML = '';
+                    const placeholderOption = document.createElement('option');
+                    placeholderOption.value = '';
+                    placeholderOption.textContent = placeholder;
+                    select.appendChild(placeholderOption);
+
+                    (items || []).forEach(function (item) {
+                        const option = document.createElement('option');
+                        option.value = valueKey === 'code' ? (item.code || '') : String(item.id || '');
+                        option.textContent = item.name || '';
+                        if (String(option.value) === String(selectedValue || '')) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                };
+
+                const syncSelectedText = function (select, hiddenInput) {
+                    if (!select || !hiddenInput) return;
+                    const option = select.options[select.selectedIndex];
+                    hiddenInput.value = option && option.value ? option.text : '';
+                };
+
+                const loadDistricts = function (provinceId, selectedValue, selectedWardValue) {
+                    if (!districtSelect || !wardSelect) return;
+
+                    if (!provinceId) {
+                        renderOptions(districtSelect, [], 'Chọn quận/huyện', '');
+                        renderOptions(wardSelect, [], 'Chọn phường/xã', '');
+                        if (districtNameInput) districtNameInput.value = '';
+                        if (wardNameInput) wardNameInput.value = '';
+                        return;
+                    }
+
+                    fetch('@Url.Action("GetGhnDistricts", "Setting", new { area = areaName })?provinceId=' + provinceId, { credentials: 'same-origin' })
+                        .then(response => response.json())
+                        .then(payload => {
+                            const items = Array.isArray(payload?.items) ? payload.items : [];
+                            renderOptions(districtSelect, items, 'Chọn quận/huyện', selectedValue || '');
+                            syncSelectedText(districtSelect, districtNameInput);
+
+                            if (districtSelect.value) {
+                                loadWards(districtSelect.value, selectedWardValue || '');
+                            } else {
+                                renderOptions(wardSelect, [], 'Chọn phường/xã', '');
+                                if (wardNameInput) wardNameInput.value = '';
+                            }
+                        })
+                        .catch(() => {
+                            renderOptions(districtSelect, [], 'Không tải được quận/huyện', '');
+                            renderOptions(wardSelect, [], 'Không tải được phường/xã', '');
+                        });
+                };
+
+                const loadWards = function (districtId, selectedValue) {
+                    if (!wardSelect) return;
+
+                    if (!districtId) {
+                        renderOptions(wardSelect, [], 'Chọn phường/xã', '');
+                        if (wardNameInput) wardNameInput.value = '';
+                        return;
+                    }
+
+                    fetch('@Url.Action("GetGhnWards", "Setting", new { area = areaName })?districtId=' + districtId, { credentials: 'same-origin' })
+                        .then(response => response.json())
+                        .then(payload => {
+                            const items = Array.isArray(payload?.items) ? payload.items : [];
+                            renderOptions(wardSelect, items, 'Chọn phường/xã', selectedValue || '', 'code');
+                            syncSelectedText(wardSelect, wardNameInput);
+                        })
+                        .catch(() => {
+                            renderOptions(wardSelect, [], 'Không tải được phường/xã', '');
+                        });
+                };
+
+                const loadProvinces = function () {
+                    if (!provinceSelect) return;
+
+                    fetch('@Url.Action("GetGhnProvinces", "Setting", new { area = areaName })', { credentials: 'same-origin' })
+                        .then(response => response.json())
+                        .then(payload => {
+                            const items = Array.isArray(payload?.items) ? payload.items : [];
+                            renderOptions(provinceSelect, items, 'Chọn tỉnh/thành phố', selectedProvinceId || '');
+                            syncSelectedText(provinceSelect, provinceNameInput);
+
+                            if (provinceSelect.value) {
+                                loadDistricts(provinceSelect.value, selectedDistrictId || '', selectedWardCode || '');
+                            }
+                        })
+                        .catch(() => {
+                            renderOptions(provinceSelect, [], 'Không tải được tỉnh/thành phố', '');
+                        });
+                };
+
+                provinceSelect?.addEventListener('change', function () {
+                    syncSelectedText(provinceSelect, provinceNameInput);
+                    loadDistricts(provinceSelect.value, '', '');
+                });
+
+                districtSelect?.addEventListener('change', function () {
+                    syncSelectedText(districtSelect, districtNameInput);
+                    loadWards(districtSelect.value, '');
+                });
+
+                wardSelect?.addEventListener('change', function () {
+                    syncSelectedText(wardSelect, wardNameInput);
+                });
+
+                loadProvinces();
+            }
+
             $('#settingForm').on('submit', function (e) {
                 e.preventDefault();
 
@@ -288,7 +510,10 @@
                     },
                     error: function (xhr, status, error) {
                         console.error('Error:', error);
-                        $('#errorText').text('Lỗi khi lưu cài đặt: ' + error);
+                        const fallbackMessage = xhr?.responseJSON?.message
+                            || xhr?.responseText
+                            || ('Lỗi khi lưu cài đặt: ' + error);
+                        $('#errorText').text(fallbackMessage);
                         $('#errorMessage').fadeIn();
 
                         setTimeout(function () {

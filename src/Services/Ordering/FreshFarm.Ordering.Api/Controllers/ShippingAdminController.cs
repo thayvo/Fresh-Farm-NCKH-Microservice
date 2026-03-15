@@ -149,7 +149,7 @@ public sealed class ShippingAdminController : ControllerBase
             page = totalPages;
         }
 
-        var rows = await query
+        var rowsRaw = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(s => new
@@ -165,12 +165,6 @@ public sealed class ShippingAdminController : ControllerBase
                 communeId = s.CommuneId,
                 isStorePickup = s.ShippingType == "StorePickup",
                 storeAddress = s.ShippingType == "StorePickup" ? s.AddressDetail : null,
-                province = s.ProvinceId.HasValue
-                    ? Provinces.Where(p => p.Id == s.ProvinceId.Value).Select(p => new { provinceId = p.Id, provinceName = p.Name }).FirstOrDefault()
-                    : null,
-                commune = s.CommuneId.HasValue && s.ProvinceId.HasValue && CommunesByProvince.ContainsKey(s.ProvinceId.Value)
-                    ? CommunesByProvince[s.ProvinceId.Value].Where(c => c.Id == s.CommuneId.Value).Select(c => new { communeId = c.Id, communeName = c.Name }).FirstOrDefault()
-                    : null,
                 order = new
                 {
                     orderID = s.Order.OrderId,
@@ -186,6 +180,42 @@ public sealed class ShippingAdminController : ControllerBase
                 deliveryAssignments = Array.Empty<object>()
             })
             .ToListAsync(cancellationToken);
+
+        var rows = rowsRaw.Select(s =>
+        {
+            var province = s.provinceId.HasValue
+                ? Provinces.FirstOrDefault(p => p.Id == s.provinceId.Value)
+                : null;
+
+            var commune = s.communeId.HasValue &&
+                          s.provinceId.HasValue &&
+                          CommunesByProvince.TryGetValue(s.provinceId.Value, out var provinceCommunes)
+                ? provinceCommunes.FirstOrDefault(c => c.Id == s.communeId.Value)
+                : null;
+
+            return new
+            {
+                s.shippingID,
+                s.orderID,
+                s.shippingType,
+                s.fullName,
+                s.phone,
+                s.email,
+                s.addressDetail,
+                s.provinceId,
+                s.communeId,
+                s.isStorePickup,
+                s.storeAddress,
+                province = province is null
+                    ? null
+                    : new { provinceId = province.Id, provinceName = province.Name },
+                commune = commune is null
+                    ? null
+                    : new { communeId = commune.Id, communeName = commune.Name },
+                s.order,
+                s.deliveryAssignments
+            };
+        }).ToList();
 
         var sellerOrderIds = await ApplySellerScopeToOrders(_db.Orders.AsNoTracking(), sellerId, isAdmin)
             .Select(o => o.OrderId)
