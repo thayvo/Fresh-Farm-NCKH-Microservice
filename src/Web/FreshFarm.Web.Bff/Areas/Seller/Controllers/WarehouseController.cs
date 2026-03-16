@@ -337,7 +337,15 @@ public class WarehouseController : LegacySellerControllerBase
             return;
         }
 
-        var products = await response.Content.ReadFromJsonAsync<List<CatalogProductDto>>(JsonOptions) ?? new List<CatalogProductDto>();
+        var payload = await response.Content.ReadFromJsonAsync<WarehouseProductsApiResponse>(JsonOptions);
+        var products = payload?.data?.products?
+            .Select(p => new CatalogProductDto
+            {
+                productId = p.productID,
+                productName = p.productName,
+                sku = p.sku
+            })
+            .ToList() ?? new List<CatalogProductDto>();
 
         vm.ProductOptions = products
             .OrderBy(p => p.productName)

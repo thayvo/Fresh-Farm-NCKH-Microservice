@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace FreshFarm.Ordering.Api.Controllers;
 
@@ -161,15 +162,22 @@ public sealed class OrdersController : ControllerBase
             item.Quantity <= 0 ||
             item.Quantity > 10_000 ||
             item.UnitPrice < 0 ||
-            item.ProductId <= 0);
+            item.ProductId <= 0 ||
+            item.SellerId <= 0);
         if (invalidItem)
         {
-            return BadRequest("Co item khong hop le (ProductId/Quantity/UnitPrice). Quantity phai trong khoang 1..10000.");
+            return BadRequest("Co item khong hop le (ProductId/SellerId/Quantity/UnitPrice). Quantity phai trong khoang 1..10000.");
         }
 
         var itemsAmount = request.Items.Sum(item => item.UnitPrice * item.Quantity);
         var shippingFee = request.ShippingFee ?? 0m;
         var totalAmount = itemsAmount + shippingFee;
+        var sellerShippingLookup = request.SellerShippingBreakdowns?
+            .Where(x => x.SellerId > 0)
+            .GroupBy(x => x.SellerId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => x.ShippingFee).First().ShippingFee) ?? new Dictionary<int, decimal>();
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -196,16 +204,115 @@ public sealed class OrdersController : ControllerBase
             _db.Orders.Add(order);
             await _db.SaveChangesAsync(cancellationToken);
 
-            var details = request.Items.Select(item => new OrderDetail
+            var indexedItems = request.Items
+                .Select((item, index) => new { Item = item, Index = index })
+                .ToList();
+
+            var details = indexedItems.Select(entry => new OrderDetail
             {
                 OrderId = order.OrderId,
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                UnitSymbol = item.UnitSymbol
+                ProductId = entry.Item.ProductId,
+                Quantity = entry.Item.Quantity,
+                UnitPrice = entry.Item.UnitPrice,
+                UnitSymbol = entry.Item.UnitSymbol
             }).ToList();
 
             _db.OrderDetails.AddRange(details);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            var detailByIndex = details
+                .Select((detail, index) => new { detail, index })
+                .ToDictionary(x => x.index, x => x.detail);
+
+            var sellerGroups = indexedItems
+                .GroupBy(x => x.Item.SellerId)
+                .ToList();
+
+            var sellerOrders = new List<SellerOrder>(sellerGroups.Count);
+            foreach (var sellerGroup in sellerGroups)
+            {
+                var sellerSubtotal = sellerGroup.Sum(x => x.Item.UnitPrice * x.Item.Quantity);
+                sellerOrders.Add(new SellerOrder
+                {
+                    OrderId = order.OrderId,
+                    SellerId = sellerGroup.Key,
+                    SellerStatus = "Pending",
+                    CommissionRate = 0m,
+                    CommissionAmount = 0m,
+                    ShippingFee = sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShippingFee)
+                        ? sellerShippingFee
+                        : 0m,
+                    SellerEarning = sellerSubtotal,
+                    CancelledBy = string.Empty,
+                    CancelReasonId = null,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = null
+                });
+            }
+
+            _db.SellerOrders.AddRange(sellerOrders);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            var paymentMethod = NormalizePaymentMethod(request.Payment?.PaymentMethod);
+            var sellerOrdersBySellerId = sellerOrders.ToDictionary(x => x.SellerId);
+            var sellerOrderItems = new List<SellerOrderItem>(indexedItems.Count);
+            var shipments = new List<Shipment>(sellerGroups.Count);
+
+            foreach (var sellerGroup in sellerGroups)
+            {
+                var sellerOrder = sellerOrdersBySellerId[sellerGroup.Key];
+                foreach (var entry in sellerGroup)
+                {
+                    var detail = detailByIndex[entry.Index];
+                    var snapshotName = string.IsNullOrWhiteSpace(entry.Item.ProductName)
+                        ? $"Sản phẩm #{entry.Item.ProductId}"
+                        : entry.Item.ProductName.Trim();
+                    var snapshotAttributes = JsonSerializer.Serialize(new
+                    {
+                        unitSymbol = string.IsNullOrWhiteSpace(entry.Item.UnitSymbol) ? null : entry.Item.UnitSymbol.Trim(),
+                        sellerName = string.IsNullOrWhiteSpace(entry.Item.SellerName) ? null : entry.Item.SellerName.Trim()
+                    });
+
+                    sellerOrderItems.Add(new SellerOrderItem
+                    {
+                        SellerOrderId = sellerOrder.SellerOrderId,
+                        ListingId = detail.OrderDetailId,
+                        ProductId = entry.Item.ProductId,
+                        Quantity = entry.Item.Quantity,
+                        UnitPrice = entry.Item.UnitPrice,
+                        DiscountAmount = 0m,
+                        SnapshotName = snapshotName,
+                        SnapshotAttributes = snapshotAttributes,
+                        FulfillmentType = "SellerShip"
+                    });
+                }
+
+                shipments.Add(new Shipment
+                {
+                    SellerOrderId = sellerOrder.SellerOrderId,
+                    WarehouseId = null,
+                    Carrier = "GHN",
+                    ServiceLevel = string.IsNullOrWhiteSpace(request.Shipping.ShippingType)
+                        ? "HomeDelivery"
+                        : request.Shipping.ShippingType.Trim(),
+                    TrackingNumber = string.Empty,
+                    LabelUrl = string.Empty,
+                    Status = "Pending",
+                    Codamount = string.Equals(paymentMethod, "COD", StringComparison.OrdinalIgnoreCase)
+                        ? sellerGroup.Sum(x => x.Item.UnitPrice * x.Item.Quantity)
+                        : null,
+                    WeightKg = null,
+                    LengthCm = null,
+                    WidthCm = null,
+                    HeightCm = null,
+                    ShippedAt = null,
+                    DeliveredAt = null,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            _db.SellerOrderItems.AddRange(sellerOrderItems);
+            _db.Shipments.AddRange(shipments);
 
             var shipping = new Shipping
             {
@@ -223,7 +330,6 @@ public sealed class OrdersController : ControllerBase
 
             if (request.Payment is not null)
             {
-                var paymentMethod = NormalizePaymentMethod(request.Payment.PaymentMethod);
                 var payment = new Payment
                 {
                     OrderId = order.OrderId,
@@ -318,8 +424,9 @@ public sealed class OrdersController : ControllerBase
                     ? o.TotalAmount
                     : o.SellerOrders
                         .Where(so => sellerId.HasValue && so.SellerId == sellerId.Value)
-                        .SelectMany(so => so.SellerOrderItems)
-                        .Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m,
+                        .Sum(so =>
+                            (decimal?)so.ShippingFee +
+                            (so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m)) ?? 0m,
                 Status = o.Status,
                 StatusBadgeClass = GetStatusBadgeClass(o.Status),
                 StatusText = GetStatusText(o.Status)
@@ -389,6 +496,9 @@ public sealed class OrdersController : ControllerBase
             .Where(so => isAdmin || (sellerId.HasValue && so.SellerId == sellerId.Value))
             .SelectMany(so => so.SellerOrderItems)
             .ToList();
+        var scopedSellerOrders = order.SellerOrders
+            .Where(so => isAdmin || (sellerId.HasValue && so.SellerId == sellerId.Value))
+            .ToList();
 
         if (sellerOrderItems.Count == 0 && !isAdmin)
         {
@@ -431,7 +541,8 @@ public sealed class OrdersController : ControllerBase
         var sellerSubtotal = items.Sum(i => i.totalPrice);
         var fallbackSubtotal = Math.Max(0m, order.TotalAmount - order.ShippingFee);
         var subtotal = sellerSubtotal > 0 ? sellerSubtotal : fallbackSubtotal;
-        var shippingFee = sellerSubtotal > 0 ? 0m : Math.Max(0m, order.ShippingFee);
+        var scopedShippingFee = scopedSellerOrders.Sum(x => x.ShippingFee);
+        var shippingFee = sellerSubtotal > 0 ? Math.Max(0m, scopedShippingFee) : Math.Max(0m, order.ShippingFee);
         var total = subtotal + shippingFee;
 
         return Ok(new

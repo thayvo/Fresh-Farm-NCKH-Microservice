@@ -296,7 +296,7 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex gap-3">
-                                            <img class="thumb-box" src="@(string.IsNullOrWhiteSpace(row.ImageFileName) ? Url.Content("~/Images/no-image.png") : Url.Content("~/Images/" + row.ImageFileName))" alt="@row.ProductName" />
+                                    <img class="thumb-box" src="@ProductImagePaths.ResolveRequestPath(row.ImageFileName)" alt="@row.ProductName" />
                                             <div>
                                                 <div class="fw-bold">@row.ProductName</div>
                                                 <div class="text-muted small">SKU: @row.Sku</div>

@@ -29,6 +29,7 @@
     var recipientName = hasOrderData ? (ViewBag.RecipientName as string ?? "Chưa cập nhật") : null;
     var recipientPhone = hasOrderData ? (ViewBag.RecipientPhone as string ?? "Chưa cập nhật") : null;
     var recipientAddress = hasOrderData ? (ViewBag.RecipientAddress as string ?? "Chưa cập nhật") : null;
+    var addressBookNotice = hasOrderData ? (ViewBag.AddressBookNotice as string ?? string.Empty) : string.Empty;
 
     string Vnd(decimal value) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", value);
 }
@@ -120,6 +121,13 @@
                             <i class="bi bi-info-circle-fill me-2"></i>
                             Bạn có thể theo dõi đơn hàng trong mục <strong>Lịch sử đơn hàng</strong>.
                         </div>
+
+                        @if (!string.IsNullOrWhiteSpace(addressBookNotice))
+                        {
+                            <div class="alert alert-success border-0 text-start" role="alert">
+                                <i class="bi bi-bookmark-check-fill me-2"></i>@addressBookNotice
+                            </div>
+                        }
 
                         <p class="mt-4 mb-2 text-muted small">
                             Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.

@@ -78,6 +78,21 @@
   - Theo user (turn moi nhat): uu tien co endpoint test tao don GHN bang `GET` tren trinh duyet hoac tu man Admin Shipping de tranh vuong cookie/token khi goi `POST`.
   - GHN sandbox tra mot so truong ngay gio voi dinh dang khong co dinh (`expected_delivery_time`, `created_date`, `updated_date`, `finish_date`), nen BFF can parse linh hoat tu `JsonElement` thay vi ep `long?` truc tiep.
   - Theo user (turn moi nhat): can mo hinh dia chi shop theo tung seller cho GHN; moi seller phai co dia chi lay hang chuan rieng, khong dung chung origin global khi chay that.
+  - Theo user (2026-03-16, turn moi nhat): nhan fallback buyer checkout phai dung ten website `FreshFarm` thay vi cac cum ky thuat nhu `Giỏ hàng tổng hợp` / `Origin hệ thống`.
+  - Theo user (2026-03-16, turn moi nhat): buyer-facing PDP can tu nhien hon; `Thêm giỏ hàng` khong duoc tu dong da buyer sang `/cart`, va o trang chi tiet phai cho chon so luong roi moi them vao gio.
+  - Theo user (2026-03-16, turn moi nhat): trang `/shop/{sellerId}` buyer-facing dang vo giao dien; can sua de dong bo giao dien voi cac trang user-facing khac.
+  - Theo user (2026-03-16, turn moi nhat): bo CSS top chrome buyer-facing (`promo/header/nav/cart/account`) phai dung chung mot shared partial cho `Index/Search/Product/Shop`, khong va tung trang rieng le.
+  - Theo user (2026-03-16, turn moi nhat): seller phai dat duoc ten shop rieng; ten nay se hien cho buyer thay vi `Shop #id`/`Seller #id`, va ten shop khong duoc trung.
+  - Theo user (2026-03-16, turn moi nhat): font chu buyer-facing tren `Search` va cac trang marketplace dang kho doc; can dong bo lai mot font ho tro tieng Viet tot hon.
+  - Da xac minh luong anh san pham hien tai:
+    - seller upload anh tai BFF `Areas/Seller/ProductController`,
+    - file bytes duoc luu tren filesystem web server trong thu muc map tu `~/Images/`,
+    - Catalog API/DB chi luu `ImageFileName`, khong luu blob/file bytes.
+  - Theo user (2026-03-16, turn moi nhat): chuyen luong anh san pham sang `wwwroot/uploads/products`; tam thoi van giu DB luu ten file de user tu chuyen anh cu sau.
+  - Theo user (2026-03-16, turn moi nhat): neu lo dan nham anh vao `wwwroot/Images` cu thi uu tien don file moi do de tranh nham voi luong anh san pham moi.
+  - Kiem tra live 2026-03-16 cho buyer-facing image:
+    - static file `/uploads/products/{file}` dang phuc vu dung;
+    - nguyen nhan `/products/122` fallback `no-image` la do payload product hien tai tra `imageFileName = null`, khong phai do static path.
   - Da chot huong schema `SellerStoreSettings` trong `IdentityDB` de luu thong tin shop + origin GHN theo `UserId`; giu `StoreSettings` cho lane global/admin.
   - GHN BFF service ho tro `OriginOverride` theo request de Admin/Seller dung origin rieng ma khong can doi cau hinh sandbox global.
   - Huong dung han: khong de he thong phu thuoc cung vao GHN; ma GHN chi dong vai tro `carrier mapping`. Dia chi nghiep vu cua shop can duoc luu theo model trung lap nha van chuyen, con `ghnDistrictId/ghnWardCode` la lop adapter de goi GHN.
@@ -87,6 +102,239 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Da tiep tuc tach phi ship xuong tung seller o tang Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
+        - `CheckoutSubmitRequestDto` them `SellerShippingBreakdowns`;
+        - them DTO `CheckoutSellerShippingInputDto`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - khi submit checkout, BFF gio map `shippingPreview.SellerBreakdowns` thanh `SellerShippingBreakdowns` gui sang Ordering;
+        - normalize request de dedupe shipping breakdown theo `SellerId`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
+        - `CreateOrderRequest` them `SellerShippingBreakdowns`;
+        - them DTO `CreateSellerShippingRequest`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/{SellerOrder,FreshFarmOrderingDBContext.cs}`
+        - them field/map `SellerOrder.ShippingFee`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+        - `POST /api/orders` gio gan `ShippingFee` cho tung `SellerOrder` tu breakdown buyer checkout;
+        - seller order list/detail gio cong dung ship fee scoped seller thay vi ep `0`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ReportsAdminController.cs`
+        - shipping report seller gio doc `SellerOrder.ShippingFee` thay vi `Orders.ShippingFee` tong.
+      - SQL docs moi:
+        - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.delta.sql`
+        - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.verify.sql`
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_multiseller_shippingfee\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_multiseller_shippingfee_contract\` -> PASS (`20 warning` cu, `0 error`).
+    - Da doi nhan fallback checkout multi-seller ve ten website de de hieu hon cho buyer:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - fallback `ShippingOriginLabel` doi tu `Origin hệ thống` thanh `FreshFarm`;
+        - fallback ten nhom seller doi tu `Giỏ hàng tổng hợp` thanh `FreshFarm`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_checkout_freshfarm_label\` -> PASS (`20 warning` cu, `0 error`).
+    - Da chinh UX buyer-facing cho trang chi tiet san pham va add-to-cart:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CartController.cs`
+        - `POST /cart/add` gio tra JSON neu frontend goi bang AJAX (`Accept: application/json` / `X-Requested-With: XMLHttpRequest`), khong con bat buoc redirect sang `/cart`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
+        - card san pham trang chu gio them vao gio bang `fetch("/cart/add")`, khong con tao `form.submit()` nen khong bi redirect sang trang khac;
+        - giu them `sellerId/sellerName` neu payload co, va hien toast xac nhan tai cho.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
+        - bo sung hop mua hang ro hon tren PDP;
+        - cho buyer chon so luong bang stepper ngay tren trang chi tiet;
+        - `Thêm vào giỏ` gio them bang fetch nen giu nguyen trang, hien thong bao tai cho, va `Mua ngay` tu dong di theo so luong dang chon.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`
+        - nut `Thêm giỏ` gio them hang bang fetch nen khong nhay sang `/cart`;
+        - hien toast nho xac nhan da them hang ngay tren trang listing/search.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_product_cart_ux_fix\` -> PASS (`20 warning` cu, `0 error`).
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_home_addtocart_ajax_fix\` -> PASS (`20 warning` cu, `0 error`).
+    - Da sua giao dien trang gian hang buyer-facing:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`
+        - bo sung CSS cho `_PromoBarLegacy`, `_HeaderLegacy`, `_NavLegacy` de header/nav khong con hien dang HTML tho;
+        - giu media query hop le cho grid shop/products.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_shop_header_css_fix\` -> PASS (`20 warning` cu, `0 error`).
+    - Da gom CSS top chrome buyer-facing thanh partial dung chung:
+      - them `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml` chua CSS dung chung cho `promo/header/nav/cart/account`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/{Index,Search,Product,Shop}.cshtml` gio include partial nay trong `<head>` va bo bot CSS lap cho top chrome.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_shared_marketplace_chrome\` -> PASS (`20 warning` cu, `0 error`).
+    - Da chot luong ten shop seller-facing va buyer-facing:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs`
+        - seller save `StoreName` gio bi chan neu trung voi shop khac (case-insensitive);
+        - seller moi auto-seed `StoreName` unique neu chua co `SellerStoreSetting`.
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
+        - public merchant list/detail/shipping origins gio uu tien `SellerStoreSetting.StoreName` thay vi `FullName/UserName/Seller #id`;
+        - search shop buyer-facing gio tim duoc theo `StoreName`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/{BffCatalogController,CheckoutController}.cs`
+        - fallback nhan shop buyer-facing doi tu `Shop #id` / `Seller #id` sang `FreshFarm Seller {id}` neu thieu ten shop that.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Setting/Index.cshtml`
+        - bo sung note ro rang rang ten shop se hien cho buyer va khong duoc trung.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_shopname_unique\` -> PASS (`10 warning` cu, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_shopname_public\` -> PASS (`20 warning` cu, `0 error`).
+    - Da dong bo font chu buyer-facing marketplace:
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml`
+        - them Google Font `Be Vietnam Pro` + bien `--marketplace-font`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/{Index,Search,Product,Shop,Shops}.cshtml`
+        - body gio dung `font-family: var(--marketplace-font)` de nhin ro hon va dong bo giua cac trang marketplace.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - checkout gio cung nap `Be Vietnam Pro` va dung chung font cho toan trang.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_marketplace_font_sync\` -> PASS (`20 warning` cu, `0 error`).
+    - Da doi chieu luong luu anh san pham hien tai:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`
+        - `Create/Edit` nhan `IFormFile imageFile`, validate extension (`.jpg/.jpeg/.png/.gif/.webp`) va gioi han 5MB;
+        - `SaveImageFile` luu file bang ten `Guid + extension` vao duong dan map tu `~/Images/`;
+        - `DeleteImageFile` xoa file cu tren filesystem khi replace/delete.
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
+        - Catalog API chi nhan/lưu `ImageFileName` trong `Product.ImageFileName`; khong nhan binary upload.
+    - Da chuyen luong luu anh san pham sang `wwwroot/uploads/products`:
+      - them `src/Web/FreshFarm.Web.Bff/Services/{ProductImagePaths.cs,IProductImageStorageService.cs,ProductImageStorageService.cs}`
+        - tap trung hoa validate/save/delete anh san pham;
+        - quy uoc URL public moi la `/uploads/products/{fileName}`;
+        - fallback chung la `/images/legacy/no-image.png`.
+      - `src/Web/FreshFarm.Web.Bff/Program.cs`
+        - dang ky `IProductImageStorageService`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/{Seller,Admin}/Controllers/ProductController.cs`
+        - bo luong `~/Images/` cu, chuyen sang service luu/xoa anh moi;
+        - DB van chi luu `ImageFileName` de de migrate anh cu.
+      - cac view buyer/seller/admin render anh san pham gio uu tien `ProductImagePaths.ResolveRequestPath(...)` hoac base path `/uploads/products/`:
+        - `Areas/Seller/Views/Product/{Create,Edit,ManageProducts}.cshtml`
+        - `Areas/Seller/Views/{Report/Product,Report/Review,Review/ManageReview,Warehouse/Details,Warehouse/Index,Warehouse/TransactionHistory}.cshtml`
+        - `Areas/Admin/Views/CatalogModeration/Index.cshtml`
+        - `Views/{Home/Product,Home/Search,Home/Shop,Home/Shops}.cshtml`
+        - `Views/Shared/_ProductCard.cshtml`
+      - them thu muc giu cho git: `src/Web/FreshFarm.Web.Bff/wwwroot/uploads/products/.gitkeep`
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_product_image_storage_migration` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua trang chu buyer-facing de dung anh san pham that thay vi anh Pexels mac dinh:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml`
+        - bo `defaultImage` co dinh cho card san pham;
+        - them `resolveProductImage(...)` va map `imageFileName` trong `normalizeProduct(...)`;
+        - featured/suggestion/home cards gio doc anh tu `/uploads/products/{ImageFileName}` nhu PDP/Search.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_home_product_image_fix` -> PASS (`17 warning` cu, `0 error`).
+    - Da doi chieu live payload image cho case `Rau muống`:
+      - `Invoke-RestMethod https://localhost:7085/bff/products -SkipCertificateCheck` tra:
+        - `ProductId = 1`, `ProductName = Rau muống`, `imageFileName = rau-muong.jpg`
+        - `ProductId = 122`, `ProductName = Rau muống`, `imageFileName = null`
+      - Vi vay `/products/122` fallback `/images/legacy/no-image.png` la dung theo du lieu hien tai; file `rau-muong.jpg` dang gan voi record `ProductId = 1`, khong phai `122`.
+    - Da don file anh dan nham vao `wwwroot/Images` cu:
+      - xoa `src/Web/FreshFarm.Web.Bff/wwwroot/Images/e20f46f9-0e3e-4ae1-99a6-448a71447363.png`;
+      - verify `Test-Path ...` -> `False`, va khong con file moi trong `wwwroot/Images` 4 gio gan day.
+    - Da hoan tat tang Ordering cho checkout multi-seller de tao cau truc don hang theo seller thay vi chi luu `Order` tong:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
+        - `CreateOrderItemRequest` gio mang them `SellerId`, `SellerName`, `ProductName`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+        - `POST /api/orders` gio validate bat buoc `SellerId`;
+        - sau khi tao `Order` + `OrderDetails`, he thong nhom item theo seller de tao `SellerOrder`, `SellerOrderItem` va `Shipment` `Pending` cho tung shop.
+      - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
+        - `CheckoutItemInputDto` them `ProductName`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - build/normalize checkout request va shipping-preview request giu them snapshot ten san pham.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - checkout render ten san pham that va submit hidden field `Items[i].ProductName`.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_multiseller_suborders\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_multiseller_ordering_contract\` -> PASS (`20 warning` cu, `0 error`).
+    - Da nang checkout/cart buyer-facing len multi-seller GHN preview theo seller:
+      - `src/Web/FreshFarm.Web.Bff/Dtos/{CartDtos,CheckoutDtos}.cs`
+        - cart item va checkout item gio mang `SellerId`, `SellerName`, `CartItemKey`;
+        - preview phi ship tra them `SellerBreakdowns`.
+      - `src/Web/FreshFarm.Web.Bff/Services/{ICartSessionService,CartSessionService}.cs`
+        - cart session dinh danh item theo `(ProductId + SellerId)`;
+        - update/remove support `CartItemKey`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/{CartController,CheckoutController}.cs`
+        - checkout-selected gio luu `CHECKOUT_SELECTED_CART_ITEM_KEYS`;
+        - `Mua ngay` parse them `sellerId/sellerName`;
+        - checkout loc item theo item key, submit thanh cong chi xoa item da mua;
+        - preview GHN nhom item theo seller, lay origin seller tu Identity public endpoint va cong tong phi.
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
+        - them `GET /auth/public/merchants/shipping-origins?sellerIds=...` de buyer checkout doc GHN origin toi thieu cua tung seller.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - hidden field checkout mang seller/cart key;
+        - hien breakdown phi ship theo tung shop.
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/{Search,Product}.cshtml` + `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
+        - `Them gio` va `Mua ngay` gio mang them seller info.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_public_seller_shipping_origin\` -> PASS (`10 warning` cu, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_multiseller_checkout_shipping\` -> PASS (`20 warning` cu, `0 error`).
+    - Da sua flow `Mua ngay` buyer-facing de khong roi vao giỏ hang rong:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - `GET /checkout` gio se doc query `productId/productName/unitPrice/unitSymbol/quantity` tu cac nut `Mua ngay`,
+        - tu dong seed/cap nhat san pham vao cart session,
+        - tu dong set `CHECKOUT_SELECTED_PRODUCT_IDS` de checkout chi render dung san pham vua chon.
+      - Nguyen nhan goc: cac view user-facing dang link `Mua ngay` den `/checkout?...`, trong khi checkout truoc do chi doc session cart nen neu cart rong se redirect ve `/cart`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_direct_buy_checkout_fix\` -> PASS (`20 warning` cu, `0 error`).
+    - Da noi preview phi ship GHN tu dong vao checkout buyer-facing, khong con cho nhap tay phi van chuyen:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - them endpoint `POST /checkout/ghn/preview-fee`,
+        - tu dong resolve diem giao hang tu dia chi da luu hoac dia chi moi GHN,
+        - doc can nang san pham tu Catalog API va fallback kien hang an toan neu thieu metadata,
+        - recalculate `ShippingFee` bang GHN ngay truoc khi submit order de tranh lech client state.
+      - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
+        - them DTO request/response cho preview phi ship checkout.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - doi `Phi van chuyen` thanh hien thi read-only,
+        - JS tu dong goi preview GHN khi doi dia chi, so luong hoac mode dia chi,
+        - tong tien cap nhat theo phi GHN va khoa nut dat hang trong luc dang tinh phi.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_checkout_shipping_preview\` -> PASS (`20 warning` cu, `0 error`).
+    - Da dong bo so dia chi buyer tren `Account/Profile` sang picker GHN, khong con nhap tay tinh/quan/phuong:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+        - inject `IGhnSandboxService`,
+        - them endpoint `GET /account/profile/ghn/{provinces,districts,wards}`,
+        - day `ViewBag.GhnSandboxConfigured` cho trang profile.
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressFormModal.cshtml`
+        - modal `Them dia chi moi` da dung dropdown GHN cho `tinh/thanh -> quan/huyen -> phuong/xa`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`
+        - modal `Cap nhat dia chi` cua tung dong da dung dropdown GHN thay vi input text tay.
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/Profile.cshtml`
+        - them script chung de load danh muc GHN va cascade select cho tat ca form dia chi create/edit.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_profile_ghn_addresspicker\` -> PASS (`20 warning` cu, `0 error`).
+    - Da hoan tat flow dia chi moi trong checkout buyer-facing theo UX user yeu cau:
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - neu buyer CHUA co dia chi luu san thi checkout chi hien `Nhap dia chi moi`;
+        - neu buyer DA co dia chi thi checkout hien them lua chon `Dung dia chi da luu`;
+        - dia chi moi nhap o checkout se duoc luu vao so dia chi sau khi dat don thanh cong;
+        - them cong tac `Luu dia chi nay lam dia chi mac dinh`;
+        - neu dia chi moi trung voi dia chi cu thi checkout chan submit va bao `Dia chi nay da co trong so dia chi. Vui long chon dia chi da luu hoac nhap dia chi khac.`
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - them duplicate-check truoc khi tao don,
+        - sau khi tao don thanh cong, tu dong goi Identity API de luu dia chi moi vao so dia chi,
+        - success page nhan them `AddressBookNotice`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Success.cshtml`
+        - hien thong bao da luu dia chi / da dat mac dinh / khong luu them vi trung dia chi.
+      - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
+        - them `SaveAddressAsDefault` cho luong luu dia chi sau checkout.
+    - Da harden duplicate guard cho so dia chi o Identity API:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+        - `POST /auth/addresses` va `PUT /auth/addresses/{id}` gio chan tao/cap nhat neu trung dia chi active cua cung user,
+        - tra `409 Conflict` voi thong diep huong user chon dia chi da luu hoac nhap dia chi khac.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_checkout_addressbook_flow\` -> PASS (`20 warning` cu, `0 error`).
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_address_duplicate_guard\` -> PASS (`10 warning` cu, `0 error`).
+    - Da noi picker dia chi GHN vao checkout buyer-facing:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - inject `IGhnSandboxService`,
+        - them endpoint `GET /checkout/ghn/{provinces,districts,wards}`,
+        - khi user chon `Nhap dia chi moi`, BFF validate bat buoc `tinh/thanh`, `quan/huyen`, `phuong/xa` va ghep dia chi day du truoc khi goi Ordering API.
+      - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
+        - bo sung field shipping phuc vu checkout GHN: `ProvinceName`, `DistrictId`, `DistrictName`, `WardCode`, `WardName`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/Index.cshtml`
+        - them UI chon dia chi GHN theo 3 cap phu thuoc,
+        - giu song song 2 mode `dia chi da luu` / `nhap dia chi moi`,
+        - khi doi qua lai giua 2 mode, checkout giu lai du lieu dang nhap dang do,
+        - label/huong dan dia chi duoc doi theo mode de tranh nham `so nha/ten duong` voi `dia chi day du`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_checkout_ghn_address\` -> PASS (`20 warning` cu, `0 error`).
+    - Da kiem tra loi giao dien user-facing tai `https://localhost:7085/products/` va xac dinh nguyen nhan hien tai la route PLP bi thieu, KHONG phai mat file CSS:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/HomeController.cs` truoc patch chi map PLP tai `/search`, con `/products/` tra `404`.
+      - Da bo sung alias `[HttpGet("/products")]` cho action `Search`, de URL user-facing `/products` va `/products/` mo dung trang danh sach san pham.
+      - `Invoke-WebRequest https://localhost:7085/search` tra `200` voi day du HTML/style inline; `https://localhost:7085/products/` truoc patch tra `404`.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_products_route_fix\` -> PASS (`20 warning` cu, `0 error`).
+    - Da va loi runtime man `Seller/Warehouse/ImportCart`:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/WarehouseController.cs`
+        - `PopulateImportProducts` khong con deserialize truc tiep top-level JSON thanh `List<CatalogProductDto>`.
+        - Da doi sang doc `WarehouseProductsApiResponse` va map `data.products` -> `CatalogProductDto` de khop shape moi cua Catalog API.
+      - Nguyen nhan goc: `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/WarehouseAdminController.cs` tra ve envelope `{ success, data: { products, ... } }`, trong khi BFF dang cho raw array.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_warehouse_import_fix\` -> PASS (`20 warning` cu, `0 error`).
     - Da doc `docs/Report Nhom 1.docx` va doi chieu claim bao mat voi repo hien tai.
     - Da xac nhan cac lech chinh:
       - repo dung `PasswordHasher/PBKDF2`, khong phai `BCrypt`;
@@ -108,6 +356,18 @@
       - ghi chu ket qua dia chi lay hang duoc doi sang ngon ngu tu nhien,
       - cac o nhap/select trong panel van chuyen duoc tang bo goc, do cao, bong do, focus state va readonly state de nhin mem va ro hon.
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_shipping_polish\` -> PASS (`20 warning` cu, `0 error`).
+    - Da harden tiep man `Seller/Shipping/ManageShipping` theo nghiep vu don hang that:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs`
+        - `CreateGhnSandboxOrder` gio bat buoc `OrderId > 0`,
+        - goi lai `order-info/{orderId}` de xac nhan don hang hop le truoc khi tao van don,
+        - thong diep `GetGhnSellerOrigin` doi sang tieng Viet tu nhien hon.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shipping/ManageShipping.cshtml`
+        - them hidden `ghnSelectedOrderId`,
+        - nut `Tạo vận đơn` mac dinh bi khoa cho den khi seller bam nut xe tai o mot dong don,
+        - validate bo sung: phai chon don, phai nhap can nang/kich thuoc, ten mat hang va so luong,
+        - bo ghi chu/toast tu dong "Da doc dia chi lay hang...",
+        - tach form thanh cum `Thong tin nguoi nhan` va `Thong tin goi hang`, chinh lai card/input de mem va de doc hon.
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_shipping_orderlock\` -> PASS (`20 warning` cu, `0 error`).
     - Theo user (turn moi nhat): bo cac gia tri test hard-code o form tao van don seller; shop se tu nhap thong tin kich thuoc/khoi luong moi lan tao van don.
     - Da dong bo roadmap voi quyet dinh nghiep vu moi:
       - luong van chuyen production phai di tu don hang that,
@@ -1223,13 +1483,19 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-    - Dang giai thich cho user y nghia/rui ro cua viec bo `ff_access_token` khoi auth cookie claim trong BFF.
-    - Da hoan tat file doi chieu `docs/report-nhom-1-security-review.md` va dang chot ket luan cho user.
-    - Dang doi chieu tai lieu Word `docs/Report Nhom 1.docx` voi code hien tai de kiem tra noi dung docs co khop lane auth recovery, Admin Shipping, va dia chi lay hang theo seller hay khong.
-    - Da xac nhan lane `Merchant lifecycle & compliance` da ton tai end-to-end tren `Identity API + BFF Admin`.
-    - Da harden tiep module nay de khop yeu cau UI/message tieng Viet co dau va build xanh lai tren moi truong hien tai.
-    - Dang cho user retest runtime/UI that tren `/Admin/Merchant/Index`.
+    - Ordering multi-seller + shipping fee theo seller da build xanh; can user apply SQL delta moi cho DB that va retest flow seller/admin.
   - *Next*:
+    - Apply DB script:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.delta.sql`
+      - sau do chay `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.verify.sql`.
+    - Retest `/checkout` voi gio nhieu seller:
+      - breakdown phi ship van hien theo tung shop.
+      - dat hang thanh cong thi Ordering tao `SellerOrder` + `Shipment` theo tung seller va luu ship fee scoped seller.
+      - `Mua ngay` tu PLP/PDP/partial card van mang dung seller vao checkout.
+    - Retest module seller/admin:
+      - `ManageOrders` scope seller phai thay tong tien gom ca ship fee cua shop minh.
+      - `ManageShipping` va shipping report seller phai hien ship fee dung scope seller, khong lay fee tong order me.
+    - Neu can, mo rong tiep `Account/Profile` de form so dia chi cua buyer cung dung danh muc GHN thay vi nhap tay tu do.
     - Neu user muon thuc thi hardening ngay, uu tien:
       - bo JWT khoi auth cookie claim,
       - them rate limiting + lockout,
@@ -1378,9 +1644,10 @@
       - Quy dinh module `Status/StatusType` la global hay tenant-specific; neu tenant-specific can them ownership va seller filter.
       - Danh gia `auth/admin/customers` cho seller (hien global), can endpoint scope theo order ownership hoac disable tac vu vuot pham vi.
     - Sau khi user test seller end-to-end:
-      - khoa luong tao van don theo `OrderId`,
-      - an/bo form tao van don roi,
+      - an/bot them duong tao van don roi neu con o lai tren UI,
       - luu `orderCode/status/fee` vao shipping/order noi bo.
+    - User can retest:
+      - `/Seller/Warehouse/ImportCart` (dropdown san pham phai load lai binh thuong, khong con crash `JsonException`).
     - User can retest ngay sau patch token isolation:
       - Stop/start lai `FreshFarm.Web.Bff` + APIs.
       - Dang xuat seller hien tai, xoa cookie/session trinh duyet, dang nhap lai account `tho`.
@@ -1445,7 +1712,7 @@
   - UNCONFIRMED DB that da apply schema `Catalog readiness`; can chay script delta/verify truoc khi retest `/Admin/CatalogReadiness`.
   - Da xac nhan DB that da apply schema `Fresh ops` (`verify` pass, row count = 0).
   - Da xac nhan user da apply schema `Communications governance`.
-- **Working set** (files/ids/commands):
+  - **Working set** (files/ids/commands):
   - `docs/report-nhom-1-security-review.md`
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
   - `LOT_4_5_PERSISTENCE_HARDENING.md`
@@ -1507,6 +1774,7 @@
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Finance/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Services/IGhnSandboxService.cs`
   - `src/Web/FreshFarm.Web.Bff/Services/GhnSandboxService.cs`
+  - `src/Web/FreshFarm.Web.Bff/Services/{ProductImagePaths,IProductImageStorageService,ProductImageStorageService}.cs`
   - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
   - `src/Web/FreshFarm.Web.Bff/Program.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Campaign/Index.cshtml`
@@ -1570,6 +1838,9 @@
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Product.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Shops.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
+  - `https://localhost:7085/bff/products`
   - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductOffersController.cs`

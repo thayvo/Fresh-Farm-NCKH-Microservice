@@ -14,6 +14,7 @@
     <title>Chi tiết sản phẩm - FreshFarm</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    @await Html.PartialAsync("_MarketplaceChromeStyles")
     <style>
         :root {
             --brand-primary: #16a34a;
@@ -21,164 +22,14 @@
             --brand-orange: #f97316;
             --border-soft: #e5e7eb;
             --surface-soft: #f8fafc;
-            --primary-green: #28a745;
         }
 
         body {
-            font-family: "Inter", sans-serif;
+            font-family: var(--marketplace-font);
             background:
                 radial-gradient(circle at top right, rgba(249, 115, 22, .14), transparent 28%),
                 linear-gradient(180deg, #f8fafc 0%, #ffffff 40%, #f8fafc 100%);
             color: #0f172a;
-        }
-
-        .promo-bar {
-            background: linear-gradient(90deg, #18a85f 0%, #0b8f4d 100%);
-            color: #fff;
-            font-size: .875rem;
-        }
-
-        .promo-inner {
-            min-height: 28px;
-        }
-
-        .promo-links a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        .promo-links a:hover {
-            text-decoration: underline;
-        }
-
-        .header-main-shell {
-            background: #fff;
-            padding: 14px 0 12px;
-            border-bottom: 1px solid #e8eaee;
-        }
-
-        .header-main-wrap {
-            display: flex;
-            align-items: center;
-            gap: 18px;
-        }
-
-        .header-brand-wrap {
-            flex: 0 0 auto;
-        }
-
-        .brand-logo {
-            width: 42px;
-            height: 42px;
-            border-radius: 14px;
-            display: inline-grid;
-            place-items: center;
-            background: linear-gradient(135deg, #22c55e, #15803d);
-            color: #fff;
-            font-weight: 800;
-            box-shadow: 0 12px 24px rgba(34, 197, 94, .22);
-        }
-
-        .brand-text {
-            color: #166534;
-            font-weight: 900;
-            letter-spacing: .12em;
-        }
-
-        .brand-sub {
-            color: #64748b;
-            font-size: .78rem;
-        }
-
-        .header-search-wrap {
-            flex: 1 1 auto;
-            min-width: 0;
-        }
-
-        .header-search-form {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .header-search-input {
-            min-height: 48px;
-            border-radius: 16px;
-            border: 1px solid #d1d5db;
-            box-shadow: none;
-            padding-left: 16px;
-        }
-
-        .header-search-input:focus {
-            border-color: #22c55e;
-            box-shadow: 0 0 0 .2rem rgba(34, 197, 94, .12);
-        }
-
-        .header-search-btn {
-            min-height: 48px;
-            padding-inline: 20px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #22c55e, #16a34a);
-            border: 0;
-            color: #fff;
-            font-weight: 700;
-        }
-
-        .header-search-btn:hover {
-            background: linear-gradient(135deg, #16a34a, #15803d);
-            color: #fff;
-        }
-
-        .header-search-keywords {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        .header-search-keywords a {
-            color: #64748b;
-            text-decoration: none;
-            font-size: .9rem;
-        }
-
-        .header-search-keywords a:hover {
-            color: #f97316;
-        }
-
-        .header-actions-wrap {
-            flex: 0 0 auto;
-        }
-
-        .header-cart-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            text-decoration: none;
-            color: #166534;
-            font-weight: 700;
-        }
-
-        .header-cart-link:hover {
-            color: #f97316;
-        }
-
-        .navbar-main {
-            background: #fff;
-            border-top: 1px solid #ebedf0;
-            border-bottom: 1px solid #ebedf0;
-        }
-
-        .navbar-main .nav-link {
-            position: relative;
-            color: #334155;
-            font-weight: 600;
-            transition: color .2s ease;
-        }
-
-        .navbar-main .nav-link:hover,
-        .navbar-main .nav-link.active {
-            color: var(--brand-primary);
         }
 
         .footer-link {
@@ -462,6 +313,138 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
             margin-bottom: 24px;
+        }
+
+        .purchase-box {
+            display: grid;
+            gap: 14px;
+            margin-bottom: 22px;
+            padding: 18px;
+            border-radius: 18px;
+            border: 1px solid rgba(22, 163, 74, .18);
+            background: linear-gradient(135deg, rgba(220, 252, 231, .88), rgba(255, 255, 255, .98));
+        }
+
+        .purchase-box-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .purchase-box-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #166534;
+            margin-bottom: 4px;
+        }
+
+        .purchase-box-text {
+            color: #475569;
+            font-size: .93rem;
+            line-height: 1.6;
+        }
+
+        .purchase-box-store {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, .92);
+            border: 1px solid rgba(226, 232, 240, .96);
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .purchase-box-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .qty-selector {
+            display: inline-flex;
+            align-items: stretch;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .qty-btn {
+            width: 46px;
+            border: 0;
+            background: #fff;
+            color: #166534;
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .qty-btn:hover {
+            background: #f0fdf4;
+        }
+
+        .qty-btn:disabled {
+            color: #94a3b8;
+            background: #f8fafc;
+        }
+
+        .qty-input {
+            width: 78px;
+            border: 0;
+            border-left: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            text-align: center;
+            font-weight: 800;
+            color: #0f172a;
+            outline: none;
+        }
+
+        .purchase-subtotal {
+            display: grid;
+            gap: 4px;
+            justify-items: end;
+        }
+
+        .purchase-subtotal-label {
+            color: #64748b;
+            font-size: .84rem;
+            font-weight: 600;
+        }
+
+        .purchase-subtotal-value {
+            color: #166534;
+            font-size: 1.25rem;
+            font-weight: 900;
+        }
+
+        .detail-cart-note {
+            display: none;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: .92rem;
+            font-weight: 600;
+            line-height: 1.55;
+        }
+
+        .detail-cart-note.is-visible {
+            display: block;
+        }
+
+        .detail-cart-note.is-success {
+            background: rgba(220, 252, 231, .92);
+            border: 1px solid rgba(22, 163, 74, .2);
+            color: #166534;
+        }
+
+        .detail-cart-note.is-error {
+            background: rgba(254, 226, 226, .92);
+            border: 1px solid rgba(239, 68, 68, .18);
+            color: #b91c1c;
         }
 
         .btn-detail-primary,
@@ -769,22 +752,12 @@
         }
 
         @@media (max-width: 767.98px) {
-            .header-main-wrap,
-            .header-search-form {
-                flex-direction: column;
-                align-items: stretch;
+            .header-main-wrap {
+                gap: 14px;
             }
 
-            .header-actions-wrap {
-                width: 100%;
-            }
-
-            .header-cart-link {
-                justify-content: center;
-            }
-
-            .page-shell {
-                padding-top: 18px;
+            .header-brand-wrap {
+                min-width: 200px;
             }
 
             .detail-media,
@@ -797,12 +770,55 @@
                 grid-template-columns: 1fr;
             }
 
+            .purchase-box-controls {
+                align-items: stretch;
+            }
+
+            .purchase-subtotal {
+                justify-items: start;
+            }
+
             .offer-card {
                 grid-template-columns: 1fr;
             }
 
             .offer-price {
                 text-align: left;
+            }
+        }
+
+        @@media (max-width: 991.98px) {
+            .header-main-wrap {
+                align-items: flex-start;
+            }
+
+            .header-brand-wrap {
+                flex: 0 0 100%;
+                min-width: 0;
+            }
+
+            .header-search-wrap {
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+        }
+
+        @@media (max-width: 767.98px) {
+            .header-cart-link span {
+                display: none !important;
+            }
+
+            .header-cart-link i {
+                font-size: 1.4rem;
+            }
+
+            .header-cart-panel {
+                width: min(92vw, 360px);
+                right: -8px;
+            }
+
+            .page-shell {
+                padding-top: 18px;
             }
         }
     </style>
@@ -868,15 +884,15 @@
 
             const resolveImageUrl = (raw) => {
                 const imageFileName = (raw.imageFileName ?? raw.ImageFileName ?? "").toString().trim();
-                if (!imageFileName) {
-                    return "/Images/no-image.png";
+                if (!imageFileName || imageFileName.toLowerCase() === "no-image.png") {
+                    return "@ProductImagePaths.FallbackImageRequestPath";
                 }
 
                 if (/^(https?:)?\/\//i.test(imageFileName) || imageFileName.startsWith("/")) {
                     return imageFileName;
                 }
 
-                return `/Images/${imageFileName}`;
+                return `@ProductImagePaths.UploadFolderRequestPath${imageFileName}`;
             };
 
             const normalizeProduct = (raw) => {
@@ -1003,9 +1019,12 @@
                 `;
             };
 
-            const buildCheckoutUrl = (product, qty = 1) => {
+            const buildCheckoutUrl = (product, qty = 1, sellerId = null, sellerName = "") => {
+                const resolvedSellerId = toNumber(sellerId, toNumber(product.primarySellerId, 0));
                 const query = new URLSearchParams({
                     productId: String(product.productId),
+                    sellerId: String(resolvedSellerId),
+                    sellerName: (sellerName || "").toString(),
                     productName: product.productName,
                     unitPrice: String(product.price),
                     unitSymbol: product.unitName,
@@ -1156,33 +1175,88 @@
                 return `/Images/${raw}`;
             };
 
-            const submitAddToCart = (product, qty = 1) => {
-                if (!antiForgeryToken || product.productId <= 0) {
+            const showDetailCartNotice = (message, tone = "success") => {
+                const noticeNode = document.getElementById("detailCartNotice");
+                if (!(noticeNode instanceof HTMLElement)) {
                     return;
                 }
 
-                const form = document.createElement("form");
-                form.method = "POST";
-                form.action = "/cart/add";
-                form.style.display = "none";
+                noticeNode.textContent = message;
+                noticeNode.className = `detail-cart-note is-visible ${tone === "error" ? "is-error" : "is-success"}`;
+            };
 
-                const addField = (name, value) => {
-                    const input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = name;
-                    input.value = String(value ?? "");
-                    form.appendChild(input);
-                };
+            const clearDetailCartNotice = () => {
+                const noticeNode = document.getElementById("detailCartNotice");
+                if (!(noticeNode instanceof HTMLElement)) {
+                    return;
+                }
 
-                addField("__RequestVerificationToken", antiForgeryToken);
-                addField("ProductId", product.productId);
-                addField("ProductName", product.productName);
-                addField("UnitPrice", product.price);
-                addField("UnitSymbol", product.unitName);
-                addField("Quantity", Math.max(1, toNumber(qty, 1)));
+                noticeNode.textContent = "";
+                noticeNode.className = "detail-cart-note";
+            };
 
-                document.body.appendChild(form);
-                form.submit();
+            const submitAddToCart = async (product, qty = 1, triggerButton = null) => {
+                if (!antiForgeryToken || product.productId <= 0) {
+                    return null;
+                }
+
+                const targetButton = triggerButton instanceof HTMLButtonElement ? triggerButton : null;
+                const originalLabel = targetButton?.innerHTML ?? "";
+                if (targetButton) {
+                    targetButton.disabled = true;
+                    targetButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang thêm';
+                }
+
+                try {
+                    const body = new URLSearchParams();
+                    body.set("__RequestVerificationToken", antiForgeryToken);
+                    body.set("ProductId", String(product.productId));
+                    body.set("SellerId", String(toNumber(product.sellerId, product.primarySellerId || 0)));
+                    body.set("SellerName", product.sellerName || "");
+                    body.set("ProductName", product.productName || "");
+                    body.set("UnitPrice", String(product.price ?? 0));
+                    body.set("UnitSymbol", product.unitName || "");
+                    body.set("Quantity", String(Math.max(1, toNumber(qty, 1))));
+
+                    const response = await fetch("/cart/add", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "Accept": "application/json",
+                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+                        body: body.toString()
+                    });
+
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                        return null;
+                    }
+
+                    const text = await response.text();
+                    let payload = null;
+
+                    try {
+                        payload = text ? JSON.parse(text) : null;
+                    } catch {
+                        payload = null;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                    }
+
+                    return payload;
+                } catch (error) {
+                    showDetailCartNotice(error?.message || "Không thể thêm sản phẩm vào giỏ hàng lúc này.", "error");
+                    return null;
+                } finally {
+                    if (targetButton) {
+                        targetButton.disabled = false;
+                        targetButton.innerHTML = originalLabel;
+                    }
+                }
             };
 
             const redirectToSearch = (keyword) => {
@@ -1264,7 +1338,7 @@
                                 <div>
                                     <div class="offer-price">${vnd(product.price)}</div>
                                     ${canPurchase
-                                        ? `<a href="${buildCheckoutUrl(product)}" class="offer-action mb-2">${isPrimarySeller ? "Mua từ shop chính" : "Chọn mua"}</a>`
+                                        ? `<a href="${buildCheckoutUrl(product, 1, sellerIdValue, shopName)}" class="offer-action mb-2">${isPrimarySeller ? "Mua từ shop chính" : "Chọn mua"}</a>`
                                         : `<a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Hỏi shop chính" : "Hỏi shop này"}</a>`}
                                     <a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Nhắn shop chính" : "Nhắn shop"}</a>
                                     <a href="${buildShopUrl(sellerIdValue)}" class="offer-action">Vào shop</a>
@@ -1301,6 +1375,7 @@
                 const backUrl = searchKeyword ? `/search?q=${encodeURIComponent(searchKeyword)}` : "/search";
                 const primaryShopUrl = buildShopUrl(product.primarySellerId);
                 const primaryChatUrl = buildShopChatUrl(product.primarySellerId);
+                const primarySellerName = (product.sellerName ?? "").toString().trim() || (product.primarySellerId > 0 ? `Shop #${product.primarySellerId}` : "FreshFarm");
                 const primaryChatLabel = primaryShopUrl
                     ? (isBuyerEligible ? "Chat với shop" : (isAuthenticated ? "Xem shop đang bán" : "Đăng nhập để chat"))
                     : "Quay lại tìm kiếm";
@@ -1338,9 +1413,33 @@
                                 </div>
                                 ${renderFreshnessPanel(product)}
                                 <div class="summary-text">${escapeHtml(summary)}</div>
+                                <div class="purchase-box">
+                                    <div class="purchase-box-head">
+                                        <div>
+                                            <div class="purchase-box-title">Chọn số lượng trước khi mua</div>
+                                            <div class="purchase-box-text">Trang chi tiết giờ sẽ để bạn chọn số lượng ngay tại chỗ. Thêm vào giỏ sẽ giữ nguyên trang này để bạn mua tiếp.</div>
+                                        </div>
+                                        <div class="purchase-box-store">
+                                            <i class="bi bi-shop"></i>
+                                            <span>${escapeHtml(primarySellerName)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="purchase-box-controls">
+                                        <div class="qty-selector" aria-label="Bộ chọn số lượng">
+                                            <button type="button" class="qty-btn" id="purchaseQtyDecrease" aria-label="Giảm số lượng">-</button>
+                                            <input id="purchaseQtyInput" class="qty-input" type="number" min="1" step="1" value="1" inputmode="numeric" />
+                                            <button type="button" class="qty-btn" id="purchaseQtyIncrease" aria-label="Tăng số lượng">+</button>
+                                        </div>
+                                        <div class="purchase-subtotal">
+                                            <span class="purchase-subtotal-label">Tạm tính</span>
+                                            <span class="purchase-subtotal-value" id="purchaseSubtotal">${vnd(product.price)}</span>
+                                        </div>
+                                    </div>
+                                    <div id="detailCartNotice" class="detail-cart-note"></div>
+                                </div>
                                 <div class="cta-row">
                                     ${canPurchase
-                                        ? `<a href="${buildCheckoutUrl(product)}" class="btn-detail-primary">Mua ngay</a>`
+                                        ? `<a href="${buildCheckoutUrl(product)}" id="buyNowBtn" class="btn-detail-primary">Mua ngay</a>`
                                         : `<button type="button" class="btn-detail-primary is-disabled" disabled>Tạm hết hàng</button>`}
                                     <button type="button" id="addToCartBtn" class="btn-detail-secondary${canPurchase ? "" : " is-disabled"}" ${canPurchase ? "" : "disabled"}>Thêm vào giỏ</button>
                                     ${primaryChatUrl
@@ -1388,9 +1487,75 @@
                 loadingNode.classList.add("d-none");
                 errorNode.classList.add("d-none");
 
+                const qtyInput = document.getElementById("purchaseQtyInput");
+                const qtyDecreaseBtn = document.getElementById("purchaseQtyDecrease");
+                const qtyIncreaseBtn = document.getElementById("purchaseQtyIncrease");
+                const subtotalNode = document.getElementById("purchaseSubtotal");
+                const buyNowBtn = document.getElementById("buyNowBtn");
                 const addToCartBtn = document.getElementById("addToCartBtn");
+
+                const syncPurchaseState = () => {
+                    const quantity = Math.max(1, toNumber(qtyInput instanceof HTMLInputElement ? qtyInput.value : 1, 1));
+                    if (qtyInput instanceof HTMLInputElement) {
+                        qtyInput.value = String(quantity);
+                    }
+
+                    if (qtyDecreaseBtn instanceof HTMLButtonElement) {
+                        qtyDecreaseBtn.disabled = quantity <= 1;
+                    }
+
+                    if (subtotalNode instanceof HTMLElement) {
+                        subtotalNode.textContent = vnd(Math.max(0, product.price) * quantity);
+                    }
+
+                    if (buyNowBtn instanceof HTMLAnchorElement) {
+                        buyNowBtn.href = buildCheckoutUrl(product, quantity);
+                    }
+
+                    return quantity;
+                };
+
+                if (qtyInput instanceof HTMLInputElement) {
+                    qtyInput.addEventListener("input", () => {
+                        clearDetailCartNotice();
+                        syncPurchaseState();
+                    });
+                    qtyInput.addEventListener("blur", syncPurchaseState);
+                }
+
+                if (qtyDecreaseBtn instanceof HTMLButtonElement) {
+                    qtyDecreaseBtn.addEventListener("click", () => {
+                        if (qtyInput instanceof HTMLInputElement) {
+                            qtyInput.value = String(Math.max(1, toNumber(qtyInput.value, 1) - 1));
+                        }
+
+                        clearDetailCartNotice();
+                        syncPurchaseState();
+                    });
+                }
+
+                if (qtyIncreaseBtn instanceof HTMLButtonElement) {
+                    qtyIncreaseBtn.addEventListener("click", () => {
+                        if (qtyInput instanceof HTMLInputElement) {
+                            qtyInput.value = String(Math.max(1, toNumber(qtyInput.value, 1) + 1));
+                        }
+
+                        clearDetailCartNotice();
+                        syncPurchaseState();
+                    });
+                }
+
+                syncPurchaseState();
+
                 if (addToCartBtn instanceof HTMLButtonElement) {
-                    addToCartBtn.addEventListener("click", () => submitAddToCart(product));
+                    addToCartBtn.addEventListener("click", async () => {
+                        clearDetailCartNotice();
+                        const quantity = syncPurchaseState();
+                        const result = await submitAddToCart(product, quantity, addToCartBtn);
+                        if (result?.success) {
+                            showDetailCartNotice(`Đã thêm "${product.productName}" vào giỏ với số lượng ${quantity.toLocaleString("vi-VN")} ${product.unitName}.`, "success");
+                        }
+                    });
                 }
 
                 void loadOffers(product);

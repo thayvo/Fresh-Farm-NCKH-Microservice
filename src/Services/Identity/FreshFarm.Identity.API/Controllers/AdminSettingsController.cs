@@ -48,6 +48,7 @@ public sealed class AdminSettingsController : ControllerBase
                 var now = DateTime.UtcNow;
                 var globalDefaults = await GetOrCreateGlobalStoreSettingAsync(cancellationToken);
                 sellerEntity = CreateDefaultSellerEntity(seller, globalDefaults, now);
+                sellerEntity.StoreName = await EnsureGeneratedStoreNameAsync(sellerEntity.StoreName, seller.UserId, cancellationToken);
                 _db.SellerStoreSettings.Add(sellerEntity);
                 await _db.SaveChangesAsync(cancellationToken);
             }
@@ -95,7 +96,26 @@ public sealed class AdminSettingsController : ControllerBase
             {
                 var globalDefaults = await GetOrCreateGlobalStoreSettingAsync(cancellationToken);
                 entity = CreateDefaultSellerEntity(seller, globalDefaults, now);
+                entity.StoreName = await EnsureGeneratedStoreNameAsync(entity.StoreName, seller.UserId, cancellationToken);
                 _db.SellerStoreSettings.Add(entity);
+            }
+
+            var normalizedStoreName = NormalizeStoreName(request.StoreName);
+            if (string.IsNullOrWhiteSpace(normalizedStoreName))
+            {
+                return BadRequest("Tên cửa hàng không được để trống.");
+            }
+
+            var duplicatedStoreName = await _db.SellerStoreSettings
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.UserId != userId
+                        && x.StoreName != null
+                        && x.StoreName.ToLower() == normalizedStoreName,
+                    cancellationToken);
+            if (duplicatedStoreName)
+            {
+                return Conflict("Tên cửa hàng này đã tồn tại. Vui lòng chọn tên khác.");
             }
 
             ApplySharedFields(entity, request, now);
@@ -201,6 +221,30 @@ public sealed class AdminSettingsController : ControllerBase
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    private async Task<string> EnsureGeneratedStoreNameAsync(string preferredName, int userId, CancellationToken cancellationToken)
+    {
+        var normalizedPreferred = NormalizeStoreName(preferredName);
+        if (string.IsNullOrWhiteSpace(normalizedPreferred))
+        {
+            return $"Cửa hàng {userId}";
+        }
+
+        var exists = await _db.SellerStoreSettings
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId != userId
+                    && x.StoreName != null
+                    && x.StoreName.ToLower() == normalizedPreferred,
+                cancellationToken);
+
+        if (!exists)
+        {
+            return preferredName.Trim();
+        }
+
+        return $"{preferredName.Trim()} {userId}";
     }
 
     private static void ApplySharedFields(StoreSetting entity, AdminStoreSettingsRequest request, DateTime now)
@@ -333,6 +377,11 @@ public sealed class AdminSettingsController : ControllerBase
     private static string? TrimOrNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizeStoreName(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
     }
 
     private bool TryGetCurrentUserId(out int userId)

@@ -219,7 +219,7 @@
                              style="width: 200px; height: 200px; object-fit: cover; border: 2px dashed #ccc; background: #f8f9fa; display: block; margin: 0 auto;"
                              class="rounded"
                              id="imagePreview"
-                             src="~/Images/no-image.png" />
+                             src="@ProductImagePaths.FallbackImageRequestPath" />
                     </div>
                     <input type="file" name="ImageFile" class="form-control" id="imageInput" accept="image/*" />
                     <small class="text-muted d-block mt-1">Chỉ chấp nhận file: JPG, PNG, GIF, WEBP (tối đa 5MB)</small>
@@ -375,7 +375,7 @@
                 if (!validTypes.includes(file.type)) {
                     imageError.textContent = 'Chỉ chấp nhận file ảnh JPG, PNG, GIF, WEBP!';
                     this.value = '';
-                    imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                    imagePreview.src = '@ProductImagePaths.FallbackImageRequestPath';
                     imagePreview.style.border = '2px dashed #ccc';
                     return;
                 }
@@ -383,7 +383,7 @@
                 if (file.size > 5 * 1024 * 1024) {
                     imageError.textContent = 'Kích thước file không được vượt quá 5MB!';
                     this.value = '';
-                    imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                    imagePreview.src = '@ProductImagePaths.FallbackImageRequestPath';
                     imagePreview.style.border = '2px dashed #ccc';
                     return;
                 }
@@ -448,7 +448,7 @@
         $('#resetBtn').on('click', function() {
             if (confirm('Bạn có chắc muốn xóa toàn bộ dữ liệu đã nhập?')) {
                 $('form')[0].reset();
-                imagePreview.src = '@Url.Content("~/Images/no-image.png")';
+                    imagePreview.src = '@ProductImagePaths.FallbackImageRequestPath';
                 imagePreview.style.border = '2px dashed #ccc';
                 imageError.textContent = '';
 

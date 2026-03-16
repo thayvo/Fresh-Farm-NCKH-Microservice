@@ -157,6 +157,7 @@
                             {
                                 var safeName = string.IsNullOrWhiteSpace(item.ProductName) ? $"Sản phẩm #{item.ProductId}" : item.ProductName;
                                 var safeUnit = string.IsNullOrWhiteSpace(item.UnitSymbol) ? "đơn vị" : item.UnitSymbol;
+                                var safeSellerName = string.IsNullOrWhiteSpace(item.SellerName) ? $"Shop #{item.SellerId}" : item.SellerName;
                                 var safeQuantity = Math.Max(1, item.Quantity);
                                 var lineTotal = item.UnitPrice * safeQuantity;
 
@@ -168,6 +169,7 @@
                                                type="checkbox"
                                                checked
                                                aria-label="Chọn @safeName"
+                                               data-cart-item-key="@item.CartItemKey"
                                                data-product-id="@item.ProductId" />
                                     </div>
 
@@ -179,6 +181,7 @@
                                         <div class="ms-3">
                                             <h6 class="mb-1">@safeName</h6>
                                             <small class="text-muted">Đơn vị: @safeUnit</small>
+                                            <div class="small text-muted">Shop: @safeSellerName</div>
                                         </div>
                                     </div>
 
@@ -190,6 +193,8 @@
                                         <form asp-controller="Cart" asp-action="Update" method="post" class="qty-actions">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ProductId" value="@item.ProductId" />
+                                            <input type="hidden" name="SellerId" value="@item.SellerId" />
+                                            <input type="hidden" name="CartItemKey" value="@item.CartItemKey" />
                                             <div class="input-group input-group-sm">
                                                 <button type="submit"
                                                         class="btn btn-outline-secondary"
@@ -217,6 +222,8 @@
                                         <form asp-controller="Cart" asp-action="Remove" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="ProductId" value="@item.ProductId" />
+                                            <input type="hidden" name="SellerId" value="@item.SellerId" />
+                                            <input type="hidden" name="CartItemKey" value="@item.CartItemKey" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                                 <i class="bi bi-trash"></i>
                                             </button>
@@ -423,8 +430,8 @@
 
                         const input = document.createElement("input");
                         input.type = "hidden";
-                        input.name = "selectedProductIds";
-                        input.value = String(productId);
+                        input.name = "selectedCartItemKeys";
+                        input.value = checkbox.getAttribute("data-cart-item-key") || "";
                         selectedInputsWrap.appendChild(input);
                     });
                 }

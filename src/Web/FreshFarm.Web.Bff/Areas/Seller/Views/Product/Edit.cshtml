@@ -196,9 +196,7 @@
                     </label>
                     <div class="text-center mb-3">
                         @{
-                            var currentImage = !string.IsNullOrEmpty(Model.ImageFileName)
-                                ? Url.Content("~/Images/" + Model.ImageFileName)
-                                : Url.Content("~/Images/no-image.png");
+                            var currentImage = ProductImagePaths.ResolveRequestPath(Model.ImageFileName);
                         }
                         <img alt="@Model.ProductName"
                              style="width: 200px; height: 200px; object-fit: cover; border: 2px solid #28a745; background: #f8f9fa; display: block; margin: 0 auto;"
@@ -443,7 +441,7 @@
                 $('#imageInput').val('');
                 imageError.textContent = '';
 
-                var originalImage = '@(!string.IsNullOrEmpty(Model.ImageFileName) ? Url.Content("~/Images/" + Model.ImageFileName) : Url.Content("~/Images/no-image.png"))';
+                var originalImage = '@ProductImagePaths.ResolveRequestPath(Model.ImageFileName)';
                 imagePreview.src = originalImage;
                 imagePreview.style.border = '2px solid #28a745';
 

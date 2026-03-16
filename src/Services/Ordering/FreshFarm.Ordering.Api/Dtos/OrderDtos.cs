@@ -7,6 +7,8 @@ public sealed class CreateOrderRequest // Request chinh de tao don hang.
     [MinLength(1, ErrorMessage = "Items phai co it nhat 1 dong.")] // Chan truong hop tao don rong.
     public required List<CreateOrderItemRequest> Items { get; init; } // Danh sach san pham can dat.
 
+    public List<CreateSellerShippingRequest> SellerShippingBreakdowns { get; init; } = new(); // Breakdown phi ship theo tung seller.
+
     [Range(0, double.MaxValue, ErrorMessage = "ShippingFee phai >= 0.")] // Chan phi am.
     public decimal? ShippingFee { get; init; } // Cho phep null de he thong tu mac dinh 0.
 
@@ -22,6 +24,15 @@ public sealed class CreateOrderItemRequest // Tung dong san pham trong don.
 {
     [Range(1, int.MaxValue, ErrorMessage = "ProductId phai > 0.")] // ProductId phai hop le.
     public int ProductId { get; init; } // Map vao `OrderDetail.ProductId`.
+
+    [Range(1, int.MaxValue, ErrorMessage = "SellerId phai > 0.")] // Multi-seller order can seller hop le de tao SellerOrder.
+    public int SellerId { get; init; } // Map vao `SellerOrder.SellerId`.
+
+    [MaxLength(200)]
+    public string? SellerName { get; init; } // Snapshot ten shop, de fallback log/UI neu can.
+
+    [MaxLength(255)]
+    public string? ProductName { get; init; } // Snapshot ten san pham cho `SellerOrderItem.SnapshotName`.
 
     [Range(1, 10000, ErrorMessage = "Quantity phai trong khoang 1..10000.")] // Chan outlier quantity de bao ve report/runtime.
     public int Quantity { get; init; } // Map vao `OrderDetail.Quantity`.
@@ -55,6 +66,24 @@ public sealed class CreateShippingRequest
 
     public int? ProvinceId { get; init; }
     public int? CommuneId { get; init; }
+}
+
+public sealed class CreateSellerShippingRequest
+{
+    [Range(1, int.MaxValue, ErrorMessage = "SellerId phai > 0.")]
+    public int SellerId { get; init; }
+
+    [Range(0, double.MaxValue, ErrorMessage = "ShippingFee phai >= 0.")]
+    public decimal ShippingFee { get; init; }
+
+    [MaxLength(200)]
+    public string? SellerName { get; init; }
+
+    [MaxLength(100)]
+    public string? ServiceName { get; init; }
+
+    [MaxLength(255)]
+    public string? ShippingOriginLabel { get; init; }
 }
 
 

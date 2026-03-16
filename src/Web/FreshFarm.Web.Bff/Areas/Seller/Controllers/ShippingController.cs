@@ -170,8 +170,8 @@ public class ShippingController : LegacySellerControllerBase
             wardName = settings?.GhnWardName ?? string.Empty,
             hasGhnOrigin = settings?.HasGhnOrigin ?? false,
             message = origin is null
-                ? "Seller này chưa cấu hình đủ địa chỉ lấy hàng GHN. Hãy vào Cài đặt cửa hàng để chọn tỉnh/quận/phường GHN."
-                : "Đã đọc địa chỉ lấy hàng GHN của seller từ cơ sở dữ liệu."
+                ? "Bạn chưa lưu đủ địa chỉ lấy hàng. Hãy vào Cài đặt cửa hàng để cập nhật trước."
+                : "Địa chỉ lấy hàng đã sẵn sàng để dùng."
         });
     }
 
@@ -327,13 +327,32 @@ public class ShippingController : LegacySellerControllerBase
             });
         }
 
+        if (request.OrderId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Bạn cần chọn một đơn hàng có sẵn trước khi tạo vận đơn."
+            });
+        }
+
+        var orderInfo = await GetOrderInfoPayloadAsync(request.OrderId, cancellationToken);
+        if (orderInfo is null || !orderInfo.success)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Không tìm thấy đơn hàng hợp lệ để tạo vận đơn."
+            });
+        }
+
         var originOverride = await GetCurrentOriginOverrideAsync(cancellationToken);
         if (originOverride is null)
         {
             return Json(new
             {
                 success = false,
-                message = "Seller chưa cấu hình địa chỉ lấy hàng GHN. Hãy vào Cài đặt cửa hàng để lưu tỉnh/quận/phường GHN trước."
+                message = "Bạn chưa lưu đủ địa chỉ lấy hàng. Hãy cập nhật trong Cài đặt cửa hàng trước."
             });
         }
 
@@ -736,6 +755,30 @@ public class ShippingController : LegacySellerControllerBase
         return BuildOriginOverride(settings);
     }
 
+    private async Task<OrderInfoApiResponse?> GetOrderInfoPayloadAsync(int orderId, CancellationToken cancellationToken)
+    {
+        if (orderId <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/shippings/order-info/{orderId}", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<OrderInfoApiResponse>(JsonOptions, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static GhnSandboxOriginOverride? BuildOriginOverride(SellerSettingViewModel? settings)
     {
         if (settings is null
@@ -1046,6 +1089,8 @@ public class ShippingController : LegacySellerControllerBase
 
     public sealed class CreateGhnSandboxOrderRequest
     {
+        public int OrderId { get; set; }
+
         public string? ToName { get; set; }
 
         public string? ToPhone { get; set; }

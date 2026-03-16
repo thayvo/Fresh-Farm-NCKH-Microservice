@@ -45,6 +45,8 @@
     }
 
     var productId = GetInt("ProductId", "Id");
+    var sellerId = GetInt("PrimarySellerId", "SellerId");
+    var sellerName = GetText("SellerName", "ShopName");
     var productName = GetText("ProductName", "Name");
     var unitSymbol = GetText("UnitSymbol", "Unit");
     var imageName = GetText("ImageFileName", "ImageUrl", "Image");
@@ -52,12 +54,10 @@
     var fallbackName = productId > 0 ? $"Sản phẩm #{productId}" : "Sản phẩm";
     var safeProductName = string.IsNullOrWhiteSpace(productName) ? fallbackName : productName;
     var safeUnitSymbol = string.IsNullOrWhiteSpace(unitSymbol) ? "đơn vị" : unitSymbol;
-    var imageUrl = string.IsNullOrWhiteSpace(imageName)
-        ? "/images/legacy/no-image.png"
-        : (imageName.StartsWith("/") || imageName.StartsWith("http", System.StringComparison.OrdinalIgnoreCase)
-            ? imageName
-            : $"/images/legacy/{imageName}");
+    var imageUrl = ProductImagePaths.ResolveRequestPath(imageName);
     var checkoutUrl = $"/checkout?productId={productId}" +
+                      $"&sellerId={sellerId}" +
+                      $"&sellerName={System.Uri.EscapeDataString(sellerName)}" +
                       $"&productName={System.Uri.EscapeDataString(safeProductName)}" +
                       $"&unitPrice={unitPrice.ToString(CultureInfo.InvariantCulture)}" +
                       $"&unitSymbol={System.Uri.EscapeDataString(safeUnitSymbol)}";
@@ -68,7 +68,7 @@
         <img src="@imageUrl"
              class="product-image"
              alt="@safeProductName"
-             onerror="this.onerror=null;this.src='/images/legacy/no-image.png';" />
+             onerror="this.onerror=null;this.src='@ProductImagePaths.FallbackImageRequestPath';" />
     </div>
 
     <div class="product-overlay">

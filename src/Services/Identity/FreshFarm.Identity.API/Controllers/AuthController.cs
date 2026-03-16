@@ -423,6 +423,26 @@ namespace FreshFarm.Identity.Api.Controllers
             }
 
             var now = DateTime.UtcNow;
+            var normalizedRecipient = request.RecipientName.Trim();
+            var normalizedPhone = request.Phone.Trim();
+            var normalizedAddressDetail = request.AddressDetail.Trim();
+            var normalizedProvince = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim();
+            var normalizedDistrict = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim();
+            var normalizedWard = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim();
+
+            var duplicated = await _db.AddressBooks
+                .AsNoTracking()
+                .Where(a => a.UserId == userId && a.IsActive)
+                .AnyAsync(a =>
+                    a.AddressDetail == normalizedAddressDetail &&
+                    a.Province == normalizedProvince &&
+                    a.District == normalizedDistrict &&
+                    a.Ward == normalizedWard);
+
+            if (duplicated)
+            {
+                return Conflict("Địa chỉ này đã có trong sổ địa chỉ. Vui lòng chọn địa chỉ đã lưu hoặc nhập địa chỉ khác.");
+            }
 
             if (request.IsDefault)
             {
@@ -440,12 +460,12 @@ namespace FreshFarm.Identity.Api.Controllers
             var entity = new AddressBook
             {
                 UserId = userId,
-                RecipientName = request.RecipientName.Trim(),
-                Phone = request.Phone.Trim(),
-                AddressDetail = request.AddressDetail.Trim(),
-                Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim(),
-                District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim(),
-                Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim(),
+                RecipientName = normalizedRecipient,
+                Phone = normalizedPhone,
+                AddressDetail = normalizedAddressDetail,
+                Province = normalizedProvince,
+                District = normalizedDistrict,
+                Ward = normalizedWard,
                 IsDefault = request.IsDefault,
                 IsActive = true,
                 CreatedAt = now,
@@ -490,6 +510,26 @@ namespace FreshFarm.Identity.Api.Controllers
             }
 
             var now = DateTime.UtcNow;
+            var normalizedRecipient = request.RecipientName.Trim();
+            var normalizedPhone = request.Phone.Trim();
+            var normalizedAddressDetail = request.AddressDetail.Trim();
+            var normalizedProvince = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim();
+            var normalizedDistrict = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim();
+            var normalizedWard = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim();
+            var duplicated = await _db.AddressBooks
+                .AsNoTracking()
+                .Where(a => a.UserId == userId && a.IsActive && a.AddressId != addressId)
+                .AnyAsync(a =>
+                    a.AddressDetail == normalizedAddressDetail &&
+                    a.Province == normalizedProvince &&
+                    a.District == normalizedDistrict &&
+                    a.Ward == normalizedWard);
+
+            if (duplicated)
+            {
+                return Conflict("Địa chỉ này đã có trong sổ địa chỉ. Vui lòng chọn địa chỉ đã lưu hoặc nhập địa chỉ khác.");
+            }
+
             if (request.IsDefault)
             {
                 var oldDefaults = await _db.AddressBooks
@@ -503,12 +543,12 @@ namespace FreshFarm.Identity.Api.Controllers
                 }
             }
 
-            entity.RecipientName = request.RecipientName.Trim();
-            entity.Phone = request.Phone.Trim();
-            entity.AddressDetail = request.AddressDetail.Trim();
-            entity.Province = string.IsNullOrWhiteSpace(request.Province) ? null : request.Province.Trim();
-            entity.District = string.IsNullOrWhiteSpace(request.District) ? null : request.District.Trim();
-            entity.Ward = string.IsNullOrWhiteSpace(request.Ward) ? null : request.Ward.Trim();
+            entity.RecipientName = normalizedRecipient;
+            entity.Phone = normalizedPhone;
+            entity.AddressDetail = normalizedAddressDetail;
+            entity.Province = normalizedProvince;
+            entity.District = normalizedDistrict;
+            entity.Ward = normalizedWard;
             entity.IsDefault = request.IsDefault;
             entity.UpdatedAt = now;
 

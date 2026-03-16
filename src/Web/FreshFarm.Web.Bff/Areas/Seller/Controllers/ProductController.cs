@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,19 +18,19 @@ public class ProductController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IProductImageStorageService _productImageStorageService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    private static readonly string[] AllowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-    private const int MaxFileSize = 5 * 1024 * 1024;
-    private const string ProductImagePath = "~/Images/";
-
-    public ProductController(IHttpClientFactory httpClientFactory)
+    public ProductController(
+        IHttpClientFactory httpClientFactory,
+        IProductImageStorageService productImageStorageService)
     {
         _httpClientFactory = httpClientFactory;
+        _productImageStorageService = productImageStorageService;
     }
 
     public async Task<IActionResult> ManageProducts(
@@ -223,7 +224,7 @@ public class ProductController : LegacySellerControllerBase
 
         if (imageFile is { Length: > 0 })
         {
-            var validation = ValidateImageFile(imageFile);
+            var validation = _productImageStorageService.Validate(imageFile);
             if (!validation.isValid)
             {
                 ModelState.AddModelError("ImageFile", validation.errorMessage);
@@ -232,7 +233,7 @@ public class ProductController : LegacySellerControllerBase
                 return View(product);
             }
 
-            product.ImageFileName = SaveImageFile(imageFile);
+            product.ImageFileName = _productImageStorageService.Save(imageFile);
         }
 
         var client = CreateCatalogClient();
@@ -254,7 +255,7 @@ public class ProductController : LegacySellerControllerBase
         {
             if (!string.IsNullOrWhiteSpace(product.ImageFileName))
             {
-                DeleteImageFile(product.ImageFileName);
+                _productImageStorageService.Delete(product.ImageFileName);
             }
 
             TempData["ErrorMessage"] = $"❌ {await ReadApiErrorAsync(response, "Không thể thêm sản phẩm")}";
@@ -357,7 +358,7 @@ public class ProductController : LegacySellerControllerBase
 
         if (imageFile is { Length: > 0 })
         {
-            var validation = ValidateImageFile(imageFile);
+            var validation = _productImageStorageService.Validate(imageFile);
             if (!validation.isValid)
             {
                 ModelState.AddModelError("ImageFile", validation.errorMessage);
@@ -366,7 +367,7 @@ public class ProductController : LegacySellerControllerBase
                 return View(product);
             }
 
-            product.ImageFileName = SaveImageFile(imageFile);
+            product.ImageFileName = _productImageStorageService.Save(imageFile);
         }
         else
         {
@@ -402,7 +403,7 @@ public class ProductController : LegacySellerControllerBase
             if (!string.IsNullOrWhiteSpace(product.ImageFileName) &&
                 !string.Equals(product.ImageFileName, oldImageFileName, StringComparison.OrdinalIgnoreCase))
             {
-                DeleteImageFile(product.ImageFileName);
+                _productImageStorageService.Delete(product.ImageFileName);
                 product.ImageFileName = oldImageFileName;
             }
 
@@ -414,7 +415,7 @@ public class ProductController : LegacySellerControllerBase
         if (!string.IsNullOrWhiteSpace(oldImageFileName) &&
             !string.Equals(oldImageFileName, product.ImageFileName, StringComparison.OrdinalIgnoreCase))
         {
-            DeleteImageFile(oldImageFileName);
+            _productImageStorageService.Delete(oldImageFileName);
         }
 
         TempData["SuccessMessage"] = $"✅ Cập nhật sản phẩm <strong>{product.ProductName}</strong> thành công!";
@@ -443,7 +444,7 @@ public class ProductController : LegacySellerControllerBase
 
         if (!string.IsNullOrWhiteSpace(existing.ImageFileName))
         {
-            DeleteImageFile(existing.ImageFileName);
+            _productImageStorageService.Delete(existing.ImageFileName);
         }
 
         TempData["SuccessMessage"] = "✅ Xóa sản phẩm thành công!";
@@ -660,72 +661,6 @@ public class ProductController : LegacySellerControllerBase
         }
 
         return client;
-    }
-
-    private string GetUploadPath()
-    {
-        var path = Server.MapPath(ProductImagePath);
-        if (!Directory.Exists(path))
-        {
-            Directory.CreateDirectory(path);
-        }
-
-        return path;
-    }
-
-    private static (bool isValid, string errorMessage) ValidateImageFile(IFormFile file)
-    {
-        if (file.Length == 0)
-        {
-            return (false, "File không hợp lệ");
-        }
-
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedImageExtensions.Contains(extension))
-        {
-            return (false, $"Chỉ chấp nhận file ảnh: {string.Join(", ", AllowedImageExtensions)}");
-        }
-
-        if (file.Length > MaxFileSize)
-        {
-            return (false, $"Kích thước file không được vượt quá {MaxFileSize / (1024 * 1024)}MB");
-        }
-
-        return (true, string.Empty);
-    }
-
-    private string SaveImageFile(IFormFile file)
-    {
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-        var uploadPath = GetUploadPath();
-        var filePath = Path.Combine(uploadPath, uniqueFileName);
-
-        using var stream = System.IO.File.Create(filePath);
-        file.CopyTo(stream);
-
-        return uniqueFileName;
-    }
-
-    private void DeleteImageFile(string? fileName)
-    {
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
-            return;
-        }
-
-        try
-        {
-            var filePath = Server.MapPath(Path.Combine(ProductImagePath, fileName));
-            if (System.IO.File.Exists(filePath))
-            {
-                System.IO.File.Delete(filePath);
-            }
-        }
-        catch
-        {
-            // No-op: xóa file lỗi không làm hỏng luồng nghiệp vụ chính.
-        }
     }
 
     private static string GenerateSku(int categoryId, IEnumerable<Product> products)

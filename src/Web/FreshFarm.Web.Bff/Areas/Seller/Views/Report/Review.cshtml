@@ -3,7 +3,7 @@
     ViewBag.Title = "Quản Lý Đánh Giá";
     var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
     Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
-    Func<string, string> imgUrl = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
+Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
 }
 
 <main class="container-fluid py-4 min-vh-100">

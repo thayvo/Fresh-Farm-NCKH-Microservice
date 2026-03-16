@@ -3,7 +3,7 @@
 @{
     ViewBag.Title = "Quản lý đánh giá";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
-    Func<string, string> imgUrl = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
+Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
 }
 
 <style>

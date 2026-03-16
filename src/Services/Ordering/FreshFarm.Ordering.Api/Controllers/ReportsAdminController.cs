@@ -656,6 +656,8 @@ public sealed class ReportsAdminController : ControllerBase
         var normalizedSort = string.IsNullOrWhiteSpace(sort) ? "date_desc" : sort.Trim().ToLowerInvariant();
         var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
         var keyword = string.IsNullOrWhiteSpace(q) ? string.Empty : q.Trim().ToLowerInvariant();
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
 
         var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
@@ -672,6 +674,13 @@ public sealed class ReportsAdminController : ControllerBase
         var shippingLookup = shippingRows
             .GroupBy(s => s.OrderId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ShippingId).First());
+        var sellerShippingLookup = !isAdmin && sellerId.HasValue
+            ? await _db.SellerOrders
+                .AsNoTracking()
+                .Where(so => so.SellerId == sellerId.Value && orderIds.Contains(so.OrderId))
+                .GroupBy(so => so.OrderId)
+                .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.ShippingFee), cancellationToken)
+            : new Dictionary<int, decimal>();
 
         var rows = orders
             .Select(order =>
@@ -697,7 +706,9 @@ public sealed class ReportsAdminController : ControllerBase
                     StatusText = MapStatusText(order.Status),
                     StatusBadgeClass = MapStatusBadgeClass(order.Status),
                     ActualDeliveryDays = actualDays,
-                    ShippingFee = order.ShippingFee
+                    ShippingFee = !isAdmin && sellerId.HasValue && sellerShippingLookup.TryGetValue(order.OrderId, out var scopedShippingFee)
+                        ? scopedShippingFee
+                        : order.ShippingFee
                 };
             })
             .ToList();
@@ -839,6 +850,8 @@ public sealed class ReportsAdminController : ControllerBase
         var normalizedSort = string.IsNullOrWhiteSpace(sort) ? "date_desc" : sort.Trim().ToLowerInvariant();
         var normalizedStatus = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant();
         var keyword = string.IsNullOrWhiteSpace(q) ? string.Empty : q.Trim().ToLowerInvariant();
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
 
         var orders = await ApplySellerScopeToOrdersQuery(_db.Orders)
             .AsNoTracking()
@@ -855,6 +868,13 @@ public sealed class ReportsAdminController : ControllerBase
         var shippingLookup = shippingRows
             .GroupBy(s => s.OrderId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ShippingId).First());
+        var sellerShippingLookup = !isAdmin && sellerId.HasValue
+            ? await _db.SellerOrders
+                .AsNoTracking()
+                .Where(so => so.SellerId == sellerId.Value && orderIds.Contains(so.OrderId))
+                .GroupBy(so => so.OrderId)
+                .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.ShippingFee), cancellationToken)
+            : new Dictionary<int, decimal>();
 
         var rows = orders
             .Select(order =>
@@ -880,7 +900,9 @@ public sealed class ReportsAdminController : ControllerBase
                     StatusText = MapStatusText(order.Status),
                     StatusBadgeClass = MapStatusBadgeClass(order.Status),
                     ActualDeliveryDays = actualDays,
-                    ShippingFee = order.ShippingFee
+                    ShippingFee = !isAdmin && sellerId.HasValue && sellerShippingLookup.TryGetValue(order.OrderId, out var scopedShippingFee)
+                        ? scopedShippingFee
+                        : order.ShippingFee
                 };
             })
             .ToList();

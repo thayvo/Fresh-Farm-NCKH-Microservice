@@ -3,7 +3,7 @@
     ViewBag.Title = "Báo Cáo Sản Phẩm";
     Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
     // Helper tạo URL ảnh sản phẩm, dùng chung logic với các trang khác
-    Func<string, string> productImg = f => Url.Content("~/Images/" + (string.IsNullOrWhiteSpace(f) ? "no-image.png" : f));
+Func<string?, string> productImg = f => ProductImagePaths.ResolveRequestPath(f);
 }
 
 <style>
@@ -502,7 +502,7 @@
                                                  class="rounded me-3"
                                                  width="48"
                                                  height="48"
-                                                 onerror="this.src='@Url.Content("~/Images/no-image.png")'" />
+                                     onerror="this.src='@ProductImagePaths.FallbackImageRequestPath'" />
                                             <div>
                                                 <h6 class="mb-0 fw-bold text-primary-blue">@product.ProductName</h6>
                                                 <small class="text-muted">SKU: @product.Sku</small>

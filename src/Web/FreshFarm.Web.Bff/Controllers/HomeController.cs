@@ -9,6 +9,7 @@ namespace FreshFarm.Web.Bff.Controllers
             return View();
         }
 
+        [HttpGet("/products")]
         [HttpGet("/search")]
         [HttpGet("/home/search")]
         public IActionResult Search(string? q)

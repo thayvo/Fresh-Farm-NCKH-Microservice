@@ -1293,6 +1293,9 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasDefaultValueSql("(getutcdate())")
                 .HasColumnType("datetime");
             entity.Property(e => e.OrderId).HasColumnName("OrderID");
+            entity.Property(e => e.ShippingFee)
+                .HasDefaultValue(0m)
+                .HasColumnType("decimal(18, 2)");
             entity.Property(e => e.SellerEarning).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.SellerId).HasColumnName("SellerID");
             entity.Property(e => e.SellerStatus)

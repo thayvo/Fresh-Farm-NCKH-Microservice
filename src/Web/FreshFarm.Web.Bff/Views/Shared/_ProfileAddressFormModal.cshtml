@@ -5,6 +5,8 @@
     {
         returnUrl = "/account/profile";
     }
+
+    var ghnConfigured = ViewBag.GhnSandboxConfigured as bool? ?? false;
 }
 
 <div class="modal fade" id="createAddressModal" tabindex="-1" aria-labelledby="createAddressModalLabel" aria-hidden="true">
@@ -20,8 +22,9 @@
             <form asp-controller="Account"
                   asp-action="CreateAddress"
                   method="post"
-                  class="needs-validation"
-                  novalidate>
+                  class="needs-validation ghn-address-form"
+                  novalidate
+                  data-ghn-form="true">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="ReturnUrl" value="@returnUrl" />
 
@@ -50,37 +53,67 @@
                         </div>
 
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Địa chỉ chi tiết</label>
-                            <input class="form-control"
+                            <label class="form-label fw-semibold">Số nhà, tên đường</label>
+                            <input class="form-control ghn-street-input"
                                    name="AddressDetail"
                                    placeholder="Số nhà, tên đường, khu vực..."
                                    maxlength="255"
                                    required />
-                            <div class="invalid-feedback">Vui lòng nhập địa chỉ chi tiết.</div>
+                            <div class="invalid-feedback">Vui lòng nhập số nhà, tên đường.</div>
+                            <div class="form-text">Phường/xã, quận/huyện và tỉnh/thành sẽ lấy theo lựa chọn GHN bên dưới.</div>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Tỉnh/Thành</label>
-                            <input class="form-control"
-                                   name="Province"
-                                   placeholder="Ví dụ: Bình Dương"
-                                   maxlength="100" />
-                        </div>
+                        <div class="col-12">
+                            <div class="profile-address-picker p-3 rounded-3 border">
+                                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                                    <div>
+                                        <div class="fw-semibold">Khu vực nhận hàng</div>
+                                        <div class="small text-muted">Chọn tỉnh/thành, quận/huyện và phường/xã theo danh mục GHN.</div>
+                                    </div>
+                                    @if (!ghnConfigured)
+                                    {
+                                        <span class="badge text-bg-warning">GHN chưa sẵn sàng</span>
+                                    }
+                                </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Quận/Huyện</label>
-                            <input class="form-control"
-                                   name="District"
-                                   placeholder="Ví dụ: Thủ Dầu Một"
-                                   maxlength="100" />
-                        </div>
+                                @if (!ghnConfigured)
+                                {
+                                    <div class="alert alert-warning py-2 px-3 small mb-0">
+                                        Hệ thống chưa tải được danh mục địa chỉ GHN. Vui lòng kiểm tra cấu hình GHN trước khi thêm địa chỉ mới.
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Tỉnh/Thành</label>
+                                            <select class="form-select ghn-province-select" data-selected-id="">
+                                                <option value="">Đang tải tỉnh/thành...</option>
+                                            </select>
+                                            <input type="hidden" name="Province" class="ghn-province-name" value="" />
+                                            <div class="invalid-feedback">Vui lòng chọn tỉnh/thành.</div>
+                                        </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">Phường/Xã</label>
-                            <input class="form-control"
-                                   name="Ward"
-                                   placeholder="Ví dụ: Phú Hòa"
-                                   maxlength="100" />
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Quận/Huyện</label>
+                                            <select class="form-select ghn-district-select" data-selected-id="">
+                                                <option value="">Chọn tỉnh/thành trước</option>
+                                            </select>
+                                            <input type="hidden" name="District" class="ghn-district-name" value="" />
+                                            <div class="invalid-feedback">Vui lòng chọn quận/huyện.</div>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-semibold">Phường/Xã</label>
+                                            <select class="form-select ghn-ward-select" data-selected-code="">
+                                                <option value="">Chọn quận/huyện trước</option>
+                                            </select>
+                                            <input type="hidden" name="Ward" class="ghn-ward-name" value="" />
+                                            <div class="invalid-feedback">Vui lòng chọn phường/xã.</div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
                         </div>
                     </div>
 

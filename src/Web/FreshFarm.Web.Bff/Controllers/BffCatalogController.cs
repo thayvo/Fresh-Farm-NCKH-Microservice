@@ -415,7 +415,7 @@ public sealed class BffCatalogController : ControllerBase
                 offer.SellerId,
                 offer.ProductId,
                 offer.ActiveSinceUtc,
-                ShopName = merchant?.ShopName ?? $"Seller #{offer.SellerId}",
+                ShopName = merchant?.ShopName ?? $"FreshFarm Seller {offer.SellerId}",
                 UserName = merchant?.UserName ?? string.Empty,
                 Avatar = merchant?.Avatar,
                 AddressSummary = merchant?.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động",
@@ -543,7 +543,7 @@ public sealed class BffCatalogController : ControllerBase
                 return new AvailableShopFacetDto
                 {
                     SellerId = summary.SellerId,
-                    ShopName = merchant?.ShopName ?? merchant?.UserName ?? $"Shop #{summary.SellerId}",
+                    ShopName = merchant?.ShopName ?? merchant?.UserName ?? $"FreshFarm Seller {summary.SellerId}",
                     Avatar = merchant?.Avatar,
                     AddressSummary = merchant?.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động",
                     JoinedAt = merchant?.JoinedAt,

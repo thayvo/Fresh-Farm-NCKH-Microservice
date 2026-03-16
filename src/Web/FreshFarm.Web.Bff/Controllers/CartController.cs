@@ -12,31 +12,32 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
     private readonly ICartSessionService _cart; // Service thao tác cart trong session.
 
     // thêm trong class CartController
-    private const string CheckoutSelectedProductIdsSessionKey = "CHECKOUT_SELECTED_PRODUCT_IDS";
+    private const string CheckoutSelectedCartItemKeysSessionKey = "CHECKOUT_SELECTED_CART_ITEM_KEYS";
 
     [HttpPost("/cart/checkout-selected")]
     [ValidateAntiForgeryToken]
-    public IActionResult CheckoutSelected([FromForm] int[] selectedProductIds)
+    public IActionResult CheckoutSelected([FromForm] string[] selectedCartItemKeys)
     {
-        var cartIds = _cart.GetItems()
-            .Select(x => x.ProductId)
+        var cartKeys = _cart.GetItems()
+            .Select(x => x.CartItemKey)
             .ToHashSet();
 
-        var validSelectedIds = (selectedProductIds ?? Array.Empty<int>())
-            .Where(id => id > 0 && cartIds.Contains(id))
+        var validSelectedKeys = (selectedCartItemKeys ?? Array.Empty<string>())
+            .Where(key => !string.IsNullOrWhiteSpace(key) && cartKeys.Contains(key.Trim()))
+            .Select(key => key.Trim())
             .Distinct()
             .ToList();
 
-        if (validSelectedIds.Count == 0)
+        if (validSelectedKeys.Count == 0)
         {
-            HttpContext.Session.Remove(CheckoutSelectedProductIdsSessionKey);
+            HttpContext.Session.Remove(CheckoutSelectedCartItemKeysSessionKey);
             TempData["CheckoutError"] = "Vui lòng chọn ít nhất 1 sản phẩm để thanh toán.";
             return RedirectToAction(nameof(Index));
         }
 
         HttpContext.Session.SetString(
-            CheckoutSelectedProductIdsSessionKey,
-            JsonSerializer.Serialize(validSelectedIds));
+            CheckoutSelectedCartItemKeysSessionKey,
+            JsonSerializer.Serialize(validSelectedKeys));
 
         return RedirectToAction("Index", "Checkout");
     }
@@ -64,6 +65,24 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
         }
 
         _cart.AddOrIncrease(request); // Thêm mới hoặc cộng dồn quantity.
+        if (WantsJson())
+        {
+            var cartItems = _cart.GetItems();
+            var cartItem = cartItems.FirstOrDefault(x =>
+                x.ProductId == request.ProductId &&
+                x.SellerId == request.SellerId);
+
+            return Json(new
+            {
+                success = true,
+                message = "Đã thêm sản phẩm vào giỏ hàng.",
+                cartItemCount = cartItems.Count,
+                cartQuantity = cartItems.Sum(x => Math.Max(0, x.Quantity)),
+                quantity = cartItem?.Quantity ?? Math.Max(1, request.Quantity),
+                cartUrl = Url.Action(nameof(Index), "Cart") ?? "/cart"
+            });
+        }
+
         return RedirectToAction(nameof(Index)); // Mặc định quay về trang cart.
     }
 
@@ -71,12 +90,12 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
     [ValidateAntiForgeryToken] // Chặn CSRF.
     public IActionResult Update([FromForm] UpdateCartItemRequestDto request) // Nhận productId + quantity.
     {
-        if (request.ProductId <= 0) // Validate input.
+        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey)) // Validate input.
         {
             return BadRequest("ProductId không hợp lệ."); // 400 nếu sai.
         }
 
-        _cart.UpdateQuantity(request.ProductId, request.Quantity); // Update hoặc remove nếu quantity <= 0.
+        _cart.UpdateQuantity(request.ProductId, request.SellerId, request.CartItemKey, request.Quantity); // Update đúng dòng item multi-seller.
         return RedirectToAction(nameof(Index)); // Quay lại cart để thấy kết quả.
     }
 
@@ -84,12 +103,12 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
     [ValidateAntiForgeryToken] // Chặn CSRF.
     public IActionResult Remove([FromForm] RemoveCartItemRequestDto request) // Nhận productId cần xóa.
     {
-        if (request.ProductId <= 0) // Validate input.
+        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey)) // Validate input.
         {
             return BadRequest("ProductId không hợp lệ."); // 400 nếu sai.
         }
 
-        _cart.Remove(request.ProductId); // Xóa item.
+        _cart.Remove(request.ProductId, request.SellerId, request.CartItemKey); // Xóa đúng dòng item multi-seller.
         return RedirectToAction(nameof(Index)); // Quay lại cart.
     }
 
@@ -99,5 +118,18 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
     {
         _cart.Clear(); // Xóa sạch session cart.
         return RedirectToAction(nameof(Index)); // Quay lại cart rỗng.
+    }
+
+    private bool WantsJson()
+    {
+        var accept = Request.Headers.Accept.ToString();
+        if (!string.IsNullOrWhiteSpace(accept) &&
+            accept.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var requestedWith = Request.Headers["X-Requested-With"].ToString();
+        return string.Equals(requestedWith, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -8,7 +8,9 @@ public interface ICartSessionService // Hợp đồng để controller gọi mà
     void SetItems(List<CartItemDto> items); // Ghi đè toàn bộ giỏ.
     void AddOrIncrease(AddToCartRequestDto request); // Thêm mới hoặc cộng dồn số lượng.
     void UpdateQuantity(int productId, int quantity); // Cập nhật số lượng 1 item.
+    void UpdateQuantity(int productId, int sellerId, string? cartItemKey, int quantity); // Cập nhật đúng dòng multi-seller.
     void Remove(int productId); // Xóa 1 item.
+    void Remove(int productId, int sellerId, string? cartItemKey); // Xóa đúng dòng multi-seller.
     void Clear(); // Xóa toàn bộ giỏ.
     CartSummaryDto BuildSummary(decimal shippingFee); // Tính subtotal/grand total.
 }

@@ -39,13 +39,15 @@ public sealed class CartSessionService : ICartSessionService // Triển khai int
     {
         var items = GetItems(); // Lấy trạng thái giỏ hiện tại.
         var quantity = request.Quantity <= 0 ? 1 : request.Quantity; // Chuẩn hóa quantity để tránh 0/âm.
-
-        var existing = items.FirstOrDefault(x => x.ProductId == request.ProductId); // Tìm item trùng ProductId.
+        var sellerId = request.SellerId > 0 ? request.SellerId : 0;
+        var existing = items.FirstOrDefault(x => x.ProductId == request.ProductId && NormalizeSellerId(x.SellerId) == sellerId); // Tìm item theo product + seller.
         if (existing is null) // Nếu chưa có trong giỏ.
         {
             items.Add(new CartItemDto // Tạo item mới.
             {
                 ProductId = request.ProductId, // Gán mã sản phẩm.
+                SellerId = sellerId, // Gắn seller để hỗ trợ multi-seller cart.
+                SellerName = request.SellerName, // Gắn tên shop để render nhanh.
                 ProductName = request.ProductName, // Gán tên để render.
                 UnitPrice = request.UnitPrice, // Gán đơn giá.
                 UnitSymbol = string.IsNullOrWhiteSpace(request.UnitSymbol) ? "đơn vị" : request.UnitSymbol, // Fallback đơn vị.
@@ -55,7 +57,9 @@ public sealed class CartSessionService : ICartSessionService // Triển khai int
         else // Nếu đã có item.
         {
             existing.Quantity += quantity; // Cộng dồn số lượng thay vì tạo dòng trùng.
+            existing.SellerId = sellerId; // Đồng bộ seller nếu request đã có.
             existing.UnitPrice = request.UnitPrice; // Cập nhật theo giá mới nhất trên Home.
+            if (!string.IsNullOrWhiteSpace(request.SellerName)) existing.SellerName = request.SellerName; // Đồng bộ tên shop nếu có.
             if (!string.IsNullOrWhiteSpace(request.ProductName)) existing.ProductName = request.ProductName; // Đồng bộ tên nếu có.
             if (!string.IsNullOrWhiteSpace(request.UnitSymbol)) existing.UnitSymbol = request.UnitSymbol; // Đồng bộ đơn vị nếu có.
         }
@@ -65,30 +69,40 @@ public sealed class CartSessionService : ICartSessionService // Triển khai int
 
     public void UpdateQuantity(int productId, int quantity) // Cập nhật quantity.
     {
-        var items = GetItems(); // Lấy cart hiện tại.
-        var existing = items.FirstOrDefault(x => x.ProductId == productId); // Tìm item cần cập nhật.
-        if (existing is null) return; // Không có item thì thôi, tránh throw không cần thiết.
-
-        if (quantity <= 0) // Nếu quantity không hợp lệ.
-        {
-            items.Remove(existing); // Quy ước: <=0 thì xóa khỏi giỏ.
-        }
-        else
-        {
-            existing.Quantity = quantity; // Gán số lượng mới.
-        }
-
-        SetItems(items); // Persist lại session.
+        UpdateQuantity(productId, 0, string.Empty, quantity); // Backward-compatible path cho code cũ.
     }
 
     public void Remove(int productId) // Xóa item theo productId.
     {
-        var items = GetItems(); // Lấy cart hiện tại.
-        var existing = items.FirstOrDefault(x => x.ProductId == productId); // Tìm item cần xóa.
-        if (existing is null) return; // Không thấy thì bỏ qua.
+        Remove(productId, 0, string.Empty); // Backward-compatible path cho code cũ.
+    }
 
-        items.Remove(existing); // Xóa item.
-        SetItems(items); // Persist.
+    public void UpdateQuantity(int productId, int sellerId, string? cartItemKey, int quantity)
+    {
+        var items = GetItems();
+        var existing = FindItem(items, productId, sellerId, cartItemKey);
+        if (existing is null) return;
+
+        if (quantity <= 0)
+        {
+            items.Remove(existing);
+        }
+        else
+        {
+            existing.Quantity = quantity;
+        }
+
+        SetItems(items);
+    }
+
+    public void Remove(int productId, int sellerId, string? cartItemKey)
+    {
+        var items = GetItems();
+        var existing = FindItem(items, productId, sellerId, cartItemKey);
+        if (existing is null) return;
+
+        items.Remove(existing);
+        SetItems(items);
     }
 
     public void Clear() // Xóa toàn bộ giỏ.
@@ -108,5 +122,22 @@ public sealed class CartSessionService : ICartSessionService // Triển khai int
             ShippingFee = shippingFee, // Phí ship đưa từ ngoài vào.
             GrandTotal = subTotal + shippingFee // Tổng cuối cùng.
         };
+    }
+
+    private static CartItemDto? FindItem(IEnumerable<CartItemDto> items, int productId, int sellerId, string? cartItemKey)
+    {
+        var normalizedKey = (cartItemKey ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(normalizedKey))
+        {
+            return items.FirstOrDefault(x => string.Equals(x.CartItemKey, normalizedKey, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var normalizedSellerId = NormalizeSellerId(sellerId);
+        return items.FirstOrDefault(x => x.ProductId == productId && NormalizeSellerId(x.SellerId) == normalizedSellerId);
+    }
+
+    private static int NormalizeSellerId(int sellerId)
+    {
+        return sellerId > 0 ? sellerId : 0;
     }
 }

@@ -866,10 +866,10 @@
                                                 <input type="checkbox" class="form-check-input product-checkbox" value="@product.ProductID" />
                                             </td>
                                             <td>
-                                                <img src="@Url.Content("~/Images/" + (product.ImageFileName ?? "no-image.png"))"
+                                        <img src="@ProductImagePaths.ResolveRequestPath(product.ImageFileName)"
                                                      alt="@product.ProductName"
                                                      class="product-thumb"
-                                                     onclick="showImageModal('@Url.Content("~/Images/" + (product.ImageFileName ?? "no-image.png"))', '@product.ProductName')" />
+                                             onclick="showImageModal('@ProductImagePaths.ResolveRequestPath(product.ImageFileName)', '@product.ProductName')" />
                                             </td>
                                             <td>
                                                 <div>
@@ -1217,9 +1217,12 @@
                 success: function (response) {
                     if (response.success) {
                         const p = response.product;
-                        const imagePath = p.ImageFileName
-                            ? '@Url.Content("~/Images/")' + p.ImageFileName
-                            : '@Url.Content("~/Images/no-image.png")';
+                        const rawImage = (p.ImageFileName || '').toString().trim();
+                        const imagePath = !rawImage || rawImage.toLowerCase() === 'no-image.png'
+                            ? '@ProductImagePaths.FallbackImageRequestPath'
+                            : (/^(https?:)?\/\//i.test(rawImage) || rawImage.startsWith('/')
+                                ? rawImage
+                                : '@ProductImagePaths.UploadFolderRequestPath' + rawImage);
 
                         const statusBadge = p.Status
                             ? '<span class="badge bg-success">Đang bán</span>'

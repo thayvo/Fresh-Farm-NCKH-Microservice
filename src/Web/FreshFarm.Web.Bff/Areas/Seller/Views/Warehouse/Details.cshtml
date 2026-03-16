@@ -5,7 +5,7 @@
     ViewBag.Title = "Chi tiết kho";
     var history = ViewBag.History as IEnumerable<WarehouseHistory> ?? Enumerable.Empty<WarehouseHistory>();
     var totalLots = ViewBag.TotalLots ?? 0;
-    Func<string, string> img = f => Url.Content(string.IsNullOrWhiteSpace(f) ? "~/Images/no-image.png" : "~/Images/" + f);
+Func<string?, string> img = f => ProductImagePaths.ResolveRequestPath(f);
     Func<decimal, string> vnd = x => string.Format("{0:N0} ₫", x);
     Func<int, string> stat = q => q <= 0 ? "Hết hàng" : (q <= 10 ? "Sắp hết" : "Còn hàng");
 }

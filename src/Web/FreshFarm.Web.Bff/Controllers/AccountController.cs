@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt; // Dung de parse JWT claim.
 using System.Security.Claims; // Dung Claim/ClaimsPrincipal.
 using FreshFarm.Web.Bff.Dtos; // Dung DTO vua tao.
+using FreshFarm.Web.Bff.Services; // Dung service GHN.
 using Microsoft.AspNetCore.Authentication; // Dung SignInAsync/SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // Cookie auth scheme.
 using Microsoft.AspNetCore.Authorization; // [Authorize], [AllowAnonymous].
@@ -12,10 +13,12 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key luu JWT trong session.
     private readonly IHttpClientFactory _httpClientFactory; // Factory tao HttpClient theo ten.
+    private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
 
-    public AccountController(IHttpClientFactory httpClientFactory) // Inject factory qua DI.
+    public AccountController(IHttpClientFactory httpClientFactory, IGhnSandboxService ghnSandboxService) // Inject factory qua DI.
     {
         _httpClientFactory = httpClientFactory; // Gan vao field.
+        _ghnSandboxService = ghnSandboxService;
     }
 
     [HttpGet("/account/signin")] // Route GET signin.
@@ -362,7 +365,74 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             vm = new ProfilePageViewModel { ReturnUrl = safeReturnUrl }; // Tạo model fallback để view không vỡ.
         }
 
+        ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
         return View(vm); // Render view với model.
+    }
+
+    [HttpGet("/account/profile/ghn/provinces")]
+    [Authorize]
+    public async Task<JsonResult> GetGhnProvinces(CancellationToken cancellationToken)
+    {
+        var items = await _ghnSandboxService.GetProvincesAsync(cancellationToken);
+        return Json(new
+        {
+            success = true,
+            configured = _ghnSandboxService.IsConfigured,
+            items = items.Select(x => new
+            {
+                id = x.Id,
+                code = x.Code,
+                name = x.Name
+            })
+        });
+    }
+
+    [HttpGet("/account/profile/ghn/districts")]
+    [Authorize]
+    public async Task<JsonResult> GetGhnDistricts(int provinceId, CancellationToken cancellationToken)
+    {
+        if (provinceId <= 0)
+        {
+            return Json(new { success = false, message = "Thiếu mã tỉnh/thành GHN." });
+        }
+
+        var items = await _ghnSandboxService.GetDistrictsAsync(provinceId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            configured = _ghnSandboxService.IsConfigured,
+            provinceId,
+            items = items.Select(x => new
+            {
+                id = x.Id,
+                code = x.Code,
+                name = x.Name
+            })
+        });
+    }
+
+    [HttpGet("/account/profile/ghn/wards")]
+    [Authorize]
+    public async Task<JsonResult> GetGhnWards(int districtId, CancellationToken cancellationToken)
+    {
+        if (districtId <= 0)
+        {
+            return Json(new { success = false, message = "Thiếu mã quận/huyện GHN." });
+        }
+
+        var items = await _ghnSandboxService.GetWardsAsync(districtId, cancellationToken);
+        return Json(new
+        {
+            success = true,
+            configured = _ghnSandboxService.IsConfigured,
+            districtId,
+            items = items.Select(x => new
+            {
+                id = x.Id,
+                code = x.Code,
+                name = x.Name
+            })
+        });
     }
 
     // ===== 4) Thay action POST /account/profile bằng bản validate chặt =====

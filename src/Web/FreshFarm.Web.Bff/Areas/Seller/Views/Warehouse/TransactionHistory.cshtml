@@ -546,6 +546,19 @@
 
 @section scripts {
     <script>
+        function resolveProductImage(imageFileName) {
+            const raw = (imageFileName || '').toString().trim();
+            if (!raw || raw.toLowerCase() === 'no-image.png') {
+                return '@ProductImagePaths.FallbackImageRequestPath';
+            }
+
+            if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('/')) {
+                return raw;
+            }
+
+            return '@ProductImagePaths.UploadFolderRequestPath' + raw;
+        }
+
         function viewTransactionDetails(id) {
             $('#transactionModal').modal('show');
             $('#transactionDetailsContent').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3">Đang tải...</p></div>');
@@ -603,8 +616,8 @@
                         html += `
                             <tr>
                                 <td class="text-center">
-                                    <img src="/Images/${item.ImageFileName}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"
-                                         onerror="this.src='/Images/no-image.png'">
+                                            <img src="${resolveProductImage(item.ImageFileName)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;"
+                                                 onerror="this.src='@ProductImagePaths.FallbackImageRequestPath'">
                                 </td>
                                 <td>${item.SKU}</td>
                                 <td>${item.ProductName}</td>

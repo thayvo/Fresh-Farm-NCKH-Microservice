@@ -19,6 +19,8 @@ public partial class SellerOrder
 
     public decimal CommissionAmount { get; set; }
 
+    public decimal ShippingFee { get; set; }
+
     public decimal SellerEarning { get; set; }
 
     public string CancelledBy { get; set; }

@@ -118,6 +118,7 @@
                                     <div class="col-md-12">
                                         <label class="form-label fw-bold">Tên cửa hàng</label>
                                         @Html.TextBoxFor(m => m.StoreName, new { @class = "form-control", required = "required" })
+                                        <div class="ghn-note mt-1">Tên shop sẽ hiển thị cho người mua trên marketplace và không được trùng với shop khác.</div>
                                         @Html.ValidationMessageFor(m => m.StoreName, "", new { @class = "text-danger small" })
                                     </div>
                                     <div class="col-12">

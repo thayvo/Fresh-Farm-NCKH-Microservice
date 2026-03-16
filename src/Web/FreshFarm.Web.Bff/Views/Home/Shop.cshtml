@@ -13,9 +13,10 @@
     <title>Gian hàng - FreshFarm</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    @await Html.PartialAsync("_MarketplaceChromeStyles")
     <style>
         :root { --ff-green:#16a34a; --ff-orange:#f97316; --ff-border:#e5e7eb; --ff-soft:#f8fafc; }
-        body { font-family:"Inter",sans-serif; background:linear-gradient(180deg,#f8fafc 0%,#ffffff 45%,#f8fafc 100%); color:#0f172a; }
+        body { font-family:var(--marketplace-font); background-color:#f8f9fa; color:var(--text-color); }
         .page-shell { padding:28px 0 48px; }
         .back-link { display:inline-flex; align-items:center; gap:8px; margin-bottom:16px; color:#166534; text-decoration:none; font-weight:700; }
         .shop-hero { background:linear-gradient(135deg,rgba(22,163,74,.12),rgba(249,115,22,.08)); border:1px solid #dbeafe; border-radius:24px; padding:22px; display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center; margin-bottom:18px; }
@@ -65,9 +66,9 @@
         .product-link { display:inline-flex; justify-content:center; align-items:center; border-radius:12px; padding:10px 12px; border:1px solid #fdba74; background:#fff7ed; color:#9a3412; text-decoration:none; font-weight:800; }
         .product-link:hover { background:#ffedd5; color:#9a3412; }
         .state-box { background:#fff; border:1px dashed #cbd5e1; border-radius:18px; padding:38px 22px; text-align:center; color:#64748b; }
-        @@media (max-width: 1199.98px) { .product-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-        @@media (max-width: 991.98px) { .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-        @@media (max-width: 767.98px) { .shop-hero { grid-template-columns:1fr; } .product-grid { grid-template-columns:1fr; } }
+        @@media all and (max-width: 1199.98px) { .product-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+        @@media all and (max-width: 991.98px) { .product-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @@media all and (max-width: 767.98px) { .shop-hero { grid-template-columns:1fr; } .product-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
@@ -109,9 +110,9 @@
             };
             const resolveImage = (value) => {
                 const raw = (value ?? "").toString().trim();
-                if (!raw) return "/Images/no-image.png";
+                if (!raw || raw.toLowerCase() === "no-image.png") return "@ProductImagePaths.FallbackImageRequestPath";
                 if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("/")) return raw;
-                return `/Images/${raw}`;
+                return `@ProductImagePaths.UploadFolderRequestPath${raw}`;
             };
             const vnd = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
             const formatDate = (value) => {

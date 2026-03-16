@@ -67,6 +67,7 @@ builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 
 builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionService cần HttpContext.
 builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
+builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
 
 var app = builder.Build(); // Build app pipeline.
 
