@@ -1,6 +1,6 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.RiskCenterPageViewModel
 @{
-    ViewData["Title"] = "Risk Center";
+    ViewData["Title"] = "Trung tâm rủi ro";
 
     string ToneClass(string severity)
     {
@@ -13,14 +13,33 @@
             _ => "tone-neutral"
         };
     }
+
+    string TranslateRiskValue(string? value)
+    {
+        return (value ?? string.Empty).ToLowerInvariant() switch
+        {
+            "voucher_abuse" => "Lạm dụng voucher",
+            "return_spike" => "Tăng đột biến hoàn trả",
+            "open" => "Mở",
+            "pending_review" => "Chờ duyệt",
+            "monitoring" => "Theo dõi",
+            "resolved" => "Đã xử lý",
+            "dismissed" => "Bỏ qua",
+            "critical" => "Nghiêm trọng",
+            "high" => "Cao",
+            "medium" => "Trung bình",
+            "low" => "Thấp",
+            _ => (value ?? string.Empty).Replace("_", " ")
+        };
+    }
 }
 
 <section class="risk-console ff-admin-shell">
     <div class="risk-hero ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow ff-admin-kicker mb-2">Cross-cutting controls</p>
-            <h1 class="fw-bold mb-2">Risk center</h1>
-            <p class="mb-0 opacity-75">Heuristic fraud queue cho voucher abuse va return spike, co decision log de bat dau lane 7.7A.</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Kiểm soát liên thông</p>
+            <h1 class="fw-bold mb-2">Trung tâm rủi ro</h1>
+            <p class="mb-0 opacity-75">Theo dõi hàng đợi nghi ngờ gian lận cho lạm dụng voucher và tăng đột biến hoàn trả, kèm nhật ký quyết định để vận hành lane 7.7A.</p>
         </div>
         <div class="hero-chip ff-admin-chip">Phase 7.7A MVP</div>
     </div>
@@ -45,30 +64,30 @@
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3">
             <div class="metric-card ff-admin-card">
-                <span class="metric-label">Total cases</span>
+                <span class="metric-label">Tổng số ca</span>
                 <strong>@Model.Overview.TotalCases</strong>
-                <small>@Model.Overview.OpenCases open</small>
+                <small>@Model.Overview.OpenCases đang mở</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="metric-card ff-admin-card">
-                <span class="metric-label">Pending review</span>
+                <span class="metric-label">Chờ duyệt</span>
                 <strong>@Model.Overview.ReviewCases</strong>
-                <small>@Model.Overview.EscalatedCases escalated</small>
+                <small>@Model.Overview.EscalatedCases đã leo thang</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="metric-card ff-admin-card">
-                <span class="metric-label">High severity</span>
+                <span class="metric-label">Mức độ cao</span>
                 <strong>@Model.Overview.HighSeverityCases</strong>
-                <small>@Model.Overview.DecisionsLast7d decisions / 7 ngay</small>
+                <small>@Model.Overview.DecisionsLast7d quyết định / 7 ngày</small>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="metric-card ff-admin-card">
-                <span class="metric-label">Case mix</span>
+                <span class="metric-label">Cơ cấu ca</span>
                 <strong>@Model.Overview.VoucherAbuseCases</strong>
-                <small>@Model.Overview.ReturnSpikeCases return spike</small>
+                <small>@Model.Overview.ReturnSpikeCases ca hoàn trả tăng đột biến</small>
             </div>
         </div>
     </div>
@@ -78,8 +97,8 @@
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <h2 class="h5 mb-1">Risk queue</h2>
-                        <p class="text-muted mb-0">Loc theo case type, status va severity de triage nhanh nhung tin hieu dang noi len.</p>
+                        <h2 class="h5 mb-1">Hàng đợi rủi ro</h2>
+                        <p class="text-muted mb-0">Lọc theo loại ca, trạng thái và mức độ nghiêm trọng để xử lý nhanh các tín hiệu đang nổi lên.</p>
                     </div>
                     <form method="post" asp-action="SyncHeuristics" asp-controller="Risk" asp-area="Admin">
                         @Html.AntiForgeryToken()
@@ -88,13 +107,13 @@
                         <input type="hidden" name="status" value="@Model.Status" />
                         <input type="hidden" name="severity" value="@Model.Severity" />
                         <input type="hidden" name="riskCaseId" value="@Model.SelectedCaseId" />
-                        <button type="submit" class="btn btn-outline-primary">Dong bo heuristic</button>
+                        <button type="submit" class="btn btn-outline-primary">Đồng bộ heuristic</button>
                     </form>
                 </div>
 
                 <form method="get" asp-action="Index" asp-controller="Risk" asp-area="Admin" class="row g-3 mb-4">
                     <div class="col-md-4">
-                        <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo title, summary, reference..." />
+                        <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo tiêu đề, tóm tắt, mã tham chiếu..." />
                     </div>
                     <div class="col-md-2">
                         <select class="form-select" name="type">
@@ -121,7 +140,7 @@
                         </select>
                     </div>
                     <div class="col-md-2 d-grid">
-                        <button class="btn btn-primary" type="submit">Loc</button>
+                        <button class="btn btn-primary" type="submit">Lọc</button>
                     </div>
                 </form>
 
@@ -129,10 +148,10 @@
                     <table class="table align-middle risk-table">
                         <thead>
                             <tr>
-                                <th>Case</th>
-                                <th>Links</th>
-                                <th>Signals</th>
-                                <th>Status</th>
+                                <th>Ca</th>
+                                <th>Liên kết</th>
+                                <th>Tín hiệu</th>
+                                <th>Trạng thái</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -140,7 +159,7 @@
                             @if (Model.Rows.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">Chua co risk case nao khop bo loc hien tai.</td>
+                                    <td colspan="5" class="text-center text-muted py-4">Chưa có ca rủi ro nào khớp với bộ lọc hiện tại.</td>
                                 </tr>
                             }
                             else
@@ -150,7 +169,7 @@
                                     <tr class="@(Model.SelectedCaseId == item.RiskCaseId ? "is-selected" : string.Empty)">
                                         <td>
                                             <div class="fw-semibold">@item.Title</div>
-                                            <div class="small text-muted">@item.CaseType.Replace("_", " ")</div>
+                                            <div class="small text-muted">@TranslateRiskValue(item.CaseType)</div>
                                             @if (!string.IsNullOrWhiteSpace(item.Summary))
                                             {
                                                 <div class="small text-muted mt-1">@item.Summary</div>
@@ -159,35 +178,35 @@
                                         <td>
                                             @if (item.SellerId.HasValue)
                                             {
-                                                <div class="small">Seller #@item.SellerId</div>
+                                                <div class="small">Nhà bán #@item.SellerId</div>
                                             }
                                             @if (item.BuyerId.HasValue)
                                             {
-                                                <div class="small">Buyer #@item.BuyerId</div>
+                                                <div class="small">Người mua #@item.BuyerId</div>
                                             }
                                             @if (item.OrderId.HasValue)
                                             {
-                                                <div class="small">Order #@item.OrderId</div>
+                                                <div class="small">Đơn hàng #@item.OrderId</div>
                                             }
                                             @if (item.VoucherCouponId.HasValue)
                                             {
-                                                <div class="small">Coupon #@item.VoucherCouponId</div>
+                                                <div class="small">Mã giảm giá #@item.VoucherCouponId</div>
                                             }
                                         </td>
                                         <td>
-                                            <div class="fw-semibold">@item.SignalCount signal</div>
+                                            <div class="fw-semibold">@item.SignalCount tín hiệu</div>
                                             <div class="small text-muted">@(item.LastSignalAt?.ToLocalTime().ToString("dd/MM HH:mm") ?? "-")</div>
                                         </td>
                                         <td>
-                                            <span class="status-pill @ToneClass(item.Severity)">@item.Severity</span>
-                                            <div class="small text-muted mt-1">@item.Status.Replace("_", " ")</div>
+                                            <span class="status-pill @ToneClass(item.Severity)">@TranslateRiskValue(item.Severity)</span>
+                                            <div class="small text-muted mt-1">@TranslateRiskValue(item.Status)</div>
                                             @if (item.IsEscalated)
                                             {
-                                                <div class="small text-danger">Escalated</div>
+                                                <div class="small text-danger">Đã leo thang</div>
                                             }
                                         </td>
                                         <td class="text-end">
-                                            <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-riskCaseId="@item.RiskCaseId" asp-route-q="@Model.Query" asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-severity="@Model.Severity">Chi tiet</a>
+                                            <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-riskCaseId="@item.RiskCaseId" asp-route-q="@Model.Query" asp-route-type="@Model.Type" asp-route-status="@Model.Status" asp-route-severity="@Model.Severity">Chi tiết</a>
                                         </td>
                                     </tr>
                                 }
@@ -199,13 +218,13 @@
 
             <div class="panel-card ff-admin-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Recent signals</h2>
-                    <p class="text-muted mb-0">Canh nhanh nhung case moi cap nhat de ca team growth va ops khong bo sot.</p>
+                    <h2 class="h5 mb-1">Tín hiệu gần đây</h2>
+                    <p class="text-muted mb-0">Theo dõi nhanh các ca vừa cập nhật để đội tăng trưởng và vận hành không bỏ sót.</p>
                 </div>
 
                 @if (Model.Overview.Recent.Count == 0)
                 {
-                    <div class="text-muted">Chua co recent case.</div>
+                    <div class="text-muted">Chưa có ca mới gần đây.</div>
                 }
                 else
                 {
@@ -215,11 +234,11 @@
                             <div class="detail-item">
                                 <div>
                                     <div class="fw-semibold">@item.Title</div>
-                                    <div class="small text-muted">@item.CaseType.Replace("_", " ") | @item.Status.Replace("_", " ")</div>
+                                    <div class="small text-muted">@TranslateRiskValue(item.CaseType) | @TranslateRiskValue(item.Status)</div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="status-pill @ToneClass(item.Severity)">@item.Severity</div>
-                                    <div class="small text-muted mt-1">@item.SignalCount signal</div>
+                                    <div class="status-pill @ToneClass(item.Severity)">@TranslateRiskValue(item.Severity)</div>
+                                    <div class="small text-muted mt-1">@item.SignalCount tín hiệu</div>
                                 </div>
                             </div>
                         }
@@ -231,25 +250,25 @@
         <div class="col-xl-5">
             <div class="panel-card ff-admin-card sticky-panel">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Case detail</h2>
-                    <p class="text-muted mb-0">Timeline toi gian gon de admin ra quyet dinh nhanh va de lai audit decision co ban.</p>
+                    <h2 class="h5 mb-1">Chi tiết ca</h2>
+                    <p class="text-muted mb-0">Dòng thời gian tinh gọn để admin ra quyết định nhanh và lưu lại nhật ký xử lý cơ bản.</p>
                 </div>
 
                 @if (Model.SelectedCase is null)
                 {
-                    <div class="text-muted">Chon mot case de xem chi tiet.</div>
+                    <div class="text-muted">Chọn một ca để xem chi tiết.</div>
                 }
                 else
                 {
                     <div class="case-detail-head mb-3">
                         <div>
-                            <div class="section-label">@Model.SelectedCase.CaseType.Replace("_", " ")</div>
+                            <div class="section-label">@TranslateRiskValue(Model.SelectedCase.CaseType)</div>
                             <h3 class="h5 mb-1">@Model.SelectedCase.Title</h3>
                             <div class="small text-muted">@Model.SelectedCase.ReferenceKey</div>
                         </div>
                         <div class="text-end">
-                            <div class="status-pill @ToneClass(Model.SelectedCase.Severity)">@Model.SelectedCase.Severity</div>
-                            <div class="small text-muted mt-1">@Model.SelectedCase.Status.Replace("_", " ")</div>
+                            <div class="status-pill @ToneClass(Model.SelectedCase.Severity)">@TranslateRiskValue(Model.SelectedCase.Severity)</div>
+                            <div class="small text-muted mt-1">@TranslateRiskValue(Model.SelectedCase.Status)</div>
                         </div>
                     </div>
 
@@ -261,16 +280,16 @@
                     }
 
                     <div class="meta-grid mb-4">
-                        <div class="meta-item"><span class="section-label">Seller</span><strong>@(Model.SelectedCase.SellerId?.ToString() ?? "-")</strong></div>
-                        <div class="meta-item"><span class="section-label">Buyer</span><strong>@(Model.SelectedCase.BuyerId?.ToString() ?? "-")</strong></div>
-                        <div class="meta-item"><span class="section-label">Order</span><strong>@(Model.SelectedCase.OrderId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Nhà bán</span><strong>@(Model.SelectedCase.SellerId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Người mua</span><strong>@(Model.SelectedCase.BuyerId?.ToString() ?? "-")</strong></div>
+                        <div class="meta-item"><span class="section-label">Đơn hàng</span><strong>@(Model.SelectedCase.OrderId?.ToString() ?? "-")</strong></div>
                         <div class="meta-item"><span class="section-label">Voucher</span><strong>@(Model.SelectedCase.VoucherCode ?? Model.SelectedCase.VoucherCouponId?.ToString() ?? "-")</strong></div>
                     </div>
 
-                    <div class="section-label">Signals</div>
+                    <div class="section-label">Tín hiệu</div>
                     @if (Model.SelectedCase.Signals.Count == 0)
                     {
-                        <div class="text-muted small mb-4">Chua co signal chi tiet.</div>
+                        <div class="text-muted small mb-4">Chưa có tín hiệu chi tiết.</div>
                     }
                     else
                     {
@@ -279,10 +298,10 @@
                             {
                                 <div class="detail-item">
                                     <div>
-                                        <strong>@signal.SignalType.Replace("_", " ")</strong>
+                                        <strong>@TranslateRiskValue(signal.SignalType)</strong>
                                         <div class="small text-muted">@signal.SignalCode | @signal.Source</div>
                                     </div>
-                                    <div class="small text-end text-muted">@signal.Score.ToString("N1") pts<br />@signal.TriggeredAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                    <div class="small text-end text-muted">@signal.Score.ToString("N1") điểm<br />@signal.TriggeredAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
                                 </div>
                             }
                         </div>
@@ -290,14 +309,14 @@
 
                     @if (Model.SelectedCase.VoucherAbuseCases.Count > 0)
                     {
-                        <div class="section-label">Voucher abuse trail</div>
+                        <div class="section-label">Dấu vết lạm dụng voucher</div>
                         <div class="detail-stack mb-4">
                             @foreach (var abuse in Model.SelectedCase.VoucherAbuseCases.Take(3))
                             {
                                 <div class="detail-item">
                                     <div>
-                                        <strong>@abuse.AbuseType.Replace("_", " ")</strong>
-                                        <div class="small text-muted">Coupon #@abuse.CouponId | Buyer #@(abuse.BuyerId?.ToString() ?? "-")</div>
+                                        <strong>@TranslateRiskValue(abuse.AbuseType)</strong>
+                                        <div class="small text-muted">Mã giảm giá #@abuse.CouponId | Người mua #@(abuse.BuyerId?.ToString() ?? "-")</div>
                                     </div>
                                     <div class="small text-end text-muted">@(abuse.SuspectedBenefitAmount?.ToString("N0") ?? "0") đ</div>
                                 </div>
@@ -305,10 +324,10 @@
                         </div>
                     }
 
-                    <div class="section-label">Decision log</div>
+                    <div class="section-label">Nhật ký quyết định</div>
                     @if (Model.SelectedCase.Decisions.Count == 0)
                     {
-                        <div class="text-muted small mb-3">Chua co decision nao.</div>
+                        <div class="text-muted small mb-3">Chưa có quyết định nào.</div>
                     }
                     else
                     {
@@ -317,7 +336,7 @@
                             {
                                 <div class="detail-item">
                                     <div>
-                                        <strong>@decision.DecisionType.Replace("_", " ")</strong>
+                                        <strong>@TranslateRiskValue(decision.DecisionType)</strong>
                                         <div class="small text-muted">@decision.Notes</div>
                                     </div>
                                     <div class="small text-end text-muted">@decision.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
@@ -334,7 +353,7 @@
                         <input type="hidden" name="status" value="@Model.Status" />
                         <input type="hidden" name="severity" value="@Model.Severity" />
                         <div class="col-12">
-                            <label asp-for="DecisionEditor.DecisionType" class="form-label">Decision</label>
+                            <label asp-for="DecisionEditor.DecisionType" class="form-label">Quyết định</label>
                             <select asp-for="DecisionEditor.DecisionType" class="form-select">
                                 @foreach (var option in Model.SelectedCase.DecisionOptions)
                                 {
@@ -343,11 +362,11 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label asp-for="DecisionEditor.Notes" class="form-label">Notes</label>
-                            <textarea asp-for="DecisionEditor.Notes" class="form-control" rows="3" placeholder="Ghi chu quyet dinh hoac handoff tiep theo..."></textarea>
+                            <label asp-for="DecisionEditor.Notes" class="form-label">Ghi chú</label>
+                            <textarea asp-for="DecisionEditor.Notes" class="form-control" rows="3" placeholder="Ghi chú quyết định hoặc phần handoff tiếp theo..."></textarea>
                         </div>
                         <div class="col-12 d-grid">
-                            <button type="submit" class="btn btn-primary">Ghi nhan decision</button>
+                            <button type="submit" class="btn btn-primary">Ghi nhận quyết định</button>
                         </div>
                     </form>
                 }

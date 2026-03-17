@@ -30,12 +30,19 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpGet("/account/signin")] // Route GET signin.
     [AllowAnonymous] // Chua login van vao duoc.
-    public IActionResult SignIn(string? returnUrl = null) // Render view signin.
+    public IActionResult SignIn(string? returnUrl = null, string? externalError = null) // Render view signin.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chuan hoa returnUrl cho redirect an toan.
         if (User.Identity?.IsAuthenticated == true) // Neu da dang nhap thi khong can vao form.
         {
             return RedirectToLocal(normalizedReturnUrl); // Quay ve trang truoc hoac fallback.
+        }
+
+        if (!string.IsNullOrWhiteSpace(externalError))
+        {
+            TempData["ErrorMessage"] = externalError.Contains("access_denied", StringComparison.OrdinalIgnoreCase)
+                ? "Bạn đã hủy đăng nhập bằng Google."
+                : "Đăng nhập Google chưa hoàn tất. Vui lòng thử lại.";
         }
 
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
@@ -95,6 +102,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         {
             RedirectUri = Url.Action(nameof(GoogleCallback), new { returnUrl = normalizedReturnUrl })
         };
+        if (!string.IsNullOrWhiteSpace(normalizedReturnUrl))
+        {
+            properties.Items["returnUrl"] = normalizedReturnUrl;
+        }
 
         return Challenge(properties, "Google");
     }
@@ -157,9 +168,24 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpGet("/account/signup")] // Route GET signup.
     [AllowAnonymous] // Anonymous vao trang dang ky.
-    public IActionResult SignUp() // Render view signup.
+    public IActionResult SignUp(string? returnUrl = null) // Render view signup.
     {
-        return View(); // Views/Account/SignUp.cshtml.
+        ViewData["ReturnUrl"] = NormalizeReturnUrl(returnUrl);
+        return View(new RegisterRequestDto()); // Views/Account/SignUp.cshtml.
+    }
+
+    [HttpGet("/account/terms")]
+    [AllowAnonymous]
+    public IActionResult Terms()
+    {
+        return View();
+    }
+
+    [HttpGet("/account/privacy")]
+    [AllowAnonymous]
+    public IActionResult PrivacyPolicy()
+    {
+        return View("PrivacyPolicy");
     }
 
     [HttpPost("/account/signup")] // Route POST signup.
@@ -167,22 +193,55 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [AllowAnonymous] // Anonymous dang ky.
     public async Task<IActionResult> SignUp(RegisterRequestDto request, string? returnUrl = null) // Nhan model form.
     {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        ViewData["ReturnUrl"] = normalizedReturnUrl;
+
+        request.FullName = request.FullName?.Trim() ?? string.Empty;
+        request.UserName = request.UserName?.Trim() ?? string.Empty;
+        request.Email = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
+        request.Phone = request.Phone?.Trim() ?? string.Empty;
+        request.RoleName = "Customer";
+
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            var hasLetter = request.Password.Any(char.IsLetter);
+            var hasDigit = request.Password.Any(char.IsDigit);
+            if (!hasLetter || !hasDigit)
+            {
+                ModelState.AddModelError(nameof(RegisterRequestDto.Password), "Mật khẩu cần có ít nhất 1 chữ cái và 1 chữ số.");
+            }
+        }
+
         if (!ModelState.IsValid) // Validate MVC model.
         {
             return View(request); // Render lai neu invalid.
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // HttpClient cho Identity.
-        var registerResponse = await identityClient.PostAsJsonAsync("/auth/register", request); // Goi register API.
+        var registerResponse = await identityClient.PostAsJsonAsync("/auth/register", new
+        {
+            request.UserName,
+            request.FullName,
+            request.Email,
+            request.Phone,
+            request.Password,
+            request.ConfirmPassword,
+            request.RoleName
+        }); // Goi register API.
 
         if (!registerResponse.IsSuccessStatusCode) // Register fail.
         {
             var errorText = await registerResponse.Content.ReadAsStringAsync(); // Doc loi.
-            ModelState.AddModelError(string.Empty, $"Dang ky that bai: {errorText}"); // Show loi.
+            ModelState.AddModelError(
+                string.Empty,
+                string.IsNullOrWhiteSpace(errorText)
+                    ? "Đăng ký chưa thành công. Vui lòng kiểm tra lại thông tin và thử lại."
+                    : errorText); // Show loi.
             return View(request); // O lai form.
         }
-        TempData["SuccessMessage"] = "Đăng ký thành công. Bạn có thể đăng nhập ngay.";
-        return RedirectToAction(nameof(SignIn), new { returnUrl });
+
+        TempData["SuccessMessage"] = "Đăng ký thành công. Bạn có thể đăng nhập ngay để tiếp tục mua sắm tại FreshFarm.";
+        return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
     }
 
     [HttpGet("/account/forgot-password")] // Route GET quên mật khẩu.

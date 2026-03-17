@@ -1,6 +1,30 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.CommunicationGovernancePageViewModel
 @{
-    ViewBag.Title = "Communications governance";
+    ViewBag.Title = "Trung tâm quản trị truyền thông";
+
+    string TranslateCommValue(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "" => "Tất cả",
+        "all" => "Tất cả",
+        "in_app" => "Trong ứng dụng",
+        "push" => "Thông báo đẩy",
+        "email" => "Email",
+        "sms" => "SMS",
+        "order_created" => "Đơn hàng được tạo",
+        "order_paid" => "Đơn hàng đã thanh toán",
+        "order_shipped" => "Đơn hàng đã giao vận",
+        "fresh_recall" => "Thu hồi hàng tươi",
+        "buyer" => "Người mua",
+        "seller" => "Người bán",
+        "admin" => "Quản trị viên",
+        "immediate" => "Gửi ngay",
+        "batched" => "Gửi theo lô",
+        "manual" => "Thủ công",
+        "admin_console" => "Bảng điều khiển admin",
+        "import" => "Nhập liệu",
+        "customer_service" => "Chăm sóc khách hàng",
+        _ => value ?? string.Empty
+    };
 }
 
 <style>
@@ -16,13 +40,13 @@
     <section class="comm-hero ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-xl-row justify-content-between gap-4">
             <div>
-                <div class="ff-admin-chip mb-3">Phase 7.7A</div>
-                <h1 class="fw-bold mb-2">Communications governance</h1>
-                <p class="mb-0 opacity-75">Quản trị template, notification policy theo event, và opt-in/out tracking để các luồng thông báo toàn sàn chạy có kiểm soát.</p>
+                <div class="ff-admin-chip mb-3">Giai đoạn 7.7A</div>
+                <h1 class="fw-bold mb-2">Trung tâm quản trị truyền thông</h1>
+                <p class="mb-0 opacity-75">Quản trị mẫu thông báo, chính sách gửi theo sự kiện và theo dõi opt-in hoặc opt-out để các luồng thông báo toàn sàn vận hành có kiểm soát.</p>
             </div>
             <div class="text-xl-end">
-                <div class="small opacity-75">Filter hiện tại</div>
-                <div class="fw-semibold">@Model.Channel / @Model.EventType</div>
+                <div class="small opacity-75">Bộ lọc hiện tại</div>
+                <div class="fw-semibold">@TranslateCommValue(Model.Channel) / @TranslateCommValue(Model.EventType)</div>
             </div>
         </div>
     </section>
@@ -44,19 +68,19 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-2">
-            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Templates</div><div class="display-6 fw-bold">@Model.Stats.TotalTemplates</div></div></div>
+            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Mẫu thông báo</div><div class="display-6 fw-bold">@Model.Stats.TotalTemplates</div></div></div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Đang active</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveTemplates</div></div></div>
+            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Đang bật</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveTemplates</div></div></div>
         </div>
         <div class="col-md-6 col-xl-2">
-            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Policies bật</div><div class="display-6 fw-bold text-primary">@Model.Stats.EnabledPolicies</div></div></div>
+            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Chính sách đang bật</div><div class="display-6 fw-bold text-primary">@Model.Stats.EnabledPolicies</div></div></div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Opt-out đang có</div><div class="display-6 fw-bold text-danger">@Model.Stats.OptedOutCount</div></div></div>
+            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Đang từ chối nhận</div><div class="display-6 fw-bold text-danger">@Model.Stats.OptedOutCount</div></div></div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Preference update 24h</div><div class="display-6 fw-bold">@Model.Stats.UpdatedPreferences24h</div></div></div>
+            <div class="card comm-card"><div class="card-body"><div class="text-muted small">Cập nhật tùy chọn 24h</div><div class="display-6 fw-bold">@Model.Stats.UpdatedPreferences24h</div></div></div>
         </div>
     </div>
 
@@ -65,10 +89,10 @@
             <form method="get" class="row g-3 align-items-end">
                 <div class="col-lg-5">
                     <label class="form-label fw-semibold">Tìm kiếm</label>
-                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Template, event, channel, userId..." />
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Mẫu thông báo, sự kiện, kênh, mã người dùng..." />
                 </div>
                 <div class="col-md-3 col-lg-2">
-                    <label class="form-label fw-semibold">Channel</label>
+                    <label class="form-label fw-semibold">Kênh</label>
                     <select class="form-select" name="channel">
                         @foreach (var option in Model.ChannelOptions)
                         {
@@ -84,7 +108,7 @@
                     </select>
                 </div>
                 <div class="col-md-4 col-lg-3">
-                    <label class="form-label fw-semibold">Event</label>
+                    <label class="form-label fw-semibold">Sự kiện</label>
                     <select class="form-select" name="eventType">
                         @foreach (var option in Model.EventOptions)
                         {
@@ -101,7 +125,7 @@
                 </div>
                 <div class="col-lg-2 d-flex gap-2">
                     <button type="submit" class="btn btn-primary rounded-pill px-4 w-100">Lọc</button>
-                    <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Communication", new { area = "Admin" })">Reset</a>
+                    <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Communication", new { area = "Admin" })">Đặt lại</a>
                 </div>
             </form>
         </div>
@@ -113,17 +137,17 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>
-                            <h5 class="mb-1">Template registry</h5>
-                            <div class="text-muted small">Bản mẫu dùng cho email/SMS/push/in-app theo từng event.</div>
+                            <h5 class="mb-1">Kho mẫu thông báo</h5>
+                            <div class="text-muted small">Bản mẫu dùng cho email, SMS, push hoặc trong ứng dụng theo từng sự kiện.</div>
                         </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th>Template</th>
-                                    <th>Event</th>
-                                    <th>Channel</th>
+                                    <th>Mẫu thông báo</th>
+                                    <th>Sự kiện</th>
+                                    <th>Kênh</th>
                                     <th>Nội dung</th>
                                     <th>Trạng thái</th>
                                     <th class="text-end">Thao tác</th>
@@ -132,7 +156,7 @@
                             <tbody>
                                 @if (Model.Templates.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có template nào trong phạm vi lọc.</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có mẫu thông báo nào trong phạm vi lọc.</td></tr>
                                 }
                                 else
                                 {
@@ -141,10 +165,10 @@
                                         <tr>
                                             <td>
                                                 <div class="fw-semibold">@item.TemplateName</div>
-                                                <div class="small text-muted">v@item.Version · @item.Locale · editor #@(item.LastEditedByUserId?.ToString() ?? "-")</div>
+                                                <div class="small text-muted">v@item.Version · @item.Locale · biên tập viên #@(item.LastEditedByUserId?.ToString() ?? "-")</div>
                                             </td>
-                                            <td><span class="comm-tag">@item.EventType</span></td>
-                                            <td><span class="comm-tag">@item.Channel</span></td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.EventType)</span></td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.Channel)</span></td>
                                             <td>
                                                 @if (!string.IsNullOrWhiteSpace(item.Subject))
                                                 {
@@ -152,7 +176,7 @@
                                                 }
                                                 <div class="comm-body small">@item.Body</div>
                                             </td>
-                                            <td><span class="comm-chip @(item.IsActive ? "is-on" : "is-off")">@(item.IsActive ? "Active" : "Paused")</span></td>
+                                            <td><span class="comm-chip @(item.IsActive ? "is-on" : "is-off")">@(item.IsActive ? "Đang bật" : "Tạm dừng")</span></td>
                                             <td class="text-end">
                                                 <form method="post" action="@Url.Action("ToggleTemplate", "Communication", new { area = "Admin" })" class="d-inline">
                                                     @Html.AntiForgeryToken()
@@ -174,16 +198,16 @@
 
             <div class="card comm-card mb-4">
                 <div class="card-body">
-                    <h5 class="mb-1">Notification policies</h5>
-                    <div class="text-muted small mb-3">Rule quyết định event nào được gửi, qua channel nào, cooldown và delivery mode ra sao.</div>
+                    <h5 class="mb-1">Chính sách thông báo</h5>
+                    <div class="text-muted small mb-3">Các quy tắc quyết định sự kiện nào được gửi, qua kênh nào, thời gian chờ và chế độ gửi ra sao.</div>
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th>Rule</th>
-                                    <th>Audience</th>
-                                    <th>Template</th>
-                                    <th>Delivery</th>
+                                    <th>Quy tắc</th>
+                                    <th>Đối tượng</th>
+                                    <th>Mẫu dùng</th>
+                                    <th>Chế độ gửi</th>
                                     <th>Trạng thái</th>
                                     <th class="text-end">Thao tác</th>
                                 </tr>
@@ -191,7 +215,7 @@
                             <tbody>
                                 @if (Model.Policies.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có policy nào trong phạm vi lọc.</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có chính sách nào trong phạm vi lọc.</td></tr>
                                 }
                                 else
                                 {
@@ -199,17 +223,17 @@
                                     {
                                         <tr>
                                             <td>
-                                                <div class="fw-semibold">@item.EventType / @item.Channel</div>
-                                                <div class="small text-muted">Cooldown @item.CooldownMinutes phút · Priority @item.Priority</div>
+                                                <div class="fw-semibold">@TranslateCommValue(item.EventType) / @TranslateCommValue(item.Channel)</div>
+                                                <div class="small text-muted">Thời gian chờ @item.CooldownMinutes phút · Ưu tiên @item.Priority</div>
                                                 @if (!string.IsNullOrWhiteSpace(item.Notes))
                                                 {
                                                     <div class="small text-muted">@item.Notes</div>
                                                 }
                                             </td>
-                                            <td><span class="comm-tag">@item.AudienceType</span></td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.AudienceType)</span></td>
                                             <td>@(string.IsNullOrWhiteSpace(item.TemplateName) ? "Fallback mặc định" : item.TemplateName)</td>
-                                            <td><span class="comm-tag">@item.DeliveryMode</span></td>
-                                            <td><span class="comm-chip @(item.IsEnabled ? "is-on" : "is-off")">@(item.IsEnabled ? "Enabled" : "Disabled")</span></td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.DeliveryMode)</span></td>
+                                            <td><span class="comm-chip @(item.IsEnabled ? "is-on" : "is-off")">@(item.IsEnabled ? "Đang bật" : "Đang tắt")</span></td>
                                             <td class="text-end">
                                                 <form method="post" action="@Url.Action("TogglePolicy", "Communication", new { area = "Admin" })" class="d-inline">
                                                     @Html.AntiForgeryToken()
@@ -231,24 +255,24 @@
 
             <div class="card comm-card">
                 <div class="card-body">
-                    <h5 class="mb-1">Opt-in / opt-out tracking</h5>
-                    <div class="text-muted small mb-3">Theo dõi override preference theo user để CS hoặc growth team có thể tra cứu và sửa nhanh.</div>
+                    <h5 class="mb-1">Theo dõi opt-in / opt-out</h5>
+                    <div class="text-muted small mb-3">Theo dõi tùy chọn ghi đè theo người dùng để chăm sóc khách hàng hoặc đội tăng trưởng có thể tra cứu và cập nhật nhanh.</div>
                     <div class="table-responsive">
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th>User</th>
-                                    <th>Event</th>
-                                    <th>Channel</th>
-                                    <th>Preference</th>
-                                    <th>Source</th>
+                                    <th>Người dùng</th>
+                                    <th>Sự kiện</th>
+                                    <th>Kênh</th>
+                                    <th>Tùy chọn</th>
+                                    <th>Nguồn</th>
                                     <th>Cập nhật</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @if (Model.Preferences.Count == 0)
                                 {
-                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có preference override nào.</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted py-5">Chưa có bản ghi ghi đè tùy chọn nào.</td></tr>
                                 }
                                 else
                                 {
@@ -256,10 +280,10 @@
                                     {
                                         <tr>
                                             <td class="fw-semibold">#@item.UserId</td>
-                                            <td><span class="comm-tag">@item.EventType</span></td>
-                                            <td><span class="comm-tag">@item.Channel</span></td>
-                                            <td><span class="comm-chip @(item.IsOptedIn ? "is-on" : "is-off")">@(item.IsOptedIn ? "Opt-in" : "Opt-out")</span></td>
-                                            <td>@item.Source</td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.EventType)</span></td>
+                                            <td><span class="comm-tag">@TranslateCommValue(item.Channel)</span></td>
+                                            <td><span class="comm-chip @(item.IsOptedIn ? "is-on" : "is-off")">@(item.IsOptedIn ? "Cho phép nhận" : "Từ chối nhận")</span></td>
+                                            <td>@TranslateCommValue(item.Source)</td>
                                             <td>@item.UpdatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
                                         </tr>
                                     }
@@ -274,19 +298,19 @@
         <div class="col-12 col-xxl-5">
             <div class="card comm-card mb-4">
                 <div class="card-body">
-                    <h5 class="mb-1">Lưu template</h5>
-                    <div class="text-muted small mb-3">MVP tập trung vào tạo template mới cho event/channel chính.</div>
+                    <h5 class="mb-1">Lưu mẫu thông báo</h5>
+                    <div class="text-muted small mb-3">Giai đoạn này tập trung vào việc tạo mẫu mới cho các sự kiện và kênh chính.</div>
                     <form method="post" action="@Url.Action("SaveTemplate", "Communication", new { area = "Admin" })" class="row g-3">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="q" value="@Model.Query" />
                         <input type="hidden" name="channel" value="@Model.Channel" />
                         <input type="hidden" name="eventType" value="@Model.EventType" />
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Tên template</label>
+                            <label class="form-label fw-semibold">Tên mẫu thông báo</label>
                             <input class="form-control" name="TemplateName" value="@Model.NewTemplate.TemplateName" required />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Event</label>
+                            <label class="form-label fw-semibold">Sự kiện</label>
                             <select class="form-select" name="EventType">
                                 @foreach (var option in Model.EventOptions.Where(x => x.Value != "all"))
                                 {
@@ -295,7 +319,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Channel</label>
+                            <label class="form-label fw-semibold">Kênh</label>
                             <select class="form-select" name="Channel">
                                 @foreach (var option in Model.ChannelOptions.Where(x => x.Value != "all"))
                                 {
@@ -304,24 +328,24 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Locale</label>
+                            <label class="form-label fw-semibold">Ngôn ngữ</label>
                             <input class="form-control" name="Locale" value="vi-VN" />
                         </div>
                         <div class="col-md-6 form-check mt-4 ps-5">
                             <input class="form-check-input" type="checkbox" name="IsActive" value="true" checked />
                             <input type="hidden" name="IsActive" value="false" />
-                            <label class="form-check-label">Active ngay sau khi lưu</label>
+                            <label class="form-check-label">Bật ngay sau khi lưu</label>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Subject</label>
+                            <label class="form-label fw-semibold">Tiêu đề</label>
                             <input class="form-control" name="Subject" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Body</label>
-                            <textarea class="form-control" name="Body" rows="5" required placeholder="Xin chao {{customerName}}, don hang {{orderCode}} da duoc tiep nhan..."></textarea>
+                            <label class="form-label fw-semibold">Nội dung</label>
+                            <textarea class="form-control" name="Body" rows="5" required placeholder="Xin chào {{customerName}}, đơn hàng {{orderCode}} đã được tiếp nhận..."></textarea>
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu template</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu mẫu thông báo</button>
                         </div>
                     </form>
                 </div>
@@ -329,15 +353,15 @@
 
             <div class="card comm-card mb-4">
                 <div class="card-body">
-                    <h5 class="mb-1">Lưu policy</h5>
-                    <div class="text-muted small mb-3">Ràng buộc event, audience, cooldown và template đi kèm.</div>
+                    <h5 class="mb-1">Lưu chính sách</h5>
+                    <div class="text-muted small mb-3">Thiết lập sự kiện, đối tượng nhận, thời gian chờ và mẫu thông báo đi kèm.</div>
                     <form method="post" action="@Url.Action("SavePolicy", "Communication", new { area = "Admin" })" class="row g-3">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="q" value="@Model.Query" />
                         <input type="hidden" name="channel" value="@Model.Channel" />
                         <input type="hidden" name="eventType" value="@Model.EventType" />
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Event</label>
+                            <label class="form-label fw-semibold">Sự kiện</label>
                             <select class="form-select" name="EventType">
                                 @foreach (var option in Model.EventOptions.Where(x => x.Value != "all"))
                                 {
@@ -346,7 +370,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Channel</label>
+                            <label class="form-label fw-semibold">Kênh</label>
                             <select class="form-select" name="Channel">
                                 @foreach (var option in Model.ChannelOptions.Where(x => x.Value != "all"))
                                 {
@@ -355,7 +379,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Audience</label>
+                            <label class="form-label fw-semibold">Đối tượng</label>
                             <select class="form-select" name="AudienceType">
                                 @foreach (var option in Model.AudienceOptions)
                                 {
@@ -364,7 +388,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Delivery mode</label>
+                            <label class="form-label fw-semibold">Chế độ gửi</label>
                             <select class="form-select" name="DeliveryMode">
                                 @foreach (var option in Model.DeliveryModeOptions)
                                 {
@@ -373,9 +397,9 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Template liên kết</label>
+                            <label class="form-label fw-semibold">Mẫu liên kết</label>
                             <select class="form-select" name="CommunicationTemplateId">
-                                <option value="">Fallback mặc định</option>
+                                <option value="">Dùng mẫu mặc định</option>
                                 @foreach (var option in Model.TemplateOptions)
                                 {
                                     <option value="@option.CommunicationTemplateId">@option.Text</option>
@@ -383,24 +407,24 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Cooldown</label>
+                            <label class="form-label fw-semibold">Thời gian chờ</label>
                             <input class="form-control" name="CooldownMinutes" type="number" min="0" value="0" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Priority</label>
+                            <label class="form-label fw-semibold">Độ ưu tiên</label>
                             <input class="form-control" name="Priority" type="number" min="0" max="100" value="50" />
                         </div>
                         <div class="col-12 form-check ps-5">
                             <input class="form-check-input" type="checkbox" name="IsEnabled" value="true" checked />
                             <input type="hidden" name="IsEnabled" value="false" />
-                            <label class="form-check-label">Bật policy sau khi lưu</label>
+                            <label class="form-check-label">Bật chính sách sau khi lưu</label>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold">Notes</label>
-                            <textarea class="form-control" name="Notes" rows="3" placeholder="Ví dụ: voucher drop chỉ gửi push/email cho buyer đã opt-in."></textarea>
+                            <label class="form-label fw-semibold">Ghi chú</label>
+                            <textarea class="form-control" name="Notes" rows="3" placeholder="Ví dụ: voucher flash sale chỉ gửi push hoặc email cho người mua đã đồng ý nhận."></textarea>
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu policy</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu chính sách</button>
                         </div>
                     </form>
                 </div>
@@ -408,19 +432,19 @@
 
             <div class="card comm-card">
                 <div class="card-body">
-                    <h5 class="mb-1">Ghi đè preference</h5>
-                    <div class="text-muted small mb-3">Dùng khi cần xử lý yêu cầu opt-in/out từ CS hoặc growth team.</div>
+                    <h5 class="mb-1">Ghi đè tùy chọn nhận thông báo</h5>
+                    <div class="text-muted small mb-3">Dùng khi cần xử lý yêu cầu cho phép hoặc từ chối nhận thông báo từ chăm sóc khách hàng hoặc đội tăng trưởng.</div>
                     <form method="post" action="@Url.Action("SavePreference", "Communication", new { area = "Admin" })" class="row g-3">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="q" value="@Model.Query" />
                         <input type="hidden" name="channel" value="@Model.Channel" />
                         <input type="hidden" name="eventType" value="@Model.EventType" />
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">User ID</label>
+                            <label class="form-label fw-semibold">Mã người dùng</label>
                             <input class="form-control" name="UserId" type="number" min="1" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Event</label>
+                            <label class="form-label fw-semibold">Sự kiện</label>
                             <select class="form-select" name="EventType">
                                 @foreach (var option in Model.EventOptions.Where(x => x.Value != "all"))
                                 {
@@ -429,7 +453,7 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Channel</label>
+                            <label class="form-label fw-semibold">Kênh</label>
                             <select class="form-select" name="Channel">
                                 @foreach (var option in Model.ChannelOptions.Where(x => x.Value != "all"))
                                 {
@@ -438,7 +462,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Source</label>
+                            <label class="form-label fw-semibold">Nguồn cập nhật</label>
                             <select class="form-select" name="Source">
                                 @foreach (var option in Model.SourceOptions)
                                 {
@@ -449,10 +473,10 @@
                         <div class="col-md-6 form-check mt-4 ps-5">
                             <input class="form-check-input" type="checkbox" name="IsOptedIn" value="true" checked />
                             <input type="hidden" name="IsOptedIn" value="false" />
-                            <label class="form-check-label">Đánh dấu opt-in</label>
+                            <label class="form-check-label">Đánh dấu cho phép nhận</label>
                         </div>
                         <div class="col-12">
-                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu preference</button>
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">Lưu tùy chọn</button>
                         </div>
                     </form>
                 </div>

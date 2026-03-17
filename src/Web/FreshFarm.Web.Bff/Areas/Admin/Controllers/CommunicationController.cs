@@ -43,14 +43,14 @@ public sealed class CommunicationController : LegacySellerControllerBase
             var response = await client.GetAsync(BuildEndpoint(model));
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiMessageAsync(response, "Khong the tai communications governance.");
+                ViewBag.Error = await ReadApiMessageAsync(response, "Không thể tải trung tâm quản trị truyền thông.");
                 return View(model);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<CommunicationGovernanceApiResponse>(JsonOptions);
             if (payload is null)
             {
-                ViewBag.Error = "Khong doc duoc du lieu communications governance.";
+                ViewBag.Error = "Không đọc được dữ liệu trung tâm quản trị truyền thông.";
                 return View(model);
             }
 
@@ -120,7 +120,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            ViewBag.Error = "Loi khi tai communications governance: " + ex.Message;
+            ViewBag.Error = "Lỗi khi tải trung tâm quản trị truyền thông: " + ex.Message;
         }
 
         return View(model);
@@ -130,7 +130,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveTemplate(CommunicationTemplateEditorInput input, string? q = null, string? channel = null, string? eventType = null)
     {
-        await PostToOrderingAsync("/api/orders/admin/communications/templates", input, "Da luu template thong bao.", "Khong the luu template thong bao.");
+        await PostToOrderingAsync("/api/orders/admin/communications/templates", input, "Đã lưu mẫu thông báo.", "Không thể lưu mẫu thông báo.");
         return RedirectToAction(nameof(Index), new { q, channel = Normalize(channel), eventType = Normalize(eventType) });
     }
 
@@ -138,7 +138,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ToggleTemplate(int id, string? q = null, string? channel = null, string? eventType = null)
     {
-        await PostToOrderingAsync($"/api/orders/admin/communications/templates/{id}/toggle", payload: null, "Da cap nhat trang thai template.", "Khong the cap nhat template.");
+        await PostToOrderingAsync($"/api/orders/admin/communications/templates/{id}/toggle", payload: null, "Đã cập nhật trạng thái mẫu thông báo.", "Không thể cập nhật mẫu thông báo.");
         return RedirectToAction(nameof(Index), new { q, channel = Normalize(channel), eventType = Normalize(eventType) });
     }
 
@@ -146,7 +146,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SavePolicy(CommunicationPolicyEditorInput input, string? q = null, string? channel = null, string? eventType = null)
     {
-        await PostToOrderingAsync("/api/orders/admin/communications/policies", input, "Da luu notification policy.", "Khong the luu notification policy.");
+        await PostToOrderingAsync("/api/orders/admin/communications/policies", input, "Đã lưu chính sách thông báo.", "Không thể lưu chính sách thông báo.");
         return RedirectToAction(nameof(Index), new { q, channel = Normalize(channel), eventType = Normalize(eventType) });
     }
 
@@ -154,7 +154,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> TogglePolicy(int id, string? q = null, string? channel = null, string? eventType = null)
     {
-        await PostToOrderingAsync($"/api/orders/admin/communications/policies/{id}/toggle", payload: null, "Da cap nhat trang thai policy.", "Khong the cap nhat policy.");
+        await PostToOrderingAsync($"/api/orders/admin/communications/policies/{id}/toggle", payload: null, "Đã cập nhật trạng thái chính sách.", "Không thể cập nhật chính sách.");
         return RedirectToAction(nameof(Index), new { q, channel = Normalize(channel), eventType = Normalize(eventType) });
     }
 
@@ -162,7 +162,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SavePreference(CommunicationPreferenceEditorInput input, string? q = null, string? channel = null, string? eventType = null)
     {
-        await PostToOrderingAsync("/api/orders/admin/communications/preferences", input, "Da luu preference opt-in/out.", "Khong the luu preference opt-in/out.");
+        await PostToOrderingAsync("/api/orders/admin/communications/preferences", input, "Đã lưu tùy chọn nhận thông báo.", "Không thể lưu tùy chọn nhận thông báo.");
         return RedirectToAction(nameof(Index), new { q, channel = Normalize(channel), eventType = Normalize(eventType) });
     }
 
@@ -235,7 +235,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
     {
         model.ChannelOptions =
         [
-            new CommunicationOptionViewModel { Value = "all", Text = "Tat ca" },
+            new CommunicationOptionViewModel { Value = "all", Text = "Tất cả" },
             new CommunicationOptionViewModel { Value = "in_app", Text = "In-app" },
             new CommunicationOptionViewModel { Value = "push", Text = "Push" },
             new CommunicationOptionViewModel { Value = "email", Text = "Email" },
@@ -243,30 +243,30 @@ public sealed class CommunicationController : LegacySellerControllerBase
         ];
         model.EventOptions =
         [
-            new CommunicationOptionViewModel { Value = "all", Text = "Tat ca" },
-            new CommunicationOptionViewModel { Value = "order_created", Text = "Order created" },
-            new CommunicationOptionViewModel { Value = "order_paid", Text = "Order paid" },
-            new CommunicationOptionViewModel { Value = "order_shipped", Text = "Order shipped" },
-            new CommunicationOptionViewModel { Value = "fresh_recall", Text = "Fresh recall" }
+            new CommunicationOptionViewModel { Value = "all", Text = "Tất cả" },
+            new CommunicationOptionViewModel { Value = "order_created", Text = "Đơn hàng được tạo" },
+            new CommunicationOptionViewModel { Value = "order_paid", Text = "Đơn hàng đã thanh toán" },
+            new CommunicationOptionViewModel { Value = "order_shipped", Text = "Đơn hàng đã giao vận" },
+            new CommunicationOptionViewModel { Value = "fresh_recall", Text = "Thu hồi hàng tươi" }
         ];
         model.AudienceOptions =
         [
-            new CommunicationOptionViewModel { Value = "buyer", Text = "Buyer" },
-            new CommunicationOptionViewModel { Value = "seller", Text = "Seller" },
+            new CommunicationOptionViewModel { Value = "buyer", Text = "Người mua" },
+            new CommunicationOptionViewModel { Value = "seller", Text = "Người bán" },
             new CommunicationOptionViewModel { Value = "admin", Text = "Admin" },
-            new CommunicationOptionViewModel { Value = "all", Text = "Tat ca" }
+            new CommunicationOptionViewModel { Value = "all", Text = "Tất cả" }
         ];
         model.DeliveryModeOptions =
         [
-            new CommunicationOptionViewModel { Value = "immediate", Text = "Immediate" },
-            new CommunicationOptionViewModel { Value = "batched", Text = "Batched" },
-            new CommunicationOptionViewModel { Value = "manual", Text = "Manual" }
+            new CommunicationOptionViewModel { Value = "immediate", Text = "Gửi ngay" },
+            new CommunicationOptionViewModel { Value = "batched", Text = "Gửi theo lô" },
+            new CommunicationOptionViewModel { Value = "manual", Text = "Thủ công" }
         ];
         model.SourceOptions =
         [
-            new CommunicationOptionViewModel { Value = "admin_console", Text = "Admin console" },
-            new CommunicationOptionViewModel { Value = "import", Text = "Import" },
-            new CommunicationOptionViewModel { Value = "customer_service", Text = "Customer service" }
+            new CommunicationOptionViewModel { Value = "admin_console", Text = "Bảng điều khiển admin" },
+            new CommunicationOptionViewModel { Value = "import", Text = "Nhập liệu" },
+            new CommunicationOptionViewModel { Value = "customer_service", Text = "Chăm sóc khách hàng" }
         ];
     }
 

@@ -10,13 +10,36 @@ namespace FreshFarm.Web.Bff.Dtos
 
     public sealed class RegisterRequestDto // Payload gui den Identity /auth/register.
     {
-        public string Email { get; set; } = string.Empty; // Email dang ky.
-        public string UserName { get; set; } = string.Empty; // Ten dang nhap.
+        [Required(ErrorMessage = "Họ và tên không được để trống.")]
+        [StringLength(100, MinimumLength = 2, ErrorMessage = "Họ và tên phải từ 2 đến 100 ký tự.")]
         public string FullName { get; set; } = string.Empty; // Ho ten.
+
+        [Required(ErrorMessage = "Tên đăng nhập không được để trống.")]
+        [StringLength(50, MinimumLength = 4, ErrorMessage = "Tên đăng nhập phải từ 4 đến 50 ký tự.")]
+        [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Tên đăng nhập chỉ được chứa chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.")]
+        public string UserName { get; set; } = string.Empty; // Ten dang nhap.
+
+        [Required(ErrorMessage = "Email không được để trống.")]
+        [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
+        [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
+        public string Email { get; set; } = string.Empty; // Email dang ky.
+
+        [Required(ErrorMessage = "Số điện thoại không được để trống.")]
+        [RegularExpression(@"^(0|\+84)(\d){9,10}$", ErrorMessage = "Số điện thoại phải đúng định dạng Việt Nam.")]
         public string Phone { get; set; } = string.Empty; // So dien thoai.
+
+        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu phải từ 8 đến 100 ký tự.")]
         public string Password { get; set; } = string.Empty; // Mat khau.
+
+        [Required(ErrorMessage = "Vui lòng nhập lại mật khẩu.")]
+        [Compare(nameof(Password), ErrorMessage = "Xác nhận mật khẩu không khớp.")]
         public string ConfirmPassword { get; set; } = string.Empty; // Xac nhan mat khau.
+
         public string RoleName { get; set; } = "Customer"; // Mac dinh role customer.
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Bạn cần đồng ý với điều khoản sử dụng và chính sách quyền riêng tư.")]
+        public bool AcceptTerms { get; set; }
     }
 
     public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.

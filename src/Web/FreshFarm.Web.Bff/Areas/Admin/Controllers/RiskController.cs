@@ -303,35 +303,53 @@ public sealed class RiskController : LegacySellerControllerBase
         => new()
         {
             Value = option.Value ?? string.Empty,
-            Text = option.Text ?? string.Empty
+            Text = TranslateRiskOption(option.Value, option.Text)
+        };
+
+    private static string TranslateRiskOption(string? value, string? text)
+        => (value ?? string.Empty).ToLowerInvariant() switch
+        {
+            "all" => "Tất cả",
+            "voucher_abuse" => "Lạm dụng voucher",
+            "return_spike" => "Tăng đột biến hoàn trả",
+            "open" => "Mở",
+            "pending_review" => "Chờ duyệt",
+            "monitoring" => "Theo dõi",
+            "resolved" => "Đã xử lý",
+            "dismissed" => "Bỏ qua",
+            "low" => "Thấp",
+            "medium" => "Trung bình",
+            "high" => "Cao",
+            "critical" => "Nghiêm trọng",
+            _ => text ?? string.Empty
         };
 
     private static void SeedFallbackOptions(RiskCenterPageViewModel model)
     {
         model.TypeOptions =
         [
-            new RiskOptionViewModel { Value = "all", Text = "Tat ca" },
-            new RiskOptionViewModel { Value = "voucher_abuse", Text = "Voucher abuse" },
-            new RiskOptionViewModel { Value = "return_spike", Text = "Return spike" }
+            new RiskOptionViewModel { Value = "all", Text = "Tất cả" },
+            new RiskOptionViewModel { Value = "voucher_abuse", Text = "Lạm dụng voucher" },
+            new RiskOptionViewModel { Value = "return_spike", Text = "Tăng đột biến hoàn trả" }
         ];
 
         model.StatusOptions =
         [
-            new RiskOptionViewModel { Value = "all", Text = "Tat ca" },
-            new RiskOptionViewModel { Value = "open", Text = "Open" },
-            new RiskOptionViewModel { Value = "pending_review", Text = "Pending review" },
-            new RiskOptionViewModel { Value = "monitoring", Text = "Monitoring" },
-            new RiskOptionViewModel { Value = "resolved", Text = "Resolved" },
-            new RiskOptionViewModel { Value = "dismissed", Text = "Dismissed" }
+            new RiskOptionViewModel { Value = "all", Text = "Tất cả" },
+            new RiskOptionViewModel { Value = "open", Text = "Mở" },
+            new RiskOptionViewModel { Value = "pending_review", Text = "Chờ duyệt" },
+            new RiskOptionViewModel { Value = "monitoring", Text = "Theo dõi" },
+            new RiskOptionViewModel { Value = "resolved", Text = "Đã xử lý" },
+            new RiskOptionViewModel { Value = "dismissed", Text = "Bỏ qua" }
         ];
 
         model.SeverityOptions =
         [
-            new RiskOptionViewModel { Value = "all", Text = "Tat ca" },
-            new RiskOptionViewModel { Value = "low", Text = "Low" },
-            new RiskOptionViewModel { Value = "medium", Text = "Medium" },
-            new RiskOptionViewModel { Value = "high", Text = "High" },
-            new RiskOptionViewModel { Value = "critical", Text = "Critical" }
+            new RiskOptionViewModel { Value = "all", Text = "Tất cả" },
+            new RiskOptionViewModel { Value = "low", Text = "Thấp" },
+            new RiskOptionViewModel { Value = "medium", Text = "Trung bình" },
+            new RiskOptionViewModel { Value = "high", Text = "Cao" },
+            new RiskOptionViewModel { Value = "critical", Text = "Nghiêm trọng" }
         ];
     }
 

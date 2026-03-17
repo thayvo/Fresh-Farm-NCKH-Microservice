@@ -1,6 +1,7 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
+  - Viet hoa dong bo cac man Admin moi (`Catalog readiness`, `Fresh ops`, `Communication`) theo phong cach tieng Viet co dau tu nhien, khong con tron English/no-dau trong UI.
   - Huong dan user dung Cloudflare cho project FreshFarm theo cach phu hop nhat voi dev/local hien tai (uu tien Cloudflare Tunnel), map dung hostnames vao cac service BFF/API va cap nhat cac callback URL lien quan.
   - Giai dap / neu can thi sua luong checkout hien tai: vi sao order da duoc luu vao bang `Orders` du payment/checkout chua hoan tat; neu doi hanh vi thi can chot huong giu `Pending` tam thoi hay chi tao order sau khi thanh toan thanh cong.
   - Doi chieu `docs/Report Nhom 1.docx` voi ma nguon hien tai, chi ro:
@@ -17,6 +18,26 @@
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Seller review reply edit (2026-03-17): user yeu cau seller sua lai reply cu; API `/api/orders/admin/reviews/{reviewId}/replies` duoc doi thanh upsert theo seller actor (`AdminUserId` neu co, fallback `sellerId` tu token), va man Seller Review se doi nut thanh `Sửa phản hồi`, mo modal voi noi dung cu de cap nhat.
+  - Buyer review seller replies (2026-03-17): seller da co backend reply rieng trong lane Seller, nen buyer-facing se tai lai cung root reviews va replies cong khai tren PDP; reply duoc render ben duoi review goc voi nhan trung tinh `Shop phản hồi`, khong mo quyen gui review cho nguoi chua mua.
+  - Buyer product review gating (2026-03-17): user yeu cau chi nguoi da mua moi duoc danh gia; huong chot la PDP `/products/{id}` luon hien review public cho moi nguoi, nhung form review chi mo khi viewer co don chua san pham va don khong o cac trang thai `AwaitingPayment/Expired/Canceled` hoac payment `Failed/Expired`; moi user giu 1 review goc cho 1 san pham va gui lai se la cap nhat.
+  - Seller attribute-routing fix (2026-03-17): alias route cu cua Seller khong duoc gan chung tren action `Login/Logout` dang dung conventional route, vi gay startup exception `attribute routing information`; giai phap la tach alias thanh action rieng (`LegacyLogin`, `LegacyLoginPost`, `LegacyLogout`) roi delegate ve handler chung.
+  - Seller legacy login compatibility (2026-03-17): de tranh gay bookmark/link cu sau khi doi ten lane Seller, `SellerAccountController` giu them alias route cu `/Seller/AdminAccount/Login` (GET/POST) va `/Seller/AdminAccount/Logout`; route chinh thuc van la `/Seller/SellerAccount/Login`.
+  - Seller login naming cleanup (2026-03-17): user yeu cau doi ten code lane Seller cho ro nghia; `AdminAccountController`/`AdminLoginVM`/`Views/AdminAccount/Login` trong area Seller da duoc doi thanh `SellerAccountController`/`SellerLoginViewModel`/`Views/SellerAccount/Login`, va route login Seller chinh thuc la `/Seller/SellerAccount/Login`.
+  - Backoffice login split (2026-03-17): theo user, buyer / seller / admin khong duoc dung chung man dang nhap; BFF se giu buyer o `/account/signin`, seller dang nhap rieng o `/Seller/SellerAccount/Login` (chi nhan role `Seller`), admin dang nhap rieng o `/Admin/AdminAccount/Login` (chi nhan role `Admin`), va cookie redirect se tu map theo path area.
+  - Buyer footer policy links (2026-03-17): user yeu cau dua link `Dieu khoan su dung` va `Chinh sach quyen rieng tu` vao footer public dung chung de nguoi dung truy cap lai duoc tu cac trang buyer-facing.
+  - Buyer signup policy public chrome (2026-03-17): user yeu cau tiep tuc polish 2 trang policy; `Terms` va `PrivacyPolicy` se dung cung bo public chrome buyer-facing (`_PromoBarLegacy`, `_HeaderLegacy`, `_NavLegacy`, `_FooterLegacy`, `_MarketplaceChromeStyles`) thay vi page standalone.
+  - Buyer signup policy pages (2026-03-17): de luong dang ky tron ven hon, BFF them 2 trang public `Dieu khoan su dung` (`/account/terms`) va `Chinh sach quyen rieng tu` (`/account/privacy`); checkbox dong y tren signup link truc tiep den 2 trang nay.
+  - Buyer signup hardening (2026-03-17): user yeu cau hoan thien luong dang ky bang tieng Viet; BFF signup se co validation day du cho `ho ten`, `ten dang nhap`, `email`, `so dien thoai`, `mat khau`, `xac nhan mat khau`, va bat buoc checkbox dong y `dieu khoan su dung + chinh sach quyen rieng tu` voi noi dung ngan gon, khong can van ban phap ly qua chi tiet.
+  - VNPay payment result UI diagnosis (2026-03-17): screenshot loi cho thay bug render Razor o `src/Web/FreshFarm.Web.Bff/Views/Checkout/PaymentResult.cshtml`; chuoi `#FF@orderId.Value.ToString("D6")` dang bi render thanh text literal thay vi format ra ma don hang that.
+  - Google login cancel hardening (2026-03-17): khi user bam huy o Google OAuth, BFF se bat `OnRemoteFailure`, redirect lai `/account/signin` va hien thong bao than thien thay vi roi vao developer exception page.
+  - VNPay callback URL confirmation (2026-03-17): route callback dung cua BFF la `https://app.thayvo.id.vn/checkout/vnpay/return`; bien the `https://app.thayvo.id.vn/account/checkout/vnpay/return` la sai route va se 404.
+  - Web branding asset path migration (2026-03-17): user yeu cau cac anh thuoc ve website/branding (`logo`, `slogan`, icon social nhu `facebook`, `google`, `instagram`, `zalo`, uu tien ca `tiktok` neu co file) phai lay tu `wwwroot/uploads/web`.
+  - Category image path migration (2026-03-17): user yeu cau anh danh muc phai luu va render tu `wwwroot/uploads/categories`, khong dung `~/Images` legacy nua.
+  - Admin Vietnamese round 2 (2026-03-17): user chot uu tien tiep tuc Viet hoa 3 man `/Admin/CatalogReadiness/Index`, `/Admin/FreshOps/Index`, `/Admin/Communication/Index`; uu tien text hien thi co dau, option labels de doc, va giu nguyen values ky thuat/postback.
+  - Admin UI cleanup (2026-03-17): cac man `/Admin/Report/Revenue`, `/Admin/Campaign/Index`, `/Admin/Risk/Index`, `/Admin/Audit/Index` va `_SideBar` can duoc Viet hoa dong bo; uu tien text co dau tu nhien thay vi giu label English/no-dau.
+  - Admin revenue hardening (2026-03-17): `Admin/Report/Revenue` dang render lai view Seller revenue, nen de tranh JS bi lo ra UI se tach block script inline thanh `application/json` + file JS ngoai `wwwroot/js/revenue-report.js`.
+  - Admin shipping UX fix (2026-03-17): man `/Admin/Shipping/ManageShipping` cung phai bo cum dropdown `Tinh/Quan/Phuong GHN`; admin chi can thay `dia chi chi tiet`, con district/ward se duoc auto-resolve tu dia chi va giu o field an.
   - Seller revenue view fix (2026-03-17): `Revenue.cshtml` bi vo markup/script o lane Seller Report; can uu tien sua de JS chart/pagination khong bi lo ra thanh text tren UI.
   - Login redirect UX fix (2026-03-17): buyer login neu khong co `returnUrl` hop le se fallback ve trang chu `/` thay vi day sang luong `Tai khoan/Don hang`; neu `returnUrl` tro vao lane `Admin/Seller` nhung user khong dung role thi cung fallback ve `/`.
   - Search UX fix (2026-03-17): tren `/search`, neu dang co `category` va `q` chi dong vai tro nhan dieu huong marketplace/category context (vi du `Nong san huu co`, `Rau sach`, `Trai cay`, `Thuc pham tuoi`, `Giao nhanh` hoac trung ten/slug danh muc), request `/bff/product-search` se bo qua tham so `name` de tranh bi over-filter thanh `0` san pham.
@@ -172,6 +193,81 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Seller review reply da ho tro sua lai noi dung cu:
+      - Ordering `ReviewsAdminController.Reply` chuyen sang upsert reply theo seller/user actor thay vi tao ban ghi moi moi lan.
+      - Seller view `Areas/Seller/Views/Review/ManageReview.cshtml` doi nut `Phản hồi` thanh `Sửa phản hồi` khi da co reply, va modal tu do san noi dung cu.
+    - Build verify pass:
+      - `dotnet build src\Services\Ordering\FreshFarm.Ordering.Api\FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_seller_reply_edit\`
+      - `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_reply_edit\`
+    - Public PDP review flow da render them reply cua seller/shop ngay duoi tung danh gia buyer; Ordering API `ProductReviewsController` tra kem `Replies`, view `Home/Product` da hien block `Shop phản hồi`.
+    - Build verify pass:
+      - `dotnet build src\Services\Ordering\FreshFarm.Ordering.Api\FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_review_replies\`
+      - `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_review_replies\`
+    - Da them buyer-facing review flow end-to-end:
+      - Ordering API co public GET + auth POST cho `api/orders/product-reviews/products/{productId}`.
+      - BFF co proxy `bff/reviews/products/{productId}`.
+      - PDP `Views/Home/Product.cshtml` da co section xem/gui/cap nhat danh gia bang tieng Viet.
+      - `Views/Account/OrderDetail.cshtml` da them CTA dan den khu vuc review cho item thuoc don hop le.
+    - Da build verify Ordering API voi output `.codex-build/ordering_product_reviews`; build pass 0 warning, 0 error.
+    - Da build verify BFF voi output `.codex-build/bff_product_reviews`; build pass, chi con warnings cu khong lien quan.
+    - Da sua startup exception attribute routing o Seller login/logout bang cach tach alias route cu thanh action rieng trong `SellerAccountController`.
+    - Da giu tuong thich route cu lane Seller bang alias `/Seller/AdminAccount/Login` va `/Seller/AdminAccount/Logout` trong `SellerAccountController`.
+    - Da doi ten noi bo lane Seller login sang `SellerAccount` va cap nhat redirect/navbar/middleware tu `/Seller/AdminAccount/Login` sang `/Seller/SellerAccount/Login`.
+    - Da build verify lai BFF voi output `.codex-build/bff_rename_selleraccount`; build pass, chi con warnings cu khong lien quan.
+    - Da build verify lai alias route Seller voi output `.codex-build/bff_seller_login_compat`; build pass 0 warning, 0 error.
+    - Da build verify lai ban sua route Seller voi output `.codex-build/bff_seller_routefix`; build pass, chi con warnings cu khong lien quan.
+    - Da tach login backoffice thanh 3 lane ro rang:
+      - buyer: `/account/signin`
+      - seller: `/Seller/SellerAccount/Login`
+      - admin: `/Admin/AdminAccount/Login`
+    - Da them `Areas/Admin/Controllers/AdminAccountController.cs`, `Areas/Admin/Models/AdminLoginViewModel.cs`, `Areas/Admin/Views/AdminAccount/Login.cshtml`.
+    - Da sua seller login de chi chap nhan role `Seller`, doi wording/UI sang `Dang nhap Nha ban`.
+    - Da sua redirect unauth/access-denied trong `Program.cs` de dua dung login page theo path `/Admin` / `/Seller` / buyer.
+    - Da sua Admin navbar va Admin Home redirect de dung login area `Admin`.
+    - Da build verify lai BFF voi output `.codex-build/bff_split_admin_seller_login`; build pass, chi con warnings cu khong lien quan.
+    - Da them link `Dieu khoan su dung` va `Chinh sach quyen rieng tu` vao `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`.
+    - Da build verify lai BFF voi output `.codex-build/bff_footer_policy_links`; build pass, chi con warnings cu khong lien quan.
+    - Da polish `Terms` va `PrivacyPolicy` sang public chrome buyer-facing, giu font/branding/header/footer dong bo voi marketplace.
+    - Da build verify lai BFF voi output `.codex-build/bff_signup_policy_publicchrome`; build pass, chi con warnings cu khong lien quan.
+    - Da them 2 trang public cho signup: `src/Web/FreshFarm.Web.Bff/Views/Account/Terms.cshtml` va `src/Web/FreshFarm.Web.Bff/Views/Account/PrivacyPolicy.cshtml`, noi route trong `AccountController`.
+    - Da cap nhat label checkbox signup de link sang `/account/terms` va `/account/privacy`.
+    - Da build verify lai BFF voi output `.codex-build/bff_signup_policy_pages`; build pass, chi con warnings cu khong lien quan.
+    - Da harden luong dang ky buyer o BFF: them DataAnnotations + trim/normalize + check mat khau co chu va so + checkbox dong y dieu khoan + UI tieng Viet de doc.
+    - Da build verify `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj` voi output `.codex-build/bff_signup_fix`; build pass, chi con warnings cu khong lien quan signup.
+    - Da sua `src/Web/FreshFarm.Web.Bff/Views/Checkout/PaymentResult.cshtml` de ma don hang VNPay render dung dang `#FF000123`, khong con in literal `@orderId.Value.ToString("D6")`.
+    - Da doi chieu screenshot loi VNPay voi code va xac nhan `PaymentResult.cshtml` dang render sai ma don hang thanh chuoi literal.
+    - Da xac nhan bang code route callback VNPay cua BFF la `[HttpGet("/checkout/vnpay/return")]` trong `CheckoutController`; `appsettings.Development.json` dang dung gia tri `https://app.thayvo.id.vn/checkout/vnpay/return`.
+    - Da sua flow Google OAuth cancel:
+      - `Program.cs` them `options.Events.OnRemoteFailure`.
+      - `AccountController.SignIn(...)` nhan `externalError` va hien thong bao than thien.
+      - `SignInWithGoogle(...)` luu `returnUrl` vao auth properties de redirect lai an toan sau cancel.
+    - Web branding asset path migration (2026-03-17):
+      - Da them helper `Services/WebAssetPaths.cs` de centralize path `/uploads/web`.
+      - `Views/Account/SignIn.cshtml` va `Views/Account/SignUp.cshtml` da doi logo sang `/uploads/web/logo.PNG`.
+      - `Views/Shared/_HeaderLegacy.cshtml` da doi logo + slogan sang `/uploads/web/logo.PNG` va `/uploads/web/slogan.PNG`, co fallback ve text neu file thieu.
+      - `Views/Shared/_FooterLegacy.cshtml` da doi logo + slogan + icon social sang `/uploads/web/*`; bo sung hien thi Zalo, TikTok co fallback icon neu file chua co.
+      - `Views/Shared/_MarketplaceChromeStyles.cshtml` da them CSS cho `brand-logo-image`, `brand-slogan-image`, `social-icon-image`.
+      - Build pass: `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_web_assets\` => `0 Error(s)`, `17 Warning(s)` cu.
+    - Category image path migration (2026-03-17):
+      - `Areas/Admin/Controllers/CategoryController.cs` va `Areas/Seller/Controllers/CategoryController.cs` da doi `UploadFolderVPath` sang `~/uploads/categories/`.
+      - Cac view category dung chung (`ManageCategories`, `Create`, `Edit`) da doi path render anh sang `/uploads/categories/{file}` va fallback `~/images/legacy/no-image.png`.
+      - Build pass: `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_category_uploads\` => `0 Error(s)`, `17 Warning(s)` cu.
+    - Admin Vietnamese round 2 (2026-03-17):
+      - Da Viet hoa 3 man `/Admin/CatalogReadiness/Index`, `/Admin/FreshOps/Index`, `/Admin/Communication/Index`.
+      - `CatalogReadinessController.cs`, `FreshOpsController.cs`, `CommunicationController.cs` da doi message fallback/action/status options sang tieng Viet co dau.
+      - `CatalogReadiness/Index.cshtml` da doi hero/metric/filter/table/form labels sang tieng Viet; option `inputType` hien thi `Van ban/Doan van/So/Danh sach chon`.
+      - `FreshOps/Index.cshtml` da them helper map status/type/severity sang tieng Viet va doi labels/empty states/forms cho lot/recall.
+      - `Communication/Index.cshtml` da them helper map channel/event/audience/delivery/source sang tieng Viet va doi labels/empty states/forms/template-policy-preference.
+      - Build pass: `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_admin_vi_round2\` => `0 Error(s)`, `17 Warning(s)` cu.
+    - Admin revenue + Vietnamese cleanup (2026-03-17):
+      - `Areas/Seller/Views/Report/Revenue.cshtml` da thay block script inline bang JSON bootstrap + file ngoai `wwwroot/js/revenue-report.js` de tranh JS bi lo ra UI o ca lane Seller/Admin.
+      - `Areas/Admin/Views/Campaign/Index.cshtml`, `Areas/Admin/Views/Risk/Index.cshtml`, `Areas/Admin/Views/Audit/Index.cshtml`, `Areas/Admin/Views/Shared/_SideBar.cshtml` da duoc Viet hoa lai cac heading/label/noi dung visible chinh.
+      - `Areas/Admin/Controllers/{CampaignController,RiskController,AuditController}.cs` da them map/fallback option text tieng Viet de select/status khong con lai English.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\\bff_admin_vi_fix\\` (`0 error`, `17 warning` cu ngoai scope).
+    - Admin shipping recipient-location simplification (2026-03-17):
+      - `Areas/Admin/Views/Shipping/ManageShipping.cshtml` da bo dropdown `Tinh/Thanh GHN`, `Quan/Huyen GHN`, `Phuong/Xa GHN` khoi UI.
+      - Luong GHN admin gio tu auto-resolve province/district/ward tu `dia chi chi tiet` khi do thong tin tu row order hoac khi preview/create shipment.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\bff_admin_shipping_hide_location\` (`0 error`, `17 warning` cu ngoai scope patch).
     - Seller revenue report fix (2026-03-17):
       - `Areas/Seller/Views/Report/Revenue.cshtml` da bo row rong gay lech layout, bo sung cot `San pham` dung `@daily.TotalProducts`, sua `colspan` tu `3` -> `4`.
       - Block `@section scripts` da doi sang `<script>` inline de tranh truong hop script/pagination/chart bi render lo ra thanh text o UI.
@@ -1726,10 +1822,29 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
+    - Cho user retest buyer-facing review tren PDP va chi tiet don hang:
+      - user chua mua chi xem duoc review,
+      - user da mua co the gui/cap nhat review.
+    - Cho user retest footer tren cac trang buyer-facing de xac nhan link policy xuat hien va mo dung trang.
+    - Cho user retest `/account/terms` va `/account/privacy` de xac nhan 2 trang da dung public chrome buyer-facing, khong con le giao dien.
+    - Cho user retest 3 URL `/account/signup`, `/account/terms`, `/account/privacy` de xac nhan bo noi dung policy hien dung va link tu signup mo duoc tab moi.
+    - Cho user retest `/account/signup` de xac nhan form dang ky moi, checkbox dieu khoan, va thong bao loi/thanh cong bang tieng Viet hien dung.
+    - Cho user retest trang ket qua VNPay sau khi BFF reload de xac nhan ma don hang hien dung.
+    - Giai thich cho user phan biet giua ma loi VNPay (`24/02`) va bug giao dien Razor in literal C# o dong ma don hang.
+    - Tra loi user ve `ReturnUrl` VNPay dung/sai va giai thich vi sao URL `/account/checkout/vnpay/return` bi 404.
+    - Cho user restart `FreshFarm.Web.Bff` va retest cac man web-facing (`/`, `/search`, `/product/...`, `/account/signin`, `/account/signup`) de xac nhan logo/slogan/icon social dang lay tu `/uploads/web`.
+    - Cho user restart `FreshFarm.Web.Bff` va retest `/Admin/Category/ManageCategories` de xac nhan danh muc lay anh tu `/uploads/categories`.
+    - Cho user restart `FreshFarm.Web.Bff` va `Ctrl+F5` 3 man `/Admin/CatalogReadiness/Index`, `/Admin/FreshOps/Index`, `/Admin/Communication/Index` de xac nhan UI da sach tieng Viet va khong con text tron.
     - User dang retest live search filter tren `https://app.thayvo.id.vn/search` sau patch bo qua `name` keyword context khi da co category.
     - User dang can retest Seller Shipping sau khi an dropdown dia ban GHN va chuyen sang auto-resolve tu dia chi.
     - User dang can retest luong login buyer sau khi doi fallback redirect ve trang chu.
     - User dang can retest `/Seller/Report/Revenue` sau patch script/layout.
+    - User hoi nguon anh o `/Admin/Category/ManageCategories`; da xac dinh Admin `CategoryController` dang render shared view `~/Areas/Seller/Views/Category/ManageCategories.cshtml`.
+    - Luong anh danh muc hien tai:
+      - ten file nam trong `ImageCategoriesName`;
+      - upload luu vao `UploadFolderVPath = "~/Images/"` tren BFF;
+      - view render `~/Images/{ImageCategoriesName}` va fallback `~/Images/no-image.png`.
+    - User dang can retest `/Admin/Shipping/ManageShipping` sau khi an dropdown dia ban GHN.
     - Build verify lai patch Seller Shipping/GHN cho dung ky vong user (dia chi gon, goi hang tong hop).
       - Tong hop ket luan cho user: day la hanh vi theo thiet ke code hien tai (draft/pending order duoc tao som), khong phai DB tu dong chen order.
       - Tu van huong tranh oversell cho checkout/VNPay: reserve stock + expire pending order.
@@ -1742,6 +1857,16 @@
       - Ban giao patch reconciliation job de tu sua lech `ReservedStock` va reservation status sau su co.
       - User retest `/cart` sau patch thumb/icon/summary cleanup.
   - *Next*:
+      - Neu user muon toi uu hon nua, co the doi alias route cu sang redirect 301/302 thay vi map truc tiep action.
+      - Neu user muon lam sach ten codebase hon nua, co the doi ten seller `AdminAccountController`/view/model sang `SellerAccount` de tranh nham nghia noi bo.
+      - Neu user muon mo rong tiep, co the dua 2 link policy len them o trang dang nhap/dang ky hoac cac footer lane khac.
+      - Neu user muon polished them, co the dua link policy xuat hien them o footer public hoac signup/signin de de tim ve sau.
+      - Neu user muon polished hon nua, co the dua 2 trang policy vao layout chung/public chrome va bo sung ngay cap nhat/kenh lien he ho tro.
+      - Neu user muon lam tron ven hon nua, co the noi them trang `Dieu khoan su dung` va `Chinh sach quyen rieng tu` tach rieng de checkbox link den page that.
+      - Neu user con gap `Thanh toán chưa thành công`, tiep tuc trace nghia cua ma phan hoi VNPay trong lan test moi; bug UI ma don hang da duoc xu ly.
+      - Neu user muon, sua `src/Web/FreshFarm.Web.Bff/Views/Checkout/PaymentResult.cshtml` de hien ma don hang dung dang `#FF000123`.
+      - Cho user restart `FreshFarm.Web.Bff`, retest Google login -> bam huy va VNPay callback voi route `/checkout/vnpay/return`.
+    - Tra loi user ro rang anh danh muc dang lay tu ten file `ImageCategoriesName` + file vat ly trong thu muc `wwwroot/Images` cua BFF; neu thumbnail vo thi kha nang file khong ton tai trong thu muc nay hoac ten file luu trong DB/Catalog da lech.
       - Retest `/Seller/Shipping/ManageShipping`:
         - bam nut xe tai tren mot dong order da checkout xem `Ten mat hang` + `So luong` co tu tong hop scope seller hay khong.
         - chon `OrderID` trong modal them shipping va xac nhan panel GHN cung tu do nhu tren.
@@ -2228,6 +2353,7 @@
   - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/User/ManageUsers.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Controllers/HomeController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
   - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
   - `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`
   - `src/Web/FreshFarm.Web.Bff/Views/Home/Search.cshtml`

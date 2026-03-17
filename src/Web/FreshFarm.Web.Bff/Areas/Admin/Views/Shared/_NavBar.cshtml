@@ -24,7 +24,7 @@
                             </li>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
-                                @using (Html.BeginForm("Logout", "AdminAccount", new { area = "Seller" }, FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "px-3 m-0" }))
+                                @using (Html.BeginForm("Logout", "AdminAccount", new { area = "Admin" }, FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "px-3 m-0" }))
                                 {
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="dropdown-item">Đăng xuất</button>
@@ -36,7 +36,7 @@
                 else
                 {
                     <li class="nav-item">
-                        <a class="nav-link" href="@Url.Action("Login", "AdminAccount", new { area = "Seller", returnUrl = returnUrl })">
+                        <a class="nav-link" href="@Url.Action("Login", "AdminAccount", new { area = "Admin", returnUrl = returnUrl })">
                             <i class="bi bi-box-arrow-in-right"></i> Đăng nhập
                         </a>
                     </li>

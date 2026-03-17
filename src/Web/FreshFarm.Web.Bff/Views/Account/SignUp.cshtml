@@ -1,7 +1,12 @@
+@using FreshFarm.Web.Bff.Services
 @model FreshFarm.Web.Bff.Dtos.RegisterRequestDto
 @{
     Layout = null;
-    var returnUrl = Context.Request.Query["returnUrl"].ToString();
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = Context.Request.Query["returnUrl"].ToString();
+    }
     if (string.IsNullOrWhiteSpace(returnUrl))
     {
         returnUrl = Context.Request.Query["ReturnUrl"].ToString();
@@ -30,9 +35,25 @@
         }
 
         .signup-card {
-            max-width: 500px;
+            max-width: 560px;
             width: 100%;
             border-radius: 16px;
+        }
+
+        .form-hint {
+            font-size: .85rem;
+            color: #6c757d;
+        }
+
+        .terms-box {
+            border: 1px solid #dfe7e3;
+            border-radius: 14px;
+            background: #f8fcfa;
+            padding: 1rem;
+        }
+
+        .terms-box h6 {
+            color: var(--primary-green);
         }
 
         .logo-fallback {
@@ -77,7 +98,7 @@
         <div class="card-body">
             <div class="text-center mb-4">
                 <img id="signupLogo"
-                     src="~/images/legacy/logo.PNG"
+                     src="@WebAssetPaths.LogoRequestPath"
                      alt="Logo FreshFarm"
                      style="max-height: 70px"
                      onerror="this.classList.add('d-none');document.getElementById('signupLogoFallback').classList.remove('d-none');" />
@@ -85,7 +106,7 @@
                     <i class="bi bi-person-plus-fill"></i>
                 </div>
                 <h3 class="fw-bold mt-3">Tạo tài khoản mới</h3>
-                <p class="text-muted mb-0">Bắt đầu hành trình nông sản sạch cùng chúng tôi!</p>
+                <p class="text-muted mb-0">Đăng ký nhanh để mua sắm nông sản tươi, an toàn và minh bạch nguồn gốc.</p>
             </div>
 
             <form asp-action="SignUp"
@@ -106,7 +127,7 @@
                 <div class="form-floating mb-3">
                     <input asp-for="FullName"
                            class="form-control"
-                           placeholder="Họ và tên"
+                           placeholder="Ví dụ: Nguyễn Văn A"
                            autocomplete="name"
                            required />
                     <label asp-for="FullName">Họ và tên</label>
@@ -116,10 +137,11 @@
                 <div class="form-floating mb-3">
                     <input asp-for="UserName"
                            class="form-control"
-                           placeholder="Tên đăng nhập"
+                           placeholder="Ví dụ: nguyenvana"
                            autocomplete="username"
                            required />
                     <label asp-for="UserName">Tên đăng nhập</label>
+                    <div class="form-hint mt-1">Dùng 4-50 ký tự gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.</div>
                     <span asp-validation-for="UserName" class="text-danger small"></span>
                 </div>
 
@@ -138,10 +160,11 @@
                     <input asp-for="Phone"
                            class="form-control"
                            type="tel"
-                           placeholder="Số điện thoại"
+                           placeholder="Ví dụ: 0912345678"
                            autocomplete="tel"
                            required />
                     <label asp-for="Phone">Số điện thoại</label>
+                    <div class="form-hint mt-1">Hệ thống ưu tiên số điện thoại Việt Nam để thuận tiện giao hàng và hỗ trợ đơn.</div>
                     <span asp-validation-for="Phone" class="text-danger small"></span>
                 </div>
 
@@ -153,6 +176,7 @@
                            autocomplete="new-password"
                            required />
                     <label asp-for="Password">Mật khẩu</label>
+                    <div class="form-hint mt-1">Nên có ít nhất 8 ký tự, gồm chữ cái và chữ số.</div>
                     <span asp-validation-for="Password" class="text-danger small"></span>
                 </div>
 
@@ -167,15 +191,34 @@
                     <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
                 </div>
 
+                <div class="terms-box mb-3">
+                    <h6 class="fw-bold mb-2">Điều khoản sử dụng và quyền riêng tư</h6>
+                    <p class="small text-muted mb-2">
+                        Khi tạo tài khoản FreshFarm, bạn xác nhận thông tin cung cấp là chính xác, không dùng tài khoản cho mục đích gian lận,
+                        và đồng ý để hệ thống lưu thông tin cần thiết nhằm xử lý đơn hàng, giao vận, chăm sóc khách hàng và bảo vệ tài khoản.
+                    </p>
+                    <p class="small text-muted mb-0">
+                        FreshFarm cam kết chỉ sử dụng dữ liệu của bạn cho vận hành dịch vụ, cải thiện trải nghiệm mua sắm và các thông báo liên quan đến đơn hàng,
+                        theo phạm vi cần thiết và phù hợp với chính sách của nền tảng.
+                    </p>
+                </div>
+
                 <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="acceptTerms" disabled />
-                    <label class="form-check-label" for="acceptTerms">
-                        Tôi đồng ý với các Điều khoản dịch vụ (sẽ bật ở giai đoạn sau)
+                    <input asp-for="AcceptTerms" class="form-check-input" />
+                    <label asp-for="AcceptTerms" class="form-check-label">
+                        Tôi đã đọc và đồng ý với
+                        <a asp-action="Terms" asp-controller="Account" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Điều khoản sử dụng</a>
+                        và
+                        <a asp-action="PrivacyPolicy" asp-controller="Account" target="_blank" rel="noopener noreferrer" class="text-decoration-none">Chính sách quyền riêng tư</a>
+                        của FreshFarm.
                     </label>
+                    <div>
+                        <span asp-validation-for="AcceptTerms" class="text-danger small"></span>
+                    </div>
                 </div>
 
                 <div class="d-grid">
-                    <button class="btn btn-success btn-lg" type="submit">Đăng ký</button>
+                    <button class="btn btn-success btn-lg" type="submit">Tạo tài khoản</button>
                 </div>
             </form>
 

@@ -1,3 +1,4 @@
+@using FreshFarm.Web.Bff.Services
 @model FreshFarm.Web.Bff.Dtos.LoginRequestDto
 @{
     Layout = null;
@@ -105,7 +106,7 @@
         <div class="card-body">
             <div class="text-center mb-4">
                 <img id="signinLogo"
-                     src="~/images/legacy/logo.PNG"
+                     src="@WebAssetPaths.LogoRequestPath"
                      alt="Logo FreshFarm"
                      style="max-height: 70px"
                      onerror="this.classList.add('d-none');document.getElementById('signinLogoFallback').classList.remove('d-none');" />

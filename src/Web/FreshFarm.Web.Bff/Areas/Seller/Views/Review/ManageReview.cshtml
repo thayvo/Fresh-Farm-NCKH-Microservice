@@ -536,6 +536,9 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                                 @{
                                     var replies = Model.Where(r => r.ReplyTo == review.ReviewID).ToList();
                                     var replyCount = replies.Count;
+                                    var editableReply = replies
+                                        .OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt)
+                                        .FirstOrDefault();
                                 }
                                 @if (replyCount > 0)
                                 {
@@ -577,8 +580,10 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                                 <button class="btn btn-sm btn-outline-primary btn-action me-1"
                                         data-bs-toggle="modal"
                                         data-bs-target="#replyModal"
-                                        data-review-id="@review.ReviewID">
-                                    <i class="bi bi-reply-fill me-1"></i> Phản hồi
+                                        data-review-id="@review.ReviewID"
+                                        data-has-reply="@(editableReply is not null ? "true" : "false")"
+                                        data-reply-content="@(editableReply?.Comment ?? string.Empty)">
+                                    <i class="bi bi-reply-fill me-1"></i> @(editableReply is not null ? "Sửa phản hồi" : "Phản hồi")
                                 </button>
                                 <button class="btn btn-sm btn-outline-danger btn-action btn-delete me-1"
                                         data-bs-toggle="modal"
@@ -614,7 +619,7 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title d-flex align-items-center gap-2">
+                    <h5 class="modal-title d-flex align-items-center gap-2" id="replyModalTitle">
                         <i class="bi bi-reply-all"></i> Phản hồi đánh giá
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -631,7 +636,7 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                         <i class="bi bi-x-circle me-1"></i>Hủy
                     </button>
                     <button type="button" class="btn btn-primary btn-pill px-4" id="submitReplyBtn">
-                        <i class="bi bi-send-fill me-1"></i>Gửi phản hồi
+                        <i class="bi bi-send-fill me-1"></i>Lưu phản hồi
                     </button>
                 </div>
             </div>
@@ -764,6 +769,10 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
             let currentReviewId = null;
             const deleteModalEl = document.getElementById("deleteModal");
             const replyModalEl  = document.getElementById("replyModal");
+            const replyContentInput = document.getElementById("replyContent");
+            const replyErrorNode = document.getElementById("replyError");
+            const replyModalTitle = document.getElementById("replyModalTitle");
+            const submitReplyBtn = document.getElementById("submitReplyBtn");
 
             // Approve (nếu còn dùng .btn-approve)
             reviewsList.addEventListener("click", function (ev) {
@@ -798,22 +807,31 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
             document.querySelectorAll("[data-bs-target='#replyModal']").forEach(btn => {
                 btn.addEventListener("click", function () {
                     currentReviewId = this.dataset.reviewId;
-                    document.getElementById("replyError").style.display = "none";
-                    document.getElementById("replyContent").classList.remove("is-invalid");
+                    const hasReply = this.dataset.hasReply === "true";
+                    const existingContent = this.dataset.replyContent || "";
+                    replyErrorNode.style.display = "none";
+                    replyContentInput.classList.remove("is-invalid");
+                    replyContentInput.value = existingContent;
+                    replyModalTitle.innerHTML = hasReply
+                        ? '<i class="bi bi-pencil-square"></i> Sửa phản hồi đánh giá'
+                        : '<i class="bi bi-reply-all"></i> Phản hồi đánh giá';
+                    submitReplyBtn.innerHTML = hasReply
+                        ? '<i class="bi bi-check2-circle me-1"></i>Cập nhật phản hồi'
+                        : '<i class="bi bi-send-fill me-1"></i>Gửi phản hồi';
                 });
             });
 
             // Gửi phản hồi
-            document.getElementById("submitReplyBtn").addEventListener("click", function () {
-                const txt = document.getElementById("replyContent");
+            submitReplyBtn.addEventListener("click", function () {
+                const txt = replyContentInput;
                 const content = txt.value.trim();
                 if (!content) {
                     txt.classList.add("is-invalid");
-                    document.getElementById("replyError").style.display = "block";
+                    replyErrorNode.style.display = "block";
                     return;
                 }
                 txt.classList.remove("is-invalid");
-                document.getElementById("replyError").style.display = "none";
+                replyErrorNode.style.display = "none";
 
                 $.ajax({
                     url: '@Url.Action("ReplyReview","Review", new { area = "Seller"})',
@@ -821,7 +839,7 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                     data: { __RequestVerificationToken: token, reviewId: currentReviewId, content: content },
                     success: function (res) {
                         if (res.success) {
-                            document.getElementById("replyContent").value = "";
+                            replyContentInput.value = "";
                             bootstrap.Modal.getInstance(replyModalEl).hide();
                             showNotification(res.message || "Phản hồi thành công", 'success');
                             setTimeout(() => location.reload(), 600);

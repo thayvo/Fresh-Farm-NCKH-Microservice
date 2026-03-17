@@ -3,9 +3,9 @@
 <section class="catalog-readiness-shell ff-admin-shell">
     <div class="hero-card ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow ff-admin-kicker mb-2">7.7A Search readiness MVP</p>
-            <h1 class="fw-bold mb-2">Catalog readiness</h1>
-            <p class="mb-0 opacity-75">Theo doi required attributes theo danh muc, readiness queue cua san pham va sync nhanh tu ProductInfo de giam data debt.</p>
+            <p class="eyebrow ff-admin-kicker mb-2">7.7A Sẵn sàng tìm kiếm</p>
+            <h1 class="fw-bold mb-2">Trung tâm sẵn sàng danh mục</h1>
+            <p class="mb-0 opacity-75">Theo dõi thuộc tính bắt buộc theo danh mục, hàng đợi sẵn sàng của sản phẩm và đồng bộ nhanh từ ProductInfo để giảm nợ dữ liệu.</p>
         </div>
         <div class="hero-chip ff-admin-chip">Sprint D</div>
     </div>
@@ -26,11 +26,11 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Categories</span><strong>@Model.Stats.TotalCategories</strong><small>danh muc co trong catalog</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Attributes</span><strong>@Model.Stats.TotalAttributes</strong><small>@Model.Stats.RequiredAttributes bat buoc</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Ready</span><strong>@Model.Stats.ProductsReady</strong><small>san pham da du readiness</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Missing</span><strong>@Model.Stats.ProductsMissing</strong><small>san pham con thieu</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Facets</span><strong>@Model.Stats.FacetAttributes</strong><small>attribute co facet flag</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Danh mục</span><strong>@Model.Stats.TotalCategories</strong><small>danh mục hiện có trong catalog</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Thuộc tính</span><strong>@Model.Stats.TotalAttributes</strong><small>@Model.Stats.RequiredAttributes thuộc tính bắt buộc</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Sẵn sàng</span><strong>@Model.Stats.ProductsReady</strong><small>sản phẩm đã đạt chuẩn</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Thiếu</span><strong>@Model.Stats.ProductsMissing</strong><small>sản phẩm còn thiếu dữ liệu</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Bộ lọc</span><strong>@Model.Stats.FacetAttributes</strong><small>thuộc tính có cờ facet</small></div></div>
         <div class="col-md-6 col-xl-2">
             <form method="post" asp-action="SyncProductInfo" asp-controller="CatalogReadiness" asp-area="Admin" class="h-100">
                 @Html.AntiForgeryToken()
@@ -38,9 +38,9 @@
                 <input type="hidden" name="state" value="@Model.State" />
                 <input type="hidden" name="categoryId" value="@Model.CategoryId" />
                 <button class="metric-card ff-admin-card sync-card w-100 border-0 text-start" type="submit">
-                    <span class="metric-label">Sync</span>
+                    <span class="metric-label">Đồng bộ</span>
                     <strong><i class="bi bi-arrow-repeat"></i></strong>
-                    <small>weight, origin, standard, preservation</small>
+                    <small>khối lượng, xuất xứ, tiêu chuẩn, bảo quản</small>
                 </button>
             </form>
         </div>
@@ -48,22 +48,22 @@
 
     <div class="panel-card ff-admin-card mb-4">
         <div class="panel-head">
-            <h2 class="h5 mb-1">Bo loc readiness</h2>
-            <p class="text-muted mb-0">Tap trung vao queue san pham chua du required attributes truoc khi mo rong sang synonym/tag/search facet sau.</p>
+            <h2 class="h5 mb-1">Bộ lọc sẵn sàng danh mục</h2>
+            <p class="text-muted mb-0">Tập trung vào hàng đợi sản phẩm chưa đủ thuộc tính bắt buộc trước khi mở rộng sang synonym, tag và facet tìm kiếm.</p>
         </div>
         <form method="get" asp-action="Index" asp-controller="CatalogReadiness" asp-area="Admin" class="row g-3">
             <div class="col-lg-5">
-                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo ten san pham, SKU, category, attribute..." />
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo tên sản phẩm, SKU, danh mục, thuộc tính..." />
             </div>
             <div class="col-lg-3">
                 <select class="form-select" name="categoryId">
                     @if (!Model.CategoryId.HasValue)
                     {
-                        <option value="" selected>Tat ca danh muc</option>
+                        <option value="" selected>Tất cả danh mục</option>
                     }
                     else
                     {
-                        <option value="">Tat ca danh muc</option>
+                        <option value="">Tất cả danh mục</option>
                     }
                     @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
                     {
@@ -94,7 +94,7 @@
                 </select>
             </div>
             <div class="col-lg-2 d-grid">
-                <button class="btn btn-primary" type="submit">Loc queue</button>
+                <button class="btn btn-primary" type="submit">Lọc hàng đợi</button>
             </div>
         </form>
     </div>
@@ -103,23 +103,23 @@
         <div class="col-xl-7">
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Readiness queue</h2>
-                    <p class="text-muted mb-0">Danh sach san pham dang bi thieu thuoc tinh bat buoc theo category definition.</p>
+                    <h2 class="h5 mb-1">Hàng đợi sẵn sàng danh mục</h2>
+                    <p class="text-muted mb-0">Danh sách sản phẩm đang thiếu thuộc tính bắt buộc theo định nghĩa của từng danh mục.</p>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle readiness-table">
                         <thead>
                             <tr>
-                                <th>San pham</th>
-                                <th>Coverage</th>
-                                <th>Missing</th>
-                                <th>Trang thai</th>
+                                <th>Sản phẩm</th>
+                                <th>Độ phủ</th>
+                                <th>Thiếu</th>
+                                <th>Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (Model.ReadinessRows.Count == 0)
                             {
-                                <tr><td colspan="4" class="text-center text-muted py-4">Khong co san pham nao khop readiness filter.</td></tr>
+                                <tr><td colspan="4" class="text-center text-muted py-4">Không có sản phẩm nào khớp bộ lọc hiện tại.</td></tr>
                             }
                             else
                             {
@@ -134,12 +134,12 @@
                                         </td>
                                         <td>
                                             <span class="@readinessClass">@row.ReadinessScore%</span>
-                                            <div class="small text-muted mt-2">@row.ReadyCount / @row.TotalRequired required attributes</div>
+                                            <div class="small text-muted mt-2">@row.ReadyCount / @row.TotalRequired thuộc tính bắt buộc</div>
                                         </td>
                                         <td>
                                             @if (row.MissingAttributes.Count == 0)
                                             {
-                                                <span class="text-success">Da du readiness.</span>
+                                                <span class="text-success">Đã đạt chuẩn sẵn sàng.</span>
                                             }
                                             else
                                             {
@@ -152,11 +152,11 @@
                                         <td>
                                             @if (row.Status)
                                             {
-                                                <span class="badge bg-success-subtle text-success">Dang ban</span>
+                                                <span class="badge bg-success-subtle text-success">Đang bán</span>
                                             }
                                             else
                                             {
-                                                <span class="badge bg-secondary-subtle text-secondary">Dang an</span>
+                                                <span class="badge bg-secondary-subtle text-secondary">Đang ẩn</span>
                                             }
                                             <div class="small text-muted mt-2">@row.CreatedDate.ToLocalTime().ToString("dd/MM/yyyy")</div>
                                         </td>
@@ -170,13 +170,13 @@
 
             <div class="panel-card ff-admin-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Category attribute registry</h2>
-                    <p class="text-muted mb-0">Cap nhat nhanh required/facet/input type de chuan hoa search readiness theo tung category.</p>
+                    <h2 class="h5 mb-1">Kho thuộc tính danh mục</h2>
+                    <p class="text-muted mb-0">Cập nhật nhanh thuộc tính bắt buộc, thuộc tính lọc và kiểu nhập để chuẩn hóa khả năng tìm kiếm theo từng danh mục.</p>
                 </div>
                 <div class="detail-stack">
                     @if (Model.Attributes.Count == 0)
                     {
-                        <div class="text-muted">Chua co category attribute nao.</div>
+                        <div class="text-muted">Chưa có thuộc tính danh mục nào.</div>
                     }
                     else
                     {
@@ -189,7 +189,7 @@
                                 <input type="hidden" name="categoryId" value="@Model.CategoryId" />
                                 <div class="row g-3 w-100">
                                     <div class="col-lg-3">
-                                        <label class="form-label small text-muted">Danh muc</label>
+                                        <label class="form-label small text-muted">Danh mục</label>
                                         <select class="form-select" name="CategoryId">
                                             @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
                                             {
@@ -205,47 +205,47 @@
                                         </select>
                                     </div>
                                     <div class="col-lg-2">
-                                        <label class="form-label small text-muted">Key</label>
+                                        <label class="form-label small text-muted">Mã khóa</label>
                                         <input class="form-control" type="text" name="AttributeKey" value="@item.AttributeKey" />
                                     </div>
                                     <div class="col-lg-3">
-                                        <label class="form-label small text-muted">Display name</label>
+                                        <label class="form-label small text-muted">Tên hiển thị</label>
                                         <input class="form-control" type="text" name="DisplayName" value="@item.DisplayName" />
                                     </div>
                                     <div class="col-lg-2">
-                                        <label class="form-label small text-muted">Input</label>
+                                        <label class="form-label small text-muted">Kiểu nhập</label>
                                         <select class="form-select" name="InputType">
                                             @foreach (var inputType in new[] { "text", "textarea", "number", "select" })
                                             {
                                                 if (string.Equals(inputType, item.InputType, StringComparison.OrdinalIgnoreCase))
                                                 {
-                                                    <option value="@inputType" selected>@inputType</option>
+                                                    <option value="@inputType" selected>@(inputType switch { "text" => "Văn bản", "textarea" => "Đoạn văn", "number" => "Số", "select" => "Danh sách chọn", _ => inputType })</option>
                                                 }
                                                 else
                                                 {
-                                                    <option value="@inputType">@inputType</option>
+                                                    <option value="@inputType">@(inputType switch { "text" => "Văn bản", "textarea" => "Đoạn văn", "number" => "Số", "select" => "Danh sách chọn", _ => inputType })</option>
                                                 }
                                             }
                                         </select>
                                     </div>
                                     <div class="col-lg-2">
-                                        <label class="form-label small text-muted">Sort</label>
+                                        <label class="form-label small text-muted">Thứ tự</label>
                                         <input class="form-control" type="number" name="SortOrder" value="@item.SortOrder" min="0" max="999" />
                                     </div>
                                     <div class="col-lg-4">
-                                        <label class="form-label small text-muted">Placeholder</label>
+                                        <label class="form-label small text-muted">Gợi ý nhập</label>
                                         <input class="form-control" type="text" name="Placeholder" value="@item.Placeholder" />
                                     </div>
                                     <div class="col-lg-5 d-flex align-items-end gap-3 flex-wrap">
                                         <input type="hidden" name="IsRequired" value="false" />
-                                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@item.IsRequired" /><span>Required</span></label>
+                                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@item.IsRequired" /><span>Bắt buộc</span></label>
                                         <input type="hidden" name="IsFacet" value="false" />
-                                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@item.IsFacet" /><span>Facet</span></label>
+                                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@item.IsFacet" /><span>Bộ lọc</span></label>
                                         <input type="hidden" name="IsActive" value="false" />
-                                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@item.IsActive" /><span>Active</span></label>
+                                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@item.IsActive" /><span>Đang dùng</span></label>
                                     </div>
                                     <div class="col-lg-3 d-flex align-items-end justify-content-lg-end">
-                                        <button class="btn btn-outline-primary w-100" type="submit">Cap nhat</button>
+                                        <button class="btn btn-outline-primary w-100" type="submit">Cập nhật</button>
                                     </div>
                                 </div>
                             </form>
@@ -258,8 +258,8 @@
         <div class="col-xl-5">
             <div class="panel-card ff-admin-card sticky-panel">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Tao category attribute moi</h2>
-                    <p class="text-muted mb-0">Dung de bo sung nhanh readiness cho category chua co khung attribute.</p>
+                    <h2 class="h5 mb-1">Tạo thuộc tính danh mục mới</h2>
+                    <p class="text-muted mb-0">Dùng để bổ sung nhanh bộ thuộc tính cho danh mục chưa có khung dữ liệu chuẩn.</p>
                 </div>
                 <form method="post" asp-action="CreateAttribute" asp-controller="CatalogReadiness" asp-area="Admin" class="row g-3">
                     @Html.AntiForgeryToken()
@@ -267,9 +267,9 @@
                     <input type="hidden" name="state" value="@Model.State" />
                     <input type="hidden" name="categoryId" value="@Model.CategoryId" />
                     <div class="col-12">
-                        <label class="form-label">Danh muc</label>
+                        <label class="form-label">Danh mục</label>
                         <select class="form-select" name="CategoryId" required>
-                            <option value="">Chon danh muc</option>
+                            <option value="">Chọn danh mục</option>
                             @foreach (var option in Model.CategoryOptions.OrderBy(x => x.Text))
                             {
                                 if (int.TryParse(option.Value, out var optionId) && optionId == Model.NewAttribute.CategoryId)
@@ -284,47 +284,47 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Attribute key</label>
+                        <label class="form-label">Mã khóa thuộc tính</label>
                         <input class="form-control" type="text" name="AttributeKey" value="@Model.NewAttribute.AttributeKey" placeholder="weight, origin..." required />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Display name</label>
-                        <input class="form-control" type="text" name="DisplayName" value="@Model.NewAttribute.DisplayName" placeholder="Trong luong, Xuat xu..." required />
+                        <label class="form-label">Tên hiển thị</label>
+                        <input class="form-control" type="text" name="DisplayName" value="@Model.NewAttribute.DisplayName" placeholder="Trọng lượng, Xuất xứ..." required />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Input type</label>
+                        <label class="form-label">Kiểu nhập</label>
                         <select class="form-select" name="InputType">
                             @foreach (var inputType in new[] { "text", "textarea", "number", "select" })
                             {
                                 if (string.Equals(inputType, Model.NewAttribute.InputType, StringComparison.OrdinalIgnoreCase))
                                 {
-                                    <option value="@inputType" selected>@inputType</option>
+                                    <option value="@inputType" selected>@(inputType switch { "text" => "Văn bản", "textarea" => "Đoạn văn", "number" => "Số", "select" => "Danh sách chọn", _ => inputType })</option>
                                 }
                                 else
                                 {
-                                    <option value="@inputType">@inputType</option>
+                                    <option value="@inputType">@(inputType switch { "text" => "Văn bản", "textarea" => "Đoạn văn", "number" => "Số", "select" => "Danh sách chọn", _ => inputType })</option>
                                 }
                             }
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Sort order</label>
+                        <label class="form-label">Thứ tự hiển thị</label>
                         <input class="form-control" type="number" name="SortOrder" value="@Model.NewAttribute.SortOrder" min="0" max="999" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Placeholder</label>
+                        <label class="form-label">Gợi ý nhập</label>
                         <input class="form-control" type="text" name="Placeholder" value="@Model.NewAttribute.Placeholder" />
                     </div>
                     <div class="col-12 d-flex gap-3 flex-wrap">
                         <input type="hidden" name="IsRequired" value="false" />
-                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@Model.NewAttribute.IsRequired" /><span>Required</span></label>
+                        <label class="toggle-chip"><input type="checkbox" name="IsRequired" value="true" checked="@Model.NewAttribute.IsRequired" /><span>Bắt buộc</span></label>
                         <input type="hidden" name="IsFacet" value="false" />
-                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@Model.NewAttribute.IsFacet" /><span>Facet</span></label>
+                        <label class="toggle-chip"><input type="checkbox" name="IsFacet" value="true" checked="@Model.NewAttribute.IsFacet" /><span>Bộ lọc</span></label>
                         <input type="hidden" name="IsActive" value="false" />
-                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@(Model.NewAttribute.IsActive || Model.NewAttribute.CategoryId == 0)" /><span>Active</span></label>
+                        <label class="toggle-chip"><input type="checkbox" name="IsActive" value="true" checked="@(Model.NewAttribute.IsActive || Model.NewAttribute.CategoryId == 0)" /><span>Đang dùng</span></label>
                     </div>
                     <div class="col-12 d-grid">
-                        <button class="btn btn-primary" type="submit">Tao attribute</button>
+                        <button class="btn btn-primary" type="submit">Tạo thuộc tính</button>
                     </div>
                 </form>
             </div>

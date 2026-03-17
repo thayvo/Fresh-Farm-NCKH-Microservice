@@ -308,6 +308,197 @@
             margin-bottom: 20px;
         }
 
+        .review-shell {
+            display: grid;
+            gap: 18px;
+        }
+
+        .review-summary-grid {
+            display: grid;
+            grid-template-columns: 220px minmax(0, 1fr);
+            gap: 18px;
+        }
+
+        .review-score-card,
+        .review-form-card {
+            border: 1px solid rgba(226, 232, 240, .95);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(248, 250, 252, .92), rgba(255, 255, 255, .98));
+            padding: 18px;
+        }
+
+        .review-score-value {
+            font-size: 2.4rem;
+            line-height: 1;
+            font-weight: 900;
+            color: #dc2626;
+        }
+
+        .review-score-meta {
+            color: #64748b;
+            margin-top: 6px;
+        }
+
+        .review-stars {
+            color: #f59e0b;
+            letter-spacing: 2px;
+            font-size: 1.05rem;
+        }
+
+        .review-bars {
+            display: grid;
+            gap: 10px;
+        }
+
+        .review-bar-row {
+            display: grid;
+            grid-template-columns: 72px minmax(0, 1fr) 52px;
+            gap: 10px;
+            align-items: center;
+            font-size: .95rem;
+        }
+
+        .review-bar-track {
+            height: 10px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .review-bar-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #f97316, #dc2626);
+        }
+
+        .review-viewer-note {
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            font-size: .95rem;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+
+        .review-form-card label {
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+        }
+
+        .review-form-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 12px;
+        }
+
+        .review-submit-note {
+            min-height: 24px;
+            font-size: .92rem;
+            color: #166534;
+        }
+
+        .review-submit-note.is-error {
+            color: #b91c1c;
+        }
+
+        .review-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .review-card {
+            border-top: 1px solid rgba(226, 232, 240, .95);
+            padding-top: 14px;
+        }
+
+        .review-card:first-child {
+            border-top: 0;
+            padding-top: 0;
+        }
+
+        .review-card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .review-author {
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .review-date {
+            color: #64748b;
+            font-size: .9rem;
+        }
+
+        .review-owner-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 4px 10px;
+            background: rgba(22, 163, 74, .08);
+            color: #166534;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .review-comment {
+            color: #334155;
+            line-height: 1.7;
+            white-space: pre-line;
+        }
+
+        .review-replies {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .review-reply {
+            border-radius: 16px;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, rgba(239, 246, 255, .96), rgba(219, 234, 254, .9));
+            border-left: 4px solid #2563eb;
+        }
+
+        .review-reply-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            margin-bottom: 6px;
+        }
+
+        .review-reply-author {
+            color: #1d4ed8;
+            font-weight: 800;
+        }
+
+        .review-reply-comment {
+            color: #334155;
+            line-height: 1.65;
+            white-space: pre-line;
+        }
+
+        .review-empty {
+            border-radius: 18px;
+            border: 1px dashed #cbd5e1;
+            padding: 18px;
+            color: #64748b;
+            background: rgba(248, 250, 252, .8);
+        }
+
         .cta-row {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -749,6 +940,10 @@
                 border-right: 0;
                 border-bottom: 1px solid rgba(226, 232, 240, .95);
             }
+
+            .review-summary-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         @@media (max-width: 767.98px) {
@@ -860,6 +1055,7 @@
             const signInUrl = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(signInUrl));
             const endpoint = `/bff/products/${productId}`;
             const offersEndpoint = `/bff/products/${productId}/offers`;
+            const reviewsEndpoint = `/bff/reviews/products/${productId}`;
             const antiForgeryToken = document.querySelector("#productAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
             const loadingNode = document.getElementById("productLoading");
             const errorNode = document.getElementById("productError");
@@ -881,6 +1077,7 @@
             };
 
             const vnd = (value) => `${toNumber(value, 0).toLocaleString("vi-VN")} đ`;
+            const formatMultilineText = (value) => escapeHtml(value).replace(/\r?\n/g, "<br />");
 
             const resolveImageUrl = (raw) => {
                 const imageFileName = (raw.imageFileName ?? raw.ImageFileName ?? "").toString().trim();
@@ -1112,6 +1309,236 @@
                 return Number.isNaN(date.getTime())
                     ? "Chưa rõ thời gian"
                     : date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+            };
+
+            const renderStarIcons = (rating) => {
+                const resolved = Math.max(0, Math.min(5, toNumber(rating, 0)));
+                return Array.from({ length: 5 }, (_, index) => index < resolved ? "★" : "☆").join("");
+            };
+
+            const setReviewNotice = (message, isError = false) => {
+                const node = document.getElementById("productReviewSubmitNote");
+                if (!(node instanceof HTMLElement)) {
+                    return;
+                }
+
+                node.textContent = message || "";
+                node.className = `review-submit-note${isError ? " is-error" : ""}`;
+            };
+
+            const renderReviewRows = (reviews) => {
+                if (!Array.isArray(reviews) || reviews.length === 0) {
+                    return `<div class="review-empty">Sản phẩm này chưa có đánh giá nào. Người chưa mua vẫn có thể vào đây để xem khi có khách hàng chia sẻ trải nghiệm.</div>`;
+                }
+
+                const renderReplyRows = (replies) => {
+                    if (!Array.isArray(replies) || replies.length === 0) {
+                        return "";
+                    }
+
+                    return `
+                        <div class="review-replies">
+                            ${replies.map((reply) => `
+                                <div class="review-reply">
+                                    <div class="review-reply-head">
+                                        <div class="review-reply-author">${escapeHtml(reply.author?.displayName ?? reply.Author?.DisplayName ?? "Shop phản hồi")}</div>
+                                        <div class="review-date">
+                                            ${escapeHtml(formatDate(reply.updatedAt ?? reply.UpdatedAt ?? reply.createdAt ?? reply.CreatedAt))}
+                                            ${(reply.isEdited ?? reply.IsEdited) ? " · Đã chỉnh sửa" : ""}
+                                        </div>
+                                    </div>
+                                    <div class="review-reply-comment">${formatMultilineText(reply.comment ?? reply.Comment ?? "")}</div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    `;
+                };
+
+                return `
+                    <div class="review-list">
+                        ${reviews.map((review) => `
+                            <article class="review-card">
+                                <div class="review-card-head">
+                                    <div>
+                                        <div class="review-author">${escapeHtml(review.author?.displayName ?? "Khách hàng")}</div>
+                                        <div class="review-stars">${renderStarIcons(review.rating)}</div>
+                                        <div class="review-date">
+                                            ${escapeHtml(formatDate(review.updatedAt ?? review.createdAt))}
+                                            ${review.isEdited ? " · Đã chỉnh sửa" : ""}
+                                        </div>
+                                    </div>
+                                    ${review.isOwner ? `<span class="review-owner-badge"><i class="bi bi-person-check"></i> Đánh giá của bạn</span>` : ""}
+                                </div>
+                                <div class="review-comment">${formatMultilineText(review.comment ?? "")}</div>
+                                ${renderReplyRows(review.replies ?? review.Replies)}
+                            </article>
+                        `).join("")}
+                    </div>
+                `;
+            };
+
+            const renderReviewSection = (payload) => {
+                const panel = document.getElementById("productReviewPanel");
+                if (!(panel instanceof HTMLElement)) {
+                    return;
+                }
+
+                const summary = payload?.summary ?? {};
+                const viewer = payload?.viewer ?? {};
+                const reviews = Array.isArray(payload?.reviews) ? payload.reviews : [];
+                const stars = Array.isArray(summary.stars) ? summary.stars : [];
+                const totalReviews = toNumber(summary.totalReviews, 0);
+                const averageRating = toNumber(summary.averageRating, 0);
+                const existingReview = viewer.existingReview ?? null;
+                const canSubmit = !!viewer.canSubmitReview;
+
+                panel.innerHTML = `
+                    <div class="review-shell">
+                        <div class="review-summary-grid">
+                            <div class="review-score-card">
+                                <div class="review-score-value">${averageRating.toFixed(1)}</div>
+                                <div class="review-score-meta">trên 5 · ${totalReviews.toLocaleString("vi-VN")} đánh giá</div>
+                                <div class="review-stars mt-2">${renderStarIcons(Math.round(averageRating))}</div>
+                            </div>
+                            <div class="review-score-card">
+                                <div class="review-bars">
+                                    ${[5, 4, 3, 2, 1].map((star) => {
+                                        const row = stars.find((item) => toNumber(item.rating, 0) === star) ?? {};
+                                        const count = toNumber(row.count, 0);
+                                        const width = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
+                                        return `
+                                            <div class="review-bar-row">
+                                                <span>${star} sao</span>
+                                                <div class="review-bar-track"><div class="review-bar-fill" style="width:${width}%"></div></div>
+                                                <strong>${count.toLocaleString("vi-VN")}</strong>
+                                            </div>
+                                        `;
+                                    }).join("")}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="review-form-card">
+                            <div class="review-viewer-note">${escapeHtml(viewer.message ?? "")}</div>
+                            ${canSubmit ? `
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label for="productReviewRating">Số sao</label>
+                                        <select id="productReviewRating" class="form-select">
+                                            <option value="5">5 sao</option>
+                                            <option value="4">4 sao</option>
+                                            <option value="3">3 sao</option>
+                                            <option value="2">2 sao</option>
+                                            <option value="1">1 sao</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-9">
+                                        <label for="productReviewComment">Nội dung đánh giá</label>
+                                        <textarea id="productReviewComment" class="form-control" rows="4" maxlength="1000" placeholder="Chia sẻ cảm nhận thật của bạn về sản phẩm, đóng gói và trải nghiệm nhận hàng."></textarea>
+                                    </div>
+                                </div>
+                                <div class="review-form-actions">
+                                    <button type="button" id="productReviewSubmitBtn" class="btn-detail-primary">${existingReview ? "Cập nhật đánh giá" : "Gửi đánh giá"}</button>
+                                    ${existingReview ? `<span class="text-muted small">Bạn đã có đánh giá trước đó và có thể chỉnh sửa lại nội dung.</span>` : ""}
+                                </div>
+                                <div id="productReviewSubmitNote" class="review-submit-note"></div>
+                            ` : (!viewer.isAuthenticated
+                                ? `<div class="review-form-actions"><a class="btn-detail-primary" href="${signInUrl}">Đăng nhập để đánh giá</a></div>`
+                                : "")}
+                        </div>
+                        ${renderReviewRows(reviews)}
+                    </div>
+                `;
+
+                if (!canSubmit) {
+                    return;
+                }
+
+                const ratingInput = document.getElementById("productReviewRating");
+                const commentInput = document.getElementById("productReviewComment");
+                const submitButton = document.getElementById("productReviewSubmitBtn");
+                if (ratingInput instanceof HTMLSelectElement && existingReview) {
+                    ratingInput.value = String(toNumber(existingReview.rating, 5));
+                }
+
+                if (commentInput instanceof HTMLTextAreaElement && existingReview) {
+                    commentInput.value = (existingReview.comment ?? "").toString();
+                }
+
+                if (submitButton instanceof HTMLButtonElement) {
+                    submitButton.addEventListener("click", async () => {
+                        if (!(ratingInput instanceof HTMLSelectElement) || !(commentInput instanceof HTMLTextAreaElement)) {
+                            return;
+                        }
+
+                        const comment = commentInput.value.trim();
+                        const rating = Math.max(1, Math.min(5, toNumber(ratingInput.value, 5)));
+                        if (comment.length < 5) {
+                            setReviewNotice("Nội dung đánh giá cần ít nhất 5 ký tự.", true);
+                            commentInput.focus();
+                            return;
+                        }
+
+                        const defaultLabel = existingReview ? "Cập nhật đánh giá" : "Gửi đánh giá";
+                        submitButton.disabled = true;
+                        submitButton.textContent = "Đang gửi...";
+                        setReviewNotice("");
+
+                        try {
+                            const body = new URLSearchParams();
+                            body.set("__RequestVerificationToken", antiForgeryToken);
+                            body.set("Rating", String(rating));
+                            body.set("Comment", comment);
+
+                            const response = await fetch(reviewsEndpoint, {
+                                method: "POST",
+                                credentials: "same-origin",
+                                headers: {
+                                    "Accept": "application/json",
+                                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                                    "X-Requested-With": "XMLHttpRequest"
+                                },
+                                body: body.toString()
+                            });
+
+                            const text = await response.text();
+                            const result = text ? JSON.parse(text) : null;
+                            if (!response.ok) {
+                                throw new Error(result?.message || `HTTP ${response.status}`);
+                            }
+
+                            setReviewNotice(result?.message || "Đã lưu đánh giá của bạn.");
+                            await loadReviews();
+                        } catch (error) {
+                            setReviewNotice(error?.message || "Chưa thể gửi đánh giá lúc này.", true);
+                        } finally {
+                            submitButton.disabled = false;
+                            submitButton.textContent = defaultLabel;
+                        }
+                    });
+                }
+            };
+
+            const loadReviews = async () => {
+                const panel = document.getElementById("productReviewPanel");
+                if (panel instanceof HTMLElement) {
+                    panel.innerHTML = `<div class="offer-state">Đang tải đánh giá sản phẩm...</div>`;
+                }
+
+                try {
+                    const response = await fetch(reviewsEndpoint, { headers: { "Accept": "application/json" } });
+                    const text = await response.text();
+                    const payload = text ? JSON.parse(text) : null;
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                    }
+
+                    renderReviewSection(payload);
+                } catch (error) {
+                    if (panel instanceof HTMLElement) {
+                        panel.innerHTML = `<div class="review-empty">${escapeHtml(error?.message || "Chưa thể tải đánh giá sản phẩm.")}</div>`;
+                    }
+                }
             };
 
             const parseDate = (value) => {
@@ -1482,6 +1909,10 @@
                             <div class="offer-state">Đang tải danh sách shop...</div>
                         </div>
                     </section>
+                    <section class="section-card" id="product-reviews">
+                        <h2>Đánh giá sản phẩm</h2>
+                        <div id="productReviewPanel" class="offer-state">Đang tải đánh giá sản phẩm...</div>
+                    </section>
                 `;
 
                 rootNode.classList.remove("d-none");
@@ -1560,6 +1991,7 @@
                 }
 
                 void loadOffers(product);
+                void loadReviews();
 
                 if (isBuyerEligible && product.primarySellerId > 0) {
                     void loadChatSummary(product.primarySellerId).then((conversation) => {

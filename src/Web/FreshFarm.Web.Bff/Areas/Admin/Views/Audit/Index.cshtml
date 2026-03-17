@@ -1,11 +1,14 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.AuditCenterPageViewModel
+@{
+    ViewData["Title"] = "Trung tâm kiểm toán";
+}
 
 <section class="audit-console ff-admin-shell">
     <div class="audit-hero ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow ff-admin-kicker mb-2">Cross-cutting controls</p>
-            <h1 class="fw-bold mb-2">Audit center</h1>
-            <p class="mb-0 opacity-75">Theo doi admin action log, moderation audit va settlement audit cho cac lane marketplace moi.</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Kiểm soát liên thông</p>
+            <h1 class="fw-bold mb-2">Trung tâm kiểm toán</h1>
+            <p class="mb-0 opacity-75">Theo dõi nhật ký thao tác admin, kiểm toán kiểm duyệt và kiểm toán đối soát cho các lane mới của sàn.</p>
         </div>
         <div class="hero-chip ff-admin-chip">7.7A Audit MVP</div>
     </div>
@@ -16,20 +19,20 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Action logs</span><strong>@Model.Stats.TotalActionLogs</strong><small>@Model.Stats.Recent24hActions trong 24h</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Moderation</span><strong>@Model.Stats.ModerationCount</strong><small>quyet dinh moderation</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Settlement</span><strong>@Model.Stats.SettlementCount</strong><small>ledger audit entries</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">7 ngay</span><strong>@Model.Stats.SettlementAmount7d.ToString("N0") đ</strong><small>tong amount settlement audit</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Nhật ký thao tác</span><strong>@Model.Stats.TotalActionLogs</strong><small>@Model.Stats.Recent24hActions trong 24 giờ</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Kiểm duyệt</span><strong>@Model.Stats.ModerationCount</strong><small>quyết định kiểm duyệt</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Đối soát</span><strong>@Model.Stats.SettlementCount</strong><small>bản ghi kiểm toán sổ cái</small></div></div>
+        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">7 ngày</span><strong>@Model.Stats.SettlementAmount7d.ToString("N0") đ</strong><small>tổng giá trị kiểm toán đối soát</small></div></div>
     </div>
 
     <div class="panel-card mb-4">
         <div class="panel-head">
-            <h2 class="h5 mb-1">Loc audit</h2>
-            <p class="text-muted mb-0">Tap trung vao campaign center va risk center truoc khi mo rong sang lane moderation/finance sau.</p>
+            <h2 class="h5 mb-1">Lọc kiểm toán</h2>
+            <p class="text-muted mb-0">Tập trung vào trung tâm chiến dịch và trung tâm rủi ro trước khi mở rộng thêm sang lane kiểm duyệt và tài chính.</p>
         </div>
         <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="row g-3">
             <div class="col-md-5">
-                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo area, action, summary..." />
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo khu vực, thao tác, tóm tắt..." />
             </div>
             <div class="col-md-3">
                 <select class="form-select" name="area">
@@ -48,7 +51,7 @@
                 </select>
             </div>
             <div class="col-md-1 d-grid">
-                <button class="btn btn-primary" type="submit">Loc</button>
+                <button class="btn btn-primary" type="submit">Lọc</button>
             </div>
         </form>
     </div>
@@ -57,23 +60,23 @@
         <div class="col-xl-7">
             <div class="panel-card mb-4">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Admin action log</h2>
-                    <p class="text-muted mb-0">Ghi lai thao tac admin o muc action/source/target de truy vet nhanh khi co van de runtime.</p>
+                    <h2 class="h5 mb-1">Nhật ký thao tác admin</h2>
+                    <p class="text-muted mb-0">Ghi lại thao tác admin ở mức hành động, nguồn và đích để truy vết nhanh khi có sự cố runtime.</p>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle audit-table">
                         <thead>
                             <tr>
-                                <th>Action</th>
-                                <th>Target</th>
-                                <th>Actor</th>
-                                <th>Time</th>
+                                <th>Thao tác</th>
+                                <th>Đối tượng</th>
+                                <th>Người thực hiện</th>
+                                <th>Thời gian</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (Model.ActionLogs.Count == 0)
                             {
-                                <tr><td colspan="4" class="text-center text-muted py-4">Chua co admin action log nao.</td></tr>
+                                <tr><td colspan="4" class="text-center text-muted py-4">Chưa có nhật ký thao tác admin nào.</td></tr>
                             }
                             else
                             {
@@ -101,13 +104,13 @@
 
             <div class="panel-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Moderation audit</h2>
-                    <p class="text-muted mb-0">Tap trung vao quyet dinh moderation tu risk center trong MVP nay.</p>
+                    <h2 class="h5 mb-1">Kiểm toán kiểm duyệt</h2>
+                    <p class="text-muted mb-0">Tập trung vào các quyết định kiểm duyệt đi ra từ trung tâm rủi ro trong giai đoạn MVP.</p>
                 </div>
                 <div class="detail-stack">
                     @if (Model.ModerationAudits.Count == 0)
                     {
-                        <div class="text-muted">Chua co moderation audit.</div>
+                        <div class="text-muted">Chưa có bản ghi kiểm toán kiểm duyệt.</div>
                     }
                     else
                     {
@@ -130,13 +133,13 @@
         <div class="col-xl-5">
             <div class="panel-card sticky-panel">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Settlement audit</h2>
-                    <p class="text-muted mb-0">Theo doi topup, spend va reserve budget tu ads wallet de de doi chieu voi lane finance sau nay.</p>
+                    <h2 class="h5 mb-1">Kiểm toán đối soát</h2>
+                    <p class="text-muted mb-0">Theo dõi nạp tiền, chi tiêu và ngân sách giữ chỗ từ ví quảng cáo để đối chiếu với lane tài chính về sau.</p>
                 </div>
                 <div class="detail-stack">
                     @if (Model.SettlementAudits.Count == 0)
                     {
-                        <div class="text-muted">Chua co settlement audit.</div>
+                        <div class="text-muted">Chưa có bản ghi kiểm toán đối soát.</div>
                     }
                     else
                     {

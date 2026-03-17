@@ -44,14 +44,14 @@ public sealed class FreshOpsController : LegacySellerControllerBase
             var response = await client.GetAsync(BuildEndpoint(model));
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiErrorAsync(response, "Khong the tai fresh-goods operations.");
+                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải trung tâm vận hành hàng tươi.");
                 return View(model);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<FreshOpsApiResponse>(JsonOptions);
             if (payload is null)
             {
-                ViewBag.Error = "Khong doc duoc du lieu fresh-goods operations.";
+                ViewBag.Error = "Không đọc được dữ liệu trung tâm vận hành hàng tươi.";
                 return View(model);
             }
 
@@ -139,7 +139,7 @@ public sealed class FreshOpsController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            ViewBag.Error = "Loi khi tai fresh-goods operations: " + ex.Message;
+            ViewBag.Error = "Lỗi khi tải trung tâm vận hành hàng tươi: " + ex.Message;
         }
 
         return View(model);
@@ -155,12 +155,12 @@ public sealed class FreshOpsController : LegacySellerControllerBase
             var response = await client.PostAsJsonAsync("/api/catalog/admin/fresh-ops/lots", input);
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
                 response.IsSuccessStatusCode
-                    ? "Da tao fresh inventory lot."
-                    : await ReadApiErrorAsync(response, "Khong the tao fresh inventory lot.");
+                    ? "Đã tạo lô hàng tươi."
+                    : await ReadApiErrorAsync(response, "Không thể tạo lô hàng tươi.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi tao lot: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi tạo lô hàng: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), new { q, sellerId = sellerId > 0 ? sellerId : input.SellerId, status = NormalizeStatus(status) });
@@ -176,12 +176,12 @@ public sealed class FreshOpsController : LegacySellerControllerBase
             var response = await client.PostAsJsonAsync("/api/catalog/admin/fresh-ops/recalls", input);
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
                 response.IsSuccessStatusCode
-                    ? "Da tao quality recall."
-                    : await ReadApiErrorAsync(response, "Khong the tao quality recall.");
+                    ? "Đã tạo ca thu hồi chất lượng."
+                    : await ReadApiErrorAsync(response, "Không thể tạo ca thu hồi chất lượng.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi tao recall: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi tạo ca thu hồi: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), new { q, sellerId = sellerId > 0 ? sellerId : input.SellerId, status = NormalizeStatus(status) });
@@ -197,12 +197,12 @@ public sealed class FreshOpsController : LegacySellerControllerBase
             var response = await client.PostAsync($"/api/catalog/admin/fresh-ops/recalls/{id}/resolve", null);
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
                 response.IsSuccessStatusCode
-                    ? "Da resolve quality recall."
-                    : await ReadApiErrorAsync(response, "Khong the resolve quality recall.");
+                    ? "Đã đánh dấu xử lý xong ca thu hồi."
+                    : await ReadApiErrorAsync(response, "Không thể cập nhật ca thu hồi chất lượng.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi resolve recall: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật ca thu hồi: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), new { q, sellerId, status = NormalizeStatus(status) });
@@ -244,11 +244,11 @@ public sealed class FreshOpsController : LegacySellerControllerBase
     {
         model.StatusOptions =
         [
-            new FreshOpsOptionViewModel { Value = "all", Text = "Tat ca" },
-            new FreshOpsOptionViewModel { Value = "active", Text = "Active lot" },
-            new FreshOpsOptionViewModel { Value = "held", Text = "Held" },
-            new FreshOpsOptionViewModel { Value = "expired", Text = "Expired" },
-            new FreshOpsOptionViewModel { Value = "recalled", Text = "Recalled" }
+            new FreshOpsOptionViewModel { Value = "all", Text = "Tất cả" },
+            new FreshOpsOptionViewModel { Value = "active", Text = "Lô đang hoạt động" },
+            new FreshOpsOptionViewModel { Value = "held", Text = "Lô đang giữ" },
+            new FreshOpsOptionViewModel { Value = "expired", Text = "Lô hết hạn" },
+            new FreshOpsOptionViewModel { Value = "recalled", Text = "Lô bị thu hồi" }
         ];
     }
 

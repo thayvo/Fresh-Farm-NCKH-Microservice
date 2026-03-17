@@ -8,8 +8,8 @@
     ViewBag.BreadcrumbCurrentTitle = "Thêm mới";
 
     Func<string, string> catImg = f =>
-        Url.Content(string.IsNullOrWhiteSpace(f) ? "~/Images/no-image.png"
-                                                 : "~/Images/Categories/" + f);
+    Url.Content(string.IsNullOrWhiteSpace(f) ? "~/images/legacy/no-image.png"
+                                             : "~/uploads/categories/" + f);
 }
 <main class="container-fluid p-4">
     <div class="mb-4">
@@ -52,7 +52,7 @@
                             <div class="card-body">
                                 <h6 class="card-title">Ảnh danh mục</h6>
                                 <div class="mb-3 text-center">
-                                    <img id="imgPreview" src="@Url.Content("~/Images/no-image.png")"
+                <img id="imgPreview" src="@Url.Content("~/images/legacy/no-image.png")"
                                          class="rounded border"
                                          style="width:160px;height:160px;object-fit:cover;" />
                                 </div>

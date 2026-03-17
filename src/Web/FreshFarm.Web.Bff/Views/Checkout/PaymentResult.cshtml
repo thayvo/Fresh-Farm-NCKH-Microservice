@@ -44,7 +44,7 @@
                 @if (orderId.HasValue)
                 {
                     <div class="alert alert-light border small mb-4">
-                        Mã đơn hàng: <strong>#FF@orderId.Value.ToString("D6")</strong>
+                        <strong>Mã đơn hàng: @($"#FF{orderId.Value:D6}")</strong>
                     </div>
                 }
 

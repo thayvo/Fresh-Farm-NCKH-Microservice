@@ -44,14 +44,14 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
             var response = await client.GetAsync(BuildCenterEndpoint(model));
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiErrorAsync(response, "Khong the tai catalog readiness.");
+                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải trung tâm sẵn sàng danh mục.");
                 return View(model);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<CatalogReadinessApiResponse>(JsonOptions);
             if (payload is null)
             {
-                ViewBag.Error = "Khong doc duoc du lieu catalog readiness.";
+                ViewBag.Error = "Không đọc được dữ liệu trung tâm sẵn sàng danh mục.";
                 return View(model);
             }
 
@@ -79,7 +79,7 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            ViewBag.Error = "Loi khi tai catalog readiness: " + ex.Message;
+            ViewBag.Error = "Lỗi khi tải trung tâm sẵn sàng danh mục: " + ex.Message;
         }
 
         return View(model);
@@ -91,7 +91,7 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
     {
         if (!ModelState.IsValid)
         {
-            TempData["ErrorMessage"] = "Form attribute chua hop le.";
+            TempData["ErrorMessage"] = "Biểu mẫu thuộc tính chưa hợp lệ.";
             return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
         }
 
@@ -101,15 +101,15 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
             var response = await client.PostAsJsonAsync("/api/catalog/admin/readiness/category-attributes", input);
             if (!response.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the tao category attribute.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể tạo thuộc tính danh mục.");
                 return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
             }
 
-            TempData["SuccessMessage"] = "Da tao category attribute.";
+            TempData["SuccessMessage"] = "Đã tạo thuộc tính danh mục.";
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi tao category attribute: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi tạo thuộc tính danh mục: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
@@ -121,13 +121,13 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
     {
         if (id <= 0)
         {
-            TempData["ErrorMessage"] = "Category attribute id khong hop le.";
+            TempData["ErrorMessage"] = "Mã thuộc tính danh mục không hợp lệ.";
             return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, categoryId));
         }
 
         if (!ModelState.IsValid)
         {
-            TempData["ErrorMessage"] = "Form cap nhat attribute chua hop le.";
+            TempData["ErrorMessage"] = "Biểu mẫu cập nhật thuộc tính chưa hợp lệ.";
             return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
         }
 
@@ -137,15 +137,15 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
             var response = await client.PutAsJsonAsync($"/api/catalog/admin/readiness/category-attributes/{id}", input);
             if (!response.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the cap nhat category attribute.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể cập nhật thuộc tính danh mục.");
                 return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
             }
 
-            TempData["SuccessMessage"] = "Da cap nhat category attribute.";
+            TempData["SuccessMessage"] = "Đã cập nhật thuộc tính danh mục.";
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi cap nhat category attribute: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật thuộc tính danh mục: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, input.CategoryId));
@@ -167,15 +167,15 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
             var response = await client.PostAsync(endpoint, content: null);
             if (!response.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the sync product info.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể đồng bộ thông tin sản phẩm.");
                 return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, categoryId));
             }
 
-            TempData["SuccessMessage"] = await ReadApiErrorAsync(response, "Da sync product info vao readiness.");
+            TempData["SuccessMessage"] = await ReadApiErrorAsync(response, "Đã đồng bộ thông tin sản phẩm vào trung tâm sẵn sàng danh mục.");
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi khi sync product info: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi khi đồng bộ thông tin sản phẩm: " + ex.Message;
         }
 
         return RedirectToAction(nameof(Index), BuildRouteValues(q, categoryId, state, categoryId));
@@ -235,9 +235,9 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
     {
         model.StateOptions =
         [
-            new CatalogReadinessOptionViewModel { Value = "all", Text = "Tat ca" },
-            new CatalogReadinessOptionViewModel { Value = "missing", Text = "Thieu attribute" },
-            new CatalogReadinessOptionViewModel { Value = "ready", Text = "Da san sang" }
+            new CatalogReadinessOptionViewModel { Value = "all", Text = "Tất cả" },
+            new CatalogReadinessOptionViewModel { Value = "missing", Text = "Thiếu thuộc tính" },
+            new CatalogReadinessOptionViewModel { Value = "ready", Text = "Đã sẵn sàng" }
         ];
     }
 

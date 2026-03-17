@@ -41,7 +41,7 @@ public sealed class HomeController : LegacySellerControllerBase
             await ForceReLoginAsync();
             return RedirectToAction("Login", "AdminAccount", new
             {
-                area = "Seller",
+                area = "Admin",
                 returnUrl = dashboardUrl
             });
         }
@@ -68,7 +68,7 @@ public sealed class HomeController : LegacySellerControllerBase
             await ForceReLoginAsync();
             return RedirectToAction("Login", "AdminAccount", new
             {
-                area = "Seller",
+                area = "Admin",
                 returnUrl = dashboardUrl
             });
         }

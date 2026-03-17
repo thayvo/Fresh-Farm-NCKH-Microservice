@@ -11,9 +11,8 @@
     Func<string, string> catImg = f =>
     {
         var name = string.IsNullOrWhiteSpace(f) ? "no-image.png" : f;
-        // Ảnh danh mục nằm trong ~/Images/Categories, fallback no-image.png ở ~/Images
-        return Url.Content(name == "no-image.png" ? "~/Images/no-image.png"
-                                                  : "~/Images/" + name);
+        return Url.Content(name == "no-image.png" ? "~/images/legacy/no-image.png"
+                                                  : "~/uploads/categories/" + name);
     };
 }
 

@@ -19,10 +19,20 @@
         <div class="header-main-wrap">
             <div class="header-brand-wrap">
                 <a href="/" class="text-decoration-none d-flex align-items-center gap-2">
-                    <span class="brand-logo">FF</span>
+                    <span class="brand-logo-wrap">
+                        <img src="@WebAssetPaths.LogoRequestPath"
+                             alt="Logo FreshFarm"
+                             class="brand-logo-image"
+                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
+                        <span class="brand-logo d-none">FF</span>
+                    </span>
                     <span>
                         <span class="d-block brand-text">FRESHFARM</span>
-                        <span class="brand-sub">Nông sản sạch mỗi ngày</span>
+                        <img src="@WebAssetPaths.SloganRequestPath"
+                             alt="Nông sản sạch mỗi ngày"
+                             class="brand-slogan-image"
+                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-block');this.nextElementSibling.classList.add('d-inline');" />
+                        <span class="brand-sub d-none">Nông sản sạch mỗi ngày</span>
                     </span>
                 </a>
             </div>

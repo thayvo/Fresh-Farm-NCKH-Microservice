@@ -92,13 +92,13 @@ public class HomeController : LegacySellerControllerBase
         var adminId = TryGetCurrentAdminId();
         if (adminId <= 0)
         {
-            return RedirectToAction("Login", "AdminAccount", new { area = "Seller" });
+            return RedirectToAction("Login", "SellerAccount", new { area = "Seller" });
         }
 
         var profile = await GetCurrentAdminProfileAsync(adminId);
         if (profile is null)
         {
-            return RedirectToAction("Login", "AdminAccount", new { area = "Seller" });
+            return RedirectToAction("Login", "SellerAccount", new { area = "Seller" });
         }
 
         return View(profile);
@@ -118,7 +118,7 @@ public class HomeController : LegacySellerControllerBase
         var token = GetAccessToken(AccessTokenSessionKey);
         if (string.IsNullOrWhiteSpace(token))
         {
-            return RedirectToAction("Login", "AdminAccount", new { area = "Seller" });
+            return RedirectToAction("Login", "SellerAccount", new { area = "Seller" });
         }
 
         try
@@ -155,7 +155,7 @@ public class HomeController : LegacySellerControllerBase
         var adminId = TryGetCurrentAdminId();
         if (adminId <= 0)
         {
-            return RedirectToAction("Login", "AdminAccount", new { area = "Seller" });
+            return RedirectToAction("Login", "SellerAccount", new { area = "Seller" });
         }
 
         if (!ModelState.IsValid)

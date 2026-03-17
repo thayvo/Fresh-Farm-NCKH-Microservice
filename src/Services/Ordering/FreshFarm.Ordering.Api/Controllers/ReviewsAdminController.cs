@@ -386,14 +386,31 @@ public sealed class ReviewsAdminController : ControllerBase
             return NotFound(new { message = "Khong tim thay danh gia." });
         }
 
+        var actorUserId = request?.AdminUserId is > 0 ? request.AdminUserId.Value : sellerId.Value;
+        var now = DateTime.UtcNow;
+        var existingReply = await _db.Reviews
+            .FirstOrDefaultAsync(r => r.ReplyTo == parent.ReviewId && !r.IsDeleted && r.UserId == actorUserId, cancellationToken);
+
+        if (existingReply is not null)
+        {
+            existingReply.Comment = content;
+            existingReply.IsApproved = true;
+            existingReply.IsEdited = true;
+            existingReply.UpdatedAt = now;
+
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return Ok(new { success = true, message = "Da cap nhat phan hoi." });
+        }
+
         var reply = new Review
         {
             ReplyTo = parent.ReviewId,
-            UserId = request?.AdminUserId ?? 0,
+            UserId = actorUserId,
             ProductId = parent.ProductId,
             Rating = 0,
             Comment = content,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = now,
             IsApproved = true,
             IsEdited = false,
             IsDeleted = false

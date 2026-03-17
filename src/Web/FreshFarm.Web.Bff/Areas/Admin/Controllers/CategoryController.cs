@@ -18,7 +18,7 @@ public sealed class CategoryController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
     private static readonly string[] AllowedExts = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
     private const int MaxFileSizeBytes = 2 * 1024 * 1024;
-    private const string UploadFolderVPath = "~/Images/";
+    private const string UploadFolderVPath = "~/uploads/categories/";
     private const string FallbackImg = "no-image.png";
 
     private readonly IHttpClientFactory _httpClientFactory;

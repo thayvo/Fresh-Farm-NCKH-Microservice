@@ -494,24 +494,23 @@
                             <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết</label>
                             <input type="text" class="form-control" id="ghnToAddress" placeholder="45 Nguyen Van Cu" />
                         </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold text-primary-blue">Tỉnh/Thành GHN</label>
+                    <div class="col-12">
+                        <div class="shipping-readonly-note" id="ghnRecipientLocationStatus">
+                            <i class="bi bi-magic"></i>
+                            Hệ thống sẽ tự nhận diện tỉnh/quận/phường GHN từ địa chỉ chi tiết bên trên.
+                        </div>
+                        <div class="d-none">
                             <select class="form-select" id="ghnProvinceId">
                                 <option value="">Chọn tỉnh/thành GHN</option>
                             </select>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold text-primary-blue">Quận/Huyện GHN</label>
                             <select class="form-select" id="ghnDistrictId">
                                 <option value="">Chọn quận/huyện GHN</option>
                             </select>
-                        </div>
-                        <div class="col-12 col-md-4">
-                            <label class="form-label fw-semibold text-primary-blue">Phường/Xã GHN</label>
                             <select class="form-select" id="ghnWardCode">
                                 <option value="">Chọn phường/xã GHN</option>
                             </select>
                         </div>
+                    </div>
                         <div class="col-6 col-md-3">
                             <label class="form-label fw-semibold text-primary-blue">Cân nặng (gram)</label>
                             <input type="number" class="form-control" id="ghnWeight" value="500" min="1" />
@@ -1078,16 +1077,126 @@
                 button.innerHTML = button.dataset.originalHtml;
             }
         }
-        function ensureGhnRecipient() {
+        function setGhnRecipientLocationStatus(message, tone = 'info') {
+            const node = document.getElementById('ghnRecipientLocationStatus');
+            if (!node) return;
+            const icon = tone === 'success'
+                ? 'bi-check-circle-fill'
+                : tone === 'warning'
+                    ? 'bi-exclamation-triangle-fill'
+                    : tone === 'danger'
+                        ? 'bi-x-circle-fill'
+                        : 'bi-magic';
+            node.innerHTML = `<i class="bi ${icon}"></i> ${message}`;
+        }
+        function normalizeAdministrativeName(value) {
+            return (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/đ/g, 'd')
+                .replace(/\b(tinh|thanh pho|tp|quan|huyen|thi xa|thi tran|phuong|xa)\b/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+        function findAdministrativeOptionMatch(select, addressText) {
+            if (!select) return null;
+            const normalizedAddress = normalizeAdministrativeName(addressText);
+            if (!normalizedAddress) return null;
+
+            const options = Array.from(select.options || []).filter(option => option.value);
+            let best = null;
+            let bestScore = -1;
+
+            options.forEach(option => {
+                const normalizedName = normalizeAdministrativeName(option.textContent || '');
+                if (!normalizedName) return;
+
+                let score = -1;
+                if (normalizedAddress.includes(normalizedName)) {
+                    score = normalizedName.length + 100;
+                } else if (normalizedName.includes(normalizedAddress)) {
+                    score = normalizedAddress.length + 50;
+                }
+
+                if (score > bestScore) {
+                    best = option;
+                    bestScore = score;
+                }
+            });
+
+            return best;
+        }
+        async function autoResolveGhnRecipientLocation(addressText) {
+            const provinceSelect = document.getElementById('ghnProvinceId');
+            const districtSelect = document.getElementById('ghnDistrictId');
+            const wardSelect = document.getElementById('ghnWardCode');
+            if (!provinceSelect || !districtSelect || !wardSelect) return false;
+
+            const normalizedAddress = (addressText || '').trim();
+            if (!normalizedAddress) {
+                setGhnRecipientLocationStatus('Chưa có địa chỉ chi tiết để tự nhận diện địa bàn GHN.', 'warning');
+                return false;
+            }
+
+            try {
+                setGhnRecipientLocationStatus('Đang tự nhận diện tỉnh/quận/phường từ địa chỉ người nhận...', 'info');
+                await loadGhnProvinces();
+
+                const matchedProvince = findAdministrativeOptionMatch(provinceSelect, normalizedAddress);
+                if (!matchedProvince) {
+                    setGhnRecipientLocationStatus('Không tự nhận diện được tỉnh/thành từ địa chỉ này. Hãy kiểm tra lại địa chỉ.', 'warning');
+                    return false;
+                }
+
+                provinceSelect.value = matchedProvince.value;
+                await loadGhnDistricts(matchedProvince.value);
+
+                const matchedDistrict = findAdministrativeOptionMatch(districtSelect, normalizedAddress);
+                if (!matchedDistrict) {
+                    setGhnRecipientLocationStatus('Không tự nhận diện được quận/huyện từ địa chỉ này. Hãy kiểm tra lại địa chỉ.', 'warning');
+                    return false;
+                }
+
+                districtSelect.value = matchedDistrict.value;
+                await loadGhnWards(matchedDistrict.value);
+
+                const matchedWard = findAdministrativeOptionMatch(wardSelect, normalizedAddress);
+                if (!matchedWard) {
+                    setGhnRecipientLocationStatus('Không tự nhận diện được phường/xã từ địa chỉ này. Hãy kiểm tra lại địa chỉ.', 'warning');
+                    return false;
+                }
+
+                wardSelect.value = matchedWard.value;
+                setGhnRecipientLocationStatus(`Đã tự nhận diện GHN: ${matchedProvince.textContent} / ${matchedDistrict.textContent} / ${matchedWard.textContent}.`, 'success');
+                return true;
+            } catch {
+                setGhnRecipientLocationStatus('Không tự nhận diện được địa bàn GHN lúc này.', 'danger');
+                return false;
+            }
+        }
+        async function ensureGhnRecipient() {
             const toName = getTextValue('ghnToName');
             const toPhone = getTextValue('ghnToPhone');
             const toAddress = getTextValue('ghnToAddress');
-            const districtId = getTextValue('ghnDistrictId');
-            const wardCode = getTextValue('ghnWardCode');
-            if (!toName || !toPhone || !toAddress || !districtId || !wardCode) {
-                showNotification('Cần điền đủ người nhận, số điện thoại, địa chỉ và quận/phường GHN.', 'warning');
+            if (!toName || !toPhone || !toAddress) {
+                showNotification('Cần điền đủ người nhận, số điện thoại và địa chỉ chi tiết.', 'warning');
                 return null;
             }
+
+            let districtId = getTextValue('ghnDistrictId');
+            let wardCode = getTextValue('ghnWardCode');
+            if (!districtId || !wardCode) {
+                const resolved = await autoResolveGhnRecipientLocation(toAddress);
+                if (!resolved) {
+                    showNotification('Không tự nhận diện được quận/phường GHN từ địa chỉ này.', 'warning');
+                    return null;
+                }
+                districtId = getTextValue('ghnDistrictId');
+                wardCode = getTextValue('ghnWardCode');
+            }
+
             return { toName, toPhone, toAddress, districtId, wardCode };
         }
         async function fetchJson(url, options) {
@@ -1139,8 +1248,8 @@
                 wardSelect.appendChild(option);
             });
         }
-        function buildPreviewParams() {
-            const recipient = ensureGhnRecipient();
+        async function buildPreviewParams() {
+            const recipient = await ensureGhnRecipient();
             if (!recipient) return null;
             return {
                 ToDistrictId: recipient.districtId,
@@ -1154,7 +1263,7 @@
                 ItemQuantity: getNumericValue('ghnItemQuantity', 1)
             };
         }
-        function fillGhnFormFromRow(button) {
+        async function fillGhnFormFromRow(button) {
             const row = button.closest('tr');
             if (!row) return;
             const orderLabel = row.dataset.ghnOrderLabel || 'Đơn nội bộ';
@@ -1165,10 +1274,14 @@
             document.getElementById('ghnToName').value = row.dataset.ghnName || '';
             document.getElementById('ghnToPhone').value = row.dataset.ghnPhone || '';
             document.getElementById('ghnToAddress').value = addressParts.join(', ');
+            document.getElementById('ghnProvinceId').value = '';
+            document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện GHN</option>';
+            document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã GHN</option>';
             document.getElementById('ghnClientOrderCode').value = `FF-ORD-${row.dataset.ghnOrderId}-${Date.now()}`;
             document.getElementById('ghnContent').value = `Đơn giao vận cho ${orderLabel}`;
             document.getElementById('ghnItemCode').value = `ORDER-${row.dataset.ghnOrderId}`;
             document.getElementById('ghnTrackingOrderCode').value = '';
+            await autoResolveGhnRecipientLocation(addressParts.join(', '));
             showNotification(`Đã đổ thông tin ${orderLabel} vào bảng điều khiển GHN.`, 'info');
             document.getElementById('ghnCreateOrderPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -1188,7 +1301,7 @@
         }
         async function previewGhnFee() {
             const button = document.getElementById('btnGhnPreviewFee');
-            const params = buildPreviewParams();
+            const params = await buildPreviewParams();
             if (!params) return;
             try {
                 setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tính...');
@@ -1203,7 +1316,7 @@
         }
         async function previewGhnLeadTime() {
             const button = document.getElementById('btnGhnPreviewLeadTime');
-            const recipient = ensureGhnRecipient();
+            const recipient = await ensureGhnRecipient();
             if (!recipient) return;
             try {
                 setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang lấy...');
@@ -1221,7 +1334,7 @@
         }
         async function createGhnOrder() {
             const button = document.getElementById('btnGhnCreateOrder');
-            const recipient = ensureGhnRecipient();
+            const recipient = await ensureGhnRecipient();
             if (!recipient) return;
             const params = {
                 ToName: recipient.toName,
@@ -1359,18 +1472,6 @@
             setResult('ghnShopProfileResult', 'Không tải được danh sách tỉnh/thành GHN.');
         });
 
-        document.getElementById('ghnProvinceId')?.addEventListener('change', function () {
-            loadGhnDistricts(this.value).catch(() => {
-                showNotification('Không tải được quận/huyện GHN.', 'danger');
-            });
-        });
-
-        document.getElementById('ghnDistrictId')?.addEventListener('change', function () {
-            loadGhnWards(this.value).catch(() => {
-                showNotification('Không tải được phường/xã GHN.', 'danger');
-            });
-        });
-
         document.getElementById('btnGhnLoadShopProfile')?.addEventListener('click', function () {
             loadShopProfile();
         });
@@ -1407,7 +1508,7 @@
         });
 
         document.querySelectorAll('.btn-use-ghn').forEach(button => button.addEventListener('click', function () {
-            fillGhnFormFromRow(this);
+            void fillGhnFormFromRow(this);
         }));
 
         document.getElementById('status').addEventListener('change', function () {

@@ -367,7 +367,27 @@ public sealed class CampaignController : LegacySellerControllerBase
         => new()
         {
             Value = option.Value ?? string.Empty,
-            Text = option.Text ?? string.Empty
+            Text = TranslateCampaignOption(option.Value, option.Text)
+        };
+
+    private static string TranslateCampaignOption(string? value, string? text)
+        => (value ?? string.Empty).ToLowerInvariant() switch
+        {
+            "all" => "Tất cả",
+            "draft" => "Nháp",
+            "registration_open" => "Mở đăng ký",
+            "registration_closed" => "Đóng đăng ký",
+            "scheduled" => "Đã lên lịch",
+            "running" => "Đang chạy",
+            "completed" => "Hoàn tất",
+            "suspended" => "Tạm ngưng",
+            "active" => "Hoạt động",
+            "paused" => "Tạm dừng",
+            "flash_sale" => "Flash sale",
+            "voucher_boost" => "Đẩy voucher",
+            "seasonal" => "Theo mùa",
+            "livestream" => "Livestream",
+            _ => text ?? string.Empty
         };
 
     private static CampaignListItemViewModel MapCampaignListItem(CampaignListItemApiModel item)
@@ -398,31 +418,31 @@ public sealed class CampaignController : LegacySellerControllerBase
     {
         model.StatusOptions =
         [
-            new CampaignOptionViewModel { Value = "all", Text = "Tat ca" },
-            new CampaignOptionViewModel { Value = "draft", Text = "Draft" },
-            new CampaignOptionViewModel { Value = "registration_open", Text = "Mo dang ky" },
-            new CampaignOptionViewModel { Value = "registration_closed", Text = "Dong dang ky" },
-            new CampaignOptionViewModel { Value = "scheduled", Text = "Scheduled" },
-            new CampaignOptionViewModel { Value = "running", Text = "Running" },
-            new CampaignOptionViewModel { Value = "completed", Text = "Completed" },
-            new CampaignOptionViewModel { Value = "suspended", Text = "Suspended" }
+            new CampaignOptionViewModel { Value = "all", Text = "Tất cả" },
+            new CampaignOptionViewModel { Value = "draft", Text = "Nháp" },
+            new CampaignOptionViewModel { Value = "registration_open", Text = "Mở đăng ký" },
+            new CampaignOptionViewModel { Value = "registration_closed", Text = "Đóng đăng ký" },
+            new CampaignOptionViewModel { Value = "scheduled", Text = "Đã lên lịch" },
+            new CampaignOptionViewModel { Value = "running", Text = "Đang chạy" },
+            new CampaignOptionViewModel { Value = "completed", Text = "Hoàn tất" },
+            new CampaignOptionViewModel { Value = "suspended", Text = "Tạm ngưng" }
         ];
 
         model.TypeOptions =
         [
-            new CampaignOptionViewModel { Value = "all", Text = "Tat ca" },
+            new CampaignOptionViewModel { Value = "all", Text = "Tất cả" },
             new CampaignOptionViewModel { Value = "flash_sale", Text = "Flash sale" },
-            new CampaignOptionViewModel { Value = "voucher_boost", Text = "Voucher boost" },
-            new CampaignOptionViewModel { Value = "seasonal", Text = "Seasonal" },
+            new CampaignOptionViewModel { Value = "voucher_boost", Text = "Đẩy voucher" },
+            new CampaignOptionViewModel { Value = "seasonal", Text = "Theo mùa" },
             new CampaignOptionViewModel { Value = "livestream", Text = "Livestream" }
         ];
 
         model.WalletStatusOptions =
         [
-            new CampaignOptionViewModel { Value = "all", Text = "Tat ca" },
-            new CampaignOptionViewModel { Value = "active", Text = "Active" },
-            new CampaignOptionViewModel { Value = "paused", Text = "Paused" },
-            new CampaignOptionViewModel { Value = "suspended", Text = "Suspended" }
+            new CampaignOptionViewModel { Value = "all", Text = "Tất cả" },
+            new CampaignOptionViewModel { Value = "active", Text = "Hoạt động" },
+            new CampaignOptionViewModel { Value = "paused", Text = "Tạm dừng" },
+            new CampaignOptionViewModel { Value = "suspended", Text = "Tạm ngưng" }
         ];
     }
 

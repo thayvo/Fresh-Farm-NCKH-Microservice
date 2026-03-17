@@ -27,6 +27,43 @@ builder.Services // Dang ky cookie authentication cho user web.
         options.AccessDeniedPath = "/account/signin"; // Tam thoi redirect signin cho MVP.
         options.SlidingExpiration = true; // User hoat dong thi reset han cookie.
         options.ExpireTimeSpan = TimeSpan.FromHours(2); // Han cookie auth.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = context =>
+            {
+                var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+                var loginPath = "/account/signin";
+
+                if (context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    loginPath = "/Admin/AdminAccount/Login";
+                }
+                else if (context.Request.Path.StartsWithSegments("/Seller", StringComparison.OrdinalIgnoreCase))
+                {
+                    loginPath = "/Seller/SellerAccount/Login";
+                }
+
+                context.Response.Redirect($"{loginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = context =>
+            {
+                var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+                var loginPath = "/account/signin";
+
+                if (context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    loginPath = "/Admin/AdminAccount/Login";
+                }
+                else if (context.Request.Path.StartsWithSegments("/Seller", StringComparison.OrdinalIgnoreCase))
+                {
+                    loginPath = "/Seller/SellerAccount/Login";
+                }
+
+                context.Response.Redirect($"{loginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+                return Task.CompletedTask;
+            }
+        };
     })
     .AddCookie("GoogleExternal", options =>
     {
@@ -55,6 +92,20 @@ if (googleAuthOptions.IsConfigured)
             options.SignInScheme = "GoogleExternal";
             options.CallbackPath = "/signin-google";
             options.SaveTokens = false;
+            options.Events.OnRemoteFailure = context =>
+            {
+                var returnUrl = context.Properties?.Items.TryGetValue("returnUrl", out var storedReturnUrl) == true
+                    ? storedReturnUrl
+                    : null;
+
+                var safeReturnUrl = string.IsNullOrWhiteSpace(returnUrl)
+                    ? string.Empty
+                    : $"?returnUrl={Uri.EscapeDataString(returnUrl)}&externalError={Uri.EscapeDataString(context.Failure?.Message ?? "access_denied")}";
+
+                context.Response.Redirect($"/account/signin{safeReturnUrl}");
+                context.HandleResponse();
+                return Task.CompletedTask;
+            };
         });
 }
 

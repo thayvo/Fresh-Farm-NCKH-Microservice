@@ -151,19 +151,19 @@ public sealed class AuditController : LegacySellerControllerBase
     {
         model.AreaOptions =
         [
-            new AuditOptionViewModel { Value = "all", Text = "Tat ca" },
-            new AuditOptionViewModel { Value = "campaign_center", Text = "Campaign center" },
-            new AuditOptionViewModel { Value = "risk_center", Text = "Risk center" }
+            new AuditOptionViewModel { Value = "all", Text = "Tất cả" },
+            new AuditOptionViewModel { Value = "campaign_center", Text = "Trung tâm chiến dịch" },
+            new AuditOptionViewModel { Value = "risk_center", Text = "Trung tâm rủi ro" }
         ];
 
         model.TypeOptions =
         [
-            new AuditOptionViewModel { Value = "all", Text = "Tat ca" },
-            new AuditOptionViewModel { Value = "campaign", Text = "Campaign" },
-            new AuditOptionViewModel { Value = "ads_wallet", Text = "Ads wallet" },
-            new AuditOptionViewModel { Value = "ads_campaign", Text = "Ads campaign" },
-            new AuditOptionViewModel { Value = "risk_case", Text = "Risk case" },
-            new AuditOptionViewModel { Value = "risk_center", Text = "Risk center" }
+            new AuditOptionViewModel { Value = "all", Text = "Tất cả" },
+            new AuditOptionViewModel { Value = "campaign", Text = "Chiến dịch" },
+            new AuditOptionViewModel { Value = "ads_wallet", Text = "Ví quảng cáo" },
+            new AuditOptionViewModel { Value = "ads_campaign", Text = "Chiến dịch quảng cáo" },
+            new AuditOptionViewModel { Value = "risk_case", Text = "Ca rủi ro" },
+            new AuditOptionViewModel { Value = "risk_center", Text = "Trung tâm rủi ro" }
         ];
     }
 
@@ -171,7 +171,20 @@ public sealed class AuditController : LegacySellerControllerBase
         => new()
         {
             Value = option.Value ?? string.Empty,
-            Text = option.Text ?? string.Empty
+            Text = TranslateAuditOption(option.Value, option.Text)
+        };
+
+    private static string TranslateAuditOption(string? value, string? text)
+        => (value ?? string.Empty).ToLowerInvariant() switch
+        {
+            "all" => "Tất cả",
+            "campaign_center" => "Trung tâm chiến dịch",
+            "risk_center" => "Trung tâm rủi ro",
+            "campaign" => "Chiến dịch",
+            "ads_wallet" => "Ví quảng cáo",
+            "ads_campaign" => "Chiến dịch quảng cáo",
+            "risk_case" => "Ca rủi ro",
+            _ => text ?? string.Empty
         };
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)

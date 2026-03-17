@@ -8,8 +8,8 @@
     ViewBag.BreadcrumbCurrentTitle = "Chỉnh sửa";
 
     Func<string, string> catImg = f =>
-        Url.Content(string.IsNullOrWhiteSpace(f) ? "~/Images/no-image.png"
-                                                 : "~/Images/" + f);
+    Url.Content(string.IsNullOrWhiteSpace(f) ? "~/images/legacy/no-image.png"
+                                             : "~/uploads/categories/" + f);
 }
 <main class="container-fluid p-4">
     <div class="mb-4">

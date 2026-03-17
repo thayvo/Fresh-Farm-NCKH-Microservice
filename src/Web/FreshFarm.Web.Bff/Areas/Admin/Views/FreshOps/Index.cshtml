@@ -1,13 +1,36 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.FreshOpsPageViewModel
+@{
+    string TranslateFreshOpsValue(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "active" => "Đang hoạt động",
+        "held" => "Đang giữ",
+        "expired" => "Hết hạn",
+        "recalled" => "Bị thu hồi",
+        "depleted" => "Đã hết hàng",
+        "ok" => "Ổn",
+        "watch" => "Cần theo dõi",
+        "blocked" => "Đang chặn",
+        "quality_issue" => "Lỗi chất lượng",
+        "contamination" => "Nhiễm bẩn",
+        "source_mismatch" => "Sai lệch nguồn gốc",
+        "low" => "Thấp",
+        "medium" => "Trung bình",
+        "high" => "Cao",
+        "critical" => "Khẩn cấp",
+        "investigating" => "Đang điều tra",
+        "resolved" => "Đã xử lý xong",
+        _ => value ?? string.Empty
+    };
+}
 
 <section class="fresh-ops-shell ff-admin-shell">
     <div class="hero-card ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow ff-admin-kicker mb-2">7.7A Fresh-goods MVP</p>
-            <h1 class="fw-bold mb-2">Fresh ops center</h1>
-            <p class="mb-0 opacity-75">Theo doi lot, HSD, trace code, FEFO queue va quality recall cho nong san/thuc pham tuoi.</p>
+            <p class="eyebrow ff-admin-kicker mb-2">7.7A Vận hành hàng tươi</p>
+            <h1 class="fw-bold mb-2">Trung tâm vận hành hàng tươi</h1>
+            <p class="mb-0 opacity-75">Theo dõi lô hàng, hạn sử dụng, mã truy xuất, hàng đợi FEFO và ca thu hồi chất lượng cho nông sản, thực phẩm tươi.</p>
         </div>
-        <div class="hero-chip ff-admin-chip">Lot + Recall</div>
+        <div class="hero-chip ff-admin-chip">Lô hàng + Thu hồi</div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
@@ -24,32 +47,32 @@
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Lots</span><strong>@Model.Stats.TotalLots</strong><small>dang theo doi</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Soon</span><strong>@Model.Stats.ExpiringSoonLots</strong><small>sap het han</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Expired</span><strong>@Model.Stats.ExpiredLots</strong><small>can xu ly</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Recall</span><strong>@Model.Stats.OpenRecalls</strong><small>case dang mo</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Trace</span><strong>@Model.Stats.TraceCoverage%</strong><small>lot co trace code</small></div></div>
-        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">FEFO</span><strong>@Model.FefoQueue.Count</strong><small>queue uu tien xuat</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Lô hàng</span><strong>@Model.Stats.TotalLots</strong><small>đang theo dõi</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Sắp hết hạn</span><strong>@Model.Stats.ExpiringSoonLots</strong><small>cần ưu tiên xử lý</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Hết hạn</span><strong>@Model.Stats.ExpiredLots</strong><small>cần khóa hoặc thu hồi</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Thu hồi</span><strong>@Model.Stats.OpenRecalls</strong><small>ca đang mở</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">Truy xuất</span><strong>@Model.Stats.TraceCoverage%</strong><small>lô có mã truy xuất</small></div></div>
+        <div class="col-md-6 col-xl-2"><div class="metric-card ff-admin-card"><span class="metric-label">FEFO</span><strong>@Model.FefoQueue.Count</strong><small>hàng đợi ưu tiên xuất</small></div></div>
     </div>
 
     <div class="panel-card ff-admin-card mb-4">
         <div class="panel-head">
-            <h2 class="h5 mb-1">Bo loc van hanh</h2>
-            <p class="text-muted mb-0">Tap trung vao seller, lot status va keyword de triage nhanh data freshness.</p>
+            <h2 class="h5 mb-1">Bộ lọc vận hành</h2>
+            <p class="text-muted mb-0">Tập trung theo người bán, trạng thái lô hàng và từ khóa để sàng lọc nhanh dữ liệu hàng tươi.</p>
         </div>
         <form method="get" asp-action="Index" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
             <div class="col-lg-5">
-                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tim theo product, SKU, lot, trace code..." />
+                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo sản phẩm, SKU, mã lô, mã truy xuất..." />
             </div>
             <div class="col-lg-3">
                 <select class="form-select" name="sellerId">
                     @if (!Model.SellerId.HasValue)
                     {
-                        <option value="" selected>Tat ca seller</option>
+                        <option value="" selected>Tất cả người bán</option>
                     }
                     else
                     {
-                        <option value="">Tat ca seller</option>
+                        <option value="">Tất cả người bán</option>
                     }
                     @foreach (var option in Model.SellerOptions)
                     {
@@ -80,7 +103,7 @@
                 </select>
             </div>
             <div class="col-lg-2 d-grid">
-                <button class="btn btn-primary" type="submit">Loc queue</button>
+                <button class="btn btn-primary" type="submit">Lọc hàng đợi</button>
             </div>
         </form>
     </div>
@@ -89,13 +112,13 @@
         <div class="col-xl-7">
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">FEFO queue</h2>
-                    <p class="text-muted mb-0">Danh sach lot sap den HSD de uu tien xuat truoc trong MVP nay.</p>
+                    <h2 class="h5 mb-1">Hàng đợi FEFO</h2>
+                    <p class="text-muted mb-0">Danh sách lô hàng sắp tới hạn sử dụng để ưu tiên xuất trước trong giai đoạn này.</p>
                 </div>
                 <div class="detail-stack">
                     @if (Model.FefoQueue.Count == 0)
                     {
-                        <div class="text-muted">Chua co lot nao trong FEFO queue.</div>
+                        <div class="text-muted">Chưa có lô hàng nào trong hàng đợi FEFO.</div>
                     }
                     else
                     {
@@ -105,11 +128,11 @@
                             <div class="detail-item">
                                 <div>
                                     <strong>@row.ProductName</strong>
-                                    <div class="small text-muted">Seller #@row.SellerId | Lot @row.LotCode | SKU @row.Sku</div>
-                                    <div class="small text-muted">Con @row.RemainingQuantity sp | Quality @row.QualityStatus</div>
+                                    <div class="small text-muted">Người bán #@row.SellerId | Lô @row.LotCode | SKU @row.Sku</div>
+                                    <div class="small text-muted">Còn @row.RemainingQuantity sản phẩm | Chất lượng @TranslateFreshOpsValue(row.QualityStatus)</div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="@queueClass">@row.DaysToExpiry ngay</div>
+                                    <div class="@queueClass">@row.DaysToExpiry ngày</div>
                                     <div class="small text-muted">@row.ExpiresAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
                                 </div>
                             </div>
@@ -120,24 +143,24 @@
 
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Fresh lots</h2>
-                    <p class="text-muted mb-0">Lo hang co HSD, farm/origin, trace code va ton con lai de admin theo doi.</p>
+                    <h2 class="h5 mb-1">Danh sách lô hàng tươi</h2>
+                    <p class="text-muted mb-0">Lô hàng có hạn sử dụng, nông trại, xuất xứ, mã truy xuất và tồn còn lại để admin theo dõi.</p>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle ops-table">
                         <thead>
                             <tr>
-                                <th>Lot</th>
-                                <th>Traceability</th>
-                                <th>Qty</th>
+                                <th>Lô hàng</th>
+                                <th>Truy xuất</th>
+                                <th>Số lượng</th>
                                 <th>HSD</th>
-                                <th>Status</th>
+                                <th>Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (Model.Lots.Count == 0)
                             {
-                                <tr><td colspan="5" class="text-center text-muted py-4">Chua co lot nao.</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-4">Chưa có lô hàng nào.</td></tr>
                             }
                             else
                             {
@@ -146,25 +169,25 @@
                                     <tr>
                                         <td>
                                             <div class="fw-semibold">@row.ProductName</div>
-                                            <div class="small text-muted">Seller #@row.SellerId | Lot @row.LotCode</div>
+                                            <div class="small text-muted">Người bán #@row.SellerId | Lô @row.LotCode</div>
                                             <div class="small text-muted">SKU @row.Sku</div>
                                         </td>
                                         <td>
-                                            <div class="small">Trace: @(string.IsNullOrWhiteSpace(row.TraceCode) ? "-" : row.TraceCode)</div>
-                                            <div class="small text-muted">Farm: @(string.IsNullOrWhiteSpace(row.FarmName) ? "-" : row.FarmName)</div>
-                                            <div class="small text-muted">Origin: @(string.IsNullOrWhiteSpace(row.OriginRegion) ? "-" : row.OriginRegion)</div>
+                                            <div class="small">Mã truy xuất: @(string.IsNullOrWhiteSpace(row.TraceCode) ? "-" : row.TraceCode)</div>
+                                            <div class="small text-muted">Nông trại: @(string.IsNullOrWhiteSpace(row.FarmName) ? "-" : row.FarmName)</div>
+                                            <div class="small text-muted">Xuất xứ: @(string.IsNullOrWhiteSpace(row.OriginRegion) ? "-" : row.OriginRegion)</div>
                                         </td>
                                         <td>
                                             <div class="fw-semibold">@row.RemainingQuantity / @row.InitialQuantity</div>
-                                            <div class="small text-muted">Cost: @((row.UnitCost ?? 0m).ToString("N0")) đ</div>
+                                            <div class="small text-muted">Giá vốn: @((row.UnitCost ?? 0m).ToString("N0")) đ</div>
                                         </td>
                                         <td>
                                             <div>@(row.ExpiresAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "-")</div>
-                                            <div class="small text-muted">@(row.DaysToExpiry?.ToString() ?? "-") ngay</div>
+                                            <div class="small text-muted">@(row.DaysToExpiry?.ToString() ?? "-") ngày</div>
                                         </td>
                                         <td>
-                                            <span class="status-chip">@row.Status</span>
-                                            <div class="small text-muted mt-1">Quality: @row.QualityStatus</div>
+                                            <span class="status-chip">@TranslateFreshOpsValue(row.Status)</span>
+                                            <div class="small text-muted mt-1">Chất lượng: @TranslateFreshOpsValue(row.QualityStatus)</div>
                                         </td>
                                     </tr>
                                 }
@@ -176,13 +199,13 @@
 
             <div class="panel-card ff-admin-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Quality recalls</h2>
-                    <p class="text-muted mb-0">Case recall de boi loi quality issue, contamination hoac source mismatch.</p>
+                    <h2 class="h5 mb-1">Ca thu hồi chất lượng</h2>
+                    <p class="text-muted mb-0">Ca thu hồi dùng để đánh dấu lỗi chất lượng, nhiễm bẩn hoặc sai lệch nguồn gốc.</p>
                 </div>
                 <div class="detail-stack">
                     @if (Model.Recalls.Count == 0)
                     {
-                        <div class="text-muted">Chua co recall case.</div>
+                        <div class="text-muted">Chưa có ca thu hồi nào.</div>
                     }
                     else
                     {
@@ -191,12 +214,12 @@
                             <div class="detail-item">
                                 <div>
                                     <strong>@row.Title</strong>
-                                    <div class="small text-muted">@row.RecallCode | @row.RecallType | @row.Severity</div>
-                                    <div class="small text-muted">Seller #@(row.SellerId?.ToString() ?? "-") | Product @(row.ProductName ?? "-") | Lot @(row.LotCode ?? "-")</div>
+                                    <div class="small text-muted">@row.RecallCode | @TranslateFreshOpsValue(row.RecallType) | @TranslateFreshOpsValue(row.Severity)</div>
+                                    <div class="small text-muted">Người bán #@(row.SellerId?.ToString() ?? "-") | Sản phẩm @(row.ProductName ?? "-") | Lô @(row.LotCode ?? "-")</div>
                                     <div class="small">@row.Reason</div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="status-chip">@row.Status</div>
+                                    <div class="status-chip">@TranslateFreshOpsValue(row.Status)</div>
                                     <div class="small text-muted mt-2">@row.StartedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                                     @if (!string.Equals(row.Status, "resolved", StringComparison.OrdinalIgnoreCase))
                                     {
@@ -205,7 +228,7 @@
                                             <input type="hidden" name="q" value="@Model.Query" />
                                             <input type="hidden" name="sellerId" value="@Model.SellerId" />
                                             <input type="hidden" name="status" value="@Model.Status" />
-                                            <button class="btn btn-sm btn-outline-primary" type="submit">Resolve</button>
+                                            <button class="btn btn-sm btn-outline-primary" type="submit">Đánh dấu đã xử lý</button>
                                         </form>
                                     }
                                 </div>
@@ -219,94 +242,94 @@
         <div class="col-xl-5">
             <div class="panel-card ff-admin-card mb-4 sticky-panel">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Tao fresh lot</h2>
-                    <p class="text-muted mb-0">Nhap lot co HSD, trace code va ton kho de bat dau theo doi FEFO.</p>
+                    <h2 class="h5 mb-1">Tạo lô hàng tươi</h2>
+                    <p class="text-muted mb-0">Nhập lô có hạn sử dụng, mã truy xuất và tồn kho để bắt đầu theo dõi FEFO.</p>
                 </div>
                 <form method="post" asp-action="CreateLot" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="q" value="@Model.Query" />
                     <input type="hidden" name="status" value="@Model.Status" />
                     <input type="hidden" name="sellerId" value="@Model.SellerId" />
-                    <div class="col-md-6"><label class="form-label">Product ID</label><input class="form-control" type="number" name="ProductId" min="1" required /></div>
-                    <div class="col-md-6"><label class="form-label">Seller ID</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.NewLot.SellerId" required /></div>
-                    <div class="col-md-6"><label class="form-label">Lot code</label><input class="form-control" type="text" name="LotCode" required /></div>
-                    <div class="col-md-6"><label class="form-label">Trace code</label><input class="form-control" type="text" name="TraceCode" /></div>
-                    <div class="col-md-6"><label class="form-label">Farm</label><input class="form-control" type="text" name="FarmName" /></div>
-                    <div class="col-md-6"><label class="form-label">Origin</label><input class="form-control" type="text" name="OriginRegion" /></div>
-                    <div class="col-md-6"><label class="form-label">Harvested</label><input class="form-control" type="datetime-local" name="HarvestedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Packed</label><input class="form-control" type="datetime-local" name="PackedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Received</label><input class="form-control" type="datetime-local" name="ReceivedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Expires</label><input class="form-control" type="datetime-local" name="ExpiresAt" /></div>
-                    <div class="col-md-4"><label class="form-label">Initial qty</label><input class="form-control" type="number" name="InitialQuantity" min="1" required /></div>
-                    <div class="col-md-4"><label class="form-label">Remaining qty</label><input class="form-control" type="number" name="RemainingQuantity" min="0" /></div>
-                    <div class="col-md-4"><label class="form-label">Unit cost</label><input class="form-control" type="number" step="0.01" name="UnitCost" min="0" /></div>
+                    <div class="col-md-6"><label class="form-label">Mã sản phẩm</label><input class="form-control" type="number" name="ProductId" min="1" required /></div>
+                    <div class="col-md-6"><label class="form-label">Mã người bán</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.NewLot.SellerId" required /></div>
+                    <div class="col-md-6"><label class="form-label">Mã lô</label><input class="form-control" type="text" name="LotCode" required /></div>
+                    <div class="col-md-6"><label class="form-label">Mã truy xuất</label><input class="form-control" type="text" name="TraceCode" /></div>
+                    <div class="col-md-6"><label class="form-label">Nông trại</label><input class="form-control" type="text" name="FarmName" /></div>
+                    <div class="col-md-6"><label class="form-label">Xuất xứ</label><input class="form-control" type="text" name="OriginRegion" /></div>
+                    <div class="col-md-6"><label class="form-label">Ngày thu hoạch</label><input class="form-control" type="datetime-local" name="HarvestedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Ngày đóng gói</label><input class="form-control" type="datetime-local" name="PackedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Ngày nhập kho</label><input class="form-control" type="datetime-local" name="ReceivedAt" /></div>
+                    <div class="col-md-6"><label class="form-label">Hạn sử dụng</label><input class="form-control" type="datetime-local" name="ExpiresAt" /></div>
+                    <div class="col-md-4"><label class="form-label">Số lượng đầu kỳ</label><input class="form-control" type="number" name="InitialQuantity" min="1" required /></div>
+                    <div class="col-md-4"><label class="form-label">Số lượng còn lại</label><input class="form-control" type="number" name="RemainingQuantity" min="0" /></div>
+                    <div class="col-md-4"><label class="form-label">Giá vốn đơn vị</label><input class="form-control" type="number" step="0.01" name="UnitCost" min="0" /></div>
                     <div class="col-md-6">
-                        <label class="form-label">Status</label>
+                        <label class="form-label">Trạng thái</label>
                         <select class="form-select" name="Status">
-                            <option value="active">active</option>
-                            <option value="held">held</option>
-                            <option value="expired">expired</option>
-                            <option value="recalled">recalled</option>
-                            <option value="depleted">depleted</option>
+                            <option value="active">Đang hoạt động</option>
+                            <option value="held">Đang giữ</option>
+                            <option value="expired">Hết hạn</option>
+                            <option value="recalled">Bị thu hồi</option>
+                            <option value="depleted">Đã hết hàng</option>
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Quality</label>
+                        <label class="form-label">Tình trạng chất lượng</label>
                         <select class="form-select" name="QualityStatus">
-                            <option value="ok">ok</option>
-                            <option value="watch">watch</option>
-                            <option value="blocked">blocked</option>
+                            <option value="ok">Ổn</option>
+                            <option value="watch">Cần theo dõi</option>
+                            <option value="blocked">Đang chặn</option>
                         </select>
                     </div>
-                    <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" rows="3" name="Notes"></textarea></div>
-                    <div class="col-12 d-grid"><button class="btn btn-primary" type="submit">Tao lot</button></div>
+                    <div class="col-12"><label class="form-label">Ghi chú</label><textarea class="form-control" rows="3" name="Notes"></textarea></div>
+                    <div class="col-12 d-grid"><button class="btn btn-primary" type="submit">Tạo lô hàng</button></div>
                 </form>
             </div>
 
             <div class="panel-card ff-admin-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Tao recall case</h2>
-                    <p class="text-muted mb-0">Mo quality recall theo product hoac lot khi can thu hoi/giu hang.</p>
+                    <h2 class="h5 mb-1">Tạo ca thu hồi</h2>
+                    <p class="text-muted mb-0">Mở ca thu hồi theo sản phẩm hoặc lô hàng khi cần thu hồi hoặc giữ hàng để điều tra.</p>
                 </div>
                 <form method="post" asp-action="CreateRecall" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="q" value="@Model.Query" />
                     <input type="hidden" name="status" value="@Model.Status" />
                     <input type="hidden" name="sellerId" value="@Model.SellerId" />
-                    <div class="col-md-6"><label class="form-label">Recall code</label><input class="form-control" type="text" name="RecallCode" /></div>
-                    <div class="col-md-6"><label class="form-label">Seller ID</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.SellerId" /></div>
-                    <div class="col-md-6"><label class="form-label">Product ID</label><input class="form-control" type="number" name="ProductId" min="1" /></div>
-                    <div class="col-md-6"><label class="form-label">Lot ID</label><input class="form-control" type="number" name="FreshInventoryLotId" min="1" /></div>
+                    <div class="col-md-6"><label class="form-label">Mã thu hồi</label><input class="form-control" type="text" name="RecallCode" /></div>
+                    <div class="col-md-6"><label class="form-label">Mã người bán</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.SellerId" /></div>
+                    <div class="col-md-6"><label class="form-label">Mã sản phẩm</label><input class="form-control" type="number" name="ProductId" min="1" /></div>
+                    <div class="col-md-6"><label class="form-label">Mã lô hàng</label><input class="form-control" type="number" name="FreshInventoryLotId" min="1" /></div>
                     <div class="col-md-6">
-                        <label class="form-label">Recall type</label>
+                        <label class="form-label">Loại thu hồi</label>
                         <select class="form-select" name="RecallType">
-                            <option value="quality_issue">quality_issue</option>
-                            <option value="contamination">contamination</option>
-                            <option value="source_mismatch">source_mismatch</option>
+                            <option value="quality_issue">Lỗi chất lượng</option>
+                            <option value="contamination">Nhiễm bẩn</option>
+                            <option value="source_mismatch">Sai lệch nguồn gốc</option>
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Severity</label>
+                        <label class="form-label">Mức độ nghiêm trọng</label>
                         <select class="form-select" name="Severity">
-                            <option value="low">low</option>
-                            <option value="medium">medium</option>
-                            <option value="high">high</option>
-                            <option value="critical">critical</option>
+                            <option value="low">Thấp</option>
+                            <option value="medium">Trung bình</option>
+                            <option value="high">Cao</option>
+                            <option value="critical">Khẩn cấp</option>
                         </select>
                     </div>
-                    <div class="col-12"><label class="form-label">Title</label><input class="form-control" type="text" name="Title" required /></div>
-                    <div class="col-12"><label class="form-label">Reason</label><textarea class="form-control" rows="3" name="Reason"></textarea></div>
-                    <div class="col-12"><label class="form-label">Action required</label><textarea class="form-control" rows="3" name="ActionRequired"></textarea></div>
-                    <div class="col-md-6"><label class="form-label">Started at</label><input class="form-control" type="datetime-local" name="StartedAt" /></div>
+                    <div class="col-12"><label class="form-label">Tiêu đề</label><input class="form-control" type="text" name="Title" required /></div>
+                    <div class="col-12"><label class="form-label">Lý do</label><textarea class="form-control" rows="3" name="Reason"></textarea></div>
+                    <div class="col-12"><label class="form-label">Hành động cần thực hiện</label><textarea class="form-control" rows="3" name="ActionRequired"></textarea></div>
+                    <div class="col-md-6"><label class="form-label">Thời điểm bắt đầu</label><input class="form-control" type="datetime-local" name="StartedAt" /></div>
                     <div class="col-md-6">
-                        <label class="form-label">Status</label>
+                        <label class="form-label">Trạng thái</label>
                         <select class="form-select" name="Status">
-                            <option value="open">open</option>
-                            <option value="investigating">investigating</option>
-                            <option value="resolved">resolved</option>
+                            <option value="open">Đang mở</option>
+                            <option value="investigating">Đang điều tra</option>
+                            <option value="resolved">Đã xử lý xong</option>
                         </select>
                     </div>
-                    <div class="col-12 d-grid"><button class="btn btn-outline-danger" type="submit">Tao recall</button></div>
+                    <div class="col-12 d-grid"><button class="btn btn-outline-danger" type="submit">Tạo ca thu hồi</button></div>
                 </form>
             </div>
         </div>

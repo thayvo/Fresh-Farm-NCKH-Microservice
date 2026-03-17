@@ -32,6 +32,24 @@
             _ => ("bg-light text-dark border", string.IsNullOrWhiteSpace(status) ? "Chưa rõ" : status!)
         };
     }
+
+    bool CanReviewOrder(string? orderStatus, string? paymentStatus)
+    {
+        var normalizedOrder = (orderStatus ?? string.Empty).Trim().ToLowerInvariant();
+        var normalizedPayment = (paymentStatus ?? string.Empty).Trim().ToLowerInvariant();
+
+        if (normalizedOrder is "awaitingpayment" or "expired" or "canceled" or "cancelled")
+        {
+            return false;
+        }
+
+        if (normalizedPayment is "failed" or "expired")
+        {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 <!DOCTYPE html>
@@ -99,6 +117,7 @@
                         : null;
                     var hasItems = Model.Items is not null && Model.Items.Count > 0;
                     var hasPayments = Model.Payments is not null && Model.Payments.Count > 0;
+                    var canReviewThisOrder = CanReviewOrder(Model.Status, Model.PaymentStatus);
 
                     <div class="card border-0 shadow-sm mb-4">
                         <div class="card-body p-4">
@@ -185,6 +204,7 @@
                                                 <th>Đơn vị</th>
                                                 <th>Đơn giá</th>
                                                 <th>Thành tiền</th>
+                                                <th></th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -197,11 +217,25 @@
                                                     <td>@(item.UnitSymbol ?? "-")</td>
                                                     <td>@Vnd(item.UnitPrice)</td>
                                                     <td class="fw-semibold">@Vnd(lineTotal)</td>
+                                                    <td class="text-end">
+                                                        @if (canReviewThisOrder)
+                                                        {
+                                                            <a href="/products/@item.ProductId#product-reviews" class="btn btn-outline-success btn-sm">
+                                                                <i class="bi bi-star me-1"></i>Đánh giá
+                                                            </a>
+                                                        }
+                                                    </td>
                                                 </tr>
                                             }
                                         </tbody>
                                     </table>
                                 </div>
+                                @if (canReviewThisOrder)
+                                {
+                                    <div class="text-muted small mt-2">
+                                        Bạn có thể mở từng sản phẩm để gửi hoặc cập nhật đánh giá nếu đây là đơn mua hợp lệ.
+                                    </div>
+                                }
                             }
                         </div>
                     </div>
