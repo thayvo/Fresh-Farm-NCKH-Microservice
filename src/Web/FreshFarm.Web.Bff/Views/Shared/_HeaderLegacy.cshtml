@@ -5,22 +5,13 @@
 @{
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var searchKeyword = Context.Request.Query["q"].ToString();
-    var cartItems = isAuthenticated ? CartSessionService.GetItems() : new List<CartItemDto>();
+    var cartItems = isAuthenticated ? await CartSessionService.GetItemsAsync() : new List<CartItemDto>();
     var totalQuantity = cartItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);
     var previewItems = cartItems.AsEnumerable().Reverse().Take(5).ToList();
     var previewQuantity = previewItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);
     var remainingQuantity = Math.Max(0, totalQuantity - previewQuantity);
-    var productThumbPool = new[]
-    {
-        "https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg",
-        "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
-        "https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg",
-        "https://images.pexels.com/photos/2090902/pexels-photo-2090902.jpeg",
-        "https://images.pexels.com/photos/4198019/pexels-photo-4198019.jpeg"
-    };
-
     string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo("vi-VN"), "{0:N0} ₫", amount);
-    string ProductThumb(int productId) => productThumbPool[Math.Abs(productId) % productThumbPool.Length];
+    string ProductThumb(CartItemDto item) => ProductImagePaths.ResolveRequestPath(item.ImageFileName);
 }
 
 <header class="header-main-shell border-bottom">
@@ -83,7 +74,10 @@
                                     {
                                         var qty = item.Quantity <= 0 ? 1 : item.Quantity;
                                         <a href="/cart" class="header-cart-item">
-                                            <img class="header-cart-thumb" src="@ProductThumb(item.ProductId)" alt="@item.ProductName" />
+                                            <img class="header-cart-thumb"
+                                                 src="@ProductThumb(item)"
+                                                 alt="@item.ProductName"
+                                                 onerror="this.onerror=null;this.src='@ProductImagePaths.FallbackImageRequestPath';" />
                                             <span class="header-cart-name-wrap">
                                                 <span class="header-cart-name">@item.ProductName</span>
                                                 <span class="header-cart-qty">x@qty</span>

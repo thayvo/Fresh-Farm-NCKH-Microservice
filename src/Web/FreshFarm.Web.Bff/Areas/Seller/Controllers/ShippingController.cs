@@ -839,6 +839,11 @@ public class ShippingController : LegacySellerControllerBase
                 {
                     OrderID = item.order.orderID,
                     Status = item.order.status ?? string.Empty,
+                    ShippingFee = item.order.shippingFee,
+                    ItemsAmount = item.order.itemsAmount,
+                    TotalAmount = item.order.totalAmount,
+                    TotalQuantity = item.order.totalQuantity,
+                    ItemSummary = item.order.itemSummary,
                     Payments = item.order.payments?.Select(p => new Payment
                     {
                         PaymentID = p.paymentID,
@@ -960,6 +965,16 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? status { get; set; }
 
+        public decimal? shippingFee { get; set; }
+
+        public decimal? itemsAmount { get; set; }
+
+        public decimal? totalAmount { get; set; }
+
+        public int? totalQuantity { get; set; }
+
+        public string? itemSummary { get; set; }
+
         public List<ShippingPaymentDto>? payments { get; set; }
     }
 
@@ -1024,6 +1039,22 @@ public class ShippingController : LegacySellerControllerBase
         public int? provinceId { get; set; }
 
         public int? communeId { get; set; }
+
+        public decimal? shippingFee { get; set; }
+
+        public decimal? itemsAmount { get; set; }
+
+        public decimal? totalAmount { get; set; }
+
+        public int? totalQuantity { get; set; }
+
+        public string? itemSummary { get; set; }
+
+        public string? paymentMethod { get; set; }
+
+        public bool isCod { get; set; }
+
+        public decimal? codAmount { get; set; }
     }
 
     private sealed class ShippingEditApiResponse

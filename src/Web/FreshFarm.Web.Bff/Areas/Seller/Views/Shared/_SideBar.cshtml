@@ -5,14 +5,14 @@
 
 <nav id="sidebar">
     <div class="sidebar-header text-center">
-        <h3><i class="bi bi-person-workspace"></i> Admin</h3>
+        <h3><i class="bi bi-shop"></i> Kênh người bán</h3>
     </div>
 
     <ul class="nav flex-column">
         <!-- Bảng điều khiển -->
         <li class="nav-item">
             <a class="nav-link @(currentAction == "Dashboard" && currentController == "Home" ? "active" : "")"
-               href="@Url.Action("Dashboard", "Home")">
+               href="@Url.Action("Dashboard", "Home", new { area = "Seller" })">
                 <i class="bi bi-grid-1x2-fill"></i> Bảng điều khiển
             </a>
         </li>
@@ -20,7 +20,7 @@
         <!-- Quản lý đơn hàng -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Order" ? "active" : "")"
-               href="@Url.Action("ManageOrders", "Order")">
+               href="@Url.Action("ManageOrders", "Order", new { area = "Seller" })">
                 <i class="bi bi-receipt"></i> Quản lý đơn hàng
             </a>
         </li>
@@ -28,7 +28,7 @@
         <!-- Quản lý sản phẩm -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Product" ? "active" : "")"
-               href="@Url.Action("ManageProducts", "Product")">
+               href="@Url.Action("ManageProducts", "Product", new { area = "Seller" })">
                 <i class="bi bi-box-seam-fill"></i> Quản lý sản phẩm
             </a>
         </li>
@@ -36,7 +36,7 @@
         <!-- Quản lý khách hàng -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Customer" ? "active" : "")"
-               href="@Url.Action("ManageCustomers", "Customer")">
+               href="@Url.Action("ManageCustomers", "Customer", new { area = "Seller" })">
                 <i class="bi bi-people-fill"></i> Quản lý khách hàng
             </a>
         </li>
@@ -44,7 +44,7 @@
         <!-- Quản lý mã giảm giá -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Coupon" ? "active" : "")"
-               href="@Url.Action("ManageCoupons", "Coupon")">
+               href="@Url.Action("ManageCoupons", "Coupon", new { area = "Seller" })">
                 <i class="bi bi-ticket-perforated-fill"></i> Quản lý mã giảm giá
             </a>
         </li>
@@ -52,7 +52,7 @@
         <!-- Quản lý đánh giá -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Review" && currentAction == "ManageReview" ? "active" : "")"
-               href="@Url.Action("ManageReview", "Review")">
+               href="@Url.Action("ManageReview", "Review", new { area = "Seller" })">
                 <i class="bi bi-star-fill"></i> Quản lý đánh giá
             </a>
         </li>
@@ -86,37 +86,37 @@
                 id="reportSubmenu">
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Revenue" ? "active" : "")"
-                       href="@Url.Action("Revenue", "Report")">
+                       href="@Url.Action("Revenue", "Report", new { area = "Seller" })">
                         <i class="bi bi-cash-coin"></i>Doanh thu
                     </a>
                 </li>
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Order" ? "active" : "")"
-                       href="@Url.Action("Order", "Report")">
+                       href="@Url.Action("Order", "Report", new { area = "Seller" })">
                         <i class="bi bi-receipt-cutoff"></i> Đơn hàng
                     </a>
                 </li>
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Customer" ? "active" : "")"
-                       href="@Url.Action("Customer", "Report")">
+                       href="@Url.Action("Customer", "Report", new { area = "Seller" })">
                         <i class="bi bi-people-fill"></i>Khách hàng
                     </a>
                 </li>
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Product" ? "active" : "")"
-                       href="@Url.Action("Product", "Report")">
+                       href="@Url.Action("Product", "Report", new { area = "Seller" })">
                         <i class="bi bi-box-seam"></i> Sản phẩm
                     </a>
                 </li>
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Shipping" ? "active" : "")"
-                       href="@Url.Action("Shipping", "Report")">
+                       href="@Url.Action("Shipping", "Report", new { area = "Seller" })">
                         <i class="bi bi-truck"></i>Vận chuyển
                     </a>
                 </li>
                 <li>
                     <a class="nav-link @(currentController == "Report" && currentAction == "Review" ? "active" : "")"
-                       href="@Url.Action("Review", "Report")">
+                       href="@Url.Action("Review", "Report", new { area = "Seller" })">
                         <i class="bi bi-chat-quote-fill"></i>Đánh giá & Phản hồi
                     </a>
                 </li>
@@ -126,7 +126,7 @@
         <!-- Quản lý kho -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Warehouse" ? "active" : "")"
-               href="@Url.Action("Index", "Warehouse")">
+               href="@Url.Action("Index", "Warehouse", new { area = "Seller" })">
                 <i class="bi bi-box-fill"></i>Quản lý kho
             </a>
         </li>
@@ -134,7 +134,7 @@
         <!-- Tài khoản của tôi -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Home" && currentAction == "Profile" ? "active" : "")"
-               href="@Url.Action("Profile", "Home")">
+               href="/Seller/Profile">
                 <i class="bi bi-person-circle"></i> Tài khoản của tôi
             </a>
         </li>

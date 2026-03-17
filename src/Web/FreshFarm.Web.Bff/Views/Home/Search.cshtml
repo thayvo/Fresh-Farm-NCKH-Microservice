@@ -1068,6 +1068,13 @@
             const initialSort = (urlParams.get("sort") || "related").trim();
             const initialPage = Number(urlParams.get("page") || "1");
             const initialPreset = (urlParams.get("preset") || "").trim();
+            const marketplaceShortcutKeywords = new Set([
+                "rau sach",
+                "trai cay",
+                "nong san huu co",
+                "thuc pham tuoi",
+                "giao nhanh"
+            ]);
             const state = {
                 keyword: (initialKeyword || "").trim(),
                 availableCategories: [],
@@ -1196,7 +1203,7 @@
                     categoryName,
                     unitName,
                     primarySellerId: toNumber(raw.primarySellerId ?? raw.PrimarySellerId, 0),
-                    stockQuantity: toNumber(raw.stockQuantity ?? raw.StockQuantity, 0),
+                stockQuantity: toNumber(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity, 0),
                     price,
                     rating,
                     sold,
@@ -1204,7 +1211,7 @@
                     standard,
                     preservation,
                     weight,
-                    availabilityKey: resolveAvailability(raw.stockQuantity ?? raw.StockQuantity),
+                availabilityKey: resolveAvailability(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity),
                     location: origin,
                     image,
                     certifications
@@ -1252,6 +1259,28 @@
             const getSelectedShops = () => state.availableShops.filter((shop) => state.selectedSellerIds.has(shop.sellerId));
             const getSelectedAvailability = () => state.availableAvailability.filter((entry) => state.selectedAvailability.has(entry.key));
             const getSelectedDeliveryScopes = () => state.availableDeliveryScopes.filter((entry) => state.selectedDeliveryScopes.has(entry.key));
+            const isBrowsingKeywordContext = () => {
+                const normalizedKeyword = normalizeText(state.keyword);
+                if (!normalizedKeyword) {
+                    return false;
+                }
+
+                if (marketplaceShortcutKeywords.has(normalizedKeyword)) {
+                    return true;
+                }
+
+                return state.availableCategories.some((category) => {
+                    const normalizedName = normalizeText(category.categoryName);
+                    const normalizedSlug = normalizeText(category.slug);
+                    return normalizedKeyword === normalizedName || normalizedKeyword === normalizedSlug;
+                });
+            };
+
+            const shouldOmitKeywordFromProductRequest = () => {
+                return !!state.keyword
+                    && state.selectedCategoryIds.size > 0
+                    && isBrowsingKeywordContext();
+            };
             const searchPresets = [
                 { key: "ready-today", label: "Ưu tiên còn hàng", icon: "bi-box2-heart" },
                 { key: "fresh-pick", label: "Hàng tươi dễ chọn", icon: "bi-flower1" },
@@ -1901,6 +1930,7 @@
                     body.set("SellerId", String(toNumber(product.sellerId, product.primarySellerId || 0)));
                     body.set("SellerName", product.sellerName || "");
                     body.set("ProductName", product.productName || "");
+                    body.set("ImageFileName", product.imageFileName || "");
                     body.set("UnitPrice", String(product.price ?? 0));
                     body.set("UnitSymbol", product.unitName || "");
                     body.set("Quantity", String(Math.max(1, toNumber(qty, 1))));
@@ -2338,9 +2368,10 @@
                 history.replaceState(null, "", next);
             };
 
-            const buildProductRequestUrl = () => {
+            const buildProductRequestUrl = (options = {}) => {
+                const omitKeyword = options?.omitKeyword === true;
                 const params = new URLSearchParams();
-                if (state.keyword) {
+                if (state.keyword && !omitKeyword) {
                     params.set("name", state.keyword);
                 }
 
@@ -2428,7 +2459,10 @@
 
             const reloadProducts = async () => {
                 try {
-                    const response = await fetch(buildProductRequestUrl(), {
+                    const requestUrl = buildProductRequestUrl({
+                        omitKeyword: shouldOmitKeywordFromProductRequest()
+                    });
+                    const response = await fetch(requestUrl, {
                         method: "GET",
                         headers: { Accept: "application/json" }
                     });

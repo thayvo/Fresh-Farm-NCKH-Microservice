@@ -30,7 +30,8 @@ public class HomeController : LegacySellerControllerBase
         _httpClientFactory = httpClientFactory;
     }
 
-    [HttpGet]
+    [HttpGet("/Seller")]
+    [HttpGet("/Seller/Home/Dashboard")]
     public async Task<IActionResult> Dashboard()
     {
         var viewModel = new DashboardViewModel();
@@ -67,12 +68,12 @@ public class HomeController : LegacySellerControllerBase
         }
         catch (Exception ex)
         {
-            errors.Add("Khong the tai dashboard: " + ex.Message);
+            errors.Add("Không thể tải bảng điều khiển: " + ex.Message);
         }
 
         if (viewModel.CategoryLabels.Count == 0)
         {
-            viewModel.CategoryLabels = new List<string> { "Rau la", "Rau an hoa", "Rau an qua", "Cu va re" };
+            viewModel.CategoryLabels = new List<string> { "Rau lá", "Rau ăn hoa", "Rau ăn quả", "Củ và rễ" };
             viewModel.CategoryData = new List<decimal> { 0m, 0m, 0m, 0m };
         }
 
@@ -84,7 +85,8 @@ public class HomeController : LegacySellerControllerBase
         return View(viewModel);
     }
 
-    [HttpGet]
+    [HttpGet("/Seller/Profile")]
+    [HttpGet("/Seller/Home/Profile")]
     public async Task<IActionResult> Profile()
     {
         var adminId = TryGetCurrentAdminId();
@@ -102,13 +104,14 @@ public class HomeController : LegacySellerControllerBase
         return View(profile);
     }
 
-    [HttpPost]
+    [HttpPost("/Seller/Profile")]
+    [HttpPost("/Seller/Home/Profile")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Profile(ProfileViewModel model)
     {
         if (!ModelState.IsValid)
         {
-            TempData["ErrorMessage"] = "Du lieu khong hop le.";
+            TempData["ErrorMessage"] = "Dữ liệu không hợp lệ.";
             return RedirectToAction(nameof(Profile));
         }
 
@@ -130,21 +133,22 @@ public class HomeController : LegacySellerControllerBase
 
             if (!response.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the cap nhat ho so.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể cập nhật hồ sơ.");
                 return RedirectToAction(nameof(Profile));
             }
 
-            TempData["SuccessMessage"] = "Cap nhat thong tin thanh cong!";
+            TempData["SuccessMessage"] = "Cập nhật thông tin thành công!";
             return RedirectToAction(nameof(Profile));
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi cap nhat ho so: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi cập nhật hồ sơ: " + ex.Message;
             return RedirectToAction(nameof(Profile));
         }
     }
 
-    [HttpPost]
+    [HttpPost("/Seller/Home/ChangePassword")]
+    [HttpPost("/Seller/Profile/ChangePassword")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
     {
@@ -156,7 +160,7 @@ public class HomeController : LegacySellerControllerBase
 
         if (!ModelState.IsValid)
         {
-            TempData["ErrorMessage"] = "Du lieu doi mat khau khong hop le.";
+            TempData["ErrorMessage"] = "Dữ liệu đổi mật khẩu không hợp lệ.";
             return RedirectToAction(nameof(Profile));
         }
 
@@ -166,13 +170,13 @@ public class HomeController : LegacySellerControllerBase
 
         if (!string.Equals(model.NewPassword, model.ConfirmPassword, StringComparison.Ordinal))
         {
-            TempData["ErrorMessage"] = "Mat khau xac nhan khong khop.";
+            TempData["ErrorMessage"] = "Mật khẩu xác nhận không khớp.";
             return RedirectToAction(nameof(Profile));
         }
 
         if (string.Equals(model.CurrentPassword, model.NewPassword, StringComparison.Ordinal))
         {
-            TempData["ErrorMessage"] = "Mat khau moi khong duoc trung mat khau hien tai.";
+            TempData["ErrorMessage"] = "Mật khẩu mới không được trùng mật khẩu hiện tại.";
             return RedirectToAction(nameof(Profile));
         }
 
@@ -182,14 +186,14 @@ public class HomeController : LegacySellerControllerBase
             var adminResponse = await identityClient.GetAsync($"/auth/admin/users/{adminId}");
             if (!adminResponse.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(adminResponse, "Khong the tai thong tin nguoi dung.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(adminResponse, "Không thể tải thông tin người dùng.");
                 return RedirectToAction(nameof(Profile));
             }
 
             var admin = await adminResponse.Content.ReadFromJsonAsync<AdminUserBridge>(JsonOptions);
             if (admin is null)
             {
-                TempData["ErrorMessage"] = "Khong doc duoc thong tin nguoi dung.";
+                TempData["ErrorMessage"] = "Không đọc được thông tin người dùng.";
                 return RedirectToAction(nameof(Profile));
             }
 
@@ -202,13 +206,13 @@ public class HomeController : LegacySellerControllerBase
 
             if (!verifyResponse.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = "Mat khau hien tai khong dung.";
+                TempData["ErrorMessage"] = "Mật khẩu hiện tại không đúng.";
                 return RedirectToAction(nameof(Profile));
             }
 
             if (admin.RoleId <= 0)
             {
-                TempData["ErrorMessage"] = "Khong xac dinh duoc role cua tai khoan.";
+                TempData["ErrorMessage"] = "Không xác định được vai trò của tài khoản.";
                 return RedirectToAction(nameof(Profile));
             }
 
@@ -226,16 +230,16 @@ public class HomeController : LegacySellerControllerBase
 
             if (!updateResponse.IsSuccessStatusCode)
             {
-                TempData["ErrorMessage"] = await ReadApiErrorAsync(updateResponse, "Khong the doi mat khau.");
+                TempData["ErrorMessage"] = await ReadApiErrorAsync(updateResponse, "Không thể đổi mật khẩu.");
                 return RedirectToAction(nameof(Profile));
             }
 
-            TempData["SuccessMessage"] = "Doi mat khau thanh cong!";
+            TempData["SuccessMessage"] = "Đổi mật khẩu thành công!";
             return RedirectToAction(nameof(Profile));
         }
         catch (Exception ex)
         {
-            TempData["ErrorMessage"] = "Loi doi mat khau: " + ex.Message;
+            TempData["ErrorMessage"] = "Lỗi đổi mật khẩu: " + ex.Message;
             return RedirectToAction(nameof(Profile));
         }
     }
@@ -243,63 +247,55 @@ public class HomeController : LegacySellerControllerBase
     private async Task<ProfileViewModel?> GetCurrentAdminProfileAsync(int adminId)
     {
         var identityClient = CreateAuthorizedClient("Identity");
-        var response = await identityClient.GetAsync($"/auth/admin/users/{adminId}");
+        var response = await identityClient.GetAsync("/auth/profile");
         if (!response.IsSuccessStatusCode)
         {
-            TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Khong the tai ho so nguoi dung.");
+            TempData["ErrorMessage"] = await ReadApiErrorAsync(response, "Không thể tải hồ sơ người bán.");
             return null;
         }
 
-        var admin = await response.Content.ReadFromJsonAsync<AdminUserBridge>(JsonOptions);
-        if (admin is null)
+        var sellerProfile = await response.Content.ReadFromJsonAsync<SellerProfileBridge>(JsonOptions);
+        if (sellerProfile is null)
         {
-            TempData["ErrorMessage"] = "Khong doc duoc ho so nguoi dung.";
+            TempData["ErrorMessage"] = "Không đọc được hồ sơ người bán.";
             return null;
         }
 
         var vm = new ProfileViewModel
         {
-            UserID = admin.UserId,
-            UserName = admin.UserName ?? string.Empty,
-            FullName = admin.FullName ?? string.Empty,
-            Email = admin.Email ?? string.Empty,
-            Phone = admin.Phone ?? string.Empty,
-            CreatedDate = admin.Created ?? DateTime.UtcNow,
-            LastActivity = admin.LastLogin.HasValue
-                ? "Dang nhap gan nhat: " + admin.LastLogin.Value.ToString("dd/MM/yyyy HH:mm")
-                : "Chua co hoat dong"
+            UserID = sellerProfile.UserId > 0 ? sellerProfile.UserId : adminId,
+            UserName = sellerProfile.UserName ?? string.Empty,
+            FullName = sellerProfile.FullName ?? string.Empty,
+            Email = sellerProfile.Email ?? string.Empty,
+            Phone = sellerProfile.Phone ?? string.Empty,
+            CreatedDate = DateTime.UtcNow,
+            LastActivity = "Thông tin tài khoản người bán"
         };
 
         var activities = new List<string>();
-        if (admin.Updated.HasValue)
-        {
-            activities.Add($"Cap nhat ho so luc {admin.Updated.Value:dd/MM/yyyy HH:mm}");
-        }
-
-        if (admin.LastLogin.HasValue)
-        {
-            activities.Add($"Dang nhap gan nhat luc {admin.LastLogin.Value:dd/MM/yyyy HH:mm}");
-        }
 
         var successMessage = TempData.Peek("SuccessMessage")?.ToString() ?? string.Empty;
-        if (successMessage.Contains("mat khau", StringComparison.OrdinalIgnoreCase))
+        if (successMessage.Contains("mật khẩu", StringComparison.OrdinalIgnoreCase) ||
+            successMessage.Contains("mat khau", StringComparison.OrdinalIgnoreCase))
         {
-            activities.Insert(0, "Vua doi mat khau thanh cong");
+            activities.Insert(0, "Vừa đổi mật khẩu thành công");
         }
 
-        if (successMessage.Contains("thong tin", StringComparison.OrdinalIgnoreCase))
+        if (successMessage.Contains("thông tin", StringComparison.OrdinalIgnoreCase) ||
+            successMessage.Contains("thong tin", StringComparison.OrdinalIgnoreCase))
         {
-            activities.Insert(0, "Vua cap nhat ho so thanh cong");
+            activities.Insert(0, "Vừa cập nhật hồ sơ thành công");
         }
 
         if (activities.Count == 0)
         {
-            activities.Add("Chua co hoat dong nao gan day");
+            activities.Add("Thông tin tài khoản đã sẵn sàng để cập nhật");
         }
 
+        TempData.Remove("ErrorMessage");
         ViewBag.Activities = activities;
-        ViewBag.RoleName = admin.Role?.RoleName ?? "—";
-        ViewBag.Avatar = string.IsNullOrWhiteSpace(admin.Avatar) ? "no-avatar.jpg" : admin.Avatar;
+        ViewBag.RoleName = "Người bán";
+        ViewBag.Avatar = "no-avatar.jpg";
 
         return vm;
     }
@@ -308,14 +304,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai thong ke don hang."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải thống kê đơn hàng."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<AdminStatisticsResponse>(JsonOptions);
         if (payload?.Success != true || payload.Data is null)
         {
-            errors.Add("Du lieu thong ke don hang khong hop le.");
+            errors.Add("Dữ liệu thống kê đơn hàng không hợp lệ.");
             return;
         }
 
@@ -327,14 +323,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai bao cao don hang."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải báo cáo đơn hàng."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<OrderReportViewModel>(JsonOptions);
         if (payload is null)
         {
-            errors.Add("Du lieu bao cao don hang khong hop le.");
+            errors.Add("Dữ liệu báo cáo đơn hàng không hợp lệ.");
             return;
         }
 
@@ -356,14 +352,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai bao cao khach hang."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải báo cáo khách hàng."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<CustomerReportViewModel>(JsonOptions);
         if (payload is null)
         {
-            errors.Add("Du lieu bao cao khach hang khong hop le.");
+            errors.Add("Dữ liệu báo cáo khách hàng không hợp lệ.");
             return;
         }
 
@@ -374,14 +370,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai bao cao san pham."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải báo cáo sản phẩm."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<ProductReportViewModel>(JsonOptions);
         if (payload is null)
         {
-            errors.Add("Du lieu bao cao san pham khong hop le.");
+            errors.Add("Dữ liệu báo cáo sản phẩm không hợp lệ.");
             return;
         }
 
@@ -394,14 +390,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai xu huong doanh thu."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải xu hướng doanh thu."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<RevenueReportViewModel>(JsonOptions);
         if (payload is null)
         {
-            errors.Add("Du lieu xu huong doanh thu khong hop le.");
+            errors.Add("Dữ liệu xu hướng doanh thu không hợp lệ.");
             return;
         }
 
@@ -413,14 +409,14 @@ public class HomeController : LegacySellerControllerBase
     {
         if (!response.IsSuccessStatusCode)
         {
-            errors.Add(await ReadApiErrorAsync(response, "Khong the tai thong ke ho tro."));
+            errors.Add(await ReadApiErrorAsync(response, "Không thể tải thống kê hỗ trợ."));
             return;
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SupportConversationsResponse>(JsonOptions);
         if (payload?.Ok != true || payload.Conversations is null)
         {
-            errors.Add("Du lieu thong ke ho tro khong hop le.");
+            errors.Add("Dữ liệu thống kê hỗ trợ không hợp lệ.");
             return;
         }
 
@@ -557,5 +553,18 @@ public class HomeController : LegacySellerControllerBase
         public int RoleId { get; set; }
 
         public string RoleName { get; set; } = string.Empty;
+    }
+
+    private sealed class SellerProfileBridge
+    {
+        public int UserId { get; set; }
+
+        public string UserName { get; set; } = string.Empty;
+
+        public string FullName { get; set; } = string.Empty;
+
+        public string Email { get; set; } = string.Empty;
+
+        public string Phone { get; set; } = string.Empty;
     }
 }

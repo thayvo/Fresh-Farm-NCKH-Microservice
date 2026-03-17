@@ -8,35 +8,46 @@ using System.Net.Http.Headers; // AuthenticationHeaderValue.
 using System.Globalization;
 using System.Text;
 using System.Text.Json; // thêm ở đầu file
+using Microsoft.Extensions.Options;
+using FreshFarm.Web.Bff.Models;
+using FreshFarm.Web.Bff.Options;
 namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 
 [Authorize] // Checkout bắt buộc đăng nhập.
 public sealed class CheckoutController : Controller // MVC controller cho checkout.
 {
     private const string CheckoutSelectedCartItemKeysSessionKey = "CHECKOUT_SELECTED_CART_ITEM_KEYS";
+    private const string PendingVnPayCheckoutSessionKey = "PENDING_VNPAY_CHECKOUT";
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key token trong session.
     private const decimal DefaultShippingFee = 15000m; // Mức ship mặc định cho MVP.
+    private const int DefaultVnPayExpireAfterMinutes = 30;
 
     private readonly IHttpClientFactory _httpClientFactory; // Factory tạo HttpClient.
     private readonly ICartSessionService _cart; // Service thao tác cart session.
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
+    private readonly IVnPayService _vnPayService;
+    private readonly VnPayOptions _vnPayOptions;
 
     public CheckoutController(
         IHttpClientFactory httpClientFactory,
         ICartSessionService cart,
-        IGhnSandboxService ghnSandboxService) // Inject dependencies.
+        IGhnSandboxService ghnSandboxService,
+        IVnPayService vnPayService,
+        IOptions<VnPayOptions> vnPayOptions) // Inject dependencies.
     {
         _httpClientFactory = httpClientFactory;
         _cart = cart;
         _ghnSandboxService = ghnSandboxService;
+        _vnPayService = vnPayService;
+        _vnPayOptions = vnPayOptions.Value;
     }
 
     [HttpGet("/checkout")] // Render checkout từ dữ liệu cart hiện tại.
     public async Task<IActionResult> Index()
     {
-        SeedDirectCheckoutItemFromQuery();
+        await SeedDirectCheckoutItemFromQueryAsync();
         var selectedCartItemKeys = GetSelectedCartItemKeysFromSession();
-        var vm = BuildCheckoutModelFromCart(selectedCartItemKeys);
+        var vm = await BuildCheckoutModelFromCartAsync(selectedCartItemKeys);
 
         if (vm is null)
         {
@@ -83,6 +94,87 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         ViewBag.RecipientAddress = TempData["RecipientAddress"];
         ViewBag.AddressBookNotice = TempData["AddressBookNotice"];
         return View();
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/checkout/vnpay/return")]
+    public async Task<IActionResult> VnPayReturn(CancellationToken cancellationToken)
+    {
+        var validation = _vnPayService.ValidateReturn(Request.Query);
+        if (!validation.IsValid)
+        {
+            return View("PaymentResult", BuildPaymentResultViewModel(null, false, validation.Message));
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return View("PaymentResult", BuildPaymentResultViewModel(
+                validation.OrderId,
+                false,
+                "Phiên đăng nhập đã hết hạn nên chưa thể chốt thanh toán VNPay cho đơn này. Vui lòng đăng nhập lại và kiểm tra đơn hàng."));
+        }
+
+        var orderingClient = CreateAuthorizedOrderingClient(token);
+        var finalizeResponse = await orderingClient.PostAsJsonAsync(
+            $"/api/orders/{validation.OrderId}/payments/vnpay/finalize",
+            new FinalizeVnPayPaymentRequestDto
+            {
+                TxnRef = validation.TxnRef,
+                ResponseCode = validation.ResponseCode,
+                TransactionStatus = validation.TransactionStatus,
+                Amount = validation.Amount,
+                TransactionNo = validation.TransactionNo,
+                BankCode = validation.BankCode,
+                BankTransactionNo = validation.BankTransactionNo,
+                OrderInfo = validation.OrderInfo,
+                PaidAt = validation.PaidAt,
+                IsSuccess = validation.IsSuccess
+            },
+            cancellationToken);
+
+        if (!finalizeResponse.IsSuccessStatusCode)
+        {
+            var errorText = await finalizeResponse.Content.ReadAsStringAsync(cancellationToken);
+            return View("PaymentResult", BuildPaymentResultViewModel(
+                validation.OrderId,
+                false,
+                string.IsNullOrWhiteSpace(errorText)
+                    ? "VNPay đã quay về nhưng chưa cập nhật được trạng thái thanh toán trong hệ thống."
+                    : $"VNPay đã quay về nhưng chưa cập nhật được trạng thái thanh toán: {errorText}"));
+        }
+
+        var finalizeResult = await finalizeResponse.Content.ReadFromJsonAsync<FinalizeVnPayPaymentResultDto>(cancellationToken: cancellationToken);
+        if (validation.IsSuccess)
+        {
+            var pendingCheckout = GetPendingVnPayCheckoutFromSession();
+            if (pendingCheckout is not null && pendingCheckout.OrderId == validation.OrderId)
+            {
+                var (savedAddresses, _) = await GetSavedAddressesAsync(token);
+                if (string.Equals(pendingCheckout.AddressMode, "new", StringComparison.OrdinalIgnoreCase))
+                {
+                    var saveAddressResult = await SaveNewCheckoutAddressAsync(token, savedAddresses, pendingCheckout.Request);
+                    if (!string.IsNullOrWhiteSpace(saveAddressResult))
+                    {
+                        TempData["AddressBookNotice"] = saveAddressResult;
+                    }
+                }
+
+                await RemovePurchasedCartItemsAsync(pendingCheckout.PurchasedCartItemKeys);
+                HttpContext.Session.Remove(CheckoutSelectedCartItemKeysSessionKey);
+            }
+
+            ClearPendingVnPayCheckout();
+            await HydrateSuccessTempDataAsync(orderingClient, validation.OrderId, cancellationToken);
+            TempData["PaymentMethod"] = "VNPay";
+            return RedirectToAction(nameof(Success));
+        }
+
+        ClearPendingVnPayCheckout();
+        return View("PaymentResult", BuildPaymentResultViewModel(
+            validation.OrderId,
+            false,
+            finalizeResult?.Message ?? validation.Message));
     }
 
     [HttpGet("/checkout/ghn/provinces")]
@@ -225,6 +317,9 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         }
 
         request = NormalizeRequest(request); // Chuẩn hóa payload để tránh dữ liệu bẩn.
+        var paymentMethod = NormalizePaymentMethod(request.Payment?.PaymentMethod);
+        request.Payment ??= new CheckoutPaymentInputDto();
+        request.Payment.PaymentMethod = paymentMethod;
         var selectedCartItemKeys = GetSelectedCartItemKeysFromSession();
         if (selectedCartItemKeys.Count > 0)
         {
@@ -243,6 +338,13 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         {
             ModelState.AddModelError(string.Empty, "Đơn hàng cần ít nhất 1 sản phẩm.");
             PopulateAddressSelectionViewData(savedAddresses, addressMode, selectedAddressId, addressLoadError); // Giữ state khi render lại view.
+            return View(request);
+        }
+
+        if (string.Equals(paymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase) && !_vnPayService.IsConfigured)
+        {
+            ModelState.AddModelError(string.Empty, "VNPay sandbox chưa được cấu hình cho môi trường dev. Vui lòng điền TmnCode và HashSecret trước khi test.");
+            PopulateAddressSelectionViewData(savedAddresses, addressMode, selectedAddressId, addressLoadError);
             return View(request);
         }
 
@@ -296,9 +398,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 .ToList();
         }
 
-        var orderingClient = _httpClientFactory.CreateClient("Ordering");
-        orderingClient.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        var orderingClient = CreateAuthorizedOrderingClient(token);
 
         var response = await orderingClient.PostAsJsonAsync("/api/orders", request);
         if (!response.IsSuccessStatusCode)
@@ -311,15 +411,47 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
 
         var created = await response.Content.ReadFromJsonAsync<CreateOrderResultDto>();
 
-        if (created is not null)
+        var purchasedKeys = request.Items
+            .Select(x => x.CartItemKey?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (created is null || created.OrderId <= 0)
         {
-            TempData["OrderId"] = created.OrderId;
-            TempData["OrderCode"] = $"FF{created.OrderId:D6}";
-            TempData["TotalAmount"] = created.TotalAmount.ToString(System.Globalization.CultureInfo.InvariantCulture); // TempData mặc định không serialize decimal.
+            ModelState.AddModelError(string.Empty, "Tạo đơn thành công nhưng không đọc được mã đơn để xử lý thanh toán.");
+            PopulateAddressSelectionViewData(savedAddresses, addressMode, selectedAddressId, addressLoadError);
+            return View(request);
         }
 
+        if (string.Equals(paymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase))
+        {
+            SavePendingVnPayCheckout(new PendingVnPayCheckoutSessionDto
+            {
+                OrderId = created.OrderId,
+                AddressMode = addressMode,
+                PurchasedCartItemKeys = purchasedKeys,
+                Request = request
+            });
+
+            var paymentUrl = _vnPayService.CreatePaymentUrl(new VnPayCreatePaymentRequest(
+                created.OrderId,
+                created.TotalAmount,
+                $"Thanh toan don hang FreshFarm #{created.OrderId}",
+                created.OrderId.ToString(CultureInfo.InvariantCulture),
+                ResolveClientIpAddress(),
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddMinutes(GetVnPayExpireAfterMinutes())));
+
+            return Redirect(paymentUrl);
+        }
+
+        TempData["OrderId"] = created.OrderId;
+        TempData["OrderCode"] = $"FF{created.OrderId:D6}";
+        TempData["TotalAmount"] = created.TotalAmount.ToString(System.Globalization.CultureInfo.InvariantCulture); // TempData mặc định không serialize decimal.
         TempData["OrderDate"] = DateTime.Now.ToString("O", System.Globalization.CultureInfo.InvariantCulture); // Lưu dạng chuỗi ISO để an toàn serialize TempData.
-        TempData["PaymentMethod"] = request.Payment?.PaymentMethod ?? "COD";
+        TempData["PaymentMethod"] = paymentMethod;
         TempData["RecipientName"] = request.Shipping?.FullName ?? "Khách hàng";
         TempData["RecipientPhone"] = request.Shipping?.Phone ?? string.Empty;
         TempData["RecipientAddress"] = request.Shipping?.AddressDetail ?? "Chưa cập nhật";
@@ -334,21 +466,16 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             }
         }
 
-        var purchasedKeys = request.Items
-            .Select(x => x.CartItemKey?.Trim())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        RemovePurchasedCartItems(purchasedKeys);
+        await RemovePurchasedCartItemsAsync(purchasedKeys);
         HttpContext.Session.Remove(CheckoutSelectedCartItemKeysSessionKey);
+        ClearPendingVnPayCheckout();
         return RedirectToAction(nameof(Success));
 
     }
 
-    private CheckoutSubmitRequestDto? BuildCheckoutModelFromCart(IReadOnlyCollection<string>? selectedCartItemKeys = null)
+    private async Task<CheckoutSubmitRequestDto?> BuildCheckoutModelFromCartAsync(IReadOnlyCollection<string>? selectedCartItemKeys = null)
     {
-        var cartItems = _cart.GetItems();
+        var cartItems = await _cart.GetItemsAsync();
 
         if (selectedCartItemKeys is { Count: > 0 })
         {
@@ -544,6 +671,110 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             : $"Đơn hàng đã tạo thành công nhưng chưa lưu được địa chỉ mới: {errorBody}";
     }
 
+    private HttpClient CreateAuthorizedOrderingClient(string token)
+    {
+        var orderingClient = _httpClientFactory.CreateClient("Ordering");
+        orderingClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return orderingClient;
+    }
+
+    private string ResolveClientIpAddress()
+    {
+        var forwardedFor = Request.Headers["X-Forwarded-For"].ToString();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            return forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+        }
+
+        var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        return string.IsNullOrWhiteSpace(remoteIp) ? "127.0.0.1" : remoteIp;
+    }
+
+    private void SavePendingVnPayCheckout(PendingVnPayCheckoutSessionDto pendingCheckout)
+    {
+        HttpContext.Session.SetString(
+            PendingVnPayCheckoutSessionKey,
+            JsonSerializer.Serialize(pendingCheckout));
+    }
+
+    private PendingVnPayCheckoutSessionDto? GetPendingVnPayCheckoutFromSession()
+    {
+        var raw = HttpContext.Session.GetString(PendingVnPayCheckoutSessionKey);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<PendingVnPayCheckoutSessionDto>(raw);
+        }
+        catch
+        {
+            HttpContext.Session.Remove(PendingVnPayCheckoutSessionKey);
+            return null;
+        }
+    }
+
+    private void ClearPendingVnPayCheckout()
+    {
+        HttpContext.Session.Remove(PendingVnPayCheckoutSessionKey);
+    }
+
+    private async Task HydrateSuccessTempDataAsync(HttpClient orderingClient, int orderId, CancellationToken cancellationToken)
+    {
+        using var response = await orderingClient.GetAsync($"/api/orders/{orderId}", cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            TempData["OrderId"] = orderId;
+            TempData["OrderCode"] = $"FF{orderId:D6}";
+            TempData["OrderDate"] = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+            TempData["AddressBookNotice"] ??= string.Empty;
+            return;
+        }
+
+        var detail = await response.Content.ReadFromJsonAsync<OrderDetailResponseDto>(cancellationToken: cancellationToken);
+        if (detail is null)
+        {
+            TempData["OrderId"] = orderId;
+            TempData["OrderCode"] = $"FF{orderId:D6}";
+            TempData["OrderDate"] = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+            TempData["AddressBookNotice"] ??= string.Empty;
+            return;
+        }
+
+        var shipping = detail.Shippings.FirstOrDefault();
+        TempData["OrderId"] = detail.OrderId;
+        TempData["OrderCode"] = $"FF{detail.OrderId:D6}";
+        TempData["OrderDate"] = detail.OrderDate.ToString("O", CultureInfo.InvariantCulture);
+        TempData["TotalAmount"] = detail.TotalAmount.ToString(CultureInfo.InvariantCulture);
+        TempData["PaymentMethod"] = detail.Payments.FirstOrDefault()?.PaymentMethod ?? "VNPay";
+        TempData["RecipientName"] = shipping?.FullName ?? detail.BuyerFullName ?? "Khách hàng";
+        TempData["RecipientPhone"] = shipping?.Phone ?? detail.BuyerPhone ?? string.Empty;
+        TempData["RecipientAddress"] = shipping?.AddressDetail ?? "Chưa cập nhật";
+        TempData["AddressBookNotice"] ??= string.Empty;
+    }
+
+    private static string NormalizePaymentMethod(string? paymentMethod)
+    {
+        if (string.IsNullOrWhiteSpace(paymentMethod))
+        {
+            return "COD";
+        }
+
+        return paymentMethod.Trim();
+    }
+
+    private static CheckoutPaymentResultViewModel BuildPaymentResultViewModel(int? orderId, bool isSuccess, string message)
+    {
+        return new CheckoutPaymentResultViewModel
+        {
+            OrderId = orderId,
+            IsSuccess = isSuccess,
+            Message = message
+        };
+    }
+
     private void PopulateAddressSelectionViewData(
         List<ProfileAddressItemDto> savedAddresses,
         string addressMode,
@@ -555,6 +786,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         ViewBag.SelectedAddressId = selectedAddressId; // Id địa chỉ đang chọn.
         ViewBag.AddressLoadError = addressLoadError; // Lỗi tải địa chỉ (nếu có).
         ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured; // Checkout co duoc phep load dia chi GHN hay khong.
+        ViewBag.VnPayEnabled = _vnPayService.IsConfigured;
     }
 
     private static void ApplySavedAddressToShipping(CheckoutSubmitRequestDto request, ProfileAddressItemDto selectedAddress) // Map address đã lưu -> Shipping.
@@ -1112,6 +1344,61 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         public decimal TotalAmount { get; set; }
     }
 
+    private sealed class FinalizeVnPayPaymentRequestDto
+    {
+        public string TxnRef { get; set; } = string.Empty;
+        public string ResponseCode { get; set; } = string.Empty;
+        public string? TransactionStatus { get; set; }
+        public decimal? Amount { get; set; }
+        public string? TransactionNo { get; set; }
+        public string? BankCode { get; set; }
+        public string? BankTransactionNo { get; set; }
+        public string? OrderInfo { get; set; }
+        public DateTimeOffset? PaidAt { get; set; }
+        public bool IsSuccess { get; set; }
+    }
+
+    private sealed class FinalizeVnPayPaymentResultDto
+    {
+        public bool Success { get; set; }
+        public bool AlreadyProcessed { get; set; }
+        public int OrderId { get; set; }
+        public string PaymentStatus { get; set; } = string.Empty;
+        public string OrderStatus { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
+    private sealed class OrderDetailResponseDto
+    {
+        public int OrderId { get; set; }
+        public DateTime OrderDate { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string? BuyerFullName { get; set; }
+        public string? BuyerPhone { get; set; }
+        public List<OrderDetailShippingResponseDto> Shippings { get; set; } = new();
+        public List<OrderDetailPaymentResponseDto> Payments { get; set; } = new();
+    }
+
+    private sealed class OrderDetailShippingResponseDto
+    {
+        public string? FullName { get; set; }
+        public string? Phone { get; set; }
+        public string? AddressDetail { get; set; }
+    }
+
+    private sealed class OrderDetailPaymentResponseDto
+    {
+        public string? PaymentMethod { get; set; }
+    }
+
+    private sealed class PendingVnPayCheckoutSessionDto
+    {
+        public int OrderId { get; set; }
+        public string AddressMode { get; set; } = "new";
+        public List<string> PurchasedCartItemKeys { get; set; } = new();
+        public CheckoutSubmitRequestDto Request { get; set; } = new();
+    }
+
     private sealed class CheckoutCatalogProductSnapshot
     {
         public int ProductId { get; set; }
@@ -1202,7 +1489,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         }
     }
 
-    private void SeedDirectCheckoutItemFromQuery()
+    private async Task SeedDirectCheckoutItemFromQueryAsync()
     {
         var directItem = ParseDirectCheckoutItemFromQuery();
         if (directItem is null)
@@ -1210,7 +1497,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             return;
         }
 
-        var items = _cart.GetItems();
+        var items = await _cart.GetItemsAsync();
         var existing = items.FirstOrDefault(x =>
             x.ProductId == directItem.ProductId &&
             x.SellerId == directItem.SellerId);
@@ -1228,7 +1515,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             existing.Quantity = directItem.Quantity;
         }
 
-        _cart.SetItems(items);
+        await _cart.SetItemsAsync(items);
         HttpContext.Session.SetString(
             CheckoutSelectedCartItemKeysSessionKey,
             JsonSerializer.Serialize(new[] { directItem.CartItemKey }));
@@ -1273,24 +1560,30 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         };
     }
 
-    private void RemovePurchasedCartItems(IReadOnlyCollection<string> purchasedKeys)
+    private async Task RemovePurchasedCartItemsAsync(IReadOnlyCollection<string> purchasedKeys)
     {
         if (purchasedKeys.Count == 0)
         {
             return;
         }
 
-        var remainingItems = _cart.GetItems()
+        var remainingItems = (await _cart.GetItemsAsync())
             .Where(x => !purchasedKeys.Contains(x.CartItemKey, StringComparer.OrdinalIgnoreCase))
             .ToList();
 
         if (remainingItems.Count == 0)
         {
-            _cart.Clear();
+            await _cart.ClearAsync();
             return;
         }
 
-        _cart.SetItems(remainingItems);
+        await _cart.SetItemsAsync(remainingItems);
+    }
+
+    private int GetVnPayExpireAfterMinutes()
+    {
+        var configuredMinutes = _vnPayOptions.ExpireAfterMinutes;
+        return configuredMinutes > 0 ? configuredMinutes : DefaultVnPayExpireAfterMinutes;
     }
 
     private async Task<List<SellerShippingOriginSnapshot>> GetSellerShippingOriginsAsync(

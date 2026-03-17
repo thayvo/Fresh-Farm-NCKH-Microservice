@@ -61,18 +61,18 @@ public class OrderController : LegacySellerControllerBase
     public async Task<JsonResult> GetAllOrders()
     {
         var response = await GetOrdersFromApiAsync(page: 1, pageSize: 500, null, null, null);
-        if (response is null)
+        if (response.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
+            return Json(new { success = false, message = response.ErrorMessage ?? "Lỗi khi tải danh sách đơn hàng." });
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        if (allowedOrderIds is null)
+        if (allowedOrderIds.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+            return Json(new { success = false, message = allowedOrderIds.ErrorMessage ?? "Lỗi xác thực phạm vi dữ liệu seller." });
         }
 
-        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.Payload.data), allowedOrderIds.Payload);
         return Json(new { success = true, data = rows });
     }
 
@@ -186,25 +186,25 @@ public class OrderController : LegacySellerControllerBase
     public async Task<JsonResult> GetOrdersPaged(int page = 1, int pageSize = 10)
     {
         var response = await GetOrdersFromApiAsync(page, pageSize, null, null, null);
-        if (response is null)
+        if (response.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
+            return Json(new { success = false, message = response.ErrorMessage ?? "Lỗi khi tải danh sách đơn hàng." });
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        if (allowedOrderIds is null)
+        if (allowedOrderIds.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+            return Json(new { success = false, message = allowedOrderIds.ErrorMessage ?? "Lỗi xác thực phạm vi dữ liệu seller." });
         }
 
-        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.Payload.data), allowedOrderIds.Payload);
         return Json(new
         {
             success = true,
             data = rows,
-            page = response.page,
-            pageSize = response.pageSize,
-            total = Math.Min(response.total, allowedOrderIds.Count)
+            page = response.Payload.page,
+            pageSize = response.Payload.pageSize,
+            total = Math.Min(response.Payload.total, allowedOrderIds.Payload.Count)
         });
     }
 
@@ -212,18 +212,18 @@ public class OrderController : LegacySellerControllerBase
     public async Task<JsonResult> SearchOrders(string searchTerm, string statusFilter, string dateFilter)
     {
         var response = await GetOrdersFromApiAsync(page: 1, pageSize: 100, searchTerm, statusFilter, dateFilter);
-        if (response is null)
+        if (response.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
+            return Json(new { success = false, message = response.ErrorMessage ?? "Lỗi khi tìm kiếm đơn hàng." });
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        if (allowedOrderIds is null)
+        if (allowedOrderIds.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+            return Json(new { success = false, message = allowedOrderIds.ErrorMessage ?? "Lỗi xác thực phạm vi dữ liệu seller." });
         }
 
-        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.Payload.data), allowedOrderIds.Payload);
         return Json(new { success = true, data = rows });
     }
 
@@ -231,25 +231,25 @@ public class OrderController : LegacySellerControllerBase
     public async Task<JsonResult> SearchOrdersPaged(string searchTerm, string statusFilter, string dateFilter, int page = 1, int pageSize = 10)
     {
         var response = await GetOrdersFromApiAsync(page, pageSize, searchTerm, statusFilter, dateFilter);
-        if (response is null)
+        if (response.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
+            return Json(new { success = false, message = response.ErrorMessage ?? "Lỗi khi tìm kiếm đơn hàng." });
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        if (allowedOrderIds is null)
+        if (allowedOrderIds.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+            return Json(new { success = false, message = allowedOrderIds.ErrorMessage ?? "Lỗi xác thực phạm vi dữ liệu seller." });
         }
 
-        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.data), allowedOrderIds);
+        var rows = FilterRowsByAllowedOrderIds(NormalizeOrderRows(response.Payload.data), allowedOrderIds.Payload);
         return Json(new
         {
             success = true,
             data = rows,
-            page = response.page,
-            pageSize = response.pageSize,
-            total = Math.Min(response.total, allowedOrderIds.Count)
+            page = response.Payload.page,
+            pageSize = response.Payload.pageSize,
+            total = Math.Min(response.Payload.total, allowedOrderIds.Payload.Count)
         });
     }
 
@@ -306,13 +306,13 @@ public class OrderController : LegacySellerControllerBase
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        if (allowedOrderIds is null)
+        if (allowedOrderIds.Payload is null)
         {
-            return Json(new { success = false, message = "Lỗi xác thực phạm vi dữ liệu seller." });
+            return Json(new { success = false, message = allowedOrderIds.ErrorMessage ?? "Lỗi xác thực phạm vi dữ liệu seller." });
         }
 
         var requestedOrderIds = req.orderIds.Distinct().ToList();
-        var permittedOrderIds = requestedOrderIds.Where(allowedOrderIds.Contains).ToList();
+        var permittedOrderIds = requestedOrderIds.Where(allowedOrderIds.Payload.Contains).ToList();
         if (permittedOrderIds.Count == 0)
         {
             return Json(new { success = false, message = "Không có đơn hàng hợp lệ trong phạm vi của bạn." });
@@ -385,7 +385,7 @@ public class OrderController : LegacySellerControllerBase
         });
     }
 
-    private async Task<PagedOrdersResponse?> GetOrdersFromApiAsync(
+    private async Task<ApiCallResult<PagedOrdersResponse>> GetOrdersFromApiAsync(
         int page,
         int pageSize,
         string? searchTerm,
@@ -417,28 +417,39 @@ public class OrderController : LegacySellerControllerBase
         var response = await client.GetAsync($"/api/orders/admin/paged?{string.Join("&", query)}");
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            return new ApiCallResult<PagedOrdersResponse>(null, await ReadApiErrorAsync(response, "Lỗi khi tải danh sách đơn hàng."));
         }
 
-        return await response.Content.ReadFromJsonAsync<PagedOrdersResponse>(JsonOptions);
+        var payload = await response.Content.ReadFromJsonAsync<PagedOrdersResponse>(JsonOptions);
+        if (payload is null)
+        {
+            return new ApiCallResult<PagedOrdersResponse>(null, "Không đọc được dữ liệu danh sách đơn hàng.");
+        }
+
+        if (!payload.success)
+        {
+            return new ApiCallResult<PagedOrdersResponse>(null, "Ordering API trả về danh sách đơn hàng không thành công.");
+        }
+
+        return new ApiCallResult<PagedOrdersResponse>(payload, null);
     }
 
-    private async Task<HashSet<int>?> GetAllowedOrderIdsAsync()
+    private async Task<ApiCallResult<HashSet<int>>> GetAllowedOrderIdsAsync()
     {
         var client = CreateOrderingClient();
         var response = await client.GetAsync("/api/orders/admin/order-ids");
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            return new ApiCallResult<HashSet<int>>(null, await ReadApiErrorAsync(response, "Lỗi xác thực phạm vi dữ liệu seller."));
         }
 
         var payload = await response.Content.ReadFromJsonAsync<SellerOrderIdsResponse>(JsonOptions);
         if (payload?.success != true || payload.data is null)
         {
-            return null;
+            return new ApiCallResult<HashSet<int>>(null, "Không đọc được phạm vi đơn hàng của seller.");
         }
 
-        return payload.data.Where(id => id > 0).ToHashSet();
+        return new ApiCallResult<HashSet<int>>(payload.data.Where(id => id > 0).ToHashSet(), null);
     }
 
     private async Task<bool> CanAccessOrderAsync(int orderId)
@@ -449,7 +460,7 @@ public class OrderController : LegacySellerControllerBase
         }
 
         var allowedOrderIds = await GetAllowedOrderIdsAsync();
-        return allowedOrderIds is not null && allowedOrderIds.Contains(orderId);
+        return allowedOrderIds.Payload is not null && allowedOrderIds.Payload.Contains(orderId);
     }
 
     private HttpClient CreateOrderingClient()
@@ -472,7 +483,7 @@ public class OrderController : LegacySellerControllerBase
         var body = await response.Content.ReadAsStringAsync();
         if (string.IsNullOrWhiteSpace(body))
         {
-            return fallback;
+            return $"{fallback} (HTTP {(int)response.StatusCode} {response.ReasonPhrase})";
         }
 
         try
@@ -500,7 +511,13 @@ public class OrderController : LegacySellerControllerBase
             // ignore parse failure
         }
 
-        return fallback;
+        var compactBody = body.Trim();
+        if (compactBody.Length > 220)
+        {
+            compactBody = compactBody[..220] + "...";
+        }
+
+        return $"{fallback} (HTTP {(int)response.StatusCode} {response.ReasonPhrase}) - {compactBody}";
     }
 
     private async Task<JsonResult> ToJsonResultAsync(HttpResponseMessage response, string fallbackError)
@@ -684,6 +701,8 @@ public class OrderController : LegacySellerControllerBase
             set;
         }
     }
+
+    private sealed record ApiCallResult<T>(T? Payload, string? ErrorMessage) where T : class;
 
     private sealed class SellerOrderIdsResponse
     {

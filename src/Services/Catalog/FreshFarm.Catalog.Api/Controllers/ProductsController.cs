@@ -127,6 +127,9 @@ public sealed class ProductsController : ControllerBase
                 p.Price,
                 p.Status,
                 p.StockQuantity,
+                p.ReservedStock,
+                AvailableStock = Math.Max(0, p.StockQuantity - p.ReservedStock),
+                OnHandStock = p.StockQuantity,
                 p.ImageFileName,
                 p.CreatedDate,
                 p.ShortDescription,
@@ -200,6 +203,9 @@ public sealed class ProductsController : ControllerBase
             product.Price,
             product.Status,
             product.StockQuantity,
+            product.ReservedStock,
+            AvailableStock = Math.Max(0, product.StockQuantity - product.ReservedStock),
+            OnHandStock = product.StockQuantity,
             product.ImageFileName,
             product.CreatedDate,
             product.ShortDescription,
@@ -291,6 +297,7 @@ public sealed class ProductsController : ControllerBase
             Sku = sku,
             Status = request.Status,
             StockQuantity = 0,
+            ReservedStock = 0,
             ImageFileName = request.ImageFileName,
             ShortDescription = (request.ShortDescription ?? string.Empty).Trim(),
             LongDescription = (request.LongDescription ?? string.Empty).Trim(),
@@ -533,7 +540,7 @@ public sealed class ProductsController : ControllerBase
             return NotFound(new { message = "Không tìm thấy sản phẩm." });
         }
 
-        if (product.StockQuantity <= 0 && !product.Status)
+        if ((product.StockQuantity - product.ReservedStock) <= 0 && !product.Status)
         {
             return BadRequest(new { message = "Sản phẩm đã hết hàng, không thể bật bán." });
         }

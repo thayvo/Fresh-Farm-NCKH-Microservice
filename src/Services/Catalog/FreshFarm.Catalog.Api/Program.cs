@@ -1,3 +1,4 @@
+using FreshFarm.Catalog.Api.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.Configure<InternalInventoryOptions>(
+    builder.Configuration.GetSection(InternalInventoryOptions.SectionName));
 builder.Services.AddDbContext<FreshFarm.Catalog.Api.Models.FreshFarmCatalogDBContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("FreshFarmCatalogDB"));

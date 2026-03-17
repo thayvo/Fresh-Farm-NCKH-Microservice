@@ -391,12 +391,19 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
             entity.ToTable("CartItem");
 
-            entity.HasIndex(e => new { e.CartId, e.ProductId }, "IX_CartItem_Cart_Product").IsUnique();
+            entity.HasIndex(e => new { e.CartId, e.ProductId, e.SellerId }, "IX_CartItem_Cart_Product_Seller").IsUnique();
 
             entity.Property(e => e.CartItemId).HasColumnName("CartItemID");
             entity.Property(e => e.CartId).HasColumnName("CartID");
             entity.Property(e => e.ProductId).HasColumnName("ProductID");
+            entity.Property(e => e.SellerId)
+                .HasDefaultValue(0)
+                .HasColumnName("SellerID");
             entity.Property(e => e.Quantity).HasDefaultValue(1);
+            entity.Property(e => e.SnapshotImageFileName).HasMaxLength(255);
+            entity.Property(e => e.SnapshotProductName).HasMaxLength(255);
+            entity.Property(e => e.SnapshotSellerName).HasMaxLength(255);
+            entity.Property(e => e.SnapshotUnitSymbol).HasMaxLength(100);
             entity.Property(e => e.UnitPrice).HasColumnType("decimal(18, 2)");
 
             entity.HasOne(d => d.Cart).WithMany(p => p.CartItems)

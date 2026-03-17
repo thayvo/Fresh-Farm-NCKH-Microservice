@@ -1,6 +1,8 @@
-﻿using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
 using FreshFarm.Web.Bff.Areas.Seller.Hubs;
+using FreshFarm.Web.Bff.Options;
+using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
 using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 
 var builder = WebApplication.CreateBuilder(args); // Tao host builder cho app.
@@ -25,7 +27,36 @@ builder.Services // Dang ky cookie authentication cho user web.
         options.AccessDeniedPath = "/account/signin"; // Tam thoi redirect signin cho MVP.
         options.SlidingExpiration = true; // User hoat dong thi reset han cookie.
         options.ExpireTimeSpan = TimeSpan.FromHours(2); // Han cookie auth.
+    })
+    .AddCookie("GoogleExternal", options =>
+    {
+        options.Cookie.Name = "FreshFarm.Bff.GoogleExternal";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(10);
     });
+
+builder.Services.Configure<GoogleAuthenticationOptions>(
+    builder.Configuration.GetSection(GoogleAuthenticationOptions.SectionName));
+builder.Services.Configure<VnPayOptions>(
+    builder.Configuration.GetSection(VnPayOptions.SectionName));
+
+var googleAuthOptions = builder.Configuration
+    .GetSection(GoogleAuthenticationOptions.SectionName)
+    .Get<GoogleAuthenticationOptions>() ?? new GoogleAuthenticationOptions();
+
+if (googleAuthOptions.IsConfigured)
+{
+    builder.Services.AddAuthentication()
+        .AddGoogle("Google", options =>
+        {
+            options.ClientId = googleAuthOptions.ClientId;
+            options.ClientSecret = googleAuthOptions.ClientSecret;
+            options.SignInScheme = "GoogleExternal";
+            options.CallbackPath = "/signin-google";
+            options.SaveTokens = false;
+        });
+}
 
 builder.Services.AddAuthorization(options =>
 {
@@ -68,6 +99,7 @@ builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionService cần HttpContext.
 builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
 builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
+builder.Services.AddSingleton<IVnPayService, VnPayService>(); // Ký URL + verify callback VNPay sandbox.
 
 var app = builder.Build(); // Build app pipeline.
 

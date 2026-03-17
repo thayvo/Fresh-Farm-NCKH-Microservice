@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Cryptography;
 
 namespace FreshFarm.Identity.Api.Controllers
 {
@@ -159,6 +160,125 @@ namespace FreshFarm.Identity.Api.Controllers
                 await transaction.RollbackAsync();
                 return StatusCode(500, "Có lỗi xảy ra khi đăng kí, vui lòng thử lại");
             }
+        }
+
+        [HttpPost("external-login")]
+        public async Task<IActionResult> ExternalLogin([FromBody] ExternalLoginRequest request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var provider = request.Provider.Trim();
+            if (!provider.Equals("Google", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("Hiện tại hệ thống chỉ hỗ trợ đăng nhập Google.");
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var normalizedFullName = request.FullName.Trim();
+            var normalizedAvatar = string.IsNullOrWhiteSpace(request.AvatarUrl)
+                ? null
+                : request.AvatarUrl.Trim();
+
+            var user = await _db.Users
+                .Include(u => u.UserAuth)
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .SingleOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+
+            if (user is not null && !user.IsActive)
+            {
+                return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+
+            if (user is null)
+            {
+                var customerRole = await _db.Roles.SingleOrDefaultAsync(r => r.RoleName == "Customer", cancellationToken);
+                if (customerRole is null)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Không tìm thấy vai trò Customer để tạo tài khoản Google.");
+                }
+
+                await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    var now = DateTime.UtcNow;
+                    user = new User
+                    {
+                        Email = normalizedEmail,
+                        FullName = string.IsNullOrWhiteSpace(normalizedFullName) ? normalizedEmail : normalizedFullName,
+                        UserName = await GenerateUniqueUserNameAsync(normalizedEmail, cancellationToken),
+                        Phone = await GeneratePlaceholderPhoneAsync(cancellationToken),
+                        Avatar = normalizedAvatar,
+                        IsActive = true,
+                        CreatedAt = now
+                    };
+
+                    _db.Users.Add(user);
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+                    _db.UserAuths.Add(new UserAuth
+                    {
+                        UserId = user.UserId,
+                        PasswordHash = _passwordHasher.HashPassword(user, randomPassword),
+                        FailedCount = 0,
+                        UpdatedAt = now
+                    });
+
+                    _db.UserRoles.Add(new UserRole
+                    {
+                        UserId = user.UserId,
+                        RoleId = customerRole.RoleId,
+                        CreatedAt = now
+                    });
+
+                    await _db.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+
+                    user = await _db.Users
+                        .Include(u => u.UserAuth)
+                        .Include(u => u.UserRoles)
+                        .ThenInclude(ur => ur.Role)
+                        .SingleAsync(u => u.UserId == user.UserId, cancellationToken);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            }
+            else
+            {
+                var shouldSave = false;
+                if (!string.IsNullOrWhiteSpace(normalizedFullName) && !string.Equals(user.FullName, normalizedFullName, StringComparison.Ordinal))
+                {
+                    user.FullName = normalizedFullName;
+                    shouldSave = true;
+                }
+
+                if (!string.IsNullOrWhiteSpace(normalizedAvatar) && !string.Equals(user.Avatar, normalizedAvatar, StringComparison.Ordinal))
+                {
+                    user.Avatar = normalizedAvatar;
+                    shouldSave = true;
+                }
+
+                if (shouldSave)
+                {
+                    user.UpdatedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync(cancellationToken);
+                }
+            }
+
+            var roleNames = user.UserRoles.Select(ur => ur.Role.RoleName).ToList();
+            if (roleNames.Count == 0)
+            {
+                roleNames.Add("Customer");
+            }
+
+            return Ok(CreateToken(user, roleNames));
         }
 
         [HttpPost("forgot-password")]
@@ -652,6 +772,45 @@ namespace FreshFarm.Identity.Api.Controllers
             return _passwordResetOptions.TokenLifetimeMinutes <= 0
                 ? 30
                 : _passwordResetOptions.TokenLifetimeMinutes;
+        }
+
+        private async Task<string> GenerateUniqueUserNameAsync(string email, CancellationToken cancellationToken)
+        {
+            var localPart = email.Split('@')[0];
+            var sanitized = new string(localPart
+                .Where(ch => char.IsLetterOrDigit(ch) || ch == '.' || ch == '_' || ch == '-')
+                .ToArray());
+
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                sanitized = "googleuser";
+            }
+
+            var candidate = sanitized;
+            var suffix = 1;
+            while (await _db.Users.AnyAsync(u => u.UserName == candidate, cancellationToken))
+            {
+                candidate = $"{sanitized}{suffix}";
+                suffix++;
+            }
+
+            return candidate;
+        }
+
+        private async Task<string> GeneratePlaceholderPhoneAsync(CancellationToken cancellationToken)
+        {
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                var digits = RandomNumberGenerator.GetInt32(100000000, 999999999);
+                var candidate = $"0{digits}";
+                var exists = await _db.Users.AnyAsync(u => u.Phone == candidate, cancellationToken);
+                if (!exists)
+                {
+                    return candidate;
+                }
+            }
+
+            throw new InvalidOperationException("Không thể tạo số điện thoại tạm duy nhất cho tài khoản Google.");
         }
     }
 }

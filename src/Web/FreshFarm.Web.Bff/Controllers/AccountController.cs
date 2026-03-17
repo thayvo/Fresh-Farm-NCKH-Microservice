@@ -1,11 +1,13 @@
 ﻿using System.IdentityModel.Tokens.Jwt; // Dung de parse JWT claim.
 using System.Security.Claims; // Dung Claim/ClaimsPrincipal.
 using FreshFarm.Web.Bff.Dtos; // Dung DTO vua tao.
+using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Dung service GHN.
 using Microsoft.AspNetCore.Authentication; // Dung SignInAsync/SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // Cookie auth scheme.
 using Microsoft.AspNetCore.Authorization; // [Authorize], [AllowAnonymous].
 using Microsoft.AspNetCore.Mvc; // Controller, IActionResult.
+using Microsoft.Extensions.Options;
 
 namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 
@@ -14,11 +16,16 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key luu JWT trong session.
     private readonly IHttpClientFactory _httpClientFactory; // Factory tao HttpClient theo ten.
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
+    private readonly GoogleAuthenticationOptions _googleAuthenticationOptions;
 
-    public AccountController(IHttpClientFactory httpClientFactory, IGhnSandboxService ghnSandboxService) // Inject factory qua DI.
+    public AccountController(
+        IHttpClientFactory httpClientFactory,
+        IGhnSandboxService ghnSandboxService,
+        IOptions<GoogleAuthenticationOptions> googleAuthenticationOptions) // Inject factory qua DI.
     {
         _httpClientFactory = httpClientFactory; // Gan vao field.
         _ghnSandboxService = ghnSandboxService;
+        _googleAuthenticationOptions = googleAuthenticationOptions.Value;
     }
 
     [HttpGet("/account/signin")] // Route GET signin.
@@ -31,6 +38,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return RedirectToLocal(normalizedReturnUrl); // Quay ve trang truoc hoac fallback.
         }
 
+        ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
         return View(); // Views/Account/SignIn.cshtml.
     }
@@ -41,6 +49,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     public async Task<IActionResult> SignIn(LoginRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chi chap nhan local url de tranh open redirect.
+        ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Giu lai de form render lai khi co loi.
 
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password)) // Validate input.
@@ -66,48 +75,84 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return View(request); // O lai form.
         }
 
-        HttpContext.Session.SetString(AccessTokenSessionKey, auth.AccessToken); // Luu JWT vao session server-side.
-
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.AccessToken); // Parse token de lay claims.
-        
-        var claims = new List<Claim> // Tao claim list cho cookie principal.
-        {
-            new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty), // sub -> user id.
-            new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? request.Identifier), // Ten hien thi.
-            new Claim("sub", jwt.Subject ?? string.Empty),
-            new Claim("ff_access_token", auth.AccessToken)
-        };
-        // ===== 1) Trong action SignIn POST, ngay sau khi parse jwt =====
-        var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value; // Đọc email từ JWT.
-        if (!string.IsNullOrWhiteSpace(emailValue)) // Nếu token có email.
-        {
-            claims.Add(new Claim(ClaimTypes.Email, emailValue)); // Map email chuẩn cho View/Profile.
-            claims.Add(new Claim("email", emailValue)); // Map thêm claim custom để tương thích code hiện tại.
-        }
-
-        var phoneValue = jwt.Claims.FirstOrDefault(c => c.Type == "phone" || c.Type == "phone_number" || c.Type == ClaimTypes.MobilePhone)?.Value; // Đọc phone nếu token có.
-        if (!string.IsNullOrWhiteSpace(phoneValue)) // Nếu token có phone.
-        {
-            claims.Add(new Claim(ClaimTypes.MobilePhone, phoneValue)); // Map phone chuẩn.
-            claims.Add(new Claim("phone", phoneValue)); // Map phone custom.
-        }
-        foreach (var roleClaim in jwt.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role")) // Lay role trong JWT.
-        {
-            claims.Add(new Claim(ClaimTypes.Role, roleClaim.Value)); // Add role vao principal.
-        }
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme); // Tao identity cho cookie.
-        var principal = new ClaimsPrincipal(identity); // Tao principal.
-        var authProperties = new AuthenticationProperties();
-        if (auth.ExpiredAtUtc > DateTime.UtcNow)
-        {
-            authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
-            authProperties.IsPersistent = true;
-        }
-
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties); // Set cookie auth.
+        await SignInWithIdentityTokenAsync(auth, request.Identifier);
 
         return RedirectToLocal(normalizedReturnUrl); // Login xong quay ve trang dang dung neu hop le.
+    }
+
+    [HttpGet("/account/signin/google")]
+    [AllowAnonymous]
+    public IActionResult SignInWithGoogle(string? returnUrl = null)
+    {
+        if (!_googleAuthenticationOptions.IsConfigured)
+        {
+            TempData["ErrorMessage"] = "Đăng nhập Google chưa được cấu hình trên môi trường dev.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = NormalizeReturnUrl(returnUrl) });
+        }
+
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = Url.Action(nameof(GoogleCallback), new { returnUrl = normalizedReturnUrl })
+        };
+
+        return Challenge(properties, "Google");
+    }
+
+    [HttpGet("/account/signin/google-callback")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GoogleCallback(string? returnUrl = null)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var externalAuth = await HttpContext.AuthenticateAsync("GoogleExternal");
+        if (!externalAuth.Succeeded || externalAuth.Principal is null)
+        {
+            TempData["ErrorMessage"] = "Không đọc được thông tin tài khoản Google. Vui lòng thử lại.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        var email = externalAuth.Principal.FindFirstValue(ClaimTypes.Email)
+            ?? externalAuth.Principal.FindFirstValue("email");
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            await HttpContext.SignOutAsync("GoogleExternal");
+            TempData["ErrorMessage"] = "Google chưa trả về email hợp lệ. Vui lòng chọn tài khoản Gmail khác.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        var fullName = externalAuth.Principal.FindFirstValue(ClaimTypes.Name) ?? email;
+        var avatarUrl = externalAuth.Principal.FindFirstValue("picture")
+            ?? externalAuth.Principal.FindFirstValue("urn:google:picture");
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        var exchangeResponse = await identityClient.PostAsJsonAsync("/auth/external-login", new ExternalLoginExchangeRequestDto
+        {
+            Provider = "Google",
+            Email = email,
+            FullName = fullName,
+            AvatarUrl = avatarUrl
+        });
+
+        await HttpContext.SignOutAsync("GoogleExternal");
+
+        if (!exchangeResponse.IsSuccessStatusCode)
+        {
+            var errorText = await exchangeResponse.Content.ReadAsStringAsync();
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorText)
+                ? "Không thể hoàn tất đăng nhập Google."
+                : $"Đăng nhập Google thất bại: {errorText}";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        var auth = await exchangeResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
+        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
+        {
+            TempData["ErrorMessage"] = "Identity API trả token đăng nhập Google không hợp lệ.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        await SignInWithIdentityTokenAsync(auth, email);
+        return RedirectToLocal(normalizedReturnUrl);
     }
 
     [HttpGet("/account/signup")] // Route GET signup.
@@ -331,18 +376,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             var path = returnUrl.Trim();
             if (path.StartsWith("/Admin/", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("Admin"))
             {
-                return Redirect("/Seller/Home/Dashboard");
+                return RedirectToAction("Index", "Home");
             }
 
             if (path.StartsWith("/Seller/", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("Seller"))
             {
-                return Redirect("/Admin/Home/Dashboard");
+                return RedirectToAction("Index", "Home");
             }
 
             return Redirect(returnUrl); // Quay lai trang user dang dung.
         }
 
-        return RedirectToAction(nameof(OrderHistory)); // Fallback mac dinh.
+        return RedirectToAction("Index", "Home"); // Fallback mac dinh ve trang chu buyer-facing.
     }
 
     // ===== 3) Thay action GET /account/profile bằng bản dùng API thật =====
@@ -671,6 +716,50 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         {
             claims.Add(new Claim(type, value));
         }
+    }
+
+    private async Task SignInWithIdentityTokenAsync(AuthResponseDto auth, string fallbackName)
+    {
+        HttpContext.Session.SetString(AccessTokenSessionKey, auth.AccessToken);
+
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.AccessToken);
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty),
+            new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? fallbackName),
+            new Claim("sub", jwt.Subject ?? string.Empty),
+            new Claim("ff_access_token", auth.AccessToken)
+        };
+
+        var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value;
+        if (!string.IsNullOrWhiteSpace(emailValue))
+        {
+            claims.Add(new Claim(ClaimTypes.Email, emailValue));
+            claims.Add(new Claim("email", emailValue));
+        }
+
+        var phoneValue = jwt.Claims.FirstOrDefault(c => c.Type == "phone" || c.Type == "phone_number" || c.Type == ClaimTypes.MobilePhone)?.Value;
+        if (!string.IsNullOrWhiteSpace(phoneValue))
+        {
+            claims.Add(new Claim(ClaimTypes.MobilePhone, phoneValue));
+            claims.Add(new Claim("phone", phoneValue));
+        }
+
+        foreach (var roleClaim in jwt.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role"))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, roleClaim.Value));
+        }
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        var authProperties = new AuthenticationProperties();
+        if (auth.ExpiredAtUtc > DateTime.UtcNow)
+        {
+            authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
+            authProperties.IsPersistent = true;
+        }
+
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
     }
 
     // ===== 2) Thêm helper private trong AccountController =====

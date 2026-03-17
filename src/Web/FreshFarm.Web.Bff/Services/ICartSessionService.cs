@@ -1,16 +1,16 @@
-﻿using FreshFarm.Web.Bff.Dtos; // Dùng DTO cart đã tạo.
+using FreshFarm.Web.Bff.Dtos;
 
-namespace FreshFarm.Web.Bff.Services; // Namespace service.
+namespace FreshFarm.Web.Bff.Services;
 
-public interface ICartSessionService // Hợp đồng để controller gọi mà không phụ thuộc chi tiết session/json.
+public interface ICartSessionService
 {
-    List<CartItemDto> GetItems(); // Lấy toàn bộ item trong giỏ.
-    void SetItems(List<CartItemDto> items); // Ghi đè toàn bộ giỏ.
-    void AddOrIncrease(AddToCartRequestDto request); // Thêm mới hoặc cộng dồn số lượng.
-    void UpdateQuantity(int productId, int quantity); // Cập nhật số lượng 1 item.
-    void UpdateQuantity(int productId, int sellerId, string? cartItemKey, int quantity); // Cập nhật đúng dòng multi-seller.
-    void Remove(int productId); // Xóa 1 item.
-    void Remove(int productId, int sellerId, string? cartItemKey); // Xóa đúng dòng multi-seller.
-    void Clear(); // Xóa toàn bộ giỏ.
-    CartSummaryDto BuildSummary(decimal shippingFee); // Tính subtotal/grand total.
+    Task<List<CartItemDto>> GetItemsAsync();
+    Task SetItemsAsync(List<CartItemDto> items);
+    Task AddOrIncreaseAsync(AddToCartRequestDto request);
+    Task UpdateQuantityAsync(int productId, int quantity);
+    Task UpdateQuantityAsync(int productId, int sellerId, string? cartItemKey, int quantity);
+    Task RemoveAsync(int productId);
+    Task RemoveAsync(int productId, int sellerId, string? cartItemKey);
+    Task ClearAsync();
+    Task<CartSummaryDto> BuildSummaryAsync(decimal shippingFee);
 }

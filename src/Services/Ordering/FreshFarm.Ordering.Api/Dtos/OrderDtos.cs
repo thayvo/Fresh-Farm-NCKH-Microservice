@@ -155,3 +155,42 @@ public sealed class OrderDetailPaymentResponse // Tung ban ghi payment cua don.
     public string? PaymentStatus { get; init; } // Trang thai payment.
     public DateTime? PaymentDate { get; init; } // Thoi diem thanh toan.
 }
+
+public sealed class FinalizeVnPayPaymentRequest
+{
+    [Required]
+    public string TxnRef { get; init; } = string.Empty;
+
+    [Required]
+    public string ResponseCode { get; init; } = string.Empty;
+
+    public string? TransactionStatus { get; init; }
+
+    public decimal? Amount { get; init; }
+
+    [MaxLength(100)]
+    public string? TransactionNo { get; init; }
+
+    [MaxLength(100)]
+    public string? BankCode { get; init; }
+
+    [MaxLength(100)]
+    public string? BankTransactionNo { get; init; }
+
+    [MaxLength(255)]
+    public string? OrderInfo { get; init; }
+
+    public DateTimeOffset? PaidAt { get; init; }
+
+    public bool IsSuccess { get; init; }
+}
+
+public sealed class FinalizeVnPayPaymentResult
+{
+    public bool Success { get; init; }
+    public bool AlreadyProcessed { get; init; }
+    public int OrderId { get; init; }
+    public string PaymentStatus { get; init; } = string.Empty;
+    public string OrderStatus { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+}

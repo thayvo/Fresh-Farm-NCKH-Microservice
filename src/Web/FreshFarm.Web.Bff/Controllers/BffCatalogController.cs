@@ -198,12 +198,12 @@ public sealed class BffCatalogController : ControllerBase
         var facetedList = filtered.ToList();
         if (normalizedAvailability.Count > 0)
         {
-            filtered = facetedList.Where(item => normalizedAvailability.Contains(GetAvailabilityStatus(item.StockQuantity)));
+            filtered = facetedList.Where(item => normalizedAvailability.Contains(GetAvailabilityStatus(item.AvailableStock)));
             facetedList = filtered.ToList();
         }
         else if (string.Equals(normalizedPreset, "ready-today", StringComparison.Ordinal))
         {
-            filtered = facetedList.Where(item => string.Equals(GetAvailabilityStatus(item.StockQuantity), "in-stock", StringComparison.OrdinalIgnoreCase));
+            filtered = facetedList.Where(item => string.Equals(GetAvailabilityStatus(item.AvailableStock), "in-stock", StringComparison.OrdinalIgnoreCase));
             facetedList = filtered.ToList();
         }
 
@@ -582,7 +582,7 @@ public sealed class BffCatalogController : ControllerBase
             {
                 key,
                 label = labels[key],
-                count = items.Count(item => string.Equals(GetAvailabilityStatus(item.StockQuantity), key, StringComparison.OrdinalIgnoreCase)),
+                count = items.Count(item => string.Equals(GetAvailabilityStatus(item.AvailableStock), key, StringComparison.OrdinalIgnoreCase)),
                 isSelected = selectedAvailability.Contains(key)
             })
             .Where(item => item.count > 0)
@@ -630,6 +630,9 @@ public sealed class BffCatalogController : ControllerBase
         public decimal AverageRating { get; set; }
         public int SoldCount { get; set; }
         public int StockQuantity { get; set; }
+        public int AvailableStock { get; set; }
+        public int OnHandStock { get; set; }
+        public int ReservedStock { get; set; }
         public string? Origin { get; set; }
         public string? Standard { get; set; }
         public string? Preservation { get; set; }

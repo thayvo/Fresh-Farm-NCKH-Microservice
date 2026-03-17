@@ -181,6 +181,49 @@ public sealed class ShippingAdminController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
+        var orderIds = rowsRaw.Select(x => x.orderID).Distinct().ToList();
+        var scopedSellerOrders = !isAdmin && sellerId.HasValue && orderIds.Count > 0
+            ? await _db.SellerOrders
+                .AsNoTracking()
+                .Where(so => so.SellerId == sellerId.Value && orderIds.Contains(so.OrderId))
+                .Select(so => new ShippingScopeRow(
+                    so.OrderId,
+                    so.ShippingFee,
+                    so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m))
+                .ToListAsync(cancellationToken)
+            : new List<ShippingScopeRow>();
+
+        var scopedSellerLookup = scopedSellerOrders
+            .GroupBy(x => (int)x.OrderId)
+            .ToDictionary(
+                g => g.Key,
+                g => new
+                {
+                    ShippingFee = g.Sum(x => (decimal)x.ShippingFee),
+                    ItemsAmount = g.Sum(x => (decimal)x.ItemsAmount)
+                });
+
+        var scopedSellerItemRows = !isAdmin && sellerId.HasValue && orderIds.Count > 0
+            ? await _db.SellerOrderItems
+                .AsNoTracking()
+                .Where(soi => soi.SellerOrder.SellerId == sellerId.Value && orderIds.Contains(soi.SellerOrder.OrderId))
+                .Select(soi => new ShippingItemScopeRow(
+                    soi.SellerOrder.OrderId,
+                    soi.Quantity,
+                    soi.SnapshotName))
+                .ToListAsync(cancellationToken)
+            : new List<ShippingItemScopeRow>();
+
+        var scopedSellerItemLookup = scopedSellerItemRows
+            .GroupBy(x => (int)x.OrderId)
+            .ToDictionary(
+                g => g.Key,
+                g => new
+                {
+                    TotalQuantity = g.Sum(x => (int)x.Quantity),
+                    ItemSummary = BuildItemSummary(g.Select(x => (string?)x.SnapshotName).ToList())
+                });
+
         var rows = rowsRaw.Select(s =>
         {
             var province = s.provinceId.HasValue
@@ -192,6 +235,16 @@ public sealed class ShippingAdminController : ControllerBase
                           CommunesByProvince.TryGetValue(s.provinceId.Value, out var provinceCommunes)
                 ? provinceCommunes.FirstOrDefault(c => c.Id == s.communeId.Value)
                 : null;
+
+            var scopedSellerData = scopedSellerLookup.TryGetValue(s.orderID, out var sellerScope)
+                ? sellerScope
+                : null;
+            var scopedSellerItems = scopedSellerItemLookup.TryGetValue(s.orderID, out var sellerItems)
+                ? sellerItems
+                : null;
+            var shippingFee = scopedSellerData?.ShippingFee ?? 0m;
+            var itemsAmount = scopedSellerData?.ItemsAmount ?? 0m;
+            var totalAmount = itemsAmount + shippingFee;
 
             return new
             {
@@ -212,7 +265,17 @@ public sealed class ShippingAdminController : ControllerBase
                 commune = commune is null
                     ? null
                     : new { communeId = commune.Id, communeName = commune.Name },
-                s.order,
+                order = new
+                {
+                    s.order.orderID,
+                    s.order.status,
+                    s.order.payments,
+                    shippingFee = isAdmin ? (decimal?)null : shippingFee,
+                    itemsAmount = isAdmin ? (decimal?)null : itemsAmount,
+                    totalAmount = isAdmin ? (decimal?)null : totalAmount,
+                    totalQuantity = isAdmin ? (int?)null : scopedSellerItems?.TotalQuantity,
+                    itemSummary = isAdmin ? null : scopedSellerItems?.ItemSummary
+                },
                 s.deliveryAssignments
             };
         }).ToList();
@@ -313,6 +376,10 @@ public sealed class ShippingAdminController : ControllerBase
         var order = await _db.Orders
             .AsNoTracking()
             .Include(o => o.SellerOrders)
+                .ThenInclude(so => so.SellerOrderItems)
+            .Include(o => o.OrderDetails)
+            .Include(o => o.Payments)
+            .Include(o => o.Shippings)
             .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
 
         if (order is null || !CanAccessOrderBySeller(order, sellerId, isAdmin))
@@ -320,15 +387,43 @@ public sealed class ShippingAdminController : ControllerBase
             return NotFound(new { success = false, message = "Khong tim thay don hang!" });
         }
 
+        var shipping = order.Shippings.OrderByDescending(x => x.ShippingId).FirstOrDefault();
+        var scopedSellerOrder = !isAdmin && sellerId.HasValue
+            ? order.SellerOrders.FirstOrDefault(so => so.SellerId == sellerId.Value)
+            : null;
+        var itemsAmount = scopedSellerOrder?.SellerOrderItems.Sum(soi => soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)
+            ?? Math.Max(0m, order.TotalAmount - order.ShippingFee);
+        var totalQuantity = scopedSellerOrder?.SellerOrderItems.Sum(soi => soi.Quantity)
+            ?? order.OrderDetails.Sum(od => od.Quantity);
+        IReadOnlyCollection<string?> itemNames = scopedSellerOrder?.SellerOrderItems
+            .Select(soi => (string?)soi.SnapshotName)
+            .ToList()
+            ?? order.OrderDetails
+                .Select(_ => (string?)null)
+                .ToList();
+        var itemSummary = BuildItemSummary(itemNames);
+        var shippingFee = scopedSellerOrder?.ShippingFee ?? order.ShippingFee;
+        var payment = order.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
+
         return Ok(new
         {
             success = true,
             fullName = order.BuyerFullName,
             phone = order.BuyerPhone,
             email = order.BuyerEmail,
-            address = (string?)null,
-            provinceId = (int?)null,
-            communeId = (int?)null
+            address = shipping?.AddressDetail,
+            provinceId = shipping?.ProvinceId,
+            communeId = shipping?.CommuneId,
+            shippingFee,
+            itemsAmount,
+            totalAmount = itemsAmount + shippingFee,
+            totalQuantity,
+            itemSummary,
+            paymentMethod = payment?.PaymentMethod,
+            isCod = string.Equals(payment?.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase),
+            codAmount = string.Equals(payment?.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase)
+                ? itemsAmount + shippingFee
+                : 0m
         });
     }
 
@@ -600,6 +695,25 @@ public sealed class ShippingAdminController : ControllerBase
         return shipping.Order is not null && CanAccessOrderBySeller(shipping.Order, sellerId, isAdmin);
     }
 
+    private static string BuildItemSummary(IReadOnlyCollection<string?> names)
+    {
+        var cleaned = names
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .ToList();
+
+        if (cleaned.Count == 0)
+        {
+            return "Goi hang tong hop";
+        }
+
+        return cleaned.Count == 1
+            ? cleaned[0]
+            : $"{cleaned[0]} va {Math.Max(1, names.Count - 1)} san pham khac";
+    }
+
     private static (string addressDetail, int? provinceId, int? communeId, string shippingType) NormalizeAddress(ShippingUpsertRequest request)
     {
         if (request.IsStorePickup)
@@ -651,6 +765,10 @@ public sealed class ShippingAdminController : ControllerBase
     {
         public int OrderId { get; set; }
     }
+
+    private sealed record ShippingScopeRow(int OrderId, decimal ShippingFee, decimal ItemsAmount);
+
+    private sealed record ShippingItemScopeRow(int OrderId, int Quantity, string? SnapshotName);
 
     private sealed record ProvinceOption(int Id, string Name);
 

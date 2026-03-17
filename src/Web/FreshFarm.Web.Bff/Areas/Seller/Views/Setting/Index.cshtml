@@ -344,6 +344,22 @@
 @section scripts {
     <script>
         $(document).ready(function () {
+            const searchParams = new URLSearchParams(window.location.search);
+            const requestedTab = (searchParams.get('tab') || '').toLowerCase();
+            const tabMap = {
+                general: '#settings-general',
+                payment: '#settings-payment',
+                shipping: '#settings-shipping',
+                notifications: '#settings-notifications'
+            };
+            const requestedTabSelector = tabMap[requestedTab];
+            if (requestedTabSelector) {
+                const triggerButton = document.querySelector('[data-bs-target="' + requestedTabSelector + '"]');
+                if (triggerButton) {
+                    bootstrap.Tab.getOrCreateInstance(triggerButton).show();
+                }
+            }
+
             const showSellerGhnSettings = @(showSellerGhnSettings ? "true" : "false");
 
             if (showSellerGhnSettings) {

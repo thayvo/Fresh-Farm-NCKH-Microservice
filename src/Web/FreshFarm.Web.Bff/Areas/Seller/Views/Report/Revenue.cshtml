@@ -622,10 +622,6 @@
         </div>
     </div>
 
-        <!-- Second Row for more KPI Cards -->
-        <div class="row g-4 mb-4">
-           
-
         <!-- Charts Row -->
         <div class="row g-4 mb-4">
             <div class="col-lg-8">
@@ -714,6 +710,9 @@
                                             <span class="badge bg-info rounded-pill">@daily.TotalOrders</span>
                                         </td>
                                         <td>
+                                            <span class="badge bg-primary rounded-pill">@daily.TotalProducts</span>
+                                        </td>
+                                        <td>
                                             <strong class="text-primary">@daily.Revenue.ToString("#,##0")₫</strong>
                                         </td>
                                     </tr>
@@ -722,7 +721,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="3" class="text-center py-5">
+                                    <td colspan="4" class="text-center py-5">
                                         <div class="d-flex flex-column align-items-center">
                                             <i class="bi bi-inbox display-1 text-muted mb-3"></i>
                                             <h5 class="text-muted">Không có dữ liệu</h5>
@@ -744,8 +743,7 @@
     </div>
 </div>
 
-@section scripts {
-    <script>
+<script>
         // Global variables for pagination and sorting
         let currentPage = 1;
         let pageSize = 10; // Cố định 10 dòng/trang
@@ -1306,6 +1304,5 @@
                 });
             }
         }
-    </script>
-}
+</script>
 

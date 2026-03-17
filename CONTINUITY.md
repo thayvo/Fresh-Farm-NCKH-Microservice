@@ -1,6 +1,8 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
+  - Huong dan user dung Cloudflare cho project FreshFarm theo cach phu hop nhat voi dev/local hien tai (uu tien Cloudflare Tunnel), map dung hostnames vao cac service BFF/API va cap nhat cac callback URL lien quan.
+  - Giai dap / neu can thi sua luong checkout hien tai: vi sao order da duoc luu vao bang `Orders` du payment/checkout chua hoan tat; neu doi hanh vi thi can chot huong giu `Pending` tam thoi hay chi tao order sau khi thanh toan thanh cong.
   - Doi chieu `docs/Report Nhom 1.docx` voi ma nguon hien tai, chi ro:
     - phan da lam that,
     - phan bao cao can sua vi repo da lam bang cach khac,
@@ -15,6 +17,45 @@
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Seller revenue view fix (2026-03-17): `Revenue.cshtml` bi vo markup/script o lane Seller Report; can uu tien sua de JS chart/pagination khong bi lo ra thanh text tren UI.
+  - Login redirect UX fix (2026-03-17): buyer login neu khong co `returnUrl` hop le se fallback ve trang chu `/` thay vi day sang luong `Tai khoan/Don hang`; neu `returnUrl` tro vao lane `Admin/Seller` nhung user khong dung role thi cung fallback ve `/`.
+  - Search UX fix (2026-03-17): tren `/search`, neu dang co `category` va `q` chi dong vai tro nhan dieu huong marketplace/category context (vi du `Nong san huu co`, `Rau sach`, `Trai cay`, `Thuc pham tuoi`, `Giao nhanh` hoac trung ten/slug danh muc), request `/bff/product-search` se bo qua tham so `name` de tranh bi over-filter thanh `0` san pham.
+  - Seller shipping UX (2026-03-17): phi ship buyer da duoc chot tu checkout va luu vao `Orders/SellerOrders`; panel GHN o Seller chi nen dung de doi chieu phi hang van chuyen va tao van don, KHONG duoc tao cam giac seller phai nhap lai phi ship cua buyer.
+  - Seller shipping UX (2026-03-17): user muon toi gian hoa form Seller Shipping/GHN:
+    - dia chi nguoi nhan chi can mot o `dia chi chi tiet` de seller xem/sua nhanh;
+    - can lam ro `thong tin goi hang` hien la du lieu tong hop toan don hay tong hop cac mat hang trong pham vi seller.
+  - Seller shipping UX (2026-03-17): user yeu cau BO han dropdown `Tinh/Quan/Phuong` khoi panel GHN; he thong se tu nhan dien dia ban GHN tu `dia chi chi tiet` va chi giu cac truong ky thuat o dang an.
+  - Cloudflare rollout (2026-03-17): zone `thayvo.id.vn` da active tren Cloudflare, tunnel `freshfarm-dev` da tao xong va `app.thayvo.id.vn` da route thanh cong vao BFF local.
+  - Hosting guidance (2026-03-17): voi repo hien tai dang chay nhieu ASP.NET Core services (`BFF`, `Identity`, `Catalog`, `Ordering`) tren cac port rieng va con phu thuoc SQL Server/worker/background jobs, shared hosting `Business 1/2/3` kieu Plesk/IIS khong phai lua chon phu hop de deploy full he thong.
+  - Hosting guidance (2026-03-17): neu chi can domain/tunnel/test callback thi khong can mua hosting ngay; neu muon deploy that thi uu tien `Cloud Server/VPS Windows` (hoac Linux neu se dockerize) hon la shared hosting.
+  - Hosting guidance (2026-03-17): user da co domain san; cho giai doan dev/demo hien tai, chi can domain + Cloudflare Tunnel la du, chua can mua hosting neu chap nhan app chay tren may local va chi online khi may dang mo.
+  - Domain routing (2026-03-17): `thayvo.id.vn` hien dang phuc vu site Apache/PHP san co, nen huong an toan la them subdomain rieng cho FreshFarm, vi du `app.thayvo.id.vn`, thay vi doi root domain.
+  - Cloudflare rollout cho repo nay (2026-03-17): uu tien Cloudflare Tunnel, expose duy nhat `FreshFarm.Web.Bff` ra internet; `Identity/Catalog/Ordering` tiep tuc chi nghe local va BFF van goi qua `localhost`.
+  - Cloudflare rollout cho repo nay (2026-03-17): voi code hien tai van co `UseHttpsRedirection` nhung chua bat `ForwardedHeaders`, phuong an it rui ro nhat la de `cloudflared` proxy vao local HTTPS (`https://localhost:7085`) va bat `originRequest.noTLSVerify: true`.
+  - Cloudflare rollout cho repo nay (2026-03-17): sau khi co hostname moi, can doi cac callback/phat sinh URL ra ngoai:
+    - `Payments:VNPay:ReturnUrl` trong BFF,
+    - `PasswordReset:ResetUrlBase` trong Identity,
+    - Google OAuth redirect URI `https://<host>/signin-google`.
+  - Debug checkout (2026-03-17): luong hien tai chu dong tao `Order` noi bo TRUOC khi redirect sang VNPay de lay `OrderId` lam `TxnRef`, nen bang `Orders` xuat hien ban ghi `Pending` ngay khi buyer bam dat hang.
+  - Debug checkout (2026-03-17): callback `POST /api/orders/{orderId}/payments/vnpay/finalize` chi cap nhat `PaymentStatus` sang `Paid`/`Failed`; order da tao khong bi xoa va cung chua doi `Order.Status` sang `Canceled` khi payment fail.
+  - Debug checkout (2026-03-17): trong `OrdersController.Create` chi tao `Order/OrderDetails/SellerOrders/Shipments/Payments`; khong thay logic tru ton kho hay call sang Catalog inventory ngay o buoc tao order.
+  - Khuyen nghi nghiep vu (2026-03-17): voi luong tao order truoc khi thanh toan, can bo sung giu cho ton kho (`reserved stock`) + co che timeout giai phong reservation khi payment khong thanh cong.
+  - Khuyen nghi rollout (2026-03-17): uu tien lam theo 2 pha
+    - Pha 1: them trang thai `AwaitingPayment/Expired/Failed`, auto-expire pending orders va an khoi danh sach don chinh;
+    - Pha 2: them reservation ton kho co TTL de tranh oversell that su.
+  - Implement checkout anti-oversell (2026-03-17): chot theo huong service-first
+    - Catalog API them internal endpoint giu/tra/commit/restock inventory;
+    - Ordering API giu metadata reservation + TTL trong `InventoryReservation`;
+    - order online tao voi `Status = AwaitingPayment`, payment success -> `Pending`, timeout -> `Expired`, fail/huy -> release ton kho.
+  - Rủi ro hardening (2026-03-17): vì reservation hiện đi qua 2 service riêng (`Ordering` -> `Catalog`) nhưng chưa có outbox/saga/reconciliation đầy đủ, vẫn có khe hở inconsistency nếu process sập đúng giữa lúc Catalog đã trừ stock nhưng Ordering chưa commit hoặc chưa kịp ghi reservation/release.
+  - Implement inventory split (2026-03-17): giu `Products.StockQuantity` lam ton kho vat ly (`OnHandStock`), them `Products.ReservedStock`, va tinh `AvailableStock = StockQuantity - ReservedStock`.
+  - SQL note (2026-03-17): delta `inventory-reserved-stock` ban dau bi loi compile batch trong SQL Server (`Invalid column name 'ReservedStock'`) khi `UPDATE`/`CHECK` tham chieu cot moi them trong cung batch; da sua bang dynamic SQL de rerun an toan.
+  - Implement reconciliation job (2026-03-17): Ordering background worker gio chay `InventoryReconciliationService` de
+    - expire stale awaiting-payment orders,
+    - commit local reservations con treo cho order da paid,
+    - release local reserved rows cho order failed/canceled/expired,
+    - expire order `AwaitingPayment` mo coi khong co reservation,
+    - doi chieu `ReservedStock` Catalog theo expected totals tu `Ordering.InventoryReservation`.
   - Doi chieu bao cao an toan bao mat phai dua tren code hien tai, KHONG mac dinh moi claim trong file Word da duoc implement.
   - Ket qua audit tach 3 nhom:
     - da co that trong repo,
@@ -93,6 +134,35 @@
   - Kiem tra live 2026-03-16 cho buyer-facing image:
     - static file `/uploads/products/{file}` dang phuc vu dung;
     - nguyen nhan `/products/122` fallback `no-image` la do payload product hien tai tra `imageFileName = null`, khong phai do static path.
+  - Theo user (2026-03-16, turn moi nhat): uu tien tiep theo la `dang nhap bang Gmail cho user`, sau do chuyen sang `thanh toan VNPay danh cho dev`.
+  - Da xong phan code `Google login` cho user; de test thuc te can dien `Authentication:Google:{ClientId,ClientSecret}`.
+  - Da chot flow `VNPay dev`: tao order truoc, redirect sandbox, callback quay ve BFF de verify chu ky va goi Ordering cap nhat `Payment/PaymentTransaction`; chi cleanup cart + luu dia chi moi khi callback thanh cong.
+  - Theo user (2026-03-16, turn moi nhat): trang `/cart` phai lay dung anh san pham, icon gio phai ro, va bo hoan toan phan `phi ship`/`tong cong`; cart chi can `so luong` + `tam tinh`.
+  - Da xac nhan cart buyer-facing hien tai van luu trong session BFF (`CartSessionService`), CHUA persistence vao DB theo user.
+  - Theo user (2026-03-16, turn moi nhat): chuyen cart buyer-facing sang DB-backed theo user de dang nhap lai van con gio hang.
+  - Theo user (2026-03-16, turn moi nhat): seller area dang bi nham branding/admin + mot so chuoi khong dau; uu tien sua menu/profile/dashboard de seller-facing ro rang va de doc hon.
+  - Theo user (2026-03-17, turn moi nhat): anh san pham o buyer cart dang mat lai; uu tien sua de cac item cart DB-backed cu tu tu backfill `ImageFileName` tu Catalog thay vi bat user xoa gio va them lai.
+  - Theo user (2026-03-17, turn moi nhat): checkout van bao `Shop #1 chưa cấu hình địa chỉ lấy hàng GHN` du seller `tho` da set dia chi; uu tien doi chieu lai `SellerId` trong cart DB.
+  - Theo user (2026-03-17, turn moi nhat): VNPay sandbox timeout qua nhanh khi test; uu tien tang thoi gian het han link thanh toan dev.
+  - Da xac nhan them nghi van lech mui gio VNPay:
+    - code cu ky `vnp_CreateDate`/`vnp_ExpireDate` bang `DateTimeOffset.UtcNow`;
+    - nguy co VNPay sandbox ky vong timestamp theo GMT+7/Viet Nam time.
+  - Da xac dinh them sai lech format ky URL VNPay 2.1.0:
+    - chuoi `hashData` outbound phai de key raw, chi URL-encode value;
+    - query string gui sang VNPay moi encode ca key/value;
+    - `vnp_SecureHashType` khong can thiet cho flow sandbox hien tai.
+  - Da xac dinh them runtime loi Razor o trang ket qua VNPay:
+    - `Views/Checkout/PaymentResult.cshtml` dung `@model dynamic`;
+    - controller lai truyen mot nested private type `PaymentResultViewModel` trong `CheckoutController`;
+    - Razor dynamic binder khong doc duoc `OrderId/IsSuccess/Message` cua private nested type nen no `RuntimeBinderException`.
+  - Da xac dinh nguyen nhan `Tài khoản của tôi` trong Seller bi bat ve dashboard du link sidebar da dung:
+    - `Seller/HomeController.Profile()` goi nham admin endpoint `/auth/admin/users/{id}` cho luong self-profile;
+    - khi fail, action redirect ve `Login`, va seller login GET lai dua nguoi dung ve dashboard.
+  - Da xac nhan runtime data hien tai dang lech ownership giua Catalog va Identity:
+    - `FreshFarmCatalogDB.dbo.SellerProducts` hien tai chi co `SellerId = 1` voi `98` san pham.
+    - `FreshFarmIdentityDB.dbo.UserRoles` cho thay `UserId = 1` la `Customer`, KHONG phai `Seller`.
+    - `FreshFarmIdentityDB.dbo.SellerStoreSettings` hien tai chi co shop cho `UserId = 2` (`binh` / `Hoàng Thanh Bình`) va `UserId = 4` (`tho`), ca hai deu da co GHN origin.
+    - He qua: buyer checkout voi hang dang gan `SellerId = 1` se bi bao shop chua co dia chi lay hang GHN, vi seller ownership trong Catalog dang tro vao account khong phai seller va khong co `SellerStoreSettings`.
   - Da chot huong schema `SellerStoreSettings` trong `IdentityDB` de luu thong tin shop + origin GHN theo `UserId`; giu `StoreSettings` cho lane global/admin.
   - GHN BFF service ho tro `OriginOverride` theo request de Admin/Seller dung origin rieng ma khong can doi cau hinh sandbox global.
   - Huong dung han: khong de he thong phu thuoc cung vao GHN; ma GHN chi dong vai tro `carrier mapping`. Dia chi nghiep vu cua shop can duoc luu theo model trung lap nha van chuyen, con `ghnDistrictId/ghnWardCode` la lop adapter de goi GHN.
@@ -102,6 +172,107 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Seller revenue report fix (2026-03-17):
+      - `Areas/Seller/Views/Report/Revenue.cshtml` da bo row rong gay lech layout, bo sung cot `San pham` dung `@daily.TotalProducts`, sua `colspan` tu `3` -> `4`.
+      - Block `@section scripts` da doi sang `<script>` inline de tranh truong hop script/pagination/chart bi render lo ra thanh text o UI.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\bff_seller_revenue_scriptfix\` (`0 error`, `17 warning` cu ngoai scope patch).
+    - Login redirect fix (2026-03-17):
+      - `AccountController.RedirectToLocal` da doi fallback mac dinh tu `OrderHistory` sang `Home/Index`.
+      - Neu `returnUrl` nham lane `Admin/Seller` ma role khong khop, he thong gio cung dua ve trang chu thay vi redirect sang dashboard lane khac.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\bff_account_login_redirect_home\` (`0 error`, `17 warning` cu ngoai scope patch).
+    - Seller shipping recipient-location simplification (2026-03-17):
+      - Da bo dropdown `Tinh/Thanh pho`, `Quan/Huyen`, `Phuong/Xa` khoi panel GHN seller.
+      - `ManageShipping.cshtml` gio tu dong resolve province/district/ward GHN tu `dia chi chi tiet` khi seller chon order hoac preview/create shipment.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\bff_seller_shipping_hide_location\` (`0 error`, `17 warning` cu ngoai scope patch).
+    - Search filter fix (2026-03-17):
+      - `Views/Home/Search.cshtml` da detect `browsing keyword context` cho cac keyword dieu huong marketplace/category.
+      - Khi da chon `category`, request `/bff/product-search` se khong gui them `name` neu `q` chi la nhan context, tranh case `q=Nong san huu co&category=4&category=5` tra ve `0`.
+      - Build verify `FreshFarm.Web.Bff` PASS tai `.codex-build\bff_search_filter_keyword_context\` (`0 error`, `17 warning` cu ngoai scope patch).
+    - Seller shipping package aggregation (2026-03-17):
+      - Ordering `ShippingAdminController` da tra them `totalQuantity/itemSummary` theo scope seller.
+      - BFF `ShippingController` + `WarehouseShippingSellerModels.Order` da nhan 2 field tren.
+      - View `ManageShipping` da auto-do `Ten mat hang`, `So luong`, `COD`, `Insurance` va `dia chi chi tiet` khi seller chon dong order hoac chon `OrderID`.
+    - Da hoan tat Cloudflare Tunnel dev/demo:
+      - `cloudflared tunnel login` -> PASS
+      - `cloudflared tunnel create freshfarm-dev` -> tunnel id `8cb16550-863c-439d-be18-fd3c1133668a`
+      - `cloudflared tunnel route dns freshfarm-dev app.thayvo.id.vn` -> PASS
+      - `cloudflared tunnel run freshfarm-dev` dang phuc vu duoc `https://app.thayvo.id.vn`
+    - Da sua lane Seller Shipping de keo phi ship/tong tien scope seller vao panel GHN:
+      - `ShippingAdminController` tra them `shippingFee/itemsAmount/totalAmount` cho danh sach shipping va `order-info`;
+      - Seller BFF map them cac field nay;
+      - `ManageShipping` them note ro rang "phi ship buyer da chot o checkout";
+      - khi seller bam nut xe tai chon don, form GHN tu do `COD/item price/insurance` theo du lieu don da co thay vi de seller tu nhap lai tu dau.
+    - Build verify patch seller shipping:
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_seller_shipping_fix\` -> PASS (`0 warning`, `0 error`).
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_shipping_fix\` -> PASS (`17 warning` cu ngoai scope patch, `0 error`).
+    - Da kiem tra domain user cung cap `https://thayvo.id.vn/`:
+      - DNS `A` hien tro toi `112.213.89.148`
+      - `http://thayvo.id.vn/` tra `301` sang `https://thayvo.id.vn/`
+      - `https://thayvo.id.vn/` tra `200 OK`, header cho thay dang phuc vu boi `Apache` va co `PHPSESSID`, nghia la root domain dang tro toi mot hosting/PHP site co san.
+    - Da doi chieu cau hinh local hien tai cho Cloudflare:
+      - `FreshFarm.Web.Bff`: `https://localhost:7085` / `http://localhost:5100`
+      - `FreshFarm.Identity.API`: `https://localhost:7140` / `http://localhost:5101`
+      - `FreshFarm.Catalog.Api`: `https://localhost:7245` / `http://localhost:5102`
+      - `FreshFarm.Ordering.Api`: `https://localhost:7018` / `http://localhost:5136`
+    - Da xac nhan callback URL dang can doi khi len hostname Cloudflare:
+      - BFF `Payments:VNPay:ReturnUrl = https://localhost:7085/checkout/vnpay/return`
+      - Identity `PasswordReset:ResetUrlBase = https://planklike-skiffless-judi.ngrok-free.dev/account/reset-password`
+    - Da them reconciliation primitives:
+      - Catalog internal endpoint moi:
+        - `GET /internal/inventory/reservations/snapshots`
+        - `POST /internal/inventory/reservations/reconcile`
+      - Ordering:
+        - them `Services/InventoryReconciliationService.cs`
+        - `PendingPaymentExpirationBackgroundService` gio goi reconciliation cycle thay vi chi expire timeout
+        - `CatalogInventoryClient` them `GetInventorySnapshotsAsync` + `ReconcileReservedAsync`
+        - `OrderReservationService` them `ReleaseReservedReservationsAsync` de safe release cho unpaid reservations.
+    - Build verify reconciliation patch:
+      - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog_reconciliation\` -> PASS (`0 warning`, `0 error`).
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_reconciliation\` -> PASS (`0 warning`, `0 error`).
+    - Da tach model ton kho:
+      - Catalog `Product` gio co `ReservedStock`, alias `OnHandStock`, va `AvailableStock` tinh toan.
+      - them SQL docs:
+        - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-17.inventory-reserved-stock.delta.sql`
+        - `docs/FreshFarmCatalogDb/FreshFarmCatalogDB.2026-03-17.inventory-reserved-stock.verify.sql`
+    - Da cap nhat Catalog reservation endpoints:
+      - `reserve`: tang `ReservedStock`;
+      - `release`: giam `ReservedStock`;
+      - `commit`: giam ca `StockQuantity` va `ReservedStock`;
+      - `consume`: giam `StockQuantity` truc tiep cho COD/offline consume;
+      - `restock`: tang lai `StockQuantity`.
+    - Da doi Ordering flow theo model moi:
+      - VNPay tao order `AwaitingPayment` + `InventoryReservation = Reserved`;
+      - callback success -> `commit reserved`;
+      - callback fail / expire -> `release reserved`;
+      - COD create -> `consume on-hand` ngay va tao `InventoryReservation = Committed`;
+      - cancel/delete committed order -> `restock on-hand`.
+    - Da cap nhat public availability:
+      - Catalog `/api/products` va `/api/products/{id}` tra them `OnHandStock`, `ReservedStock`, `AvailableStock`;
+      - BFF search/product gio uu tien `AvailableStock` de buyer khong thay hang da bi reserve la con ban duoc.
+    - Build verify:
+      - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog_onhand_reserved\` -> PASS (`0 warning`, `0 error`).
+      - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_onhand_reserved\` -> PASS (`0 warning`, `0 error`).
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_onhand_reserved\` -> PASS (`17 warning` cu ngoai scope patch, `0 error`).
+    - Da implement anti-oversell cho checkout/order:
+      - Catalog:
+        - them `Options/InternalInventoryOptions.cs`;
+        - them `Controllers/InternalInventoryReservationsController.cs` de `reserve/release` ton kho qua internal service key;
+        - cau hinh `Services:Internal:ServiceKey` trong `appsettings*.json`.
+      - Ordering:
+        - them `Options/CatalogServiceOptions.cs`;
+        - them `Services/{CatalogInventoryClient,OrderReservationService,PendingPaymentExpirationBackgroundService}.cs`;
+        - cau hinh `Services:Catalog:{BaseUrl,InternalServiceKey}` + `HttpClient("Catalog")`;
+        - `OrdersController.Create` gio giu ton kho khi tao don, tao `InventoryReservation`, va dat `AwaitingPayment` cho VNPay;
+        - `FinalizeVnPayPayment` gio commit reservation khi thanh cong, release reservation khi fail, va tu choi finalize neu don da het han hold;
+        - `UpdateAdminOrderStatus/DeleteAdminOrder` gio release ton kho khi huy/xoa don;
+        - bo sung auto-expire order `AwaitingPayment` qua background worker + map status text/badge moi.
+      - Build verify:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\catalog_inventory_reservation\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_inventory_reservation\` -> PASS (`0 warning`, `0 error`).
+    - Da khoanh vung luong checkout/payments lien quan tai `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs` va `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`.
+    - Da xac minh `CheckoutController` goi `POST /api/orders` truoc (`line ~403`), sau do moi `SavePendingVnPayCheckout(...)` (`line ~430`) va `CreatePaymentUrl(...)` (`line ~438`) cho VNPay.
+    - Da xac minh `OrdersController.Create` tao `Order` voi `Status = Pending`, `PaymentStatus = Pending`, goi `_db.Orders.Add(order)` (`line ~204`) va `SaveChangesAsync(...)` (`line ~205`) ngay trong transaction.
+    - Da xac minh callback finalize VNPay cap nhat `order.PaymentStatus = Paid/Failed` (`line ~502/~512`) nhung khong xoa order da tao.
     - Da tiep tuc tach phi ship xuong tung seller o tang Ordering:
       - `src/Web/FreshFarm.Web.Bff/Dtos/CheckoutDtos.cs`
         - `CheckoutSubmitRequestDto` them `SellerShippingBreakdowns`;
@@ -217,8 +388,80 @@
         - `ProductId = 1`, `ProductName = Rau muống`, `imageFileName = rau-muong.jpg`
         - `ProductId = 122`, `ProductName = Rau muống`, `imageFileName = null`
       - Vi vay `/products/122` fallback `/images/legacy/no-image.png` la dung theo du lieu hien tai; file `rau-muong.jpg` dang gan voi record `ProductId = 1`, khong phai `122`.
-    - Da don file anh dan nham vao `wwwroot/Images` cu:
-      - xoa `src/Web/FreshFarm.Web.Bff/wwwroot/Images/e20f46f9-0e3e-4ae1-99a6-448a71447363.png`;
+    - Da noi xong flow `Dang nhap voi Google` cho user-facing auth ma khong doi schema DB:
+      - `src/Services/Identity/FreshFarm.Identity.API/Dtos/ExternalLoginRequest.cs`
+        - them DTO exchange login ngoai.
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+        - them `POST /auth/external-login`;
+        - neu email da ton tai thi login vao account hien co;
+        - neu chua ton tai thi tao user `Customer` moi, tu sinh `UserName`, tao `Phone` placeholder 10 so duy nhat, tao `UserAuth` bang random password hash, roi tra JWT noi bo.
+      - `src/Web/FreshFarm.Web.Bff/Options/GoogleAuthenticationOptions.cs`
+        - bo sung options doc `Authentication:Google`.
+      - `src/Web/FreshFarm.Web.Bff/Program.cs`
+        - dang ky `GoogleExternal` cookie scheme;
+        - neu co `Authentication:Google:ClientId/ClientSecret` thi bat `AddGoogle("Google")`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+        - them `GET /account/signin/google` de challenge Google;
+        - them `GET /account/signin/google-callback` de exchange voi Identity API va dang nhap cookie/session noi bo;
+        - tach helper `SignInWithIdentityTokenAsync(...)` de dung chung cho login thuong va Google login.
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
+        - nut Google gio bat/disable theo trang thai cau hinh thay vi hard-disable cung.
+      - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
+        - them section `Authentication:Google` de user dien secret dev.
+      - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
+        - them package `Microsoft.AspNetCore.Authentication.Google`.
+      - Build verify:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_google_login\` -> PASS (`10 warning` cu, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_google_login\` -> PASS (`17 warning` cu, `0 error`).
+      - Kiem tra secret dev:
+        - `dotnet user-secrets list --project src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj` -> `No secrets configured for this application.`
+        - Vi vay luong Google login da san sang ve code, nhung can user bo sung `ClientId/ClientSecret` truoc khi nut Google bat that.
+    - Da noi thanh toan VNPay dev:
+      - `src/Web/FreshFarm.Web.Bff/Options/VnPayOptions.cs`
+        - them options `Payments:VNPay` de cau hinh sandbox URL, `TmnCode`, `HashSecret`, `ReturnUrl`.
+      - `src/Web/FreshFarm.Web.Bff/Services/{IVnPayService,VnPayService}.cs`
+        - ky URL sandbox `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html`;
+        - verify callback `vnp_SecureHash`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - `VNPay` tao order truoc, luu pending checkout vao session, roi redirect sang sandbox;
+        - them `GET /checkout/vnpay/return` de verify callback, goi Ordering finalize payment, roi moi cleanup cart + save address + redirect `Success`;
+        - callback fail render `Views/Checkout/PaymentResult.cshtml`.
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/{Index,PaymentResult}.cshtml`
+        - option `VNPay` disable neu env chua co config that;
+        - them trang ket qua quay ve cho flow fail/het session.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/{Dtos/OrderDtos.cs,Controllers/OrdersController.cs}`
+        - them DTO + endpoint `POST /api/orders/{orderId}/payments/vnpay/finalize`;
+        - cap nhat `Payment`, `PaymentTransaction`, `Order.PaymentStatus`.
+        - Build verify:
+          - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_vnpay_dev` -> PASS (`0 warning`, `0 error`).
+          - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_vnpay_dev` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua trang cart buyer-facing:
+        - `src/Web/FreshFarm.Web.Bff/Dtos/CartDtos.cs`
+          - them `ImageFileName` vao `CartItemDto` va `AddToCartRequestDto`.
+        - `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`
+          - cart session gio luu/cap nhat thumb san pham trong session.
+        - `src/Web/FreshFarm.Web.Bff/Views/Home/{Index,Product,Search}.cshtml`
+          - flow `POST /cart/add` gui kem `ImageFileName` de cart/header preview khong con mat anh.
+        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+          - preview gio tren header khong con dung anh random; thumb gio resolve tu `/uploads/products/{ImageFileName}`.
+        - `src/Web/FreshFarm.Web.Bff/Views/Shared/_CartSummary.cshtml`
+          - doi icon sang `bi-cart3` de ro va dong bo voi top chrome.
+        - `src/Web/FreshFarm.Web.Bff/Controllers/CartController.cs`
+          - cart summary bo phi ship gia lap (`shippingFee = 0`).
+          - `GET /cart` gio tu dong backfill `ImageFileName` cho item cu trong session bang cach goi `Catalog /api/products/{id}` truoc khi render.
+        - `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`
+          - item thumb gio doc tu duong dan anh san pham moi;
+          - bo card `Phi van chuyen`;
+          - bo `Phi giao hang` va `Tong cong`, chi giu `Da chon` + `Tam tinh`;
+          - don JS summary, khong con logic mien phi ship/progress/grand total;
+          - stepper so luong gio chuyen sang hidden input + JS submit de khong bi dung model binding;
+          - ghi nho checkbox da chon bang `localStorage` de reload sau khi cap nhat so luong khong tu reset tat ca ve checked.
+        - Build verify:
+          - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_image_cleanup\` -> PASS (`17 warning` cu, `0 error`).
+          - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_image_backfill\` -> PASS (`17 warning` cu, `0 error`).
+          - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_qty_selection_fix\` -> PASS (`17 warning` cu, `0 error`).
+      - Da don file anh dan nham vao `wwwroot/Images` cu:
+        - xoa `src/Web/FreshFarm.Web.Bff/wwwroot/Images/e20f46f9-0e3e-4ae1-99a6-448a71447363.png`;
       - verify `Test-Path ...` -> `False`, va khong con file moi trong `wwwroot/Images` 4 gio gan day.
     - Da hoan tat tang Ordering cho checkout multi-seller de tao cau truc don hang theo seller thay vi chi luu `Order` tong:
       - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/OrderDtos.cs`
@@ -1483,37 +1726,57 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-    - Ordering multi-seller + shipping fee theo seller da build xanh; can user apply SQL delta moi cho DB that va retest flow seller/admin.
+    - User dang retest live search filter tren `https://app.thayvo.id.vn/search` sau patch bo qua `name` keyword context khi da co category.
+    - User dang can retest Seller Shipping sau khi an dropdown dia ban GHN va chuyen sang auto-resolve tu dia chi.
+    - User dang can retest luong login buyer sau khi doi fallback redirect ve trang chu.
+    - User dang can retest `/Seller/Report/Revenue` sau patch script/layout.
+    - Build verify lai patch Seller Shipping/GHN cho dung ky vong user (dia chi gon, goi hang tong hop).
+      - Tong hop ket luan cho user: day la hanh vi theo thiet ke code hien tai (draft/pending order duoc tao som), khong phai DB tu dong chen order.
+      - Tu van huong tranh oversell cho checkout/VNPay: reserve stock + expire pending order.
+      - Ban giao thay doi anti-oversell va huong dan retest checkout/VNPay timeout.
+      - User dang can lam ro vi sao `StockQuantity` thay doi "tu tang/tu giam" sau patch reservation.
+      - User dang can lam ro he thong se ra sao neu service bi ngat/sap giua luong reserve/release.
+      - User dang can lam ro khac nhau giua `reconciliation job`, `outbox/saga`, va mo hinh tach `OnHandStock/ReservedStock/AvailableStock`.
+      - Ban giao patch tach `OnHandStock/ReservedStock` va yeu cau user apply SQL delta truoc khi runtime.
+      - Da sua SQL delta `ReservedStock` de tranh loi `Invalid column name`.
+      - Ban giao patch reconciliation job de tu sua lech `ReservedStock` va reservation status sau su co.
+      - User retest `/cart` sau patch thumb/icon/summary cleanup.
   - *Next*:
-    - Apply DB script:
-      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.delta.sql`
-      - sau do chay `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.multiseller-shipping-fee.verify.sql`.
-    - Retest `/checkout` voi gio nhieu seller:
-      - breakdown phi ship van hien theo tung shop.
-      - dat hang thanh cong thi Ordering tao `SellerOrder` + `Shipment` theo tung seller va luu ship fee scoped seller.
-      - `Mua ngay` tu PLP/PDP/partial card van mang dung seller vao checkout.
-    - Retest module seller/admin:
-      - `ManageOrders` scope seller phai thay tong tien gom ca ship fee cua shop minh.
-      - `ManageShipping` va shipping report seller phai hien ship fee dung scope seller, khong lay fee tong order me.
-    - Neu can, mo rong tiep `Account/Profile` de form so dia chi cua buyer cung dung danh muc GHN thay vi nhap tay tu do.
-    - Neu user muon thuc thi hardening ngay, uu tien:
-      - bo JWT khoi auth cookie claim,
-      - them rate limiting + lockout,
-      - harden cookie/security headers,
-      - sau do moi den 2FA va session/key ring production.
-    - Tong hop cac diem khop/lech giua `docs/Report Nhom 1.docx` va code hien tai, neu can thi de xuat cac muc tai lieu nen cap nhat.
-    - Admin retest `/Admin/Merchant/Index`:
-      - test filter `q/status/queue`,
-      - chon 1 nha ban hang de mo detail panel,
-      - thu `Tam khoa` / `Mo lai nha ban hang`,
-      - xac nhan sidebar/menu moi hien `Nha ban hang & tuan thu`.
-    - Neu lane Merchant on dinh, tiep tuc roadmap admin ke tiep theo la hardening/runtime retest cac module Admin da mo truoc do.
-    - Giu quy tac: text/message/view moi cham vao trong lane Admin phai dung tieng Viet co dau dong bo.
-    - Sau khi xong mot moc user-facing co the demo duoc, quay lai lane Admin voi:
-      - `Dispute & CS`: assign/SLA/evidence.
-      - `Finance/Settlement`: bulk action/export/doi soat sau action.
-    - Uu tien roadmap user-facing:
-      - Phase U1: chuan hoa search payload/API cho product list + filter nong san that.
+      - Retest `/Seller/Shipping/ManageShipping`:
+        - bam nut xe tai tren mot dong order da checkout xem `Ten mat hang` + `So luong` co tu tong hop scope seller hay khong.
+        - chon `OrderID` trong modal them shipping va xac nhan panel GHN cung tu do nhu tren.
+      - User restart `Identity` + `BFF` sau khi doi callback URLs.
+      - User retest `/Seller/Shipping/ManageShipping`: bam nut xe tai tren mot dong order da checkout xem note phi ship/so tien co tu do vao panel GHN.
+      - User cap nhat Google OAuth redirect URI tren Google Console thanh `https://app.thayvo.id.vn/signin-google`.
+      - User restart `Catalog` + `Ordering` sau patch reconciliation.
+      - User retest 1-2 scenario sap/ngat:
+        - reserve thanh cong roi kill Ordering truoc khi local save -> worker phai reconcile `ReservedStock` ve dung expected;
+        - order da `Paid` nhung reservation local con `Reserved` -> worker phai auto commit local state;
+        - order `Failed/Expired` ma local reservation con `Reserved` -> worker phai auto release.
+      - User can chay SQL delta/verify Catalog DB cho `ReservedStock`, restart `Catalog` + `Ordering` + `BFF`, roi retest:
+        - VNPay create -> `ReservedStock` tang, `StockQuantity` giu nguyen, `AvailableStock` giam;
+        - VNPay success -> `StockQuantity` giam, `ReservedStock` giam;
+        - VNPay fail/expire -> `ReservedStock` giam ve lai;
+        - COD create -> `StockQuantity` giam ngay, `ReservedStock` khong tang;
+        - cancel/delete COD da consume -> `StockQuantity` tang lai.
+      - User can retest:
+        - tao checkout VNPay -> kiem tra order vao `AwaitingPayment`, `InventoryReservation = Reserved`, va `Catalog.Products.StockQuantity` giam ngay;
+        - de qua timeout/background worker -> order thanh `Expired`, reservation thanh `Released`, stock duoc cong lai;
+        - thanh toan VNPay thanh cong -> order thanh `Pending`, reservation thanh `Committed`, stock giu nguyen;
+        - huy/xoa order COD/VNPay -> stock duoc cong lai.
+      - Neu user muon doi nghiep vu checkout:
+        - huong 1: giu tao order som nhung chuyen sang `AwaitingPayment` + timeout/cancel job;
+        - huong 2: tach `CheckoutSession/PaymentIntent`, chi tao `Order` sau khi cong thanh toan bao thanh cong.
+      - Neu cart da on, quay lai support user dien config dev thuc te:
+        - `Authentication:Google:{ClientId,ClientSecret}`
+        - `Payments:VNPay:{TmnCode,HashSecret}` (va sua `ReturnUrl` neu doi domain local/ngrok).
+      - Sau do restart `FreshFarm.Web.Bff` + `FreshFarm.Ordering.Api` roi test:
+        - `/account/signin` voi Google.
+        - `/checkout` chon `VNPay` -> sandbox -> callback -> success/failure.
+    - Neu flow sandbox on dinh, can nhac mo rong tiep:
+      - retry payment cho don `PaymentStatus = Failed`,
+      - hien payment status VNPay ro hon trong `/account/orders`,
+      - neu can moi them IPN/server-to-server verification.
       - Phase U2: bo sung product detail page + module `nhieu shop cung ban`.
       - Phase U3: mo public shop discovery (`/shop`, `/shop/{sellerId}`) + search theo shop.
       - Phase U4: mo buyer-seller chat box dua tren `SupportConversation/SupportMessage` voi lane/public scope rieng.
@@ -1657,6 +1920,131 @@
       - `Catalog.SellerProducts` theo `SellerID = <thoUserId>`.
       - `Ordering.SellerOrders` theo `SellerID = <thoUserId>`.
       - `Ordering.Coupons` theo `CreatedBy = <thoUserId>`.
+    - Da chuyen cart buyer-facing sang DB-backed theo user:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CartController.cs` them API cart theo user dang login.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Dtos/CartDtos.cs`, `Models/CartItem.cs`, `Models/FreshFarmOrderingDBContext.cs` mo rong contract/schema cho multi-seller + snapshot thong tin item.
+      - `src/Web/FreshFarm.Web.Bff/Services/{ICartSessionService,CartSessionService}.cs` doi sang async service, doc/ghi cart qua Ordering API va migrate cart cu trong session.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/{CartController,CheckoutController}.cs` va `Views/Shared/_HeaderLegacy.cshtml` da noi sang async DB-backed cart service.
+      - SQL docs moi:
+        - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.cart-multiseller-persistence.delta.sql`
+        - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.cart-multiseller-persistence.verify.sql`
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_cart_dbbacked` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_dbbacked` -> PASS (`17 warning` cu, `0 error`).
+    - Apply DB delta cart truoc khi retest runtime:
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.cart-multiseller-persistence.delta.sql`
+      - `docs/FreshFarmOrderingDb/FreshFarmOrderingDB.2026-03-16.cart-multiseller-persistence.verify.sql`
+    - Retest buyer cart/checkout:
+      - dang nhap user, them san pham vao gio, dang xuat/dang nhap lai xem gio con giu du lieu khong;
+      - thu `Mua ngay`, update/remove/clear cart, checkout thanh cong roi xem cart con lai dung khong.
+    - Da sua seller area cho ro ngu canh seller-facing:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shared/_SideBar.cshtml`
+        - header doi tu `Admin` sang `Kênh người bán`;
+        - cac link sidebar them explicit `area = "Seller"` de tranh route nhay sai ve dashboard.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shared/_NavBar.cshtml`
+        - dropdown top-right doi fallback ten thanh `Người bán`;
+        - muc `Hồ sơ` doi thanh `Thông tin tài khoản`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Home/Profile.cshtml`
+        - doi title/header thanh `Thông tin tài khoản` / `Hồ sơ người bán`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/HomeController.cs`
+        - sua fallback dashboard labels thanh tieng Viet co dau (`Rau lá`, `Rau ăn hoa`, `Củ và rễ`, ...);
+        - sua nhieu message profile/dashboard sang tieng Viet co dau.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_profile_text_fix2` -> PASS (`17 warning` cu, `0 error`).
+    - Da harden runtime Seller `ManageOrders`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+        - giu patch LINQ `GetAdminOrdersPaged` theo huong translation-friendly cho seller subtotal/ship fee (`Select(...).DefaultIfEmpty(0m).Sum()`), tranh loi runtime query khi seller load danh sach don.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/OrderController.cs`
+        - `GetOrdersFromApiAsync` va `GetAllowedOrderIdsAsync` gio tra ve ca payload + `ErrorMessage`;
+        - `GetAllOrders/GetOrdersPaged/SearchOrders/SearchOrdersPaged/BulkUpdateStatus` se tra ra thong diep loi upstream that thay vi thong bao chung `Lỗi khi tải danh sách đơn hàng.`;
+        - `CanAccessOrderAsync` va cac call-site da doi sang doc `Payload`.
+      - Build verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_seller_orders_fix\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_orders_fix\` -> PASS (`17 warning` cu, `0 error`).
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/OrderController.cs`
+        - `ReadApiErrorAsync` gio append them `HTTP status/reason` va body rut gon neu upstream tra body rong/non-JSON, de page `ManageOrders` khong con chi hien moi thong diep chung chung.
+      - Build verify lap lai:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_orders_fix\` -> PASS (`17 warning` cu, `0 error`).
+    - Da chot nguyen nhan goc `ManageOrders` runtime:
+      - toast moi hien `HTTP 500 ... IQueryable<decimal> cannot be used for parameter IQueryable<SellerOrder>` xac nhan loi nam o LINQ projection `GetAdminOrdersPaged`.
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+        - bo projection `o.SellerOrders.Where(...).Select(...).DefaultIfEmpty(0m).Sum()` trong `GetAdminOrdersPaged`;
+        - thay bang 2 buoc an toan hon:
+          - query page orders co `TotalAmount = o.TotalAmount`,
+          - query rieng `SellerOrders` theo `pageOrderIds + sellerId`,
+          - group in-memory thanh `sellerAmountLookup` roi map lai `TotalAmount` cho seller rows.
+      - Build verify lap lai:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_seller_orders_fix\` -> PASS (`0 warning`, `0 error`).
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_orders_fix\` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua luong self-profile Seller de `Tài khoản của tôi` vao dung trang ho so:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/HomeController.cs`
+        - `GetCurrentAdminProfileAsync(...)` doi tu `/auth/admin/users/{adminId}` sang `/auth/profile`;
+        - map payload self-profile sang `ProfileViewModel` bang `SellerProfileBridge`;
+        - doi thong diep/fallback sang ngu canh seller co dau, khong con phu thuoc admin endpoint de tai ho so ca nhan.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_profile_self_fix\` -> PASS (`17 warning` cu, `0 error`).
+    - Da don profile Seller sau khi route vao dung trang:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/HomeController.cs`
+        - clear `TempData["ErrorMessage"]` khi tai self-profile thanh cong de khong con toast do gia tu request loi cu.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Home/Profile.cshtml`
+        - doi cac label `FullName/Phone/UserName/CreatedDate` sang tieng Viet co dau.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_profile_cleanup\` -> PASS (`17 warning` cu, `0 error`).
+    - Da tang discoverability cho dia chi shop/ghn cua Seller:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Home/Profile.cshtml`
+        - them thong bao/nut `Mở cài đặt địa chỉ` tro thang sang trang cai dat.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Setting/Index.cshtml`
+        - them logic doc query `?tab=shipping` va tu dong mo dung tab `Vận chuyển`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_seller_address_shortcut\` -> PASS (`17 warning` cu, `0 error`).
+    - Da truy vet ownership du lieu san pham runtime:
+      - `sqlcmd -S "LAPTOP-D3S57BE5\DEVSQL" -d "FreshFarmCatalogDB" -E -Q "SELECT SellerId, COUNT(*) FROM dbo.SellerProducts GROUP BY SellerId"` -> `SellerId = 1`, `ProductCount = 98`.
+      - `sqlcmd -S "LAPTOP-D3S57BE5\DEVSQL" -d "FreshFarmIdentityDB" -E -Q "SELECT * FROM dbo.UserRoles; SELECT * FROM dbo.Roles;"` -> `UserId = 1` mang role `Customer`, seller hop le hien co la `UserId = 2` va `UserId = 4`.
+      - `sqlcmd -S "LAPTOP-D3S57BE5\DEVSQL" -d "FreshFarmIdentityDB" -E -Q "SELECT UserId, StoreName, GhnDistrictId, GhnWardCode, GhnPickupAddress FROM dbo.SellerStoreSettings"` -> chi co settings cho `UserId = 2` va `UserId = 4`.
+    - Da sua mat anh o buyer cart cho cac item DB-backed cu:
+      - Xac nhan view cart van render dung `ProductImagePaths.ResolveRequestPath(item.ImageFileName)`, nhung `FreshFarmOrderingDB.dbo.CartItem.SnapshotImageFileName` dang `NULL` o cac dong cu.
+      - `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`
+        - `GetItemsAsync()` gio tu dong enrich item thieu snapshot (`ProductName/ImageFileName/UnitSymbol`) bang cach goi Catalog `GET /api/products/{id}`;
+        - neu enrich thanh cong se PUT nguoc lai `/api/cart/me` de luu snapshot moi vao cart DB, hoac ghi lai legacy session neu user chua login;
+        - enrich la best-effort, neu Catalog tam thoi loi thi cart van render fallback nhu cu.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_image_snapshot_backfill\` -> PASS (`17 warning` cu, `0 error`).
+    - Da xac nhan nguyen nhan checkout van bao `Shop #1`:
+      - `FreshFarmCatalogDB.dbo.SellerProducts` hien tai da remap toan bo san pham sang `SellerId = 4`.
+      - Nhung `FreshFarmOrderingDB.dbo.CartItem` cho gio hang user hien tai van giu `SellerID = 1` o cac dong cart cu (`ProductID 105/108/107/106`...).
+      - Vi checkout doc `SellerId` tu cart snapshot, no van truy origin cua seller `1` nen bao shop chua co dia chi GHN.
+      - `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`
+        - backfill cart gio da sua them `SellerId` cu -> `PrimarySellerId` hien tai tu Catalog neu item cu khong co `SellerName`/seller snapshot hop le;
+        - sau khi sua se normalize lai cart key va PUT nguoc `/api/cart/me` de thay seller snapshot cu trong DB cart.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_cart_sellerid_backfill\` -> PASS (`17 warning` cu, `0 error`).
+    - Da tang timeout link VNPay cho moi truong dev:
+      - `src/Web/FreshFarm.Web.Bff/Options/VnPayOptions.cs`
+        - them `ExpireAfterMinutes`, default `30`.
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - bo hardcode `AddMinutes(15)`;
+        - gio lay timeout tu `VnPayOptions.ExpireAfterMinutes`, fallback `30 phut`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_vnpay_expire_extend\` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua timestamp ky URL VNPay sang gio Viet Nam / GMT+7:
+      - `src/Web/FreshFarm.Web.Bff/Services/VnPayService.cs`
+        - `CreatePaymentUrl(...)` gio convert `CreatedAtUtc` va `ExpireAtUtc` sang timezone VNPay truoc khi format `yyyyMMddHHmmss`;
+        - them helper cross-platform uu tien `SE Asia Standard Time`, fallback `Asia/Ho_Chi_Minh` / `Asia/Bangkok`.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_vnpay_timezone_fix\` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua them format chu ky outbound VNPay theo huong phu hop 2.1.0:
+      - `src/Web/FreshFarm.Web.Bff/Services/VnPayService.cs`
+        - tach rieng `BuildHashData()` (key raw, value URL-encoded) va `BuildQueryString()` (key/value URL-encoded);
+        - `CreatePaymentUrl(...)` gio tinh `vnp_SecureHash` tu `hashData` dung format, roi moi gan vao URL cuoi;
+        - bo `vnp_SecureHashType` khoi query outbound de tranh lech chu ky sandbox.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_vnpay_signature_format_fix\` -> PASS (`17 warning` cu, `0 error`).
+    - Da sua runtime `PaymentResult` view model mismatch:
+      - them public model `src/Web/FreshFarm.Web.Bff/Models/CheckoutPaymentResultViewModel.cs`;
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs` gio dung public model nay thay vi nested private class;
+      - `src/Web/FreshFarm.Web.Bff/Views/Checkout/PaymentResult.cshtml` doi sang strongly-typed model, bo dynamic binder.
+      - Build verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_vnpay_paymentresult_model_fix\` -> PASS (`17 warning` cu, `0 error`).
     - Neu build pass, tiep tuc retest realtime chat Seller (gui/nhan/mark-read/close conversation).
     - User can chay:
       - Smoke UI/APIs cho Seller scope:
@@ -1696,6 +2084,7 @@
       - hoac tiep tuc mo rong admin lane sau khi hardening `7.7A` da sach build.
 - **Open questions** (UNCONFIRMED if needed):
   - User co muon bien nhom hardening P0 trong file audit thanh code ngay sau turn nay khong? (UNCONFIRMED)
+  - Da xac nhan user da dien xong config sandbox VNPay (`TmnCode`, `HashSecret`, `ReturnUrl`) vao BFF dev config/user-secrets; chua test runtime callback.
   - Da xac nhan user da yeu cau bat dau ngay; Sprint A buoc 1 (Dashboard global) da duoc implement.
   - Da xac nhan user chon huong (A): skip import final3 tam thoi, lam runtime multi-seller truoc.
   - UNCONFIRMED schema nguon final3 co thong tin phan bo seller ownership hay khong (neu khong co can luat mapping bo sung).
@@ -1712,6 +2101,13 @@
   - UNCONFIRMED DB that da apply schema `Catalog readiness`; can chay script delta/verify truoc khi retest `/Admin/CatalogReadiness`.
   - Da xac nhan DB that da apply schema `Fresh ops` (`verify` pass, row count = 0).
   - Da xac nhan user da apply schema `Communications governance`.
+  - UNCONFIRMED DB that da apply schema `cart-multiseller-persistence`; neu chua apply thi runtime Ordering/BFF cart moi se loi do thieu cot/index.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban va `bff_cart_image_snapshot_backfill`; can retest `/cart` de xac nhan item cu da len anh lai.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_cart_sellerid_backfill`; can retest `/cart` -> `/checkout` de cart DB tu doi `SellerId = 1` sang `4`.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_expire_extend`; can tao lai mot payment URL moi de timeout moi co hieu luc.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_timezone_fix`; can tao lai mot payment URL moi vi link cu van mang timestamp UTC/het han.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_signature_format_fix`; can tao mot giao dich VNPay moi vi link cu van mang chu ky sai format.
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_paymentresult_model_fix`; can mo lai trang callback VNPay hoac tao giao dich moi de xac nhan da het `RuntimeBinderException`.
   - **Working set** (files/ids/commands):
   - `docs/report-nhom-1-security-review.md`
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
@@ -1841,6 +2237,8 @@
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
   - `https://localhost:7085/bff/products`
+  - `src/Web/FreshFarm.Web.Bff/Options/GoogleAuthenticationOptions.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Dtos/ExternalLoginRequest.cs`
   - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductOffersController.cs`
@@ -1882,7 +2280,3 @@
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_tracking_datefix\`
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_admin_ui\`
     - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_shipping_fix\`
-
-
-
-

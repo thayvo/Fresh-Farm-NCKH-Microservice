@@ -13,9 +13,19 @@ public partial class CartItem
 
     public int ProductId { get; set; }
 
+    public int SellerId { get; set; }
+
     public int Quantity { get; set; }
 
     public decimal UnitPrice { get; set; }
+
+    public string SnapshotSellerName { get; set; }
+
+    public string SnapshotProductName { get; set; }
+
+    public string SnapshotImageFileName { get; set; }
+
+    public string SnapshotUnitSymbol { get; set; }
 
     public virtual Cart Cart { get; set; }
 }

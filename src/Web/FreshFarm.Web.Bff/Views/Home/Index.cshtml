@@ -880,6 +880,7 @@
                     body.set("SellerId", String(Math.max(0, toNumber(product.sellerId, 0))));
                     body.set("SellerName", (product.sellerName ?? "").toString());
                     body.set("ProductName", (product.productName ?? "").toString());
+                    body.set("ImageFileName", (product.imageFileName ?? "").toString());
                     body.set("UnitPrice", String(product.price ?? 0));
                     body.set("UnitSymbol", (product.unitName ?? "").toString());
                     body.set("Quantity", String(Math.max(1, toNumber(qty, 1))));

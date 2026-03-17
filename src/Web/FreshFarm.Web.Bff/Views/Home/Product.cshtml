@@ -908,7 +908,7 @@
                     sku: (raw.sku ?? raw.Sku ?? "").toString(),
                     price: toNumber(raw.price ?? raw.Price, 0),
                     status: Boolean(raw.status ?? raw.Status),
-                    stockQuantity: toNumber(raw.stockQuantity ?? raw.StockQuantity, 0),
+                    stockQuantity: toNumber(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity, 0),
                     image: resolveImageUrl(raw),
                     categoryName: (raw.categoryName ?? raw.CategoryName ?? "Chưa phân loại").toString(),
                     unitName: (raw.unitName ?? raw.UnitName ?? "đơn vị").toString(),
@@ -1214,6 +1214,7 @@
                     body.set("SellerId", String(toNumber(product.sellerId, product.primarySellerId || 0)));
                     body.set("SellerName", product.sellerName || "");
                     body.set("ProductName", product.productName || "");
+                    body.set("ImageFileName", product.imageFileName || "");
                     body.set("UnitPrice", String(product.price ?? 0));
                     body.set("UnitSymbol", product.unitName || "");
                     body.set("Quantity", String(Math.max(1, toNumber(qty, 1))));

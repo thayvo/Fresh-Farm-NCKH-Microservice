@@ -1,31 +1,35 @@
-﻿using FreshFarm.Web.Bff.Dtos; // Dùng DTO cart.
-using FreshFarm.Web.Bff.Services; // Dùng service cart session.
-using Microsoft.AspNetCore.Authorization; // Dùng [Authorize].
-using Microsoft.AspNetCore.Mvc; // Dùng Controller/IActionResult.
 using System.Text.Json;
+using FreshFarm.Web.Bff.Dtos;
+using FreshFarm.Web.Bff.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
-namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
+namespace FreshFarm.Web.Bff.Controllers;
 
-[Authorize] // Giỏ hàng gắn với user đã login.
-public sealed class CartController : Controller // Controller MVC cho trang giỏ.
+[Authorize]
+public sealed class CartController : Controller
 {
-    private readonly ICartSessionService _cart; // Service thao tác cart trong session.
-
-    // thêm trong class CartController
     private const string CheckoutSelectedCartItemKeysSessionKey = "CHECKOUT_SELECTED_CART_ITEM_KEYS";
+
+    private readonly ICartSessionService _cart;
+
+    public CartController(ICartSessionService cart)
+    {
+        _cart = cart;
+    }
 
     [HttpPost("/cart/checkout-selected")]
     [ValidateAntiForgeryToken]
-    public IActionResult CheckoutSelected([FromForm] string[] selectedCartItemKeys)
+    public async Task<IActionResult> CheckoutSelected([FromForm] string[] selectedCartItemKeys)
     {
-        var cartKeys = _cart.GetItems()
+        var cartKeys = (await _cart.GetItemsAsync())
             .Select(x => x.CartItemKey)
-            .ToHashSet();
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var validSelectedKeys = (selectedCartItemKeys ?? Array.Empty<string>())
             .Where(key => !string.IsNullOrWhiteSpace(key) && cartKeys.Contains(key.Trim()))
             .Select(key => key.Trim())
-            .Distinct()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         if (validSelectedKeys.Count == 0)
@@ -42,32 +46,28 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
         return RedirectToAction("Index", "Checkout");
     }
 
-    public CartController(ICartSessionService cart) // Inject service qua DI.
+    [HttpGet("/cart")]
+    public async Task<IActionResult> Index()
     {
-        _cart = cart; // Gán field để dùng trong action.
+        const decimal shippingFee = 0m;
+        var vm = await _cart.BuildSummaryAsync(shippingFee);
+        return View(vm);
     }
 
-    [HttpGet("/cart")] // Route trang giỏ hàng.
-    public IActionResult Index() // Render trang giỏ.
+    [HttpPost("/cart/add")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Add([FromForm] AddToCartRequestDto request)
     {
-        const decimal shippingFee = 15000m; // Mức ship tạm cho MVP.
-        var vm = _cart.BuildSummary(shippingFee); // Tính subtotal/grand total.
-        return View(vm); // Render Views/Cart/Index.cshtml.
-    }
-
-    [HttpPost("/cart/add")] // API thêm item vào giỏ.
-    [ValidateAntiForgeryToken] // Chặn CSRF vì thay đổi trạng thái.
-    public IActionResult Add([FromForm] AddToCartRequestDto request) // Nhận dữ liệu từ form/home.
-    {
-        if (request.ProductId <= 0) // Validate product id.
+        if (request.ProductId <= 0)
         {
-            return BadRequest("ProductId không hợp lệ."); // Trả 400 để frontend biết request sai.
+            return BadRequest("ProductId không hợp lệ.");
         }
 
-        _cart.AddOrIncrease(request); // Thêm mới hoặc cộng dồn quantity.
+        await _cart.AddOrIncreaseAsync(request);
+
         if (WantsJson())
         {
-            var cartItems = _cart.GetItems();
+            var cartItems = await _cart.GetItemsAsync();
             var cartItem = cartItems.FirstOrDefault(x =>
                 x.ProductId == request.ProductId &&
                 x.SellerId == request.SellerId);
@@ -83,41 +83,41 @@ public sealed class CartController : Controller // Controller MVC cho trang gi�
             });
         }
 
-        return RedirectToAction(nameof(Index)); // Mặc định quay về trang cart.
+        return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost("/cart/update")] // API cập nhật số lượng.
-    [ValidateAntiForgeryToken] // Chặn CSRF.
-    public IActionResult Update([FromForm] UpdateCartItemRequestDto request) // Nhận productId + quantity.
+    [HttpPost("/cart/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Update([FromForm] UpdateCartItemRequestDto request)
     {
-        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey)) // Validate input.
+        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey))
         {
-            return BadRequest("ProductId không hợp lệ."); // 400 nếu sai.
+            return BadRequest("ProductId không hợp lệ.");
         }
 
-        _cart.UpdateQuantity(request.ProductId, request.SellerId, request.CartItemKey, request.Quantity); // Update đúng dòng item multi-seller.
-        return RedirectToAction(nameof(Index)); // Quay lại cart để thấy kết quả.
+        await _cart.UpdateQuantityAsync(request.ProductId, request.SellerId, request.CartItemKey, request.Quantity);
+        return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost("/cart/remove")] // API xóa 1 item.
-    [ValidateAntiForgeryToken] // Chặn CSRF.
-    public IActionResult Remove([FromForm] RemoveCartItemRequestDto request) // Nhận productId cần xóa.
+    [HttpPost("/cart/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Remove([FromForm] RemoveCartItemRequestDto request)
     {
-        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey)) // Validate input.
+        if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey))
         {
-            return BadRequest("ProductId không hợp lệ."); // 400 nếu sai.
+            return BadRequest("ProductId không hợp lệ.");
         }
 
-        _cart.Remove(request.ProductId, request.SellerId, request.CartItemKey); // Xóa đúng dòng item multi-seller.
-        return RedirectToAction(nameof(Index)); // Quay lại cart.
+        await _cart.RemoveAsync(request.ProductId, request.SellerId, request.CartItemKey);
+        return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost("/cart/clear")] // API xóa toàn bộ giỏ.
-    [ValidateAntiForgeryToken] // Chặn CSRF.
-    public IActionResult Clear() // Không cần payload.
+    [HttpPost("/cart/clear")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Clear()
     {
-        _cart.Clear(); // Xóa sạch session cart.
-        return RedirectToAction(nameof(Index)); // Quay lại cart rỗng.
+        await _cart.ClearAsync();
+        return RedirectToAction(nameof(Index));
     }
 
     private bool WantsJson()

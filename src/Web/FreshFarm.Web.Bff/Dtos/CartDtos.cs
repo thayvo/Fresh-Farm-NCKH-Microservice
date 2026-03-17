@@ -6,6 +6,7 @@ public sealed class CartItemDto // Mỗi dòng hàng trong giỏ.
     public int SellerId { get; set; } // Seller sở hữu offer đang được buyer chọn.
     public string SellerName { get; set; } = string.Empty; // Hiển thị shop trong cart/checkout.
     public string ProductName { get; set; } = string.Empty; // Hiển thị tên trên UI, không cần gọi lại Catalog khi render.
+    public string ImageFileName { get; set; } = string.Empty; // Giữ tên file ảnh để cart/header preview render đúng thumbnail.
     public decimal UnitPrice { get; set; } // Chụp giá tại thời điểm thêm vào giỏ để tính tổng.
     public string UnitSymbol { get; set; } = "đơn vị"; // Ví dụ: kg, hộp, bó.
     public int Quantity { get; set; } = 1; // Mặc định 1 khi thêm mới.
@@ -31,6 +32,7 @@ public sealed class AddToCartRequestDto // Payload khi thêm sản phẩm vào g
     public int SellerId { get; set; } // Seller của offer buyer đang chọn.
     public string SellerName { get; set; } = string.Empty; // Tên shop để render nhanh.
     public string ProductName { get; set; } = string.Empty; // Dùng để render ngay.
+    public string ImageFileName { get; set; } = string.Empty; // Ảnh thumbnail hiện tại của sản phẩm để render đúng trong cart.
     public decimal UnitPrice { get; set; } // Giá hiện tại từ Home.
     public string UnitSymbol { get; set; } = "đơn vị"; // Đơn vị tính.
     public int Quantity { get; set; } = 1; // Cho phép thêm >1 nếu cần.

@@ -1,6 +1,6 @@
 ﻿@model FreshFarm.Web.Bff.Areas.Seller.Models.ProfileViewModel
 @{
-    ViewBag.Title = "Hồ Sơ";
+    ViewBag.Title = "Thông tin tài khoản";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 
     // Helpers
@@ -321,10 +321,10 @@
                         </div>
                         <div>
                             <h1 class="fw-bold mb-1" style="font-size: 2.1rem; text-shadow: 0 4px 12px rgba(0,0,0,0.35);">
-                                Hồ sơ quản trị viên
+                                Hồ sơ người bán
                             </h1>
                             <p class="mb-0 opacity-90" style="font-size: 1rem;">
-                                Quản lý thông tin cá nhân và bảo mật tài khoản
+                                Quản lý thông tin cá nhân, liên hệ và bảo mật tài khoản bán hàng
                             </p>
                         </div>
                     </div>
@@ -388,6 +388,23 @@
                     </span>
                 </div>
 
+                <div class="alert alert-info border-0 mb-4" role="alert" style="border-radius: 1rem;">
+                    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                        <div>
+                            <div class="fw-bold mb-1">
+                                <i class="bi bi-geo-alt-fill me-2"></i>Địa chỉ lấy hàng không nằm ở trang hồ sơ này
+                            </div>
+                            <div class="small text-muted">
+                                Để cấu hình địa chỉ shop, tỉnh/quận/phường GHN và thông tin lấy hàng, vui lòng vào mục Cài đặt của người bán.
+                            </div>
+                        </div>
+                        <a class="btn btn-outline-primary btn-pill px-4"
+                           href="@Url.Action("Index", "Setting", new { area = "Seller", tab = "shipping" })">
+                            <i class="bi bi-truck me-1"></i>Mở cài đặt địa chỉ
+                        </a>
+                    </div>
+                </div>
+
                 @using (Html.BeginForm("Profile", "Home", FormMethod.Post, new { area = "Seller" }))
                 {
                     @Html.AntiForgeryToken()
@@ -395,30 +412,30 @@
 
                     <div class="row g-3">
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.FullName, new { @class = "form-label fw-semibold text-primary" })
+                            <label class="form-label fw-semibold text-primary" for="FullName">Họ và tên</label>
                             @Html.TextBoxFor(m => m.FullName, new { @class = "form-control", placeholder = "Họ tên" })
                             @Html.ValidationMessageFor(m => m.FullName, "", new { @class = "text-danger" })
                         </div>
 
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.Email, new { @class = "form-label fw-semibold text-primary" })
+                            <label class="form-label fw-semibold text-primary" for="Email">Email</label>
                             @Html.TextBoxFor(m => m.Email, new { @class = "form-control", type = "email", placeholder = "Email" })
                             @Html.ValidationMessageFor(m => m.Email, "", new { @class = "text-danger" })
                         </div>
 
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.Phone, new { @class = "form-label fw-semibold text-primary" })
+                            <label class="form-label fw-semibold text-primary" for="Phone">Số điện thoại</label>
                             @Html.TextBoxFor(m => m.Phone, new { @class = "form-control", placeholder = "Số điện thoại" })
                             @Html.ValidationMessageFor(m => m.Phone, "", new { @class = "text-danger" })
                         </div>
 
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.UserName, new { @class = "form-label fw-semibold text-primary" })
+                            <label class="form-label fw-semibold text-primary" for="UserName">Tên đăng nhập</label>
                             @Html.TextBoxFor(m => m.UserName, new { @class = "form-control", @readonly = "readonly" })
                         </div>
 
                         <div class="col-md-6">
-                            @Html.LabelFor(m => m.CreatedDate, new { @class = "form-label fw-semibold text-primary" })
+                            <label class="form-label fw-semibold text-primary" for="CreatedDate">Ngày tạo</label>
                             <input class="form-control" value="@Model.CreatedDate.ToString("dd/MM/yyyy HH:mm")" readonly />
                         </div>
                     </div>

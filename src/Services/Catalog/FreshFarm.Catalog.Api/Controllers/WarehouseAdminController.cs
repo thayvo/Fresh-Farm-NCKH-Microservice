@@ -65,13 +65,13 @@ public sealed class WarehouseAdminController : ControllerBase
             switch (stockStatusFilter)
             {
                 case "low-stock":
-                    query = query.Where(p => p.StockQuantity > 0 && p.StockQuantity <= 10);
+                    query = query.Where(p => (p.StockQuantity - p.ReservedStock) > 0 && (p.StockQuantity - p.ReservedStock) <= 10);
                     break;
                 case "out-of-stock":
-                    query = query.Where(p => p.StockQuantity == 0);
+                    query = query.Where(p => (p.StockQuantity - p.ReservedStock) <= 0);
                     break;
                 case "in-stock":
-                    query = query.Where(p => p.StockQuantity > 0);
+                    query = query.Where(p => (p.StockQuantity - p.ReservedStock) > 0);
                     break;
             }
         }
@@ -86,9 +86,11 @@ public sealed class WarehouseAdminController : ControllerBase
                 categoryName = p.Category.CategoryName,
                 imageFileName = p.ImageFileName,
                 stockQuantity = p.StockQuantity,
-                shelfQuantity = p.StockQuantity,
+                reservedStock = p.ReservedStock,
+                availableStock = Math.Max(0, p.StockQuantity - p.ReservedStock),
+                shelfQuantity = Math.Max(0, p.StockQuantity - p.ReservedStock),
                 warehouseQuantity = 0,
-                maxStock = p.StockQuantity == 0 ? 1 : p.StockQuantity,
+                maxStock = Math.Max(1, Math.Max(0, p.StockQuantity - p.ReservedStock)),
                 isManuallyDisabled = p.IsManuallyDisabled,
                 importPrice = 0m,
                 sellPrice = p.Price,
@@ -113,8 +115,8 @@ public sealed class WarehouseAdminController : ControllerBase
             .Take(pageSize)
             .ToList();
 
-        var lowStockCount = products.Count(p => p.stockQuantity > 0 && p.stockQuantity <= 10);
-        var outOfStockCount = products.Count(p => p.stockQuantity == 0);
+        var lowStockCount = products.Count(p => p.availableStock > 0 && p.availableStock <= 10);
+        var outOfStockCount = products.Count(p => p.availableStock == 0);
 
         return Ok(new
         {
@@ -164,9 +166,11 @@ public sealed class WarehouseAdminController : ControllerBase
                     categoryName = product.Category.CategoryName,
                     imageFileName = product.ImageFileName,
                     stockQuantity = product.StockQuantity,
-                    shelfQuantity = product.StockQuantity,
+                    reservedStock = product.ReservedStock,
+                    availableStock = Math.Max(0, product.StockQuantity - product.ReservedStock),
+                    shelfQuantity = Math.Max(0, product.StockQuantity - product.ReservedStock),
                     warehouseQuantity = 0,
-                    maxStock = product.StockQuantity == 0 ? 1 : product.StockQuantity,
+                    maxStock = Math.Max(1, Math.Max(0, product.StockQuantity - product.ReservedStock)),
                     isManuallyDisabled = product.IsManuallyDisabled,
                     importPrice = 0m,
                     sellPrice = product.Price,
@@ -250,7 +254,7 @@ public sealed class WarehouseAdminController : ControllerBase
             }
 
             product.IsManuallyDisabled = item.KeepDisabled;
-            product.Status = product.StockQuantity > 0 && !product.IsManuallyDisabled;
+            product.Status = (product.StockQuantity - product.ReservedStock) > 0 && !product.IsManuallyDisabled;
 
             detailRows.Add(new WarehouseTransactionItemStore
             {
@@ -321,13 +325,14 @@ public sealed class WarehouseAdminController : ControllerBase
                 return BadRequest(new { success = false, message = $"San pham #{item.ProductId} khong thuoc quyen quan ly cua ban." });
             }
 
-            if (item.Quantity > product.StockQuantity)
+            var availableStock = Math.Max(0, product.StockQuantity - product.ReservedStock);
+            if (item.Quantity > availableStock)
             {
-                return BadRequest(new { success = false, message = $"San pham '{product.ProductName}' chi con {product.StockQuantity}." });
+                return BadRequest(new { success = false, message = $"San pham '{product.ProductName}' chi con {availableStock} khả dụng." });
             }
 
             product.StockQuantity -= item.Quantity;
-            product.Status = product.StockQuantity > 0 && !product.IsManuallyDisabled;
+            product.Status = (product.StockQuantity - product.ReservedStock) > 0 && !product.IsManuallyDisabled;
 
             detailRows.Add(new WarehouseTransactionItemStore
             {

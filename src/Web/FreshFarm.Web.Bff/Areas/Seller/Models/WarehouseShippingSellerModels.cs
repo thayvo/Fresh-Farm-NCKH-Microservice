@@ -273,6 +273,16 @@ public sealed class Order
 
     public string Status { get; set; } = string.Empty;
 
+    public decimal? ShippingFee { get; set; }
+
+    public decimal? ItemsAmount { get; set; }
+
+    public decimal? TotalAmount { get; set; }
+
+    public int? TotalQuantity { get; set; }
+
+    public string? ItemSummary { get; set; }
+
     public List<Payment> Payments { get; set; } = new();
 
     public List<DeliveryAssignment> DeliveryAssignments { get; set; } = new();

@@ -11,6 +11,7 @@
         returnUrl = Context.Request.Query["ReturnUrl"].ToString();
     }
     var signUpReturnUrl = returnUrl;
+    var googleLoginEnabled = ViewData["GoogleLoginEnabled"] as bool? ?? false;
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -170,9 +171,24 @@
                 <p class="divider-text"><span>HOẶC</span></p>
 
                 <div class="d-grid gap-2">
-                    <button type="button" class="btn btn-danger btn-lg" disabled>
-                        <i class="bi bi-google me-2"></i> Đăng nhập với Google
-                    </button>
+                    @if (googleLoginEnabled)
+                    {
+                        <a asp-action="SignInWithGoogle"
+                           asp-controller="Account"
+                           asp-route-returnUrl="@returnUrl"
+                           class="btn btn-danger btn-lg">
+                            <i class="bi bi-google me-2"></i> Đăng nhập với Google
+                        </a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-danger btn-lg" disabled>
+                            <i class="bi bi-google me-2"></i> Đăng nhập với Google
+                        </button>
+                        <div class="small text-muted text-center">
+                            Dev note: cần cấu hình `Authentication:Google:ClientId` và `ClientSecret` để bật nút này.
+                        </div>
+                    }
                     <button type="button" class="btn btn-primary btn-lg" disabled>
                         <i class="bi bi-facebook me-2"></i> Đăng nhập với Facebook
                     </button>

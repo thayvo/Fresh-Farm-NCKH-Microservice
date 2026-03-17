@@ -53,6 +53,7 @@
 
     var addressLoadError = ViewBag.AddressLoadError as string;
     var ghnConfigured = ViewBag.GhnSandboxConfigured as bool? ?? false;
+    var vnPayEnabled = ViewBag.VnPayEnabled as bool? ?? false;
     var hasSavedAddresses = savedAddresses.Any();
     var selectedProvinceId = shipping.ProvinceId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
     var selectedDistrictId = shipping.DistrictId?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
@@ -563,10 +564,16 @@
                                     <input class="form-check-input me-2" type="radio" name="payment-method-ui" value="COD" @(paymentMethod.Equals("COD", System.StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) />
                                     <span class="fw-semibold">Thanh toán khi nhận hàng (COD)</span>
                                 </label>
-                                <label class="payment-option @(paymentMethod.Equals("VNPay", System.StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty)" data-value="VNPay">
-                                    <input class="form-check-input me-2" type="radio" name="payment-method-ui" value="VNPay" @(paymentMethod.Equals("VNPay", System.StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) />
+                                <label class="payment-option @(!vnPayEnabled ? "opacity-50" : string.Empty) @(paymentMethod.Equals("VNPay", System.StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty)" data-value="VNPay">
+                                    <input class="form-check-input me-2" type="radio" name="payment-method-ui" value="VNPay" @(!vnPayEnabled ? "disabled" : null) @(paymentMethod.Equals("VNPay", System.StringComparison.OrdinalIgnoreCase) ? "checked" : string.Empty) />
                                     <span class="fw-semibold">Thanh toán qua VNPay</span>
                                 </label>
+                                @if (!vnPayEnabled)
+                                {
+                                    <div class="small text-muted">
+                                        VNPay dev đang tắt vì môi trường chưa cấu hình `TmnCode` và `HashSecret`.
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
@@ -1271,10 +1278,14 @@
 
                 const paymentOption = target.closest(".payment-option");
                 if (paymentOption) {
+                    const radio = paymentOption.querySelector('input[type="radio"]');
+                    if (radio && radio.disabled) {
+                        return;
+                    }
+
                     paymentOptions.forEach((item) => item.classList.remove("active"));
                     paymentOption.classList.add("active");
 
-                    const radio = paymentOption.querySelector('input[type="radio"]');
                     if (radio) {
                         radio.checked = true;
                         paymentMethodHidden.value = radio.value;

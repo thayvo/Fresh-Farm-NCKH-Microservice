@@ -1,4 +1,6 @@
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Options;
+using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -81,6 +83,20 @@ builder.Services.AddDbContext<FreshFarmOrderingDBContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("FreshFarmOrderingDB"));
 });
+builder.Services.Configure<CatalogServiceOptions>(
+    builder.Configuration.GetSection(CatalogServiceOptions.SectionName));
+builder.Services.AddHttpClient("Catalog", client =>
+{
+    var baseUrl = builder.Configuration[$"{CatalogServiceOptions.SectionName}:BaseUrl"];
+    if (!string.IsNullOrWhiteSpace(baseUrl))
+    {
+        client.BaseAddress = new Uri(baseUrl);
+    }
+});
+builder.Services.AddScoped<CatalogInventoryClient>();
+builder.Services.AddScoped<OrderReservationService>();
+builder.Services.AddScoped<InventoryReconciliationService>();
+builder.Services.AddHostedService<PendingPaymentExpirationBackgroundService>();
 
 var app = builder.Build();
 

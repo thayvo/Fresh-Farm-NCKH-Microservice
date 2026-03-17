@@ -52,6 +52,14 @@ namespace FreshFarm.Web.Bff.Dtos
         public DateTime ExpiredAtUtc { get; set; } // Han token.
     }
 
+    public sealed class ExternalLoginExchangeRequestDto
+    {
+        public string Provider { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string? AvatarUrl { get; set; }
+    }
+
     public sealed class OrderHistoryItemDto // Item de render lich su don.
     {
         public int OrderId { get; set; } // Ma don.

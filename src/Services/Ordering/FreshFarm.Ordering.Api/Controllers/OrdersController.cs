@@ -1,5 +1,6 @@
 using FreshFarm.Ordering.Api.Dtos;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,24 +17,35 @@ public sealed class OrdersController : ControllerBase
 {
     private static readonly Dictionary<string, string> CanonicalStatuses = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["AwaitingPayment"] = "AwaitingPayment",
         ["Pending"] = "Pending",
         ["Processing"] = "Processing",
         ["Ready"] = "Ready",
         ["Shipped"] = "Shipped",
         ["Delivered"] = "Delivered",
+        ["Expired"] = "Expired",
         ["Canceled"] = "Canceled"
     };
 
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly CatalogInventoryClient _catalogInventoryClient;
+    private readonly OrderReservationService _orderReservationService;
 
-    public OrdersController(FreshFarmOrderingDBContext db)
+    public OrdersController(
+        FreshFarmOrderingDBContext db,
+        CatalogInventoryClient catalogInventoryClient,
+        OrderReservationService orderReservationService)
     {
         _db = db;
+        _catalogInventoryClient = catalogInventoryClient;
+        _orderReservationService = orderReservationService;
     }
 
     [HttpGet("my")]
     public async Task<IActionResult> GetMyOrders(CancellationToken cancellationToken)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
         var userId = TryGetUserIdFromToken();
         if (userId is null)
         {
@@ -60,6 +72,8 @@ public sealed class OrdersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
         var userId = TryGetUserIdFromToken();
         if (userId is null)
         {
@@ -169,6 +183,11 @@ public sealed class OrdersController : ControllerBase
             return BadRequest("Co item khong hop le (ProductId/SellerId/Quantity/UnitPrice). Quantity phai trong khoang 1..10000.");
         }
 
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
+        var paymentMethod = NormalizePaymentMethod(request.Payment?.PaymentMethod);
+        var isAwaitingPayment = string.Equals(paymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase);
+        var orderStatus = isAwaitingPayment ? "AwaitingPayment" : "Pending";
         var itemsAmount = request.Items.Sum(item => item.UnitPrice * item.Quantity);
         var shippingFee = request.ShippingFee ?? 0m;
         var totalAmount = itemsAmount + shippingFee;
@@ -178,6 +197,16 @@ public sealed class OrdersController : ControllerBase
             .ToDictionary(
                 g => g.Key,
                 g => g.OrderByDescending(x => x.ShippingFee).First().ShippingFee) ?? new Dictionary<int, decimal>();
+        var reservationItems = request.Items
+            .Select(x => new CatalogInventoryMutationItem
+            {
+                ProductId = x.ProductId,
+                SellerId = x.SellerId,
+                Quantity = x.Quantity
+            })
+            .ToList();
+        var inventoryReserved = false;
+        var reservationExpiresAt = _orderReservationService.GetReservationExpiryUtc();
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
@@ -190,7 +219,7 @@ public sealed class OrdersController : ControllerBase
                 CouponId = null,
                 TotalAmount = totalAmount,
                 OrderNote = request.OrderNote,
-                Status = "Pending",
+                Status = orderStatus,
                 PaymentStatus = "Pending",
                 PaidAt = null,
                 StatusId = null,
@@ -236,7 +265,7 @@ public sealed class OrdersController : ControllerBase
                 {
                     OrderId = order.OrderId,
                     SellerId = sellerGroup.Key,
-                    SellerStatus = "Pending",
+                    SellerStatus = orderStatus,
                     CommissionRate = 0m,
                     CommissionAmount = 0m,
                     ShippingFee = sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShippingFee)
@@ -253,7 +282,6 @@ public sealed class OrdersController : ControllerBase
             _db.SellerOrders.AddRange(sellerOrders);
             await _db.SaveChangesAsync(cancellationToken);
 
-            var paymentMethod = NormalizePaymentMethod(request.Payment?.PaymentMethod);
             var sellerOrdersBySellerId = sellerOrders.ToDictionary(x => x.SellerId);
             var sellerOrderItems = new List<SellerOrderItem>(indexedItems.Count);
             var shipments = new List<Shipment>(sellerGroups.Count);
@@ -312,6 +340,35 @@ public sealed class OrdersController : ControllerBase
             }
 
             _db.SellerOrderItems.AddRange(sellerOrderItems);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (isAwaitingPayment)
+            {
+                await _catalogInventoryClient.ReserveAsync(reservationItems, cancellationToken);
+            }
+            else
+            {
+                await _catalogInventoryClient.ConsumeOnHandAsync(reservationItems, cancellationToken);
+            }
+
+            inventoryReserved = true;
+
+            var inventoryReservations = new List<InventoryReservation>(sellerOrderItems.Count);
+            foreach (var sellerOrderItem in sellerOrderItems)
+            {
+                inventoryReservations.Add(new InventoryReservation
+                {
+                    InventoryId = sellerOrderItem.ProductId,
+                    OrderId = order.OrderId,
+                    SellerOrderItemId = sellerOrderItem.SellerOrderItemId,
+                    Quantity = sellerOrderItem.Quantity,
+                    ExpiresAt = isAwaitingPayment ? reservationExpiresAt : DateTime.UtcNow,
+                    Status = isAwaitingPayment ? "Reserved" : "Committed",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            _db.InventoryReservations.AddRange(inventoryReservations);
             _db.Shipments.AddRange(shipments);
 
             var shipping = new Shipping
@@ -353,8 +410,239 @@ public sealed class OrdersController : ControllerBase
         catch (Exception ex)
         {
             await transaction.RollbackAsync(cancellationToken);
+            if (inventoryReserved)
+            {
+                try
+                {
+                    if (isAwaitingPayment)
+                    {
+                        await _catalogInventoryClient.ReleaseAsync(reservationItems, cancellationToken);
+                    }
+                    else
+                    {
+                        await _catalogInventoryClient.RestockOnHandAsync(reservationItems, cancellationToken);
+                    }
+                }
+                catch
+                {
+                    // Best effort release when order transaction fails after stock was reserved.
+                }
+            }
+
             return StatusCode(500, new { message = "Tao order that bai.", detail = ex.Message });
         }
+    }
+
+    [HttpPost("{orderId:int}/payments/vnpay/finalize")]
+    public async Task<IActionResult> FinalizeVnPayPayment(
+        int orderId,
+        [FromBody] FinalizeVnPayPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
+        var userId = TryGetUserIdFromToken();
+        if (userId is null)
+        {
+            return Unauthorized("Token khong co claim user id hop le.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (orderId <= 0 || !string.Equals(orderId.ToString(), request.TxnRef, StringComparison.Ordinal))
+        {
+            return BadRequest(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = "Pending",
+                OrderStatus = "Pending",
+                Message = "Mã giao dịch VNPay không khớp với đơn hàng."
+            });
+        }
+
+        var order = await _db.Orders
+            .Include(o => o.Payments)
+            .Include(o => o.PaymentTransactions)
+            .Include(o => o.InventoryReservations)
+            .Include(o => o.SellerOrders)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId, cancellationToken);
+
+        if (order is null)
+        {
+            return NotFound(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = "Pending",
+                OrderStatus = "Pending",
+                Message = "Không tìm thấy đơn hàng để cập nhật thanh toán VNPay."
+            });
+        }
+
+        if (order.UserId != userId.Value)
+        {
+            return Forbid();
+        }
+
+        if (string.Equals(order.Status, "Expired", StringComparison.OrdinalIgnoreCase))
+        {
+            return Conflict(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = order.PaymentStatus ?? "Expired",
+                OrderStatus = order.Status ?? "Expired",
+                Message = "Don hang da het han giu ton kho. Vui long dat lai don moi."
+            });
+        }
+
+        var hasExpiredReservation = order.InventoryReservations.Any(x =>
+            string.Equals(x.Status, "Reserved", StringComparison.OrdinalIgnoreCase) &&
+            x.ExpiresAt <= DateTime.UtcNow);
+
+        if (hasExpiredReservation)
+        {
+            await _orderReservationService.ReleaseReservationsAsync(order, "Expired", "Expired", cancellationToken);
+            return Conflict(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = "Expired",
+                OrderStatus = "Expired",
+                Message = "Don hang da het han giu ton kho truoc khi VNPay tra ve. Vui long dat lai don moi."
+            });
+        }
+
+        var payment = order.Payments
+            .OrderByDescending(x => x.PaymentId)
+            .FirstOrDefault(x => string.Equals(x.PaymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase));
+
+        if (payment is null)
+        {
+            payment = new Payment
+            {
+                OrderId = order.OrderId,
+                PaymentMethod = "VNPay",
+                PaymentStatus = "Pending",
+                UserId = userId.Value
+            };
+            _db.Payments.Add(payment);
+        }
+
+        var transaction = order.PaymentTransactions
+            .OrderByDescending(x => x.PaymentTxnId)
+            .FirstOrDefault(x =>
+                string.Equals(x.Provider, "VNPay", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(x.Method, "VNPay", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(x.ProviderRef ?? string.Empty, request.TransactionNo ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+
+        if (transaction is null)
+        {
+            transaction = order.PaymentTransactions
+                .OrderByDescending(x => x.PaymentTxnId)
+                .FirstOrDefault(x =>
+                    string.Equals(x.Provider, "VNPay", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(x.Method, "VNPay", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(x.FailureCode ?? string.Empty, request.TxnRef, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var paidAtUtc = request.PaidAt?.UtcDateTime ?? DateTime.UtcNow;
+        if (transaction is null)
+        {
+            transaction = new PaymentTransaction
+            {
+                OrderId = order.OrderId,
+                Provider = "VNPay",
+                Method = "VNPay",
+                Amount = request.Amount ?? order.TotalAmount,
+                Currency = "VND",
+                FeeAmount = null,
+                Status = request.IsSuccess ? "Succeeded" : "Failed",
+                ProviderRef = request.TransactionNo?.Trim(),
+                FailureCode = request.IsSuccess ? request.TxnRef : request.ResponseCode?.Trim(),
+                FailureMessage = request.IsSuccess ? null : BuildVnPayFailureMessage(request),
+                PaidAt = request.IsSuccess ? paidAtUtc : null,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.PaymentTransactions.Add(transaction);
+        }
+        else
+        {
+            transaction.Amount = request.Amount ?? transaction.Amount;
+            transaction.Currency = "VND";
+            transaction.Status = request.IsSuccess ? "Succeeded" : "Failed";
+            transaction.ProviderRef = string.IsNullOrWhiteSpace(request.TransactionNo)
+                ? transaction.ProviderRef
+                : request.TransactionNo.Trim();
+            transaction.FailureCode = request.IsSuccess
+                ? request.TxnRef
+                : request.ResponseCode?.Trim();
+            transaction.FailureMessage = request.IsSuccess ? null : BuildVnPayFailureMessage(request);
+            transaction.PaidAt = request.IsSuccess ? paidAtUtc : transaction.PaidAt;
+        }
+
+        if (request.Amount.HasValue && request.Amount.Value > 0 && request.Amount.Value != order.TotalAmount)
+        {
+            return BadRequest(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = payment.PaymentStatus ?? "Pending",
+                OrderStatus = order.Status ?? "Pending",
+                Message = $"Số tiền VNPay ({request.Amount.Value:N0}) không khớp tổng đơn ({order.TotalAmount:N0})."
+            });
+        }
+
+        var alreadyProcessed = string.Equals(payment.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase) &&
+                               string.Equals(order.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase);
+
+        if (request.IsSuccess)
+        {
+            payment.PaymentStatus = "Paid";
+            payment.PaymentDate = paidAtUtc;
+            payment.BankName = NullIfWhiteSpace(request.BankCode);
+            payment.TransactionCode = NullIfWhiteSpace(request.TransactionNo ?? request.BankTransactionNo);
+
+            order.PaymentStatus = "Paid";
+            order.PaidAt = paidAtUtc;
+        }
+        else
+        {
+            payment.PaymentStatus = "Failed";
+            payment.PaymentDate = null;
+            payment.BankName = NullIfWhiteSpace(request.BankCode);
+            payment.TransactionCode = NullIfWhiteSpace(request.TransactionNo ?? request.BankTransactionNo);
+
+            order.PaymentStatus = "Failed";
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        if (request.IsSuccess)
+        {
+            await _orderReservationService.MarkReservationsCommittedAsync(order, cancellationToken);
+        }
+        else
+        {
+            await _orderReservationService.ReleaseReservationsAsync(order, "Canceled", "Failed", cancellationToken);
+        }
+
+        return Ok(new FinalizeVnPayPaymentResult
+        {
+            Success = request.IsSuccess,
+            AlreadyProcessed = alreadyProcessed,
+            OrderId = order.OrderId,
+            PaymentStatus = order.PaymentStatus ?? payment.PaymentStatus ?? "Pending",
+            OrderStatus = order.Status ?? "Pending",
+            Message = request.IsSuccess
+                ? "Đã cập nhật thanh toán VNPay thành công."
+                : BuildVnPayFailureMessage(request)
+        });
     }
 
     [Authorize(Policy = "SellerOrAdmin")]
@@ -367,6 +655,8 @@ public sealed class OrdersController : ControllerBase
         [FromQuery] string? dateFilter = null,
         CancellationToken cancellationToken = default)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
         var isAdmin = IsAdminUser();
         var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
         if (!isAdmin && !sellerId.HasValue)
@@ -410,7 +700,7 @@ public sealed class OrdersController : ControllerBase
 
         var total = await query.CountAsync(cancellationToken);
 
-        var items = await query
+        var pageRows = await query
             .OrderByDescending(o => o.OrderDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -420,18 +710,46 @@ public sealed class OrdersController : ControllerBase
                 OrderCode = $"#{o.OrderId:D6}",
                 CustomerName = string.IsNullOrWhiteSpace(o.BuyerFullName) ? $"U{o.UserId}" : o.BuyerFullName,
                 OrderDate = o.OrderDate,
-                TotalAmount = isAdmin
-                    ? o.TotalAmount
-                    : o.SellerOrders
-                        .Where(so => sellerId.HasValue && so.SellerId == sellerId.Value)
-                        .Sum(so =>
-                            (decimal?)so.ShippingFee +
-                            (so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m)) ?? 0m,
+                TotalAmount = o.TotalAmount,
                 Status = o.Status,
                 StatusBadgeClass = GetStatusBadgeClass(o.Status),
                 StatusText = GetStatusText(o.Status)
             })
             .ToListAsync(cancellationToken);
+
+        Dictionary<int, decimal>? sellerAmountLookup = null;
+        if (!isAdmin && sellerId.HasValue && pageRows.Count > 0)
+        {
+            var pageOrderIds = pageRows.Select(x => x.OrderID).Distinct().ToList();
+            var sellerAmounts = await _db.SellerOrders
+                .AsNoTracking()
+                .Where(so => so.SellerId == sellerId.Value && pageOrderIds.Contains(so.OrderId))
+                .Select(so => new
+                {
+                    so.OrderId,
+                    Amount = so.ShippingFee +
+                             (so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m)
+                })
+                .ToListAsync(cancellationToken);
+
+            sellerAmountLookup = sellerAmounts
+                .GroupBy(x => x.OrderId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+        }
+
+        var items = pageRows.Select(row => new
+        {
+            row.OrderID,
+            row.OrderCode,
+            row.CustomerName,
+            row.OrderDate,
+            TotalAmount = isAdmin
+                ? row.TotalAmount
+                : sellerAmountLookup?.GetValueOrDefault(row.OrderID) ?? 0m,
+            row.Status,
+            row.StatusBadgeClass,
+            row.StatusText
+        });
 
         return Ok(new
         {
@@ -463,6 +781,8 @@ public sealed class OrdersController : ControllerBase
     [HttpGet("admin/{orderId:int}/detail")]
     public async Task<IActionResult> GetAdminOrderDetail([FromRoute] int orderId, CancellationToken cancellationToken)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
         var isAdmin = IsAdminUser();
         var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
         if (!isAdmin && !sellerId.HasValue)
@@ -570,8 +890,8 @@ public sealed class OrdersController : ControllerBase
             total,
             orderNote = order.OrderNote,
             items,
-            canCancel = order.Status == "Pending" || order.Status == "Processing",
-            canEdit = order.Status != "Delivered" && order.Status != "Canceled"
+            canCancel = order.Status == "AwaitingPayment" || order.Status == "Pending" || order.Status == "Processing",
+            canEdit = order.Status != "Delivered" && order.Status != "Canceled" && order.Status != "Expired"
         });
     }
 
@@ -579,6 +899,8 @@ public sealed class OrdersController : ControllerBase
     [HttpPost("admin/{orderId:int}/status")]
     public async Task<IActionResult> UpdateAdminOrderStatus([FromRoute] int orderId, [FromBody] UpdateAdminOrderStatusRequest request)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(HttpContext.RequestAborted);
+
         if (request is null || string.IsNullOrWhiteSpace(request.NewStatus))
         {
             return BadRequest(new { message = "Thiếu trạng thái cần cập nhật." });
@@ -598,6 +920,8 @@ public sealed class OrdersController : ControllerBase
 
         var order = await _db.Orders
             .Include(o => o.SellerOrders)
+            .Include(o => o.InventoryReservations)
+            .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
         if (order is null)
         {
@@ -620,6 +944,12 @@ public sealed class OrdersController : ControllerBase
         var oldStatus = order.Status;
         order.Status = newStatus;
 
+        foreach (var sellerOrder in order.SellerOrders)
+        {
+            sellerOrder.SellerStatus = newStatus;
+            sellerOrder.UpdatedAt = DateTime.UtcNow;
+        }
+
         try
         {
             var stRow = await _db.Statuses.FirstOrDefaultAsync(s => s.StatusName == newStatus);
@@ -631,6 +961,20 @@ public sealed class OrdersController : ControllerBase
         catch
         {
             // No-op for status lookup compatibility.
+        }
+
+        if (newStatus == "Canceled")
+        {
+            await _orderReservationService.ReleaseReservationsAsync(order, "Canceled", order.PaymentStatus ?? "Canceled", HttpContext.RequestAborted);
+            return Ok(new
+            {
+                success = true,
+                message = $"Cập nhật trạng thái thành công: {GetStatusText(newStatus)}",
+                status = newStatus,
+                statusText = GetStatusText(newStatus),
+                statusClass = GetStatusBadgeClass(newStatus),
+                oldStatus
+            });
         }
 
         if (newStatus == "Delivered")
@@ -697,6 +1041,15 @@ public sealed class OrdersController : ControllerBase
         if (string.Equals(order.Status, "Delivered", StringComparison.OrdinalIgnoreCase))
         {
             return Conflict(new { message = "Không thể xóa đơn hàng đã giao. Vui lòng hủy đơn trước." });
+        }
+
+        try
+        {
+            await _orderReservationService.ReleaseReservationsAsync(order, order.Status ?? "Canceled", order.PaymentStatus ?? "Canceled", HttpContext.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, message = "Khong the giai phong ton kho truoc khi xoa don.", detail = ex.Message });
         }
 
         await using var tran = await _db.Database.BeginTransactionAsync();
@@ -838,6 +1191,8 @@ public sealed class OrdersController : ControllerBase
     [HttpGet("admin/statistics")]
     public async Task<IActionResult> GetAdminStatistics(CancellationToken cancellationToken)
     {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
+
         var now = DateTime.UtcNow;
         var today = now.Date;
         var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
@@ -909,13 +1264,15 @@ public sealed class OrdersController : ControllerBase
     private static bool CanChangeStatus(string currentStatus, string newStatus)
     {
         if (string.Equals(currentStatus, "Delivered", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase))
+            string.Equals(currentStatus, "Canceled", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(currentStatus, "Expired", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
         var validTransitions = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
         {
+            { "AwaitingPayment", new List<string> { "Canceled" } },
             { "Pending", new List<string> { "Processing", "Canceled" } },
             { "Processing", new List<string> { "Ready", "Shipped", "Canceled" } },
             { "Ready", new List<string> { "Shipped", "Canceled" } },
@@ -930,11 +1287,13 @@ public sealed class OrdersController : ControllerBase
     {
         return status switch
         {
+            "AwaitingPayment" => "Chờ thanh toán",
             "Pending" => "Chờ xử lý",
             "Processing" => "Đang xử lý",
             "Ready" => "Đã xử lý / Sẵn sàng giao",
             "Shipped" => "Đang giao hàng",
             "Delivered" => "Đã giao hàng",
+            "Expired" => "Hết hạn thanh toán",
             "Canceled" => "Đã hủy",
             _ => status ?? string.Empty
         };
@@ -944,11 +1303,13 @@ public sealed class OrdersController : ControllerBase
     {
         return status switch
         {
+            "AwaitingPayment" => "bg-dark",
             "Pending" => "bg-secondary",
             "Processing" => "bg-info",
             "Ready" => "badge-ready",
             "Shipped" => "bg-warning",
             "Delivered" => "bg-success",
+            "Expired" => "bg-danger-subtle",
             "Canceled" => "bg-danger",
             _ => "bg-secondary"
         };
@@ -964,6 +1325,18 @@ public sealed class OrdersController : ControllerBase
         }
 
         return normalized;
+    }
+
+    private static string BuildVnPayFailureMessage(FinalizeVnPayPaymentRequest request)
+    {
+        var responseCode = string.IsNullOrWhiteSpace(request.ResponseCode) ? "N/A" : request.ResponseCode.Trim();
+        var transactionStatus = string.IsNullOrWhiteSpace(request.TransactionStatus) ? "N/A" : request.TransactionStatus.Trim();
+        return $"Thanh toán VNPay chưa thành công (Mã phản hồi: {responseCode}/{transactionStatus}).";
+    }
+
+    private static string? NullIfWhiteSpace(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private int? TryGetUserIdFromToken()

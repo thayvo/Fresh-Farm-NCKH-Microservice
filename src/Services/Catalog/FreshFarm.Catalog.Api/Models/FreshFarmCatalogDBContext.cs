@@ -106,6 +106,9 @@ public partial class FreshFarmCatalogDBContext : DbContext
             entity.Property(e => e.ProductName)
                 .IsRequired()
                 .HasMaxLength(255);
+            entity.Property(e => e.ReservedStock)
+                .HasDefaultValue(0)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Products_ReservedStock");
             entity.Property(e => e.ShortDescription)
                 .HasMaxLength(300)
                 .HasDefaultValue("")
