@@ -35,7 +35,7 @@ public sealed class InventoryReconciliationService
             .Include(o => o.InventoryReservations)
             .Include(o => o.Payments)
             .Include(o => o.SellerOrders)
-            .Where(o => string.Equals(o.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase) &&
+            .Where(o => o.PaymentStatus == "Paid" &&
                         o.InventoryReservations.Any(r => r.Status == "Reserved"))
             .ToListAsync(cancellationToken);
 

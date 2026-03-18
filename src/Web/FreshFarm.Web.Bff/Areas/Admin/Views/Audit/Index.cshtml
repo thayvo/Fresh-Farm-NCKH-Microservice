@@ -3,36 +3,221 @@
     ViewData["Title"] = "Trung tâm kiểm toán";
 }
 
-<section class="audit-console ff-admin-shell">
-    <div class="audit-hero ff-admin-hero mb-4">
-        <div>
+<section class="audit-console audit-page ff-admin-shell">
+    <div class="audit-hero ff-admin-hero mb-4 position-relative overflow-hidden">
+        <div class="hero-content position-relative">
             <p class="eyebrow ff-admin-kicker mb-2">Kiểm soát liên thông</p>
             <h1 class="fw-bold mb-2">Trung tâm kiểm toán</h1>
-            <p class="mb-0 opacity-75">Theo dõi nhật ký thao tác admin, kiểm toán kiểm duyệt và kiểm toán đối soát cho các lane mới của sàn.</p>
+            <p class="mb-0 hero-subtitle">
+                Theo dõi nhật ký thao tác admin, kiểm toán kiểm duyệt và kiểm toán đối soát cho các lane mới của sàn.
+            </p>
         </div>
-        <div class="hero-chip ff-admin-chip">7.7A Audit MVP</div>
+        <div class="hero-side position-relative">
+            <div class="hero-chip ff-admin-chip">7.7A Audit MVP</div>
+        </div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
     {
-        <div class="alert alert-warning">@pageError</div>
+        <div class="alert alert-warning soft-alert">@pageError</div>
     }
 
     <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Nhật ký thao tác</span><strong>@Model.Stats.TotalActionLogs</strong><small>@Model.Stats.Recent24hActions trong 24 giờ</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Kiểm duyệt</span><strong>@Model.Stats.ModerationCount</strong><small>quyết định kiểm duyệt</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">Đối soát</span><strong>@Model.Stats.SettlementCount</strong><small>bản ghi kiểm toán sổ cái</small></div></div>
-        <div class="col-md-6 col-xl-3"><div class="metric-card"><span class="metric-label">7 ngày</span><strong>@Model.Stats.SettlementAmount7d.ToString("N0") đ</strong><small>tổng giá trị kiểm toán đối soát</small></div></div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card stat-card">
+                <span class="metric-label">Nhật ký thao tác</span>
+                <strong>@Model.Stats.TotalActionLogs</strong>
+                <small>@Model.Stats.Recent24hActions trong 24 giờ</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card stat-card">
+                <span class="metric-label">Kiểm duyệt</span>
+                <strong>@Model.Stats.ModerationCount</strong>
+                <small>quyết định kiểm duyệt</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card stat-card">
+                <span class="metric-label">Đối soát</span>
+                <strong>@Model.Stats.SettlementCount</strong>
+                <small>bản ghi kiểm toán sổ cái</small>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="metric-card stat-card highlight-card">
+                <span class="metric-label">7 ngày</span>
+                <strong>@Model.Stats.SettlementAmount7d.ToString("N0") đ</strong>
+                <small>tổng giá trị kiểm toán đối soát</small>
+            </div>
+        </div>
     </div>
 
-    <div class="panel-card mb-4">
+    <div class="panel-card glass-card mb-4">
+        <div class="panel-head d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+            <div>
+                <h2 class="h5 mb-1">Nhật ký đăng nhập backoffice</h2>
+                <p class="text-muted mb-0">
+                    Theo dõi đăng nhập Admin và Seller, gồm kết quả, IP, thiết bị và cờ đáng ngờ để phục vụ truy vết bảo mật.
+                </p>
+            </div>
+            <div class="section-badge">
+                <span>Security Audit</span>
+            </div>
+        </div>
+
+        @if (ViewBag.AuthError is string authError && !string.IsNullOrWhiteSpace(authError))
+        {
+            <div class="alert alert-warning soft-alert">@authError</div>
+        }
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">24 giờ</span><strong>@Model.AuthStats.Total24h</strong><small>tổng sự kiện</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Thành công</span><strong>@Model.AuthStats.Success24h</strong><small>đăng nhập hợp lệ</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Thất bại</span><strong>@Model.AuthStats.Failed24h</strong><small>sai thông tin/OTP</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Lockout</span><strong>@Model.AuthStats.Locked24h</strong><small>tài khoản bị khóa</small></div></div>
+            <div class="col-md-6 col-xl-4"><div class="metric-card metric-card-sm danger-glow"><span class="metric-label">Đáng ngờ</span><strong>@Model.AuthStats.Suspicious24h</strong><small>sự kiện bị gắn cờ cần theo dõi</small></div></div>
+        </div>
+
+        <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="filter-card row g-3 mb-4">
+            <input type="hidden" name="q" value="@Model.Query" />
+            <input type="hidden" name="area" value="@Model.Area" />
+            <input type="hidden" name="type" value="@Model.Type" />
+
+            <div class="col-md-5">
+                <div class="input-shell">
+                    <input class="form-control" type="text" name="authQ" value="@Model.AuthQuery" placeholder="Tìm theo tài khoản, email, IP, user-agent..." />
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="authRole">
+                    @foreach (var option in Model.AuthRoleOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.AuthRole)">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="authOutcome">
+                    @foreach (var option in Model.AuthOutcomeOptions)
+                    {
+                        <option value="@option.Value" selected="@(option.Value == Model.AuthOutcome)">@option.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 d-grid">
+                <button class="btn btn-primary btn-pill" type="submit">Lọc</button>
+            </div>
+        </form>
+
+        <div class="table-shell">
+            <div class="table-responsive">
+                <table class="table align-middle audit-table table-modern mb-0">
+                    <thead>
+                        <tr>
+                            <th>Thời gian</th>
+                            <th>Tài khoản</th>
+                            <th>Sự kiện</th>
+                            <th>Thiết bị</th>
+                            <th>IP</th>
+                            <th>Kết quả</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.AuthAudits.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">
+                                    <div class="empty-state">
+                                        <div class="empty-icon">🛡️</div>
+                                        <p class="mb-0">Chưa có sự kiện đăng nhập Admin hoặc Seller khớp bộ lọc hiện tại.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model.AuthAudits)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@item.OccurredAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
+                                        <div class="small text-muted">@item.ClientLane / @item.RoleName</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@(item.UserName ?? item.Identifier)</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.Email))
+                                        {
+                                            <div class="small text-muted">@item.Email</div>
+                                        }
+                                        <div class="small text-muted">@item.Identifier</div>
+                                        @if (item.UserId.HasValue)
+                                        {
+                                            <div class="small text-muted">User #@item.UserId</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@item.EventType.Replace("_", " ")</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.FailureReason))
+                                        {
+                                            <div class="small text-muted">Lý do: @item.FailureReason.Replace("_", " ")</div>
+                                        }
+                                        @if (item.FailedAttemptCount.HasValue)
+                                        {
+                                            <div class="small text-muted">Số lần sai liên tiếp: @item.FailedAttemptCount</div>
+                                        }
+                                        @if (item.IsSuspicious)
+                                        {
+                                            <div class="small suspicious-text mt-1">Đáng ngờ: @item.SuspicionReasons</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@item.DeviceType</div>
+                                        <div class="small text-muted">@item.BrowserFamily / @item.OperatingSystem</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.UserAgent))
+                                        {
+                                            <div class="small text-muted text-break">@(item.UserAgent!.Length > 120 ? item.UserAgent[..120] + "..." : item.UserAgent)</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@(item.IpAddress ?? "-")</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.ForwardedFor))
+                                        {
+                                            <div class="small text-muted text-break">X-Forwarded-For: @item.ForwardedFor</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.Success)
+                                        {
+                                            <span class="badge badge-status badge-success">Thành công</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge badge-status badge-danger">Thất bại</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel-card glass-card mb-4">
         <div class="panel-head">
             <h2 class="h5 mb-1">Lọc kiểm toán</h2>
-            <p class="text-muted mb-0">Tập trung vào trung tâm chiến dịch và trung tâm rủi ro trước khi mở rộng thêm sang lane kiểm duyệt và tài chính.</p>
+            <p class="text-muted mb-0">
+                Tập trung vào trung tâm chiến dịch và trung tâm rủi ro trước khi mở rộng thêm sang lane kiểm duyệt và tài chính.
+            </p>
         </div>
-        <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="row g-3">
+
+        <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="filter-card row g-3">
             <div class="col-md-5">
-                <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo khu vực, thao tác, tóm tắt..." />
+                <div class="input-shell">
+                    <input class="form-control" type="text" name="q" value="@Model.Query" placeholder="Tìm theo khu vực, thao tác, tóm tắt..." />
+                </div>
             </div>
             <div class="col-md-3">
                 <select class="form-select" name="area">
@@ -51,62 +236,70 @@
                 </select>
             </div>
             <div class="col-md-1 d-grid">
-                <button class="btn btn-primary" type="submit">Lọc</button>
+                <button class="btn btn-primary btn-pill" type="submit">Lọc</button>
             </div>
         </form>
     </div>
 
     <div class="row g-4">
         <div class="col-xl-7">
-            <div class="panel-card mb-4">
+            <div class="panel-card glass-card mb-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Nhật ký thao tác admin</h2>
-                    <p class="text-muted mb-0">Ghi lại thao tác admin ở mức hành động, nguồn và đích để truy vết nhanh khi có sự cố runtime.</p>
+                    <p class="text-muted mb-0">
+                        Ghi lại thao tác admin ở mức hành động, nguồn và đích để truy vết nhanh khi có sự cố runtime.
+                    </p>
                 </div>
-                <div class="table-responsive">
-                    <table class="table align-middle audit-table">
-                        <thead>
-                            <tr>
-                                <th>Thao tác</th>
-                                <th>Đối tượng</th>
-                                <th>Người thực hiện</th>
-                                <th>Thời gian</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (Model.ActionLogs.Count == 0)
-                            {
-                                <tr><td colspan="4" class="text-center text-muted py-4">Chưa có nhật ký thao tác admin nào.</td></tr>
-                            }
-                            else
-                            {
-                                @foreach (var item in Model.ActionLogs)
+
+                <div class="table-shell">
+                    <div class="table-responsive">
+                        <table class="table align-middle audit-table table-modern mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Thao tác</th>
+                                    <th>Đối tượng</th>
+                                    <th>Người thực hiện</th>
+                                    <th>Thời gian</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (Model.ActionLogs.Count == 0)
                                 {
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">@item.ActionName.Replace("_", " ")</div>
-                                            <div class="small text-muted">@item.Area.Replace("_", " ")</div>
-                                            <div class="small mt-1">@item.Summary</div>
-                                        </td>
-                                        <td>
-                                            <div class="fw-semibold">@item.TargetType.Replace("_", " ")</div>
-                                            <div class="small text-muted">#@(item.TargetId?.ToString() ?? "-")</div>
-                                        </td>
-                                        <td>Admin #@(item.ActorUserId?.ToString() ?? "-")</td>
-                                        <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                                    </tr>
+                                    <tr><td colspan="4" class="text-center text-muted py-5">Chưa có nhật ký thao tác admin nào.</td></tr>
                                 }
-                            }
-                        </tbody>
-                    </table>
+                                else
+                                {
+                                    @foreach (var item in Model.ActionLogs)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">@item.ActionName.Replace("_", " ")</div>
+                                                <div class="small text-muted">@item.Area.Replace("_", " ")</div>
+                                                <div class="small mt-1">@item.Summary</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold">@item.TargetType.Replace("_", " ")</div>
+                                                <div class="small text-muted">#@(item.TargetId?.ToString() ?? "-")</div>
+                                            </td>
+                                            <td>Admin #@(item.ActorUserId?.ToString() ?? "-")</td>
+                                            <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <div class="panel-card">
+            <div class="panel-card glass-card">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Kiểm toán kiểm duyệt</h2>
-                    <p class="text-muted mb-0">Tập trung vào các quyết định kiểm duyệt đi ra từ trung tâm rủi ro trong giai đoạn MVP.</p>
+                    <p class="text-muted mb-0">
+                        Tập trung vào các quyết định kiểm duyệt đi ra từ trung tâm rủi ro trong giai đoạn MVP.
+                    </p>
                 </div>
+
                 <div class="detail-stack">
                     @if (Model.ModerationAudits.Count == 0)
                     {
@@ -122,7 +315,11 @@
                                     <div class="small text-muted">@item.SubjectType.Replace("_", " ") #@(item.SubjectId?.ToString() ?? "-")</div>
                                     <div class="small">@item.Notes</div>
                                 </div>
-                                <div class="small text-end text-muted">@item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")<br />Admin #@(item.ActorUserId?.ToString() ?? "-")</div>
+                                <div class="small text-end text-muted">
+                                    @item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")
+                                    <br />
+                                    Admin #@(item.ActorUserId?.ToString() ?? "-")
+                                </div>
                             </div>
                         }
                     }
@@ -131,11 +328,14 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="panel-card sticky-panel">
+            <div class="panel-card glass-card sticky-panel highlight-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Kiểm toán đối soát</h2>
-                    <p class="text-muted mb-0">Theo dõi nạp tiền, chi tiêu và ngân sách giữ chỗ từ ví quảng cáo để đối chiếu với lane tài chính về sau.</p>
+                    <p class="text-muted mb-0">
+                        Theo dõi nạp tiền, chi tiêu và ngân sách giữ chỗ từ ví quảng cáo để đối chiếu với lane tài chính về sau.
+                    </p>
                 </div>
+
                 <div class="detail-stack">
                     @if (Model.SettlementAudits.Count == 0)
                     {
@@ -152,7 +352,11 @@
                                     <div class="small text-muted">Seller #@(item.SellerId?.ToString() ?? "-")</div>
                                     <div class="small">@item.Notes</div>
                                 </div>
-                                <div class="small text-end text-muted">@((item.Amount ?? 0m).ToString("N0")) @item.Currency<br />@item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")</div>
+                                <div class="small text-end text-muted">
+                                    @((item.Amount ?? 0m).ToString("N0")) @item.Currency
+                                    <br />
+                                    @item.CreatedAt.ToLocalTime().ToString("dd/MM HH:mm")
+                                </div>
                             </div>
                         }
                     }
@@ -163,69 +367,329 @@
 </section>
 
 <style>
+    :root {
+        --primary-blue: #1e40af;
+        --primary-blue-light: #3b82f6;
+        --primary-blue-dark: #1e3a8a;
+        --accent-blue: #0ea5e9;
+        --sky-blue: #60a5fa;
+        --bg-blue-light: #eff6ff;
+        --bg-blue-lighter: #dbeafe;
+        --border-blue: #bfdbfe;
+        --text-deep: #0f172a;
+        --text-soft: #64748b;
+    }
+
+    @@keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(24px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @@keyframes slideInLeft {
+        from {
+            opacity: 0;
+            transform: translateX(-18px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @@keyframes floatY {
+        0%, 100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    @@keyframes rotateSoft {
+        from {
+            transform: rotate(0deg);
+        }
+
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    @@keyframes shimmerSweep {
+        0% {
+            transform: translateX(-160%) skewX(-20deg);
+            opacity: 0;
+        }
+
+        20% {
+            opacity: .55;
+        }
+
+        100% {
+            transform: translateX(220%) skewX(-20deg);
+            opacity: 0;
+        }
+    }
+
+    .audit-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+        padding-bottom: 2rem;
+    }
+
     .audit-console .audit-hero {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        gap: 1rem;
-        padding: 1.5rem 1.75rem;
-        border-radius: 1.5rem;
-        background: linear-gradient(135deg, #0f172a 0%, #14532d 45%, #38bdf8 100%);
+        gap: 1.25rem;
+        padding: 1.8rem 2rem;
+        border-radius: 1.75rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 52%, #60a5fa 100%);
         color: #fff;
-        box-shadow: 0 24px 50px rgba(15, 23, 42, .2);
+        box-shadow: 0 24px 55px rgba(30, 64, 175, .35);
+        animation: fadeInUp .55s ease-out;
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+    }
+
+        .audit-console .audit-hero::before {
+            content: "";
+            position: absolute;
+            inset: -35%;
+            background: radial-gradient(circle, rgba(255,255,255,.16) 0%, transparent 65%);
+            animation: rotateSoft 26s linear infinite;
+            z-index: 0;
+        }
+
+        .audit-console .audit-hero::after {
+            content: "";
+            position: absolute;
+            top: -20%;
+            left: -30%;
+            width: 32%;
+            height: 170%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), rgba(255,255,255,.42), transparent);
+            transform: skewX(-20deg);
+            animation: shimmerSweep 4.8s ease-in-out infinite;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+    .audit-console .hero-content,
+    .audit-console .hero-side {
+        z-index: 2;
+    }
+
+    .audit-console .hero-subtitle {
+        max-width: 760px;
+        opacity: .92;
+        text-shadow: 0 2px 8px rgba(0,0,0,.18);
     }
 
     .audit-console .hero-chip {
-        padding: .5rem .85rem;
+        padding: .7rem 1rem;
         border-radius: 999px;
-        background: rgba(255,255,255,.14);
+        background: rgba(255,255,255,.16);
+        border: 1px solid rgba(255,255,255,.24);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
         font-weight: 700;
+        box-shadow: 0 10px 30px rgba(0,0,0,.12);
     }
 
     .audit-console .eyebrow,
     .audit-console .metric-label {
-        letter-spacing: .15em;
+        letter-spacing: .14em;
         font-weight: 700;
+        text-transform: uppercase;
     }
 
     .audit-console .metric-card,
     .audit-console .panel-card {
-        background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
-        border: 1px solid rgba(15,23,42,.08);
-        border-radius: 1.25rem;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, .08);
+        background: rgba(255,255,255,.92);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border: 1px solid rgba(30, 64, 175, .10);
+        border-radius: 1.5rem;
+        box-shadow: 0 18px 48px rgba(30, 64, 175, .12);
     }
 
     .audit-console .metric-card {
-        padding: 1.25rem;
         min-height: 128px;
+        padding: 1.25rem;
+        position: relative;
+        overflow: hidden;
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+        animation: fadeInUp .55s ease-out backwards;
+    }
+
+        .audit-console .metric-card:hover,
+        .audit-console .panel-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 24px 55px rgba(30, 64, 175, .18);
+        }
+
+        .audit-console .metric-card::after,
+        .audit-console .highlight-panel::after,
+        .audit-console .highlight-card::after {
+            content: "";
+            position: absolute;
+            top: -30%;
+            left: -45%;
+            width: 42%;
+            height: 180%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), rgba(255,255,255,.52), transparent);
+            transform: skewX(-20deg);
+            animation: shimmerSweep 5.8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+    .audit-console .metric-card-sm {
+        min-height: 104px;
     }
 
     .audit-console .metric-card strong {
         display: block;
+        margin: .35rem 0;
         font-size: 2rem;
         line-height: 1.1;
-        color: #0f172a;
+        color: var(--primary-blue-dark);
+    }
+
+    .audit-console .metric-card small {
+        color: var(--text-soft);
     }
 
     .audit-console .panel-card {
         padding: 1.5rem;
+        animation: fadeInUp .6s ease-out;
+    }
+
+    .audit-console .glass-card {
+        position: relative;
+        overflow: hidden;
     }
 
     .audit-console .panel-head {
         margin-bottom: 1rem;
     }
 
-    .audit-console .audit-table th {
-        font-size: .8rem;
+    .audit-console .section-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .6rem .95rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border: 1px solid #bfdbfe;
+        color: var(--primary-blue-dark);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .audit-console .filter-card {
+        padding: 1rem;
+        margin: 0;
+        border-radius: 1.35rem;
+        background: linear-gradient(135deg, rgba(255,255,255,.96) 0%, rgba(240,249,255,.95) 100%);
+        border: 1px solid #bfdbfe;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+    }
+
+    .audit-console .input-shell {
+        position: relative;
+    }
+
+    .audit-console .form-control,
+    .audit-console .form-select {
+        border: 2px solid #bfdbfe;
+        border-radius: 1rem;
+        padding: .875rem 1rem;
+        min-height: 50px;
+        background: rgba(255,255,255,.97);
+        transition: all .3s ease;
+        box-shadow: none;
+    }
+
+        .audit-console .form-control:focus,
+        .audit-console .form-select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 5px rgba(59, 130, 246, .14);
+            background: #fff;
+        }
+
+    .audit-console .btn-pill {
+        border: none;
+        border-radius: 999px;
+        font-weight: 700;
+        min-height: 50px;
+        padding: .8rem 1.25rem;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 12px 28px rgba(30, 64, 175, .28);
+        transition: all .3s cubic-bezier(.4,0,.2,1);
+    }
+
+        .audit-console .btn-pill:hover,
+        .audit-console .btn-pill:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 32px rgba(30, 64, 175, .34);
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+        }
+
+    .audit-console .table-shell {
+        border-radius: 1.25rem;
+        overflow: hidden;
+        border: 1px solid rgba(191, 219, 254, .85);
+        background: rgba(255,255,255,.78);
+    }
+
+    .audit-console .table-modern {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .audit-console .audit-table thead th {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        border-bottom: 3px solid #3b82f6;
+        font-size: .76rem;
         text-transform: uppercase;
         letter-spacing: .08em;
-        color: #6b7280;
+        color: #1e3a8a;
+        padding: 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .audit-console .audit-table tbody tr {
+        transition: all .28s cubic-bezier(.4,0,.2,1);
+        animation: slideInLeft .4s ease-out backwards;
+    }
+
+        .audit-console .audit-table tbody tr:hover {
+            background: linear-gradient(90deg, rgba(59,130,246,.07) 0%, rgba(147,197,253,.09) 100%);
+            transform: translateY(-2px);
+            box-shadow: inset 4px 0 0 #3b82f6;
+        }
+
+    .audit-console .audit-table td {
+        padding: 1rem;
+        border-color: rgba(226, 232, 240, .7);
     }
 
     .audit-console .detail-stack {
         display: grid;
-        gap: .85rem;
+        gap: .95rem;
     }
 
     .audit-console .detail-item {
@@ -233,9 +697,57 @@
         justify-content: space-between;
         align-items: center;
         gap: 1rem;
-        padding: .9rem 1rem;
-        border-radius: 1rem;
-        background: rgba(15, 23, 42, .03);
+        padding: 1rem 1.05rem;
+        border-radius: 1.15rem;
+        background: linear-gradient(135deg, rgba(239,246,255,.9) 0%, rgba(255,255,255,.95) 100%);
+        border: 1px solid rgba(191,219,254,.9);
+        transition: all .28s ease;
+    }
+
+        .audit-console .detail-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(59,130,246,.12);
+            background: linear-gradient(135deg, rgba(219,234,254,.9) 0%, rgba(255,255,255,.98) 100%);
+        }
+
+    .audit-console .badge-status {
+        padding: .55rem .9rem;
+        border-radius: 999px;
+        font-size: .8rem;
+        font-weight: 700;
+        letter-spacing: .02em;
+    }
+
+    .audit-console .badge-success {
+        color: #fff;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .audit-console .badge-danger {
+        color: #fff;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .audit-console .suspicious-text {
+        color: #dc2626;
+        font-weight: 700;
+    }
+
+    .audit-console .soft-alert {
+        border: none;
+        border-radius: 1.2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+
+    .audit-console .empty-state {
+        padding: 1rem;
+        color: var(--text-soft);
+    }
+
+    .audit-console .empty-icon {
+        font-size: 2.8rem;
+        margin-bottom: .5rem;
+        opacity: .6;
     }
 
     .audit-console .sticky-panel {
@@ -243,9 +755,42 @@
         top: 1rem;
     }
 
+    .audit-console .highlight-card strong,
+    .audit-console .highlight-panel h2 {
+        color: var(--primary-blue);
+    }
+
+    .audit-console .danger-glow {
+        box-shadow: 0 18px 48px rgba(239, 68, 68, .10), 0 0 0 1px rgba(239, 68, 68, .05);
+    }
+
     @@media (max-width: 1199.98px) {
         .audit-console .sticky-panel {
             position: static;
+        }
+    }
+
+    @@media (max-width: 991.98px) {
+        .audit-console .audit-hero {
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 1.5rem;
+        }
+    }
+
+    @@media (max-width: 767.98px) {
+        .audit-console .panel-card,
+        .audit-console .metric-card {
+            border-radius: 1.25rem;
+        }
+
+        .audit-console .audit-hero {
+            border-radius: 1.4rem;
+        }
+
+        .audit-console .detail-item {
+            flex-direction: column;
+            align-items: flex-start;
         }
     }
 </style>

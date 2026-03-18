@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
@@ -81,6 +82,7 @@ public sealed class BffSupportChatController : ControllerBase
 
     [HttpPost("conversations/{conversationId:int}/messages")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("support-chat")]
     public async Task<IActionResult> SendMessage([FromRoute] int conversationId, [FromBody] SendSupportMessageBridgeRequest? request)
     {
         if (conversationId <= 0)
@@ -107,6 +109,7 @@ public sealed class BffSupportChatController : ControllerBase
 
     [HttpPost("conversations/{conversationId:int}/mark-read")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("support-chat")]
     public async Task<IActionResult> MarkAsRead([FromRoute] int conversationId)
     {
         if (conversationId <= 0)

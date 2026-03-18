@@ -1,4 +1,7 @@
-﻿<!DOCTYPE html>
+@{
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
+}
+<!DOCTYPE html>
 
 <html>
 <head>
@@ -22,12 +25,12 @@
         </div>
     </div>
     @RenderSection("modal", required: false)
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+    <script nonce="@cspNonce" src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script nonce="@cspNonce" src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
 
-    <script src="~/seller/js/main.js"></script>
+    <script nonce="@cspNonce" src="~/seller/js/main.js"></script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

@@ -3,6 +3,7 @@
     var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
     var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
     var currentUrl = $"{currentPath}{currentQuery}";
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
 }
 
 <footer class="bg-dark text-white pt-5 pb-4">
@@ -14,16 +15,16 @@
                         <img src="@WebAssetPaths.LogoRequestPath"
                              alt="Logo FreshFarm"
                              class="brand-logo-image"
-                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <span class="brand-logo d-none">FF</span>
+                             data-fallback-toggle-target="footerLogoFallback" />
+                        <span id="footerLogoFallback" class="brand-logo d-none">FF</span>
                     </span>
                     <div>
                         <div class="fw-bold">FreshFarm</div>
                         <img src="@WebAssetPaths.SloganRequestPath"
                              alt="Nông sản sạch mỗi ngày"
                              class="brand-slogan-image brand-slogan-image-footer"
-                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <div class="small text-light-emphasis d-none">Nông sản sạch mỗi ngày</div>
+                             data-fallback-toggle-target="footerSloganFallback" />
+                        <div id="footerSloganFallback" class="small text-light-emphasis d-none">Nông sản sạch mỗi ngày</div>
                     </div>
                 </div>
                 <p class="small text-light-emphasis">
@@ -66,24 +67,24 @@
 
                 <div class="mt-3 d-flex gap-3">
                     <a href="https://www.facebook.com/" target="_blank" rel="noopener" class="social-icon" aria-label="Facebook">
-                        <img src="@WebAssetPaths.FacebookIconRequestPath" alt="Facebook" class="social-icon-image" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <i class="bi bi-facebook d-none"></i>
+                        <img src="@WebAssetPaths.FacebookIconRequestPath" alt="Facebook" class="social-icon-image" data-fallback-toggle-target="footerFacebookFallback" />
+                        <i id="footerFacebookFallback" class="bi bi-facebook d-none"></i>
                     </a>
                     <a href="https://www.instagram.com/" target="_blank" rel="noopener" class="social-icon" aria-label="Instagram">
-                        <img src="@WebAssetPaths.InstagramIconRequestPath" alt="Instagram" class="social-icon-image" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <i class="bi bi-instagram d-none"></i>
+                        <img src="@WebAssetPaths.InstagramIconRequestPath" alt="Instagram" class="social-icon-image" data-fallback-toggle-target="footerInstagramFallback" />
+                        <i id="footerInstagramFallback" class="bi bi-instagram d-none"></i>
                     </a>
                     <a href="https://zalo.me/" target="_blank" rel="noopener" class="social-icon" aria-label="Zalo">
-                        <img src="@WebAssetPaths.ZaloIconRequestPath" alt="Zalo" class="social-icon-image" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <i class="bi bi-chat-dots d-none"></i>
+                        <img src="@WebAssetPaths.ZaloIconRequestPath" alt="Zalo" class="social-icon-image" data-fallback-toggle-target="footerZaloFallback" />
+                        <i id="footerZaloFallback" class="bi bi-chat-dots d-none"></i>
                     </a>
                     <a href="https://www.google.com/" target="_blank" rel="noopener" class="social-icon" aria-label="Google">
-                        <img src="@WebAssetPaths.GoogleIconRequestPath" alt="Google" class="social-icon-image" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <i class="bi bi-google d-none"></i>
+                        <img src="@WebAssetPaths.GoogleIconRequestPath" alt="Google" class="social-icon-image" data-fallback-toggle-target="footerGoogleFallback" />
+                        <i id="footerGoogleFallback" class="bi bi-google d-none"></i>
                     </a>
                     <a href="https://www.tiktok.com/" target="_blank" rel="noopener" class="social-icon" aria-label="TikTok">
-                        <img src="@WebAssetPaths.TikTokIconRequestPath" alt="TikTok" class="social-icon-image" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <i class="bi bi-tiktok d-none"></i>
+                        <img src="@WebAssetPaths.TikTokIconRequestPath" alt="TikTok" class="social-icon-image" data-fallback-toggle-target="footerTikTokFallback" />
+                        <i id="footerTikTokFallback" class="bi bi-tiktok d-none"></i>
                     </a>
                 </div>
             </div>
@@ -95,3 +96,4 @@
         </div>
     </div>
 </footer>
+<script nonce="@cspNonce" src="~/js/csp-phase2.js" asp-append-version="true"></script>

@@ -2,6 +2,7 @@
 @model FreshFarm.Web.Bff.Dtos.RegisterRequestDto
 @{
     Layout = null;
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
     var returnUrl = ViewData["ReturnUrl"] as string;
     if (string.IsNullOrWhiteSpace(returnUrl))
     {
@@ -101,7 +102,7 @@
                      src="@WebAssetPaths.LogoRequestPath"
                      alt="Logo FreshFarm"
                      style="max-height: 70px"
-                     onerror="this.classList.add('d-none');document.getElementById('signupLogoFallback').classList.remove('d-none');" />
+                     data-fallback-toggle-target="signupLogoFallback" />
                 <div id="signupLogoFallback" class="logo-fallback d-none">
                     <i class="bi bi-person-plus-fill"></i>
                 </div>
@@ -234,20 +235,7 @@
     </div>
 
     <partial name="_ValidationScriptsPartial" />
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        (() => {
-            const forms = document.querySelectorAll(".needs-validation");
-            Array.from(forms).forEach(form => {
-                form.addEventListener("submit", event => {
-                    if (!form.checkValidity()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    form.classList.add("was-validated");
-                }, false);
-            });
-        })();
-    </script>
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script nonce="@cspNonce" src="~/js/csp-phase2.js" asp-append-version="true"></script>
 </body>
 </html>

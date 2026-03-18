@@ -201,7 +201,8 @@ public class HomeController : LegacySellerControllerBase
             var verifyResponse = await verifyClient.PostAsJsonAsync("/auth/login", new LoginRequestDto
             {
                 Identifier = admin.UserName,
-                Password = model.CurrentPassword
+                Password = model.CurrentPassword,
+                ClientLane = "Seller"
             });
 
             if (!verifyResponse.IsSuccessStatusCode)

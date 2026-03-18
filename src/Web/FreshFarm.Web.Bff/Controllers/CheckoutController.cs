@@ -8,7 +8,9 @@ using System.Net.Http.Headers; // AuthenticationHeaderValue.
 using System.Globalization;
 using System.Text;
 using System.Text.Json; // thêm ở đầu file
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using FreshFarm.Web.Bff.Models;
 using FreshFarm.Web.Bff.Options;
 namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
@@ -27,19 +29,25 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
     private readonly IVnPayService _vnPayService;
     private readonly VnPayOptions _vnPayOptions;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<CheckoutController> _logger;
 
     public CheckoutController(
         IHttpClientFactory httpClientFactory,
         ICartSessionService cart,
         IGhnSandboxService ghnSandboxService,
         IVnPayService vnPayService,
-        IOptions<VnPayOptions> vnPayOptions) // Inject dependencies.
+        IOptions<VnPayOptions> vnPayOptions,
+        IConfiguration configuration,
+        ILogger<CheckoutController> logger) // Inject dependencies.
     {
         _httpClientFactory = httpClientFactory;
         _cart = cart;
         _ghnSandboxService = ghnSandboxService;
         _vnPayService = vnPayService;
         _vnPayOptions = vnPayOptions.Value;
+        _configuration = configuration;
+        _logger = logger;
     }
 
     [HttpGet("/checkout")] // Render checkout từ dữ liệu cart hiện tại.
@@ -103,12 +111,21 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         var validation = _vnPayService.ValidateReturn(Request.Query);
         if (!validation.IsValid)
         {
+            _logger.LogWarning(
+                "VNPay return khong hop le tai BFF. Message={Message}, QueryString={QueryString}.",
+                validation.Message,
+                Request.QueryString.Value);
             return View("PaymentResult", BuildPaymentResultViewModel(null, false, validation.Message));
         }
 
         var token = HttpContext.Session.GetString(AccessTokenSessionKey);
         if (string.IsNullOrWhiteSpace(token))
         {
+            _logger.LogWarning(
+                "VNPay return hop le nhung session buyer da het han. OrderId={OrderId}, TxnRef={TxnRef}, TransactionNo={TransactionNo}.",
+                validation.OrderId,
+                validation.TxnRef,
+                validation.TransactionNo);
             return View("PaymentResult", BuildPaymentResultViewModel(
                 validation.OrderId,
                 false,
@@ -118,24 +135,18 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         var orderingClient = CreateAuthorizedOrderingClient(token);
         var finalizeResponse = await orderingClient.PostAsJsonAsync(
             $"/api/orders/{validation.OrderId}/payments/vnpay/finalize",
-            new FinalizeVnPayPaymentRequestDto
-            {
-                TxnRef = validation.TxnRef,
-                ResponseCode = validation.ResponseCode,
-                TransactionStatus = validation.TransactionStatus,
-                Amount = validation.Amount,
-                TransactionNo = validation.TransactionNo,
-                BankCode = validation.BankCode,
-                BankTransactionNo = validation.BankTransactionNo,
-                OrderInfo = validation.OrderInfo,
-                PaidAt = validation.PaidAt,
-                IsSuccess = validation.IsSuccess
-            },
+            BuildFinalizeVnPayRequest(validation),
             cancellationToken);
 
         if (!finalizeResponse.IsSuccessStatusCode)
         {
             var errorText = await finalizeResponse.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning(
+                "VNPay finalize that bai o Ordering. OrderId={OrderId}, TxnRef={TxnRef}, StatusCode={StatusCode}, Response={Response}.",
+                validation.OrderId,
+                validation.TxnRef,
+                (int)finalizeResponse.StatusCode,
+                errorText);
             return View("PaymentResult", BuildPaymentResultViewModel(
                 validation.OrderId,
                 false,
@@ -145,6 +156,14 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         }
 
         var finalizeResult = await finalizeResponse.Content.ReadFromJsonAsync<FinalizeVnPayPaymentResultDto>(cancellationToken: cancellationToken);
+        _logger.LogInformation(
+            "VNPay callback da duoc Ordering xu ly. OrderId={OrderId}, TxnRef={TxnRef}, Success={Success}, AlreadyProcessed={AlreadyProcessed}, PaymentStatus={PaymentStatus}, OrderStatus={OrderStatus}.",
+            validation.OrderId,
+            validation.TxnRef,
+            finalizeResult?.Success ?? validation.IsSuccess,
+            finalizeResult?.AlreadyProcessed ?? false,
+            finalizeResult?.PaymentStatus,
+            finalizeResult?.OrderStatus);
         if (validation.IsSuccess)
         {
             var pendingCheckout = GetPendingVnPayCheckoutFromSession();
@@ -175,6 +194,56 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             validation.OrderId,
             false,
             finalizeResult?.Message ?? validation.Message));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("/checkout/vnpay/ipn")]
+    public async Task<IActionResult> VnPayIpn(CancellationToken cancellationToken)
+    {
+        var validation = _vnPayService.ValidateReturn(Request.Query);
+        if (!validation.IsValid)
+        {
+            _logger.LogWarning(
+                "VNPay IPN khong hop le. Message={Message}, QueryString={QueryString}.",
+                validation.Message,
+                Request.QueryString.Value);
+            return Json(new { RspCode = "97", Message = validation.Message });
+        }
+
+        var orderingClient = CreateInternalOrderingClient();
+        var finalizeResponse = await orderingClient.PostAsJsonAsync(
+            $"/api/orders/internal/{validation.OrderId}/payments/vnpay/finalize",
+            BuildFinalizeVnPayRequest(validation),
+            cancellationToken);
+
+        var finalizeBody = await finalizeResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!finalizeResponse.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "VNPay IPN finalize that bai. OrderId={OrderId}, TxnRef={TxnRef}, StatusCode={StatusCode}, Response={Response}.",
+                validation.OrderId,
+                validation.TxnRef,
+                (int)finalizeResponse.StatusCode,
+                finalizeBody);
+
+            return Json(new
+            {
+                RspCode = "99",
+                Message = "Khong the doi soat IPN VNPay voi Ordering."
+            });
+        }
+
+        _logger.LogInformation(
+            "VNPay IPN da duoc xu ly. OrderId={OrderId}, TxnRef={TxnRef}, TransactionNo={TransactionNo}.",
+            validation.OrderId,
+            validation.TxnRef,
+            validation.TransactionNo);
+
+        return Json(new
+        {
+            RspCode = "00",
+            Message = "Confirm Success"
+        });
     }
 
     [HttpGet("/checkout/ghn/provinces")]
@@ -676,6 +745,37 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         var orderingClient = _httpClientFactory.CreateClient("Ordering");
         orderingClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return orderingClient;
+    }
+
+    private HttpClient CreateInternalOrderingClient()
+    {
+        var orderingClient = _httpClientFactory.CreateClient("Ordering");
+        var internalServiceKey = _configuration["Services:Ordering:InternalServiceKey"]?.Trim();
+        if (string.IsNullOrWhiteSpace(internalServiceKey))
+        {
+            throw new InvalidOperationException("Services:Ordering:InternalServiceKey chưa được cấu hình cho IPN VNPay.");
+        }
+
+        orderingClient.DefaultRequestHeaders.Remove("X-Internal-Service-Key");
+        orderingClient.DefaultRequestHeaders.Add("X-Internal-Service-Key", internalServiceKey);
+        return orderingClient;
+    }
+
+    private static FinalizeVnPayPaymentRequestDto BuildFinalizeVnPayRequest(VnPayReturnValidationResult validation)
+    {
+        return new FinalizeVnPayPaymentRequestDto
+        {
+            TxnRef = validation.TxnRef,
+            ResponseCode = validation.ResponseCode,
+            TransactionStatus = validation.TransactionStatus,
+            Amount = validation.Amount,
+            TransactionNo = validation.TransactionNo,
+            BankCode = validation.BankCode,
+            BankTransactionNo = validation.BankTransactionNo,
+            OrderInfo = validation.OrderInfo,
+            PaidAt = validation.PaidAt,
+            IsSuccess = validation.IsSuccess
+        };
     }
 
     private string ResolveClientIpAddress()

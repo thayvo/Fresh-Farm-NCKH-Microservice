@@ -85,6 +85,8 @@ builder.Services.AddDbContext<FreshFarmOrderingDBContext>(options =>
 });
 builder.Services.Configure<CatalogServiceOptions>(
     builder.Configuration.GetSection(CatalogServiceOptions.SectionName));
+builder.Services.Configure<InternalServiceAuthOptions>(
+    builder.Configuration.GetSection(InternalServiceAuthOptions.SectionName));
 builder.Services.AddHttpClient("Catalog", client =>
 {
     var baseUrl = builder.Configuration[$"{CatalogServiceOptions.SectionName}:BaseUrl"];

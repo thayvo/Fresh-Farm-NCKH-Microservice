@@ -6,6 +6,7 @@ namespace FreshFarm.Web.Bff.Dtos
     {
         public string Identifier { get; set; } = string.Empty; // Email hoac username.
         public string Password { get; set; } = string.Empty; // Mat khau.
+        public string? ClientLane { get; set; } // Buyer/Seller/Admin lane khoi tao request.
     }
 
     public sealed class RegisterRequestDto // Payload gui den Identity /auth/register.
@@ -25,7 +26,7 @@ namespace FreshFarm.Web.Bff.Dtos
         public string Email { get; set; } = string.Empty; // Email dang ky.
 
         [Required(ErrorMessage = "Số điện thoại không được để trống.")]
-        [RegularExpression(@"^(0|\+84)(\d){9,10}$", ErrorMessage = "Số điện thoại phải đúng định dạng Việt Nam.")]
+        [RegularExpression(@"^(0\d{9}|\+84\d{9})$", ErrorMessage = "Số điện thoại phải là số di động Việt Nam hợp lệ gồm 10 số, hoặc bắt đầu bằng +84.")]
         public string Phone { get; set; } = string.Empty; // So dien thoai.
 
         [Required(ErrorMessage = "Mật khẩu không được để trống.")]
@@ -73,6 +74,33 @@ namespace FreshFarm.Web.Bff.Dtos
     {
         public string AccessToken { get; set; } = string.Empty; // JWT.
         public DateTime ExpiredAtUtc { get; set; } // Han token.
+        public bool RequiresTwoFactor { get; set; }
+        public bool RequiresTwoFactorSetup { get; set; }
+        public string? TwoFactorTicket { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
+    }
+
+    public sealed class VerifyTwoFactorLoginRequestDto
+    {
+        public string Ticket { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+    }
+
+    public sealed class TwoFactorChallengeStateDto
+    {
+        public string Ticket { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
+        public string? ReturnUrl { get; set; }
+        public bool RequiresSetup { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
     }
 
     public sealed class ExternalLoginExchangeRequestDto
@@ -81,6 +109,43 @@ namespace FreshFarm.Web.Bff.Dtos
         public string Email { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public string? AvatarUrl { get; set; }
+    }
+
+    public sealed class RegisterResultDto
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string RoleName { get; set; } = string.Empty;
+        public bool EmailVerificationRequired { get; set; }
+        public bool VerificationEmailSent { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public sealed class ResendEmailVerificationRequestDto
+    {
+        [Required(ErrorMessage = "Email hoặc tên đăng nhập là bắt buộc.")]
+        [StringLength(100, ErrorMessage = "Thông tin nhận diện tối đa 100 ký tự.")]
+        public string Identifier { get; set; } = string.Empty;
+
+        public string? ReturnUrl { get; set; }
+    }
+
+    public sealed class EmailVerificationPendingViewModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string? Message { get; set; }
+        public string? ReturnUrl { get; set; }
+        public ResendEmailVerificationRequestDto ResendRequest { get; set; } = new();
+    }
+
+    public sealed class EmailVerificationResultViewModel
+    {
+        public bool Success { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string? ReturnUrl { get; set; }
+        public string? Email { get; set; }
     }
 
     public sealed class OrderHistoryItemDto // Item de render lich su don.

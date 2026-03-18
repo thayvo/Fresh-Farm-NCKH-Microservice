@@ -18,8 +18,35 @@
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Security hardening P2.1 phase 2 dot 3 complete (2026-03-18): da tach khoi inline script lon con lai o `Views/Home/Index.cshtml` sang `wwwroot/js/home-page.js`; trang chu public gio chi con script ngoai (`home-page.js`, `home-welcome-popup.js`, `csp-phase2.js`) va config qua DOM data attributes/anti-forgery form an, giup giam them phu thuoc `'unsafe-inline'`.
+  - Admin auth audit trail implementation complete (2026-03-18): Identity da persist `AuthAuditLog` cho `Admin` + `Seller` (login success/fail/lockout/2FA), co IP, forwarded IP, user-agent, device/browser/OS summary, va co dang ngo co ban; `Audit Center` o BFF Admin da co thong ke 24h, bo loc role/outcome, va bang tra cuu login backoffice.
+  - Security hardening P2.1 phase 2 dot 2 partial complete (2026-03-18): `Views/Cart/Index.cshtml` da bo toan bo inline script sang `wwwroot/js/cart-page.js`; `Views/Home/Index.cshtml` da bo inline popup handlers `onclick`, tach logic popup sang `wwwroot/js/home-welcome-popup.js`, va them DOM config cho image paths. `Home/Index` van con script inline lon cho product/category/suggestion nen chua the bo `'unsafe-inline'`.
+  - Scope clarification (2026-03-18): `Admin auth audit trail` ban dau uu tien lane `Admin` de kip bao cao. Co the thiet ke schema dung chung cho `Seller`/`Customer`, nhung pha 1 UI va truy van se tap trung vao Admin; khong coi day la full audit cho buyer/user ngay tu dot dau.
+  - Priority shift (2026-03-18): truoc khi lam tiep cac muc hardening khac trong roadmap, can lap ke hoach rieng cho `Admin auth audit trail` de kip tien do bao cao. Scope can phan biet ro voi `Audit Center` hien tai: day la auth/login audit, khong phai moderation/settlement audit.
+  - Admin auth audit coverage assessment (2026-03-18): code hien tai DA co application/security logging cho login fail, lockout, 2FA, Google cancel/fail o Identity API; NHUNG chua co persisted admin sign-in audit log rieng luu IP, user-agent/thiet bi, danh gia dang ngo, hay phan loai y do tan cong. Audit Center hien tai chu yeu doc `AdminActionLog`, `ModerationAudit`, `SettlementAudit` cho thao tac van hanh/backoffice, khong phai lich su dang nhap admin.
+  - Security hardening P2.1 phase 2 dot 1 complete (2026-03-18): da tach mot nhom inline event handler pho bien khoi lane public/shared sang `wwwroot/js/csp-phase2.js` (image fallback, bootstrap validation, confirm submit). Buoc nay giam phu thuoc `'unsafe-inline'` nhung CHUA du de enforce CSP vi `Views/Home/Index.cshtml`, `Views/Cart/Index.cshtml` va nhieu view khac van con inline script/style lon.
+  - Security hardening P2.1 phase 1 complete (2026-03-18): BFF da them `Content-Security-Policy-Report-Only` voi `CspNonce` theo request cho cac layout buyer/seller/admin dung chung. Chinh sach hien tai van giu `'unsafe-inline'` tam thoi trong `script-src/style-src` de tranh vo UI, va day chi la pha telemetry/chuan bi truoc khi giam inline va enforce CSP.
+  - Security hardening P2.2 phase 2 complete (2026-03-18): BFF da them `GET /checkout/vnpay/ipn`, goi internal finalize endpoint cua Ordering bang `X-Internal-Service-Key`; Ordering da tach `FinalizeVnPayPaymentCore(...)` va mo them `POST /api/orders/internal/{orderId}/payments/vnpay/finalize` de xu ly IPN/back-channel ma khong phu thuoc session buyer.
+  - Security hardening P2.2 phase 1 complete (2026-03-18): VNPay callback/finalize da duoc harden them. Ordering gio xu ly idempotent cho replay success hop le, reject callback xung dot sau khi order da `Paid`, reject `TransactionNo` trung order khac, ghi `ReconciliationLog` cho conflict/replay/mismatch/expiry, va BFF cung log callback/finalize de doi soat.
+  - 2FA QR rendering hardening (2026-03-18): man setup 2FA Seller/Admin da bo phu thuoc `qrcode.min.js` tu CDN. BFF render QR server-side bang `QRCoder` thanh `data:image/svg+xml;base64,...`, nen neu browser/webview chan CDN thi QR van phai hien.
+  - Runtime diagnosis (2026-03-18): loi `AdminAccount/Login` voi `HttpRequestException ... actively refused (localhost:7140)` da duoc doi chieu. `FreshFarm.Web.Bff` dang cau hinh `Services:Identity:BaseUrl = https://localhost:7140`, launch profile `https` cua Identity cung dung port nay, nhung runtime hien tai KHONG co service nghe tren `7140`; day la service-down/port-not-listening, khong phai loi controller login.
+  - Security hardening P1.4 complete (2026-03-18): Seller/Admin login da duoc doi thanh luong 2 buoc dung TOTP. Identity tra `RequiresTwoFactor` + `TwoFactorTicket`; neu tai khoan backoffice chua co `MFASecret` thi bat buoc setup Authenticator lan dau bang QR code + `manual entry key`, va BFF chi cap cookie dang nhap sau khi verify ma 6 so thanh cong.
+  - Security hardening P1.2 phase 2 complete (2026-03-18): BFF session store da ho tro cau hinh `Memory/Redis`. Mac dinh van fallback `DistributedMemoryCache` cho local/dev; neu production can multi-instance thi chi can doi `SessionStore:Provider = Redis` va cap `RedisConnectionString`, khong can sua code them.
+  - Security hardening P1.2 phase 1 complete (2026-03-18): BFF da persist DataProtection key ring vao `App_Data/DataProtectionKeys` voi `ApplicationName = FreshFarm.Bff`; muc tieu la giu auth cookie/external sign-in state on dinh qua restart. Session store van la `DistributedMemoryCache` cho local/dev va se can external distributed cache neu deploy production da-instance that.
+  - Email verification cross-device diagnosis (2026-03-18): neu link verify click tren desktop/cung thiet bi thi thanh cong nhung mo tren dien thoai thi fail, day KHONG giong loi timeout/mui gio; nghieng ve kha nang mail app/webview mobile dang rewrite/cat query `token` hoac user dang mo mail cu. Da doi token email verification/password reset sang Base64Url-safe de giam rui ro URL bi bien dang tren mobile.
+  - Email verification stabilization (2026-03-18): sau khi user gap bug signup/verify that, da bo sung persisted DataProtection key ring cho Identity tai `App_Data/DataProtectionKeys`, them logging that cho `AuthController.Register`, va dong bo validation phone signup theo so di dong Viet Nam hop le (`0` + 9 so hoac `+84` + 9 so).
+  - Email verification token fix (2026-03-18): tiep tuc sua `EmailVerificationTokenService` bo `ToUniversalTime()` khoi `BuildSecurityVersion` de tranh lech do `DateTime.Kind` khi so token verify, va bo sung log ro hon cho verify token fail.
+  - Security hardening P1 email verification complete (2026-03-18): tai khoan dang ky local bat buoc xac minh email truoc khi dang nhap; BFF them man `verify-email/pending`, `verify-email`, `gui lai email xac minh`; Google external login duoc xem la da xac minh email va se auto-confirm tai khoan trung email neu dang chua verify.
+  - Security hardening P1 forwarded headers complete (2026-03-18): BFF da cau hinh `ForwardedHeadersOptions` + `UseForwardedHeaders()` de doc `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` khi chay sau Cloudflare Tunnel; proxy trust duoc gioi han o loopback vi `cloudflared` dang ket noi local vao BFF.
+  - Security hardening P0.1 complete (2026-03-18): JWT khong con duoc nhung vao auth cookie claim `ff_access_token` o buyer/seller/admin login; token chi con luu trong session server-side.
+  - Security hardening P0.4 complete (2026-03-18): BFF cookie/session da duoc harden voi `SecurePolicy = Always`, `SameSite = Lax`, auth cookie name rieng `FreshFarm.Bff.Auth`, va external Google cookie cung duoc khoa qua HTTPS.
+  - Security hardening P0.2 complete (2026-03-18): BFF da them rate limiting theo endpoint cho login buyer/seller/admin, forgot/reset password, buyer support chat POST, va SignalR support-chat hub handshake.
+  - Security hardening P0.3 complete (2026-03-18): Identity API da bat lockout voi `FailedCount` + `LockedUntil`; sai 5 lan se khoa tam thoi 15 phut, login dung se reset bo dem, va Google external login cung ton trong trang thai khoa.
+  - Security hardening P0.5 complete (2026-03-18): BFF da them security headers co ban `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, va `Permissions-Policy`; co chu y chua bat CSP manh o buoc nay de tranh vo UI hien tai.
+  - Security hardening P0.6 complete (2026-03-18): da bo sung security logging cho login fail, lockout, login success sau lockout, forgot/reset password, va Google remote failure/cancel; identifier nhay cam duoc mask, khong log mat khau/JWT/token reset.
   - Security review refresh (2026-03-18): `docs/report-nhom-1-security-review.md` da duoc doi chieu lai voi code hien tai; ket luan la repo VAN con gap bao mat can lam, nhung report cu da loi thoi o 2 diem: `Google login` buyer-facing da co mot phan, va `VNPay` da co ky URL + verify callback hash + finalize flow.
   - Security hardening roadmap (2026-03-18): da tao file rieng `docs/security-hardening-roadmap-2026-03-18.md`; thu tu uu tien chot la `bo ff_access_token khoi cookie claim` -> `cookie/session hardening` -> `rate limit` -> `lockout` -> `security headers` -> `security logging` -> `forwarded headers` -> `email verification` -> `DataProtection/session production` -> `2FA Seller/Admin`.
+  - Security reporting support (2026-03-18): da tao file docs/security-hardening-worklog.txt de ghi lai tung buoc bao mat da lam theo dang tom tat, phuc vu viet bao cao va se tiep tuc cap nhat khi hardening them.
   - Seller review reply edit (2026-03-17): user yeu cau seller sua lai reply cu; API `/api/orders/admin/reviews/{reviewId}/replies` duoc doi thanh upsert theo seller actor (`AdminUserId` neu co, fallback `sellerId` tu token), va man Seller Review se doi nut thanh `Sửa phản hồi`, mo modal voi noi dung cu de cap nhat.
   - Buyer review seller replies (2026-03-17): seller da co backend reply rieng trong lane Seller, nen buyer-facing se tai lai cung root reviews va replies cong khai tren PDP; reply duoc render ben duoi review goc voi nhan trung tinh `Shop phản hồi`, khong mo quyen gui review cho nguoi chua mua.
   - Buyer product review gating (2026-03-17): user yeu cau chi nguoi da mua moi duoc danh gia; huong chot la PDP `/products/{id}` luon hien review public cho moi nguoi, nhung form review chi mo khi viewer co don chua san pham va don khong o cac trang thai `AwaitingPayment/Expired/Canceled` hoac payment `Failed/Expired`; moi user giu 1 review goc cho 1 san pham va gui lai se la cap nhat.
@@ -195,6 +222,73 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Da hoan tat P2.1 phase 2 dot 3 cho CSP:
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` da bo khoi inline script lon va chuyen sang `wwwroot/js/home-page.js`.
+      - Trang chu gio chi con script ngoai (`home-page.js`, `home-welcome-popup.js`, `csp-phase2.js`).
+      - Build pass:
+        - `FreshFarm.Web.Bff` (`bff_p2_csp_phase2_dot3`): `0 error`, `17 warning` cu.
+    - Da hoan tat `Admin auth audit trail` cho `Admin` + `Seller`:
+      - Identity them bang `AuthAuditLog`, service ghi auth event, API `GET /admin/auth-audit`.
+      - BFF Admin mo rong `Audit Center` de xem thong ke 24h va bang lich su login backoffice.
+      - Da them SQL delta/verify cho `FreshFarmIdentityDb`.
+        - Da hoan tat P2.1 phase 2 dot 2 partial cho CSP:
+          - `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml` da bo inline script va chuyen sang `wwwroot/js/cart-page.js`.
+          - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` da bo inline `onclick` popup welcome va tach logic popup sang `wwwroot/js/home-welcome-popup.js`.
+          - Build pass:
+            - `bff_p2_csp_phase2_dot2`: `0 error`, `17 warning` cu.
+        - Da hoan tat P2.1 phase 2 dot 1 cho CSP:
+          - Tao `src/Web/FreshFarm.Web.Bff/wwwroot/js/csp-phase2.js` de gom image fallback, bootstrap validation va submit confirm.
+          - Bo inline `onerror`/`onsubmit`/validation script o `SignIn`, `SignUp`, `_HeaderLegacy`, `_FooterLegacy`, `_ProductCard`, `Cart/Index`, `_ProfileAddressList`.
+          - Build pass:
+            - `bff_p2_csp_phase2_partial`: `0 error`, `17 warning` cu.
+        - Da hoan tat P2.1 phase 1 cho CSP:
+          - `Program.cs` them `Content-Security-Policy-Report-Only` + `CspNonce` moi request.
+          - Cac layout buyer/seller/admin dung chung da gan `nonce` vao script tags local/CDN.
+          - Build pass:
+            - `bff_p2_csp_phase1`: `0 error`, `17 warning` cu.
+      - Da hoan tat P2.2 phase 2 cho VNPay production hardening:
+        - BFF them `GET /checkout/vnpay/ipn` de xu ly IPN/back-channel.
+        - Ordering them `POST /api/orders/internal/{orderId}/payments/vnpay/finalize` duoc khoa bang `X-Internal-Service-Key`.
+        - Logic finalize VNPay duoc tach thanh core method dung chung cho buyer callback va IPN.
+        - Da them config local:
+          - `Services:Ordering:InternalServiceKey` trong BFF.
+          - `Services:InternalAuth:InternalServiceKey` trong Ordering.
+        - Build pass:
+          - `ordering_p2_vnpay_hardening_phase2`: `0 error`, `0 warning`.
+          - `bff_p2_vnpay_hardening_phase2`: `0 error`, `17 warning` cu.
+      - Da hoan tat P2.2 phase 1 cho VNPay production hardening:
+        - `OrdersController.FinalizeVnPayPayment` phat hien `TransactionNo` trung order khac.
+        - callback replay success cho order da `Paid` duoc bo qua an toan va tra `AlreadyProcessed = true`.
+        - callback xung dot / amount mismatch / callback sau expiry duoc reject va ghi `ReconciliationLog`.
+        - BFF `CheckoutController.VnPayReturn` da them logging cho validation fail, session-expired, finalize fail, finalize success.
+      - Da on dinh hoa them P1 signup/verify email:
+        - `Identity Program.cs` persist DataProtection keys o `App_Data/DataProtectionKeys`.
+      - `AuthController.Register` them `LogError(...)` trong catch de khong con nuot loi runtime.
+      - `AuthController` validate + normalize phone signup theo so di dong Viet Nam hop le.
+      - `RegisterRequestDto.Phone` o BFF da doi regex cho khop backend.
+      - Build `FreshFarm.Identity.API` pass (`.codex-build/identity_signup_verify_fix`).
+      - Build `FreshFarm.Web.Bff` pass (`.codex-build/bff_signup_verify_fix`).
+    - Da sua tiep verify token email:
+      - `EmailVerificationTokenService` bo `ToUniversalTime()` khi tao `security version`, doi sang `versionMoment.Ticks`.
+      - `VerifyEmail` log kem `tokenError` de phan biet `invalid`, `expired`, hay `security version mismatch`.
+      - Build `FreshFarm.Identity.API` pass (`.codex-build/identity_verify_token_kind_fix`).
+    - Da sua loi runtime `InventoryReconciliationService` trong `Ordering`: bo `string.Equals(..., StringComparison.OrdinalIgnoreCase)` khoi LINQ-to-EF query, doi thanh so sanh SQL-translatable `o.PaymentStatus == "Paid"`; build `FreshFarm.Ordering.Api` pass.
+    - Da hoan tat P1 `email verification` cho local signup/login:
+      - Identity them `EmailConfirmed`, `EmailConfirmedAt`, token xac minh email, endpoint `resend-email-verification` va `verify-email`.
+      - Login local se bi chan neu email chua xac minh.
+      - BFF them man `verify-email/pending`, `verify-email/result`, va resend email xac minh tu signin/pending page.
+      - Google external login tao moi/auto-confirm tai khoan voi `EmailConfirmed = true`.
+      - Da them SQL `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-18.email-verification.delta.sql` va file verify tuong ung.
+    - Da hoan tat P1 `forwarded headers / proxy hardening` cho `FreshFarm.Web.Bff`:
+      - them `ForwardedHeadersOptions` doc `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`,
+      - trust loopback (`127.0.0.1`, `::1`) vi `cloudflared` dang ket noi local,
+      - dat `UseForwardedHeaders()` truoc `UseHttpsRedirection`.
+    - Da hoan tat P0.1 theo roadmap bao mat:
+      - bo claim `ff_access_token` khoi cookie auth buyer o `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
+      - bo claim `ff_access_token` khoi cookie auth seller o `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SellerAccountController.cs`
+      - bo claim `ff_access_token` khoi cookie auth admin o `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AdminAccountController.cs`
+      - xac nhan toan repo BFF khong con tham chieu `ff_access_token`
+      - build pass: `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_p0_token_claim_cleanup\` => `0 Error(s)`, `17 Warning(s)` cu.
     - Da doc lai `docs/report-nhom-1-security-review.md` va doi chieu voi code hien tai:
       - report cu da lech o `Google login` vi BFF + Identity da co external login buyer-facing.
       - report cu da lech o `VNPay secure flow` vi BFF da co ky URL, verify callback hash va goi Ordering finalize.
@@ -1830,8 +1924,10 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-    - User dang hoi quy trinh merge nhanh hien tai vao `dev` an toan, khong mat thay doi.
-    - Tra loi user ve ket luan security moi: repo van con gap bao mat can lam va roadmap da duoc ghi vao `docs/security-hardening-roadmap-2026-03-18.md`.
+        - Dang cho user apply SQL `FreshFarmIdentityDb.2026-03-18.admin-auth-audit.delta.sql`, restart `FreshFarm.Identity.API` + `FreshFarm.Web.Bff`, va retest auth audit trail.
+    - Dang cho user restart `FreshFarm.Web.Bff` va retest `Cart/Index` + `Home/Index` sau patch CSP phase 2 dot 3.
+        - Dang cho user restart `FreshFarm.Ordering.Api` va `FreshFarm.Web.Bff`, sau do retest callback VNPay buyer-facing + IPN/back-channel sau patch `P2.2` phase 2.
+        - Dang cho user restart `FreshFarm.Identity.API` va `FreshFarm.Web.Bff`, sau do retest lai flow signup/verify/login tren `app.thayvo.id.vn` sau patch on dinh hoa va token-kind fix.
     - Cho user retest buyer-facing review tren PDP va chi tiet don hang:
       - user chua mua chi xem duoc review,
       - user da mua co the gui/cap nhat review.
@@ -1867,8 +1963,19 @@
       - Ban giao patch reconciliation job de tu sua lech `ReservedStock` va reservation status sau su co.
       - User retest `/cart` sau patch thumb/icon/summary cleanup.
   - *Next*:
-      - Neu user muon, ho tro tiep cac lenh `git` cu the de merge/rebase branch hien tai vao `dev` va xu ly conflict.
-      - Neu user chot thuc thi, bat dau P0.1: bo `ff_access_token` khoi auth cookie claim o buyer + seller + admin login.
+        - User retest login fail/success/lockout/2FA cho Admin va Seller, kiem tra `/Admin/Audit/Index`.
+    - Sau khi user retest ban patch vua xong, lam tiep `P2.1` phase 2 dot 4: ra soat cac page buyer-facing standalone con inline script/style/event handler de tiep tuc loai dan `'unsafe-inline'`.
+        - Thu gom CSP violation tu browser/DevTools de chot danh sach inline script/style/event handler can giam tiep truoc khi bo `'unsafe-inline'`.
+        - Restart `FreshFarm.Ordering.Api` va `FreshFarm.Web.Bff`.
+        - Dat `IpnUrl = https://app.thayvo.id.vn/checkout/vnpay/ipn` trong VNPay sandbox va retest giao dich moi.
+      - Retest giao dich VNPay thanh cong, replay callback, callback amount-mismatch/conflict, va IPN khong co buyer session.
+      - Neu tiep tuc roadmap bao mat: uu tien `P2.1 CSP` hoac doi soat giao dich VNPay theo lich.
+      - Restart `FreshFarm.Identity.API` va `FreshFarm.Web.Bff`.
+    - Retest tren `https://app.thayvo.id.vn/account/signup` voi phone hop le 10 so.
+    - Neu signup van fail: doc log Identity runtime moi o `Register` de lay exception that.
+    - Retest bam link verify email moi sau restart de xac nhan token khong con bi invalid/ngay lap tuc het han gia.
+    - Neu user muon, ho tro tiep cac lenh `git` cu the de merge/rebase branch hien tai vao `dev` va xu ly conflict.
+    - Neu user chot thuc thi tiep roadmap bao mat, buoc sau co the la DataProtection key ring/session production hoac 2FA Seller/Admin.
       - Neu user muon toi uu hon nua, co the doi alias route cu sang redirect 301/302 thay vi map truc tiep action.
       - Neu user muon lam sach ten codebase hon nua, co the doi ten seller `AdminAccountController`/view/model sang `SellerAccount` de tranh nham nghia noi bo.
       - Neu user muon mo rong tiep, co the dua 2 link policy len them o trang dang nhap/dang ky hoac cac footer lane khac.
@@ -2220,6 +2327,9 @@
       - quay lai lane `buyer/public marketplace` theo uu tien user,
       - hoac tiep tuc mo rong admin lane sau khi hardening `7.7A` da sach build.
 - **Open questions** (UNCONFIRMED if needed):
+  - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau patch `2FA QR server-side`; neu chua restart thi man setup van chi hien `manual entry key`.
+  - UNCONFIRMED user da chay `FreshFarm.Identity.API` bang profile `https` sau cac patch moi nhat; neu chay profile khac hoac service chua start thi BFF se tiep tuc loi `actively refused (localhost:7140)`.
+  - UNCONFIRMED user da restart `FreshFarm.Identity.API` va `FreshFarm.Web.Bff` sau patch `P1.4 2FA Seller/Admin`; can retest luong setup key lan dau va login OTP cho 2 lane backoffice.
   - User co muon bien nhom hardening P0 trong file audit thanh code ngay sau turn nay khong? (UNCONFIRMED)
   - Da xac nhan user da dien xong config sandbox VNPay (`TmnCode`, `HashSecret`, `ReturnUrl`) vao BFF dev config/user-secrets; chua test runtime callback.
   - Da xac nhan user da yeu cau bat dau ngay; Sprint A buoc 1 (Dashboard global) da duoc implement.
@@ -2245,6 +2355,9 @@
   - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_timezone_fix`; can tao lai mot payment URL moi vi link cu van mang timestamp UTC/het han.
   - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_signature_format_fix`; can tao mot giao dich VNPay moi vi link cu van mang chu ky sai format.
   - UNCONFIRMED user da restart `FreshFarm.Web.Bff` sau ban `bff_vnpay_paymentresult_model_fix`; can mo lai trang callback VNPay hoac tao giao dich moi de xac nhan da het `RuntimeBinderException`.
+  - UNCONFIRMED user da restart `FreshFarm.Identity.API` SAU khi ban URL-safe verify token/Base64Url patch; neu chua thi email moi gui tuoc van co the mang token cu.
+  - UNCONFIRMED phone dang mo CHINH email verify moi nhat hay email cu/da cache trong app mail.
+  - UNCONFIRMED user da apply SQL `FreshFarmIdentityDb.2026-03-18.admin-auth-audit.delta.sql` tren DB Identity that.
   - **Working set** (files/ids/commands):
   - `docs/report-nhom-1-security-review.md`
   - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
@@ -2309,7 +2422,33 @@
   - `src/Web/FreshFarm.Web.Bff/Services/GhnSandboxService.cs`
   - `src/Web/FreshFarm.Web.Bff/Services/{ProductImagePaths,IProductImageStorageService,ProductImageStorageService}.cs`
   - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
+  - `src/Web/FreshFarm.Web.Bff/appsettings.json`
+  - `src/Web/FreshFarm.Web.Bff/Options/SessionStoreOptions.cs`
+  - `src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj`
+  - `docs/security-hardening-worklog.txt`
+  - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_p1_dataprotection\`
+  - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_p1_sessionstore\`
   - `src/Web/FreshFarm.Web.Bff/Program.cs`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/csp-phase2.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/home-welcome-popup.js`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FooterLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_HeaderLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProductCard.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Cart/Index.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_ProfileAddressList.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignIn.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Account/SignUp.cshtml`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/TotpService.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/TwoFactorLoginTicketService.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Dtos/AuthResponse.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SellerAccountController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AdminAccountController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/SellerAccount/TwoFactor.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/AdminAccount/TwoFactor.cshtml`
+    - `src/Web/FreshFarm.Web.Bff/Utilities/QrCodeDataUriBuilder.cs`
+    - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+    - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Campaign/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Audit/Index.cshtml`
   - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Risk/Index.cshtml`
@@ -2410,6 +2549,11 @@
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Models/{SellerProduct,FreshFarmCatalogDBContext.Extras}.cs`
   - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Order/ManageOrders.cshtml`
   - Commands:
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_2fa_qr_serverside\`
+    - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_p2_vnpay_hardening\`
+    - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_p2_vnpay_hardening\`
+    - `netstat -ano | findstr :7140`
+    - `Invoke-WebRequest https://localhost:7140/swagger -SkipCertificateCheck`
     - `rg -n "INSERT \[dbo\]\.\[Orders\]|INSERT \[dbo\]\.\[Users\]" docs/final3.sql`
     - `rg -n "GetAdminOrdersPaged|Revenue|Products" ...`
     - `sed -n ...` de doi chieu mapping/controller/view.
@@ -2418,3 +2562,6 @@
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_tracking_datefix\`
     - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_ghn_admin_ui\`
     - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\ordering_shipping_fix\`
+
+
+

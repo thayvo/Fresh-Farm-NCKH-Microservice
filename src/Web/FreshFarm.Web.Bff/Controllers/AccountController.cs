@@ -5,6 +5,7 @@ using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Dung service GHN.
 using Microsoft.AspNetCore.Authentication; // Dung SignInAsync/SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // Cookie auth scheme.
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization; // [Authorize], [AllowAnonymous].
 using Microsoft.AspNetCore.Mvc; // Controller, IActionResult.
 using Microsoft.Extensions.Options;
@@ -46,6 +47,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
+        ViewData["PendingVerificationIdentifier"] = TempData["PendingVerificationIdentifier"] as string;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
         return View(); // Views/Account/SignIn.cshtml.
     }
@@ -53,15 +55,17 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/signin")] // Route POST signin.
     [ValidateAntiForgeryToken] // Bắt buộc token hợp lệ từ form.
     [AllowAnonymous] // Anonymous submit login.
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> SignIn(LoginRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chi chap nhan local url de tranh open redirect.
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Giu lai de form render lai khi co loi.
+        ViewData["PendingVerificationIdentifier"] = null;
 
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password)) // Validate input.
         {
-            ModelState.AddModelError(string.Empty, "Vui long nhap day du thong tin."); // Them loi cho view.
+            ModelState.AddModelError(string.Empty, "Vui lòng nhập đầy đủ thông tin."); // Them loi cho view.
             return View(request); // Render lai form.
         }
 
@@ -71,14 +75,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         if (!loginResponse.IsSuccessStatusCode) // Neu login fail.
         {
             var errorText = await loginResponse.Content.ReadAsStringAsync(); // Doc body loi.
-            ModelState.AddModelError(string.Empty, $"Dang nhap that bai: {errorText}"); // Show error.
+            if (RequiresEmailVerification(errorText))
+            {
+                ViewData["PendingVerificationIdentifier"] = request.Identifier.Trim();
+            }
+            ModelState.AddModelError(string.Empty, $"Đăng nhập thất bại: {errorText}"); // Show error.
             return View(request); // O lai form login.
         }
 
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(); // Parse body sang DTO.
         if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken)) // Bao ve response xau.
         {
-            ModelState.AddModelError(string.Empty, "Token tra ve khong hop le."); // Bao loi.
+            ModelState.AddModelError(string.Empty, "Token trả về không hợp lệ."); // Bao loi.
             return View(request); // O lai form.
         }
 
@@ -240,8 +248,146 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return View(request); // O lai form.
         }
 
-        TempData["SuccessMessage"] = "Đăng ký thành công. Bạn có thể đăng nhập ngay để tiếp tục mua sắm tại FreshFarm.";
+        var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResultDto>()
+                            ?? new RegisterResultDto
+                            {
+                                Email = request.Email,
+                                EmailVerificationRequired = true,
+                                VerificationEmailSent = true,
+                                Message = "Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập."
+                            };
+
+        return RedirectToAction(
+            nameof(VerifyEmailPending),
+            new
+            {
+                email = registerResult.Email,
+                returnUrl = normalizedReturnUrl,
+                message = registerResult.Message
+            });
+    }
+
+    [HttpGet("/account/verify-email/pending")]
+    [AllowAnonymous]
+    public IActionResult VerifyEmailPending(string? email = null, string? message = null, string? returnUrl = null)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var normalizedEmail = email?.Trim() ?? string.Empty;
+
+        var vm = new EmailVerificationPendingViewModel
+        {
+            Email = normalizedEmail,
+            Message = string.IsNullOrWhiteSpace(message)
+                ? "Chúng tôi đã tạo tài khoản và gửi email xác minh. Vui lòng xác minh email trước khi đăng nhập."
+                : message,
+            ReturnUrl = normalizedReturnUrl,
+            ResendRequest = new ResendEmailVerificationRequestDto
+            {
+                Identifier = normalizedEmail,
+                ReturnUrl = normalizedReturnUrl
+            }
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost("/account/verify-email/resend")]
+    [ValidateAntiForgeryToken]
+    [AllowAnonymous]
+    [EnableRateLimiting("password-recovery")]
+    public async Task<IActionResult> ResendVerificationEmail(ResendEmailVerificationRequestDto request)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(request.ReturnUrl);
+        request.Identifier = request.Identifier?.Trim() ?? string.Empty;
+
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = "Vui lòng nhập email hoặc tên đăng nhập hợp lệ để gửi lại email xác minh.";
+            TempData["PendingVerificationIdentifier"] = request.Identifier;
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        var response = await identityClient.PostAsJsonAsync("/auth/resend-email-verification", new
+        {
+            identifier = request.Identifier
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await response.Content.ReadAsStringAsync();
+            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorText)
+                ? "Không thể gửi lại email xác minh lúc này."
+                : errorText;
+            TempData["PendingVerificationIdentifier"] = request.Identifier;
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        TempData["SuccessMessage"] = "Nếu tài khoản tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh.";
+        TempData["PendingVerificationIdentifier"] = request.Identifier;
+
+        if (request.Identifier.Contains("@", StringComparison.Ordinal))
+        {
+            return RedirectToAction(nameof(VerifyEmailPending), new
+            {
+                email = request.Identifier,
+                returnUrl = normalizedReturnUrl
+            });
+        }
+
         return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+    }
+
+    [HttpGet("/account/verify-email")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyEmail(string? email = null, string? token = null, string? returnUrl = null)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var normalizedEmail = email?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(normalizedEmail) || string.IsNullOrWhiteSpace(token))
+        {
+            return View("VerifyEmailResult", new EmailVerificationResultViewModel
+            {
+                Success = false,
+                Title = "Liên kết xác minh không hợp lệ",
+                Message = "Liên kết xác minh email bị thiếu dữ liệu hoặc không còn hợp lệ.",
+                ReturnUrl = normalizedReturnUrl,
+                Email = normalizedEmail
+            });
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        var response = await identityClient.PostAsJsonAsync("/auth/verify-email", new
+        {
+            email = normalizedEmail,
+            token
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await response.Content.ReadAsStringAsync();
+            return View("VerifyEmailResult", new EmailVerificationResultViewModel
+            {
+                Success = false,
+                Title = "Xác minh email chưa thành công",
+                Message = string.IsNullOrWhiteSpace(errorText)
+                    ? "Không thể xác minh email lúc này."
+                    : errorText,
+                ReturnUrl = normalizedReturnUrl,
+                Email = normalizedEmail
+            });
+        }
+
+        TempData["SuccessMessage"] = "Xác minh email thành công. Bạn có thể đăng nhập.";
+        return View("VerifyEmailResult", new EmailVerificationResultViewModel
+        {
+            Success = true,
+            Title = "Xác minh email thành công",
+            Message = "Email của bạn đã được xác minh. Bây giờ bạn có thể đăng nhập vào FreshFarm.",
+            ReturnUrl = normalizedReturnUrl,
+            Email = normalizedEmail
+        });
     }
 
     [HttpGet("/account/forgot-password")] // Route GET quên mật khẩu.
@@ -254,6 +400,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/forgot-password")] // Route POST gửi yêu cầu reset.
     [ValidateAntiForgeryToken] // Chống CSRF cho form.
     [AllowAnonymous] // Anonymous vẫn dùng được.
+    [EnableRateLimiting("password-recovery")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequestDto request) // Nhận email từ form.
     {
         if (!ModelState.IsValid) // Validate DataAnnotation.
@@ -303,6 +450,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/reset-password")] // Route POST đặt lại mật khẩu.
     [ValidateAntiForgeryToken] // Chống CSRF cho form.
     [AllowAnonymous] // Anonymous submit reset password.
+    [EnableRateLimiting("password-recovery")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequestDto request) // Nhận email/token/password mới.
     {
         if (!ModelState.IsValid) // Validate DataAnnotation.
@@ -447,6 +595,12 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         return RedirectToAction("Index", "Home"); // Fallback mac dinh ve trang chu buyer-facing.
+    }
+
+    private static bool RequiresEmailVerification(string? message)
+    {
+        return !string.IsNullOrWhiteSpace(message) &&
+               message.Contains("chưa được xác minh", StringComparison.OrdinalIgnoreCase);
     }
 
     // ===== 3) Thay action GET /account/profile bằng bản dùng API thật =====
@@ -786,8 +940,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         {
             new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty),
             new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? fallbackName),
-            new Claim("sub", jwt.Subject ?? string.Empty),
-            new Claim("ff_access_token", auth.AccessToken)
+            new Claim("sub", jwt.Subject ?? string.Empty)
         };
 
         var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value;

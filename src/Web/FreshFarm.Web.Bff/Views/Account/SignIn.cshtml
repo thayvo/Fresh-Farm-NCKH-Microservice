@@ -2,6 +2,7 @@
 @model FreshFarm.Web.Bff.Dtos.LoginRequestDto
 @{
     Layout = null;
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
     var returnUrl = ViewData["ReturnUrl"] as string;
     if (string.IsNullOrWhiteSpace(returnUrl))
     {
@@ -13,6 +14,7 @@
     }
     var signUpReturnUrl = returnUrl;
     var googleLoginEnabled = ViewData["GoogleLoginEnabled"] as bool? ?? false;
+    var pendingVerificationIdentifier = ViewData["PendingVerificationIdentifier"] as string;
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -109,7 +111,7 @@
                      src="@WebAssetPaths.LogoRequestPath"
                      alt="Logo FreshFarm"
                      style="max-height: 70px"
-                     onerror="this.classList.add('d-none');document.getElementById('signinLogoFallback').classList.remove('d-none');" />
+                     data-fallback-toggle-target="signinLogoFallback" />
                 <div id="signinLogoFallback" class="logo-fallback d-none">
                     <i class="bi bi-basket2-fill"></i>
                 </div>
@@ -132,6 +134,23 @@
                 @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
                 {
                     <div class="alert alert-danger py-2 small mb-3">@errorMessage</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(pendingVerificationIdentifier))
+                {
+                    <div class="alert alert-warning small mb-3">
+                        <div class="fw-semibold mb-2">Tài khoản này chưa xác minh email.</div>
+                        <div class="mb-2">Bạn cần xác minh email trước khi đăng nhập. Nếu chưa nhận được thư, bạn có thể gửi lại ngay tại đây.</div>
+                        <form asp-action="ResendVerificationEmail"
+                              asp-controller="Account"
+                              method="post"
+                              class="d-flex flex-column gap-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="Identifier" value="@pendingVerificationIdentifier" />
+                            <input type="hidden" name="ReturnUrl" value="@returnUrl" />
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Gửi lại email xác minh</button>
+                        </form>
+                    </div>
                 }
 
                  <div asp-validation-summary="All" class="text-danger small mb-3"></div>
@@ -190,9 +209,6 @@
                             Dev note: cần cấu hình `Authentication:Google:ClientId` và `ClientSecret` để bật nút này.
                         </div>
                     }
-                    <button type="button" class="btn btn-primary btn-lg" disabled>
-                        <i class="bi bi-facebook me-2"></i> Đăng nhập với Facebook
-                    </button>
                 </div>
             </form>
 
@@ -208,20 +224,7 @@
     </div>
 
     <partial name="_ValidationScriptsPartial" />
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        (() => {
-            const forms = document.querySelectorAll(".needs-validation");
-            Array.from(forms).forEach(form => {
-                form.addEventListener("submit", event => {
-                    if (!form.checkValidity()) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                    }
-                    form.classList.add("was-validated");
-                }, false);
-            });
-        })();
-    </script>
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script nonce="@cspNonce" src="~/js/csp-phase2.js" asp-append-version="true"></script>
 </body>
 </html>

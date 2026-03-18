@@ -80,7 +80,7 @@ else
                                       asp-route-addressId="@address.AddressId"
                                       method="post"
                                       class="d-inline"
-                                      onsubmit="return confirm('Bạn có chắc muốn xóa địa chỉ này không?');">
+                                      data-confirm-message="Bạn có chắc muốn xóa địa chỉ này không?">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="returnUrl" value="@returnUrl" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">

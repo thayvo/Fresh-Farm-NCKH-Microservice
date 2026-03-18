@@ -28,13 +28,22 @@ public sealed class AuditController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? q = null, string? area = null, string? type = null)
+    public async Task<IActionResult> Index(
+        string? q = null,
+        string? area = null,
+        string? type = null,
+        string? authQ = null,
+        string? authRole = null,
+        string? authOutcome = null)
     {
         var model = new AuditCenterPageViewModel
         {
             Query = q?.Trim() ?? string.Empty,
             Area = Normalize(area),
-            Type = Normalize(type)
+            Type = Normalize(type),
+            AuthQuery = authQ?.Trim() ?? string.Empty,
+            AuthRole = Normalize(authRole),
+            AuthOutcome = Normalize(authOutcome)
         };
         SeedFallbackOptions(model);
 
@@ -111,12 +120,85 @@ public sealed class AuditController : LegacySellerControllerBase
             ViewBag.Error = "Loi khi tai audit center: " + ex.Message;
         }
 
+        try
+        {
+            var client = CreateIdentityClient();
+            var response = await client.GetAsync(BuildAuthEndpoint(model));
+            if (!response.IsSuccessStatusCode)
+            {
+                ViewBag.AuthError = await ReadApiErrorAsync(response, "Khong the tai auth audit.");
+                return View(model);
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AuthAuditApiResponse>(JsonOptions);
+            if (payload is null)
+            {
+                ViewBag.AuthError = "Khong doc duoc du lieu auth audit.";
+                return View(model);
+            }
+
+            model.AuthQuery = payload.Filters?.Q ?? model.AuthQuery;
+            model.AuthRole = payload.Filters?.Role ?? model.AuthRole;
+            model.AuthOutcome = payload.Filters?.Outcome ?? model.AuthOutcome;
+            model.AuthStats = new AuthAuditStatsViewModel
+            {
+                Total24h = payload.Stats?.Total24h ?? 0,
+                Success24h = payload.Stats?.Success24h ?? 0,
+                Failed24h = payload.Stats?.Failed24h ?? 0,
+                Locked24h = payload.Stats?.Locked24h ?? 0,
+                Suspicious24h = payload.Stats?.Suspicious24h ?? 0
+            };
+            model.AuthRoleOptions = payload.Filters?.RoleOptions?.Select(MapOption).ToList() ?? model.AuthRoleOptions;
+            model.AuthOutcomeOptions = payload.Filters?.OutcomeOptions?.Select(MapOption).ToList() ?? model.AuthOutcomeOptions;
+            model.AuthAudits = payload.Items?.Select(x => new AuthAuditRowViewModel
+            {
+                AuthAuditLogId = x.AuthAuditLogId,
+                UserId = x.UserId,
+                ClientLane = x.ClientLane ?? string.Empty,
+                RoleName = x.RoleName ?? string.Empty,
+                Identifier = x.Identifier ?? string.Empty,
+                UserName = x.UserName,
+                Email = x.Email,
+                EventType = x.EventType ?? string.Empty,
+                Success = x.Success,
+                FailureReason = x.FailureReason,
+                FailedAttemptCount = x.FailedAttemptCount,
+                IpAddress = x.IpAddress,
+                ForwardedFor = x.ForwardedFor,
+                UserAgent = x.UserAgent,
+                DeviceType = x.DeviceType,
+                BrowserFamily = x.BrowserFamily,
+                OperatingSystem = x.OperatingSystem,
+                IsSuspicious = x.IsSuspicious,
+                SuspicionReasons = x.SuspicionReasons,
+                OccurredAt = x.OccurredAt
+            }).ToList() ?? new List<AuthAuditRowViewModel>();
+        }
+        catch (Exception ex)
+        {
+            ViewBag.AuthError = "Loi khi tai auth audit: " + ex.Message;
+        }
+
         return View(model);
     }
 
     private HttpClient CreateOrderingClient()
     {
         var client = _httpClientFactory.CreateClient("Ordering");
+        client.DefaultRequestHeaders.Remove("Authorization");
+
+        var token = GetAccessToken(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    private HttpClient CreateIdentityClient()
+    {
+        var client = _httpClientFactory.CreateClient("Identity");
         client.DefaultRequestHeaders.Remove("Authorization");
 
         var token = GetAccessToken(AccessTokenSessionKey);
@@ -144,6 +226,22 @@ public sealed class AuditController : LegacySellerControllerBase
         return "/api/orders/admin/audit/center?" + string.Join("&", query);
     }
 
+    private static string BuildAuthEndpoint(AuditCenterPageViewModel model)
+    {
+        var query = new List<string>
+        {
+            "role=" + Uri.EscapeDataString(model.AuthRole),
+            "outcome=" + Uri.EscapeDataString(model.AuthOutcome)
+        };
+
+        if (!string.IsNullOrWhiteSpace(model.AuthQuery))
+        {
+            query.Add("q=" + Uri.EscapeDataString(model.AuthQuery));
+        }
+
+        return "/admin/auth-audit?" + string.Join("&", query);
+    }
+
     private static string Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? "all" : value.Trim().ToLowerInvariant();
 
@@ -164,6 +262,23 @@ public sealed class AuditController : LegacySellerControllerBase
             new AuditOptionViewModel { Value = "ads_campaign", Text = "Chiến dịch quảng cáo" },
             new AuditOptionViewModel { Value = "risk_case", Text = "Ca rủi ro" },
             new AuditOptionViewModel { Value = "risk_center", Text = "Trung tâm rủi ro" }
+        ];
+
+        model.AuthRoleOptions =
+        [
+            new AuditOptionViewModel { Value = "all", Text = "Tất cả" },
+            new AuditOptionViewModel { Value = "admin", Text = "Admin" },
+            new AuditOptionViewModel { Value = "seller", Text = "Seller" },
+            new AuditOptionViewModel { Value = "unknown", Text = "Không xác định" }
+        ];
+
+        model.AuthOutcomeOptions =
+        [
+            new AuditOptionViewModel { Value = "all", Text = "Tất cả" },
+            new AuditOptionViewModel { Value = "success", Text = "Thành công" },
+            new AuditOptionViewModel { Value = "failed", Text = "Thất bại" },
+            new AuditOptionViewModel { Value = "locked", Text = "Bị khóa" },
+            new AuditOptionViewModel { Value = "suspicious", Text = "Đáng ngờ" }
         ];
     }
 
@@ -221,6 +336,41 @@ public sealed class AuditController : LegacySellerControllerBase
         public List<ModerationAuditApiModel>? ModerationAudits { get; set; }
 
         public List<SettlementAuditApiModel>? SettlementAudits { get; set; }
+    }
+
+    private sealed class AuthAuditApiResponse
+    {
+        public AuthAuditStatsApiModel? Stats { get; set; }
+
+        public AuthAuditFiltersApiModel? Filters { get; set; }
+
+        public List<AuthAuditApiModel>? Items { get; set; }
+    }
+
+    private sealed class AuthAuditStatsApiModel
+    {
+        public int Total24h { get; set; }
+
+        public int Success24h { get; set; }
+
+        public int Failed24h { get; set; }
+
+        public int Locked24h { get; set; }
+
+        public int Suspicious24h { get; set; }
+    }
+
+    private sealed class AuthAuditFiltersApiModel
+    {
+        public string? Q { get; set; }
+
+        public string? Role { get; set; }
+
+        public string? Outcome { get; set; }
+
+        public List<AuditOptionApiModel>? RoleOptions { get; set; }
+
+        public List<AuditOptionApiModel>? OutcomeOptions { get; set; }
     }
 
     private sealed class AuditStatsApiModel
@@ -319,5 +469,48 @@ public sealed class AuditController : LegacySellerControllerBase
         public int? ActorUserId { get; set; }
 
         public DateTime CreatedAt { get; set; }
+    }
+
+    private sealed class AuthAuditApiModel
+    {
+        public int AuthAuditLogId { get; set; }
+
+        public int? UserId { get; set; }
+
+        public string? ClientLane { get; set; }
+
+        public string? RoleName { get; set; }
+
+        public string? Identifier { get; set; }
+
+        public string? UserName { get; set; }
+
+        public string? Email { get; set; }
+
+        public string? EventType { get; set; }
+
+        public bool Success { get; set; }
+
+        public string? FailureReason { get; set; }
+
+        public int? FailedAttemptCount { get; set; }
+
+        public string? IpAddress { get; set; }
+
+        public string? ForwardedFor { get; set; }
+
+        public string? UserAgent { get; set; }
+
+        public string? DeviceType { get; set; }
+
+        public string? BrowserFamily { get; set; }
+
+        public string? OperatingSystem { get; set; }
+
+        public bool IsSuspicious { get; set; }
+
+        public string? SuspicionReasons { get; set; }
+
+        public DateTime OccurredAt { get; set; }
     }
 }

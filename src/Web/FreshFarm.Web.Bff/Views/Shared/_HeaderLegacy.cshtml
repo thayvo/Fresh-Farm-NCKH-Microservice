@@ -23,16 +23,19 @@
                         <img src="@WebAssetPaths.LogoRequestPath"
                              alt="Logo FreshFarm"
                              class="brand-logo-image"
-                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');" />
-                        <span class="brand-logo d-none">FF</span>
+                             data-fallback-toggle-target="headerLogoFallback" />
+                        <span id="headerLogoFallback" class="brand-logo d-none">FF</span>
                     </span>
                     <span>
                         <span class="d-block brand-text">FRESHFARM</span>
                         <img src="@WebAssetPaths.SloganRequestPath"
                              alt="Nông sản sạch mỗi ngày"
                              class="brand-slogan-image"
-                             onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-block');this.nextElementSibling.classList.add('d-inline');" />
-                        <span class="brand-sub d-none">Nông sản sạch mỗi ngày</span>
+                             data-fallback-toggle-target="headerSloganFallback" />
+                        <span id="headerSloganFallback"
+                              class="brand-sub d-none"
+                              data-fallback-remove-class="d-none"
+                              data-fallback-add-class="d-inline">Nông sản sạch mỗi ngày</span>
                     </span>
                 </a>
             </div>
@@ -87,7 +90,7 @@
                                             <img class="header-cart-thumb"
                                                  src="@ProductThumb(item)"
                                                  alt="@item.ProductName"
-                                                 onerror="this.onerror=null;this.src='@ProductImagePaths.FallbackImageRequestPath';" />
+                                                 data-fallback-src="@ProductImagePaths.FallbackImageRequestPath" />
                                             <span class="header-cart-name-wrap">
                                                 <span class="header-cart-name">@item.ProductName</span>
                                                 <span class="header-cart-qty">x@qty</span>

@@ -10,6 +10,8 @@ public interface IAccountEmailSender
     bool IsConfigured { get; }
 
     Task SendPasswordResetEmailAsync(string toEmail, string? toName, string resetUrl, int expiresInMinutes, CancellationToken cancellationToken = default);
+
+    Task SendEmailVerificationAsync(string toEmail, string? toName, string verifyUrl, int expiresInMinutes, CancellationToken cancellationToken = default);
 }
 
 public sealed class SmtpAccountEmailSender : IAccountEmailSender
@@ -66,6 +68,47 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         };
 
         _logger.LogInformation("Đang gửi email đặt lại mật khẩu tới {Email} qua SMTP host {Host}.", toEmail, _options.Host);
+        cancellationToken.ThrowIfCancellationRequested();
+        await smtpClient.SendMailAsync(message, cancellationToken);
+    }
+
+    public async Task SendEmailVerificationAsync(string toEmail, string? toName, string verifyUrl, int expiresInMinutes, CancellationToken cancellationToken = default)
+    {
+        if (!IsConfigured)
+        {
+            throw new InvalidOperationException("SMTP chưa được cấu hình đầy đủ.");
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(toName) ? "bạn" : toName.Trim();
+        var safeVerifyUrl = WebUtility.HtmlEncode(verifyUrl);
+
+        using var message = new MailMessage
+        {
+            From = new MailAddress(_options.FromEmail, _options.FromName),
+            Subject = "FreshFarm - Xác minh email",
+            Body = $"""
+                <p>Xin chào {WebUtility.HtmlEncode(displayName)},</p>
+                <p>Cảm ơn bạn đã đăng ký tài khoản FreshFarm.</p>
+                <p>Vui lòng bấm vào liên kết dưới đây để xác minh email trước khi đăng nhập:</p>
+                <p><a href="{safeVerifyUrl}">Xác minh email</a></p>
+                <p>Liên kết này có hiệu lực trong {expiresInMinutes} phút.</p>
+                <p>Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.</p>
+                <p>Trân trọng,<br/>FreshFarm</p>
+                """,
+            IsBodyHtml = true
+        };
+
+        message.To.Add(new MailAddress(toEmail, displayName));
+
+        using var smtpClient = new SmtpClient(_options.Host, _options.Port)
+        {
+            EnableSsl = _options.EnableSsl,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(_options.UserName, _options.Password),
+            DeliveryMethod = SmtpDeliveryMethod.Network
+        };
+
+        _logger.LogInformation("Đang gửi email xác minh tài khoản tới {Email} qua SMTP host {Host}.", toEmail, _options.Host);
         cancellationToken.ThrowIfCancellationRequested();
         await smtpClient.SendMailAsync(message, cancellationToken);
     }

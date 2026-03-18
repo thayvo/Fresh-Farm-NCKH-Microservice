@@ -244,6 +244,10 @@ public partial class FreshFarmIdentityDBContext : DbContext
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())")
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_CreatedAt");
+            entity.Property(e => e.EmailConfirmed)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_EmailConfirmed");
+            entity.Property(e => e.EmailConfirmedAt).HasPrecision(0);
             entity.Property(e => e.Email)
                 .IsRequired()
                 .HasMaxLength(100);

@@ -1,11 +1,16 @@
 using FreshFarm.Ordering.Api.Dtos;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Options;
 using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace FreshFarm.Ordering.Api.Controllers;
@@ -30,15 +35,21 @@ public sealed class OrdersController : ControllerBase
     private readonly FreshFarmOrderingDBContext _db;
     private readonly CatalogInventoryClient _catalogInventoryClient;
     private readonly OrderReservationService _orderReservationService;
+    private readonly InternalServiceAuthOptions _internalServiceAuthOptions;
+    private readonly ILogger<OrdersController> _logger;
 
     public OrdersController(
         FreshFarmOrderingDBContext db,
         CatalogInventoryClient catalogInventoryClient,
-        OrderReservationService orderReservationService)
+        OrderReservationService orderReservationService,
+        IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
+        ILogger<OrdersController> logger)
     {
         _db = db;
         _catalogInventoryClient = catalogInventoryClient;
         _orderReservationService = orderReservationService;
+        _internalServiceAuthOptions = internalServiceAuthOptions.Value;
+        _logger = logger;
     }
 
     [HttpGet("my")]
@@ -439,13 +450,48 @@ public sealed class OrdersController : ControllerBase
         [FromBody] FinalizeVnPayPaymentRequest request,
         CancellationToken cancellationToken)
     {
-        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
-
         var userId = TryGetUserIdFromToken();
         if (userId is null)
         {
             return Unauthorized("Token khong co claim user id hop le.");
         }
+
+        return await FinalizeVnPayPaymentCore(orderId, request, userId.Value, false, cancellationToken);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("internal/{orderId:int}/payments/vnpay/finalize")]
+    public async Task<IActionResult> FinalizeVnPayPaymentInternal(
+        int orderId,
+        [FromBody] FinalizeVnPayPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidInternalServiceRequest())
+        {
+            _logger.LogWarning(
+                "VNPay internal finalize bi tu choi do internal service key khong hop le. OrderId={OrderId}.",
+                orderId);
+            return Unauthorized(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                OrderId = orderId,
+                PaymentStatus = "Pending",
+                OrderStatus = "Pending",
+                Message = "Yeu cau noi bo khong hop le."
+            });
+        }
+
+        return await FinalizeVnPayPaymentCore(orderId, request, null, true, cancellationToken);
+    }
+
+    private async Task<IActionResult> FinalizeVnPayPaymentCore(
+        int orderId,
+        FinalizeVnPayPaymentRequest request,
+        int? actorUserId,
+        bool bypassOwnershipCheck,
+        CancellationToken cancellationToken)
+    {
+        await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
 
         if (!ModelState.IsValid)
         {
@@ -454,6 +500,10 @@ public sealed class OrdersController : ControllerBase
 
         if (orderId <= 0 || !string.Equals(orderId.ToString(), request.TxnRef, StringComparison.Ordinal))
         {
+            _logger.LogWarning(
+                "VNPay finalize bi tu choi do TxnRef khong khop. OrderId={OrderId}, TxnRef={TxnRef}.",
+                orderId,
+                request.TxnRef);
             return BadRequest(new FinalizeVnPayPaymentResult
             {
                 Success = false,
@@ -483,19 +533,83 @@ public sealed class OrdersController : ControllerBase
             });
         }
 
-        if (order.UserId != userId.Value)
+        if (!bypassOwnershipCheck && order.UserId != actorUserId)
         {
+            _logger.LogWarning(
+                "VNPay finalize bi tu choi do user khong so huu order. OrderId={OrderId}, OrderUserId={OrderUserId}, ActorUserId={ActorUserId}.",
+                orderId,
+                order.UserId,
+                actorUserId);
             return Forbid();
+        }
+
+        var payment = order.Payments
+            .OrderByDescending(x => x.PaymentId)
+            .FirstOrDefault(x => string.Equals(x.PaymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase));
+
+        var paymentStatusSnapshot = payment?.PaymentStatus ?? order.PaymentStatus ?? "Pending";
+        var orderStatusSnapshot = order.Status ?? "Pending";
+
+        if (!string.IsNullOrWhiteSpace(request.TransactionNo))
+        {
+            var duplicatedProviderReference = await _db.PaymentTransactions
+                .AsNoTracking()
+                .Where(x =>
+                    x.OrderId != orderId &&
+                    x.Provider == "VNPay" &&
+                    x.Method == "VNPay" &&
+                    x.ProviderRef == request.TransactionNo.Trim())
+                .Select(x => new { x.OrderId, x.PaymentTxnId })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (duplicatedProviderReference is not null)
+            {
+                AddReconciliationLog(
+                    order,
+                    payment,
+                    "VNPayDuplicateProviderRef",
+                    $"Phat hien ProviderRef VNPay '{request.TransactionNo.Trim()}' da duoc gan cho order #{duplicatedProviderReference.OrderId}.",
+                    request.Amount);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                _logger.LogWarning(
+                    "VNPay finalize phat hien ProviderRef trung tren order khac. OrderId={OrderId}, ExistingOrderId={ExistingOrderId}, TransactionNo={TransactionNo}.",
+                    orderId,
+                    duplicatedProviderReference.OrderId,
+                    request.TransactionNo);
+
+                return Conflict(new FinalizeVnPayPaymentResult
+                {
+                    Success = false,
+                    OrderId = orderId,
+                    PaymentStatus = paymentStatusSnapshot,
+                    OrderStatus = orderStatusSnapshot,
+                    Message = "Phat hien ma giao dich VNPay da duoc su dung cho don hang khac. Vui long lien he ho tro de doi soat."
+                });
+            }
         }
 
         if (string.Equals(order.Status, "Expired", StringComparison.OrdinalIgnoreCase))
         {
+            AddReconciliationLog(
+                order,
+                payment,
+                "VNPayFinalizeAfterExpiry",
+                "VNPay tra ve sau khi don da o trang thai Expired.",
+                request.Amount);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "VNPay finalize sau khi order da Expired. OrderId={OrderId}, TxnRef={TxnRef}, TransactionNo={TransactionNo}.",
+                orderId,
+                request.TxnRef,
+                request.TransactionNo);
             return Conflict(new FinalizeVnPayPaymentResult
             {
                 Success = false,
                 OrderId = orderId,
-                PaymentStatus = order.PaymentStatus ?? "Expired",
-                OrderStatus = order.Status ?? "Expired",
+                PaymentStatus = paymentStatusSnapshot,
+                OrderStatus = orderStatusSnapshot,
                 Message = "Don hang da het han giu ton kho. Vui long dat lai don moi."
             });
         }
@@ -507,6 +621,19 @@ public sealed class OrdersController : ControllerBase
         if (hasExpiredReservation)
         {
             await _orderReservationService.ReleaseReservationsAsync(order, "Expired", "Expired", cancellationToken);
+            AddReconciliationLog(
+                order,
+                payment,
+                "VNPayFinalizeAfterReservationExpiry",
+                "VNPay tra ve sau khi reservation het han va da bi giai phong.",
+                request.Amount);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "VNPay finalize sau khi reservation het han. OrderId={OrderId}, TxnRef={TxnRef}, TransactionNo={TransactionNo}.",
+                orderId,
+                request.TxnRef,
+                request.TransactionNo);
             return Conflict(new FinalizeVnPayPaymentResult
             {
                 Success = false,
@@ -517,10 +644,6 @@ public sealed class OrdersController : ControllerBase
             });
         }
 
-        var payment = order.Payments
-            .OrderByDescending(x => x.PaymentId)
-            .FirstOrDefault(x => string.Equals(x.PaymentMethod, "VNPay", StringComparison.OrdinalIgnoreCase));
-
         if (payment is null)
         {
             payment = new Payment
@@ -528,7 +651,7 @@ public sealed class OrdersController : ControllerBase
                 OrderId = order.OrderId,
                 PaymentMethod = "VNPay",
                 PaymentStatus = "Pending",
-                UserId = userId.Value
+                UserId = actorUserId
             };
             _db.Payments.Add(payment);
         }
@@ -588,6 +711,21 @@ public sealed class OrdersController : ControllerBase
 
         if (request.Amount.HasValue && request.Amount.Value > 0 && request.Amount.Value != order.TotalAmount)
         {
+            AddReconciliationLog(
+                order,
+                payment,
+                "VNPayAmountMismatch",
+                $"So tien VNPay ({request.Amount.Value:N0}) khong khop tong don ({order.TotalAmount:N0}).",
+                request.Amount);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "VNPay amount mismatch. OrderId={OrderId}, OrderAmount={OrderAmount}, VnPayAmount={VnPayAmount}, TxnRef={TxnRef}, TransactionNo={TransactionNo}.",
+                orderId,
+                order.TotalAmount,
+                request.Amount.Value,
+                request.TxnRef,
+                request.TransactionNo);
             return BadRequest(new FinalizeVnPayPaymentResult
             {
                 Success = false,
@@ -600,6 +738,69 @@ public sealed class OrdersController : ControllerBase
 
         var alreadyProcessed = string.Equals(payment.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase) &&
                                string.Equals(order.PaymentStatus, "Paid", StringComparison.OrdinalIgnoreCase);
+
+        var incomingProviderReference = NullIfWhiteSpace(request.TransactionNo);
+        var existingProviderReference = NullIfWhiteSpace(transaction.ProviderRef);
+
+        if (alreadyProcessed)
+        {
+            var sameProviderReference = string.Equals(existingProviderReference, incomingProviderReference, StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(incomingProviderReference);
+
+            if (request.IsSuccess && sameProviderReference)
+            {
+                AddReconciliationLog(
+                    order,
+                    payment,
+                    "VNPayReplayIgnored",
+                    $"Bo qua callback VNPay lap lai cho giao dich '{incomingProviderReference ?? existingProviderReference ?? "N/A"}' vi don da Paid.",
+                    request.Amount);
+                await _db.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "VNPay replay duoc bo qua an toan. OrderId={OrderId}, TransactionNo={TransactionNo}, TxnRef={TxnRef}.",
+                    orderId,
+                    incomingProviderReference ?? existingProviderReference,
+                    request.TxnRef);
+
+                return Ok(new FinalizeVnPayPaymentResult
+                {
+                    Success = true,
+                    AlreadyProcessed = true,
+                    OrderId = order.OrderId,
+                    PaymentStatus = order.PaymentStatus ?? payment.PaymentStatus ?? "Paid",
+                    OrderStatus = order.Status ?? "Pending",
+                    Message = "Giao dich VNPay da duoc xu ly truoc do. He thong bo qua callback lap lai."
+                });
+            }
+
+            AddReconciliationLog(
+                order,
+                payment,
+                "VNPayFinalizeConflictAfterPaid",
+                $"Nhan callback VNPay xung dot sau khi don da Paid. TxNoMoi='{incomingProviderReference ?? "N/A"}', TxNoCu='{existingProviderReference ?? "N/A"}', IsSuccess={request.IsSuccess}.",
+                request.Amount);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "VNPay conflict sau khi order da Paid. OrderId={OrderId}, ExistingTransactionNo={ExistingTransactionNo}, IncomingTransactionNo={IncomingTransactionNo}, IsSuccess={IsSuccess}, ResponseCode={ResponseCode}, TransactionStatus={TransactionStatus}.",
+                orderId,
+                existingProviderReference,
+                incomingProviderReference,
+                request.IsSuccess,
+                request.ResponseCode,
+                request.TransactionStatus);
+
+            return Conflict(new FinalizeVnPayPaymentResult
+            {
+                Success = false,
+                AlreadyProcessed = true,
+                OrderId = order.OrderId,
+                PaymentStatus = order.PaymentStatus ?? payment.PaymentStatus ?? "Paid",
+                OrderStatus = order.Status ?? "Pending",
+                Message = "Don hang da duoc ghi nhan thanh toan truoc do. Callback VNPay hien tai bi xem la xung dot va da duoc ghi log doi soat."
+            });
+        }
 
         if (request.IsSuccess)
         {
@@ -621,15 +822,36 @@ public sealed class OrdersController : ControllerBase
             order.PaymentStatus = "Failed";
         }
 
+        AddReconciliationLog(
+            order,
+            payment,
+            request.IsSuccess ? "VNPayFinalizeSuccess" : "VNPayFinalizeFailed",
+            request.IsSuccess
+                ? $"Da ghi nhan thanh toan VNPay thanh cong cho TxNo '{incomingProviderReference ?? existingProviderReference ?? "N/A"}'."
+                : BuildVnPayFailureMessage(request),
+            request.Amount);
         await _db.SaveChangesAsync(cancellationToken);
 
         if (request.IsSuccess)
         {
             await _orderReservationService.MarkReservationsCommittedAsync(order, cancellationToken);
+
+            _logger.LogInformation(
+                "VNPay finalize thanh cong. OrderId={OrderId}, TransactionNo={TransactionNo}, Amount={Amount}.",
+                orderId,
+                incomingProviderReference ?? existingProviderReference,
+                request.Amount ?? order.TotalAmount);
         }
         else
         {
             await _orderReservationService.ReleaseReservationsAsync(order, "Canceled", "Failed", cancellationToken);
+
+            _logger.LogWarning(
+                "VNPay finalize that bai. OrderId={OrderId}, TransactionNo={TransactionNo}, ResponseCode={ResponseCode}, TransactionStatus={TransactionStatus}.",
+                orderId,
+                incomingProviderReference ?? existingProviderReference,
+                request.ResponseCode,
+                request.TransactionStatus);
         }
 
         return Ok(new FinalizeVnPayPaymentResult
@@ -1332,6 +1554,45 @@ public sealed class OrdersController : ControllerBase
         var responseCode = string.IsNullOrWhiteSpace(request.ResponseCode) ? "N/A" : request.ResponseCode.Trim();
         var transactionStatus = string.IsNullOrWhiteSpace(request.TransactionStatus) ? "N/A" : request.TransactionStatus.Trim();
         return $"Thanh toán VNPay chưa thành công (Mã phản hồi: {responseCode}/{transactionStatus}).";
+    }
+
+    private bool IsValidInternalServiceRequest()
+    {
+        var configuredKey = _internalServiceAuthOptions.InternalServiceKey?.Trim();
+        var incomingKey = Request.Headers["X-Internal-Service-Key"].ToString().Trim();
+
+        if (string.IsNullOrWhiteSpace(configuredKey) || string.IsNullOrWhiteSpace(incomingKey))
+        {
+            return false;
+        }
+
+        var configuredBytes = Encoding.UTF8.GetBytes(configuredKey);
+        var incomingBytes = Encoding.UTF8.GetBytes(incomingKey);
+        return CryptographicOperations.FixedTimeEquals(configuredBytes, incomingBytes);
+    }
+
+    private void AddReconciliationLog(
+        Order order,
+        Payment? payment,
+        string actionType,
+        string note,
+        decimal? amount = null)
+    {
+        if (payment is null || payment.PaymentId <= 0)
+        {
+            return;
+        }
+
+        _db.ReconciliationLogs.Add(new ReconciliationLog
+        {
+            PaymentId = payment.PaymentId,
+            OrderId = order.OrderId,
+            AdminId = null,
+            ActionType = actionType,
+            Amount = amount,
+            Note = note,
+            CreatedAt = DateTime.UtcNow
+        });
     }
 
     private static string? NullIfWhiteSpace(string? value)
