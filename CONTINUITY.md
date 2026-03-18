@@ -18,6 +18,8 @@
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Security review refresh (2026-03-18): `docs/report-nhom-1-security-review.md` da duoc doi chieu lai voi code hien tai; ket luan la repo VAN con gap bao mat can lam, nhung report cu da loi thoi o 2 diem: `Google login` buyer-facing da co mot phan, va `VNPay` da co ky URL + verify callback hash + finalize flow.
+  - Security hardening roadmap (2026-03-18): da tao file rieng `docs/security-hardening-roadmap-2026-03-18.md`; thu tu uu tien chot la `bo ff_access_token khoi cookie claim` -> `cookie/session hardening` -> `rate limit` -> `lockout` -> `security headers` -> `security logging` -> `forwarded headers` -> `email verification` -> `DataProtection/session production` -> `2FA Seller/Admin`.
   - Seller review reply edit (2026-03-17): user yeu cau seller sua lai reply cu; API `/api/orders/admin/reviews/{reviewId}/replies` duoc doi thanh upsert theo seller actor (`AdminUserId` neu co, fallback `sellerId` tu token), va man Seller Review se doi nut thanh `Sửa phản hồi`, mo modal voi noi dung cu de cap nhat.
   - Buyer review seller replies (2026-03-17): seller da co backend reply rieng trong lane Seller, nen buyer-facing se tai lai cung root reviews va replies cong khai tren PDP; reply duoc render ben duoi review goc voi nhan trung tinh `Shop phản hồi`, khong mo quyen gui review cho nguoi chua mua.
   - Buyer product review gating (2026-03-17): user yeu cau chi nguoi da mua moi duoc danh gia; huong chot la PDP `/products/{id}` luon hien review public cho moi nguoi, nhung form review chi mo khi viewer co don chua san pham va don khong o cac trang thai `AwaitingPayment/Expired/Canceled` hoac payment `Failed/Expired`; moi user giu 1 review goc cho 1 san pham va gui lai se la cap nhat.
@@ -193,6 +195,12 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Da doc lai `docs/report-nhom-1-security-review.md` va doi chieu voi code hien tai:
+      - report cu da lech o `Google login` vi BFF + Identity da co external login buyer-facing.
+      - report cu da lech o `VNPay secure flow` vi BFF da co ky URL, verify callback hash va goi Ordering finalize.
+      - cac gap bao mat van con ton tai va can roadmap rieng: `rate limiting`, `lockout`, `cookie/session hardening`, bo `ff_access_token` khoi cookie claim, `security headers`, `email verification`, `forwarded headers`, `2FA`, `session store/DataProtection production`.
+    - Da cap nhat `docs/report-nhom-1-security-review.md` de phan anh dung hon trang thai hien tai cua `Google login`, `VNPay`, `email verification`, `forwarded headers`, va `security logging`.
+    - Da tao `docs/security-hardening-roadmap-2026-03-18.md` voi lo trinh P0/P1/P2, file can cham, va tieu chi hoan tat cho tung nhom hardening.
     - Seller review reply da ho tro sua lai noi dung cu:
       - Ordering `ReviewsAdminController.Reply` chuyen sang upsert reply theo seller/user actor thay vi tao ban ghi moi moi lan.
       - Seller view `Areas/Seller/Views/Review/ManageReview.cshtml` doi nut `Phản hồi` thanh `Sửa phản hồi` khi da co reply, va modal tu do san noi dung cu.
@@ -1822,6 +1830,8 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
+    - User dang hoi quy trinh merge nhanh hien tai vao `dev` an toan, khong mat thay doi.
+    - Tra loi user ve ket luan security moi: repo van con gap bao mat can lam va roadmap da duoc ghi vao `docs/security-hardening-roadmap-2026-03-18.md`.
     - Cho user retest buyer-facing review tren PDP va chi tiet don hang:
       - user chua mua chi xem duoc review,
       - user da mua co the gui/cap nhat review.
@@ -1857,6 +1867,8 @@
       - Ban giao patch reconciliation job de tu sua lech `ReservedStock` va reservation status sau su co.
       - User retest `/cart` sau patch thumb/icon/summary cleanup.
   - *Next*:
+      - Neu user muon, ho tro tiep cac lenh `git` cu the de merge/rebase branch hien tai vao `dev` va xu ly conflict.
+      - Neu user chot thuc thi, bat dau P0.1: bo `ff_access_token` khoi auth cookie claim o buyer + seller + admin login.
       - Neu user muon toi uu hon nua, co the doi alias route cu sang redirect 301/302 thay vi map truc tiep action.
       - Neu user muon lam sach ten codebase hon nua, co the doi ten seller `AdminAccountController`/view/model sang `SellerAccount` de tranh nham nghia noi bo.
       - Neu user muon mo rong tiep, co the dua 2 link policy len them o trang dang nhap/dang ky hoac cac footer lane khac.
