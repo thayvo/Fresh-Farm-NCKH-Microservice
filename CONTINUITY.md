@@ -15,9 +15,13 @@
 - **Constraints/Assumptions**:
   - Giu UI/UX hien co cua views Seller (chi sua model/route/binding/controller mapping).
   - Khong dung lenh git/destructive.
+  - Rule moi theo user (2026-03-19): phai hoan thien phan `auth audit/log` cho chuan chinh truoc khi quay lai cac hang muc dang do trong roadmap bao mat/CSP. Truoc moi buoc tiep theo, can danh gia xem buoc do co can them DB/schema hay khong; neu can thi tam hoan va lam viec khac truoc cho den khi user yeu cau tiep, neu khong can thi tiep tuc theo lo trinh hien tai.
 
   - Van khong co ket noi SQL runtime truc tiep.
 - **Key decisions**:
+  - Priority gate (2026-03-19): `auth audit/log` tro thanh dieu kien gate truoc khi tiep tuc phan dang lam do (`P2.1` CSP phase 2 dot 4 va cac hardening khac). Moi hang muc ke tiep phai duoc danh dau ro `co/khong can them DB`.
+  - Auth audit trail expansion complete (2026-03-19): `AuthAuditLog` da duoc mo rong pham vi persist tu backoffice-only sang ca `Customer/User`; `AdminAuthAuditController` + `Audit Center` tren BFF da mo role filter/stats/UI de Admin xem duoc log dang nhap cua `Admin`, `Seller`, `Nguoi dung` va `Khong xac dinh`. Khong can them schema moi neu DB da co bang `AuthAuditLog` tu dot truoc.
+  - Auth audit heuristics expansion (2026-03-19): `AuthAuditService` da bo sung co dang ngo co ban ma khong them cot moi, gom `automation_user_agent`, `repeated_failed_ip`, `multi_account_probe`, `account_under_attack`; Google/external login success/fail cung duoc dua vao auth audit.
   - Security hardening P2.1 phase 2 dot 3 complete (2026-03-18): da tach khoi inline script lon con lai o `Views/Home/Index.cshtml` sang `wwwroot/js/home-page.js`; trang chu public gio chi con script ngoai (`home-page.js`, `home-welcome-popup.js`, `csp-phase2.js`) va config qua DOM data attributes/anti-forgery form an, giup giam them phu thuoc `'unsafe-inline'`.
   - Admin auth audit trail implementation complete (2026-03-18): Identity da persist `AuthAuditLog` cho `Admin` + `Seller` (login success/fail/lockout/2FA), co IP, forwarded IP, user-agent, device/browser/OS summary, va co dang ngo co ban; `Audit Center` o BFF Admin da co thong ke 24h, bo loc role/outcome, va bang tra cuu login backoffice.
   - Security hardening P2.1 phase 2 dot 2 partial complete (2026-03-18): `Views/Cart/Index.cshtml` da bo toan bo inline script sang `wwwroot/js/cart-page.js`; `Views/Home/Index.cshtml` da bo inline popup handlers `onclick`, tach logic popup sang `wwwroot/js/home-welcome-popup.js`, va them DOM config cho image paths. `Home/Index` van con script inline lon cho product/category/suggestion nen chua the bo `'unsafe-inline'`.
@@ -222,6 +226,7 @@
     - form nhap tay hien tai chi la duong test/hardening tam thoi va se bi an/bo sau khi luong that on dinh.
 - **State**:
   - *Done*:
+    - Da mo rong auth audit trail tu `Admin + Seller` sang `Admin + Seller + Customer/User`, cap nhat API/BFF/UI Audit Center, va build xanh `Identity` + `BFF`.
     - Da hoan tat P2.1 phase 2 dot 3 cho CSP:
       - `src/Web/FreshFarm.Web.Bff/Views/Home/Index.cshtml` da bo khoi inline script lon va chuyen sang `wwwroot/js/home-page.js`.
       - Trang chu gio chi con script ngoai (`home-page.js`, `home-welcome-popup.js`, `csp-phase2.js`).
@@ -1924,7 +1929,8 @@
         - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_merchant_vi\` -> PASS (`10 warning` cu/nullability, `0 error`).
         - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_merchant_vi\` -> PASS (`20 warning` cu ngoai scope patch, `0 error`).
   - *Now*:
-        - Dang cho user apply SQL `FreshFarmIdentityDb.2026-03-18.admin-auth-audit.delta.sql`, restart `FreshFarm.Identity.API` + `FreshFarm.Web.Bff`, va retest auth audit trail.
+    - Dang cho user restart `FreshFarm.Identity.API` + `FreshFarm.Web.Bff` va retest auth audit trail mo rong cho `Admin`, `Seller`, `Nguoi dung`.
+    - Can chot auth audit da "chuan chinh" truoc khi quay lai roadmap dang do; dong thoi danh gia tung hang muc tiep theo co/khong can them DB/schema.
     - Dang cho user restart `FreshFarm.Web.Bff` va retest `Cart/Index` + `Home/Index` sau patch CSP phase 2 dot 3.
         - Dang cho user restart `FreshFarm.Ordering.Api` va `FreshFarm.Web.Bff`, sau do retest callback VNPay buyer-facing + IPN/back-channel sau patch `P2.2` phase 2.
         - Dang cho user restart `FreshFarm.Identity.API` va `FreshFarm.Web.Bff`, sau do retest lai flow signup/verify/login tren `app.thayvo.id.vn` sau patch on dinh hoa va token-kind fix.
@@ -1963,7 +1969,10 @@
       - Ban giao patch reconciliation job de tu sua lech `ReservedStock` va reservation status sau su co.
       - User retest `/cart` sau patch thumb/icon/summary cleanup.
   - *Next*:
-        - User retest login fail/success/lockout/2FA cho Admin va Seller, kiem tra `/Admin/Audit/Index`.
+    - User retest login fail/success/lockout/2FA cho Admin, Seller, Nguoi dung; kiem tra `/Admin/Audit/Index` va bo loc role `Nguoi dung`.
+    - Sau khi auth audit on dinh, ra soat tung buoc roadmap tiep theo:
+      - `P2.1` phase 2 dot 4 (CSP buyer-facing): KHONG can DB/schema.
+      - Neu gap hang muc can them DB/schema ma user chua yeu cau, tam hoan hang muc do va chuyen sang muc khac khong can DB.
     - Sau khi user retest ban patch vua xong, lam tiep `P2.1` phase 2 dot 4: ra soat cac page buyer-facing standalone con inline script/style/event handler de tiep tuc loai dan `'unsafe-inline'`.
         - Thu gom CSP violation tu browser/DevTools de chot danh sach inline script/style/event handler can giam tiep truoc khi bo `'unsafe-inline'`.
         - Restart `FreshFarm.Ordering.Api` va `FreshFarm.Web.Bff`.

@@ -269,6 +269,7 @@ public sealed class AuditController : LegacySellerControllerBase
             new AuditOptionViewModel { Value = "all", Text = "Tất cả" },
             new AuditOptionViewModel { Value = "admin", Text = "Admin" },
             new AuditOptionViewModel { Value = "seller", Text = "Seller" },
+            new AuditOptionViewModel { Value = "customer", Text = "Người dùng" },
             new AuditOptionViewModel { Value = "unknown", Text = "Không xác định" }
         ];
 
@@ -299,6 +300,14 @@ public sealed class AuditController : LegacySellerControllerBase
             "ads_wallet" => "Ví quảng cáo",
             "ads_campaign" => "Chiến dịch quảng cáo",
             "risk_case" => "Ca rủi ro",
+            "admin" => "Admin",
+            "seller" => "Seller",
+            "customer" => "Người dùng",
+            "unknown" => "Không xác định",
+            "success" => "Thành công",
+            "failed" => "Thất bại",
+            "locked" => "Bị khóa",
+            "suspicious" => "Đáng ngờ",
             _ => text ?? string.Empty
         };
 

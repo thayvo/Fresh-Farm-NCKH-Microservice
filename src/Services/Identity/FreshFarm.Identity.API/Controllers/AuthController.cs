@@ -485,6 +485,14 @@ namespace FreshFarm.Identity.Api.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("External login that bai do request model khong hop le.");
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "invalid_request",
+                    cancellationToken: cancellationToken);
                 return ValidationProblem(ModelState);
             }
 
@@ -492,6 +500,14 @@ namespace FreshFarm.Identity.Api.Controllers
             if (!provider.Equals("Google", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("External login that bai: provider {Provider} khong duoc ho tro.", provider);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "unsupported_provider",
+                    cancellationToken: cancellationToken);
                 return BadRequest("Hiện tại hệ thống chỉ hỗ trợ đăng nhập Google.");
             }
 
@@ -510,6 +526,14 @@ namespace FreshFarm.Identity.Api.Controllers
             if (user is not null && !user.IsActive)
             {
                 _logger.LogWarning("Google external login that bai: userId {UserId} dang bi vo hieu hoa.", user.UserId);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "inactive_account",
+                    cancellationToken: cancellationToken);
                 return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
             }
 
@@ -519,6 +543,14 @@ namespace FreshFarm.Identity.Api.Controllers
                     "Google external login bi chan: userId {UserId} dang khoa tam thoi den {LockedUntil}.",
                     user.UserId,
                     user.UserAuth.LockedUntil.Value);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                    "login_locked",
+                    success: false,
+                    failureReason: "account_locked",
+                    cancellationToken: cancellationToken);
                 return Unauthorized(BuildLockoutMessage(user.UserAuth.LockedUntil.Value, DateTime.UtcNow));
             }
 
@@ -616,6 +648,15 @@ namespace FreshFarm.Identity.Api.Controllers
             {
                 roleNames.Add("Customer");
             }
+
+            await WriteExternalAuthAuditAsync(
+                request,
+                user,
+                roleNames,
+                "external_login_success",
+                success: true,
+                failureReason: null,
+                cancellationToken: cancellationToken);
 
             return Ok(CreateToken(user, roleNames));
         }
@@ -1278,6 +1319,34 @@ namespace FreshFarm.Identity.Api.Controllers
                     Success = success,
                     FailureReason = failureReason,
                     FailedAttemptCount = failedAttemptCount
+                },
+                cancellationToken);
+        }
+
+        private Task WriteExternalAuthAuditAsync(
+            ExternalLoginRequest request,
+            User? user,
+            IReadOnlyCollection<string>? roleNames,
+            string eventType,
+            bool success,
+            string? failureReason,
+            CancellationToken cancellationToken = default)
+        {
+            return _authAuditService.WriteAsync(
+                new AuthAuditWriteRequest
+                {
+                    HttpContext = HttpContext,
+                    ClientLane = ResolveClientLane(roleNames ?? user?.UserRoles?
+                        .Select(x => x.Role?.RoleName)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Cast<string>()
+                        .ToArray() ?? []),
+                    User = user,
+                    RoleNames = roleNames,
+                    Identifier = request.Email?.Trim() ?? string.Empty,
+                    EventType = eventType,
+                    Success = success,
+                    FailureReason = failureReason
                 },
                 cancellationToken);
         }

@@ -1,6 +1,24 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.AuditCenterPageViewModel
 @{
     ViewData["Title"] = "Trung tâm kiểm toán";
+
+    static string FormatRoleLabel(string? roleName)
+        => (roleName ?? string.Empty).ToLowerInvariant() switch
+        {
+            "admin" => "Admin",
+            "seller" => "Seller",
+            "customer" => "Người dùng",
+            _ => "Không xác định"
+        };
+
+    static string FormatLaneLabel(string? lane)
+        => (lane ?? string.Empty).ToLowerInvariant() switch
+        {
+            "admin" => "Admin",
+            "seller" => "Seller",
+            "customer" => "Người dùng",
+            _ => "Không xác định"
+        };
 }
 
 <section class="audit-console audit-page ff-admin-shell">
@@ -56,9 +74,9 @@
     <div class="panel-card glass-card mb-4">
         <div class="panel-head d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
             <div>
-                <h2 class="h5 mb-1">Nhật ký đăng nhập backoffice</h2>
+                <h2 class="h5 mb-1">Nhật ký đăng nhập hệ thống</h2>
                 <p class="text-muted mb-0">
-                    Theo dõi đăng nhập Admin và Seller, gồm kết quả, IP, thiết bị và cờ đáng ngờ để phục vụ truy vết bảo mật.
+                    Theo dõi đăng nhập Admin, Seller và Người dùng, gồm kết quả, IP, thiết bị và cờ đáng ngờ để phục vụ truy vết bảo mật.
                 </p>
             </div>
             <div class="section-badge">
@@ -128,12 +146,12 @@
                         {
                             <tr>
                                 <td colspan="6" class="text-center text-muted py-5">
-                                    <div class="empty-state">
-                                        <div class="empty-icon">🛡️</div>
-                                        <p class="mb-0">Chưa có sự kiện đăng nhập Admin hoặc Seller khớp bộ lọc hiện tại.</p>
-                                    </div>
-                                </td>
-                            </tr>
+                                        <div class="empty-state">
+                                            <div class="empty-icon">🛡️</div>
+                                        <p class="mb-0">Chưa có sự kiện đăng nhập hệ thống khớp bộ lọc hiện tại.</p>
+                                        </div>
+                                    </td>
+                                </tr>
                         }
                         else
                         {
@@ -142,7 +160,7 @@
                                 <tr>
                                     <td>
                                         <div class="fw-semibold">@item.OccurredAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</div>
-                                        <div class="small text-muted">@item.ClientLane / @item.RoleName</div>
+                                        <div class="small text-muted">@FormatLaneLabel(item.ClientLane) / @FormatRoleLabel(item.RoleName)</div>
                                     </td>
                                     <td>
                                         <div class="fw-semibold">@(item.UserName ?? item.Identifier)</div>

@@ -25,6 +25,7 @@ public sealed class AuthAuditService : IAuthAuditService
 {
     private readonly FreshFarmIdentityDBContext _db;
     private readonly ILogger<AuthAuditService> _logger;
+    private static readonly string[] SuspiciousAutomationMarkers = ["bot", "crawler", "spider", "curl", "postman", "python-requests", "powershell", "wget"];
 
     public AuthAuditService(
         FreshFarmIdentityDBContext db,
@@ -40,10 +41,6 @@ public sealed class AuthAuditService : IAuthAuditService
 
         var clientLane = NormalizeLane(request.ClientLane);
         var primaryRole = ResolvePrimaryRole(request.User, request.RoleNames);
-        if (!ShouldPersist(clientLane, primaryRole))
-        {
-            return;
-        }
 
         var httpContext = request.HttpContext;
         var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
@@ -51,13 +48,16 @@ public sealed class AuthAuditService : IAuthAuditService
         var remoteIp = httpContext?.Connection.RemoteIpAddress?.ToString();
         var deviceInfo = ParseUserAgent(userAgent);
 
-        var suspicionReasons = BuildSuspicionReasons(
+        var suspicionReasons = await BuildSuspicionReasonsAsync(
             clientLane,
             primaryRole,
             request.EventType,
             request.FailureReason,
             request.FailedAttemptCount,
-            userAgent);
+            userAgent,
+            remoteIp,
+            request.Identifier,
+            cancellationToken);
 
         var row = new AuthAuditLog
         {
@@ -93,9 +93,6 @@ public sealed class AuthAuditService : IAuthAuditService
             row.UserId,
             row.IsSuspicious);
     }
-
-    private static bool ShouldPersist(string clientLane, string primaryRole)
-        => IsBackofficeLane(clientLane) || IsBackofficeLane(primaryRole);
 
     private static bool IsBackofficeLane(string? value)
         => string.Equals(value, "Admin", StringComparison.OrdinalIgnoreCase) ||
@@ -149,13 +146,16 @@ public sealed class AuthAuditService : IAuthAuditService
         return "Unknown";
     }
 
-    private static List<string> BuildSuspicionReasons(
+    private async Task<List<string>> BuildSuspicionReasonsAsync(
         string clientLane,
         string primaryRole,
         string eventType,
         string? failureReason,
         int? failedAttemptCount,
-        string? userAgent)
+        string? userAgent,
+        string? remoteIp,
+        string identifier,
+        CancellationToken cancellationToken)
     {
         var reasons = new List<string>();
 
@@ -180,6 +180,12 @@ public sealed class AuthAuditService : IAuthAuditService
             reasons.Add("repeated_failed_login");
         }
 
+        if (!string.IsNullOrWhiteSpace(userAgent) &&
+            SuspiciousAutomationMarkers.Any(marker => userAgent.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+        {
+            reasons.Add("automation_user_agent");
+        }
+
         if (IsBackofficeLane(clientLane) &&
             string.Equals(primaryRole, "Unknown", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(failureReason, "account_not_found", StringComparison.OrdinalIgnoreCase))
@@ -192,6 +198,46 @@ public sealed class AuthAuditService : IAuthAuditService
             !string.Equals(clientLane, primaryRole, StringComparison.OrdinalIgnoreCase))
         {
             reasons.Add("lane_role_mismatch");
+        }
+
+        if (!string.IsNullOrWhiteSpace(remoteIp))
+        {
+            var since = DateTime.UtcNow.AddMinutes(-15);
+            var ipWindow = _db.AuthAuditLogs.AsNoTracking()
+                .Where(x => x.OccurredAt >= since && x.IpAddress == remoteIp);
+
+            var failedFromIp = await ipWindow.CountAsync(x => !x.Success, cancellationToken);
+            if (failedFromIp >= 5)
+            {
+                reasons.Add("repeated_failed_ip");
+            }
+
+            var distinctIdentifiersFromIp = await ipWindow
+                .Where(x => !string.IsNullOrEmpty(x.Identifier))
+                .Select(x => x.Identifier)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (distinctIdentifiersFromIp >= 3)
+            {
+                reasons.Add("multi_account_probe");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(identifier))
+        {
+            var accountFailWindowStart = DateTime.UtcNow.AddMinutes(-30);
+            var repeatedAccountFailures = await _db.AuthAuditLogs.AsNoTracking()
+                .CountAsync(
+                    x => x.OccurredAt >= accountFailWindowStart &&
+                         x.Identifier == identifier &&
+                         !x.Success,
+                    cancellationToken);
+
+            if (repeatedAccountFailures >= 5)
+            {
+                reasons.Add("account_under_attack");
+            }
         }
 
         return reasons.Distinct(StringComparer.OrdinalIgnoreCase).ToList();

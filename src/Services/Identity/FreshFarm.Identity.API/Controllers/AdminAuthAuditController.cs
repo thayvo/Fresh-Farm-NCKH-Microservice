@@ -10,7 +10,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public sealed class AdminAuthAuditController : ControllerBase
 {
-    private static readonly string[] AllowedRoles = { "all", "admin", "seller", "unknown" };
+    private static readonly string[] AllowedRoles = { "all", "admin", "seller", "customer", "unknown" };
     private static readonly string[] AllowedOutcomes = { "all", "success", "failed", "suspicious", "locked" };
 
     private readonly FreshFarmIdentityDBContext _db;
@@ -51,6 +51,7 @@ public sealed class AdminAuthAuditController : ControllerBase
             {
                 "admin" => "Admin",
                 "seller" => "Seller",
+                "customer" => "Customer",
                 _ => "Unknown"
             };
 
@@ -69,7 +70,7 @@ public sealed class AdminAuthAuditController : ControllerBase
         var since24h = DateTime.UtcNow.AddHours(-24);
         var statsBase = _db.AuthAuditLogs.AsNoTracking()
             .Where(x => x.OccurredAt >= since24h &&
-                (x.RoleName == "Admin" || x.RoleName == "Seller" || x.RoleName == "Unknown"));
+                (x.RoleName == "Admin" || x.RoleName == "Seller" || x.RoleName == "Customer" || x.RoleName == "Unknown"));
 
         var total24h = await statsBase.CountAsync(cancellationToken);
         var success24h = await statsBase.CountAsync(x => x.Success, cancellationToken);
@@ -142,6 +143,7 @@ public sealed class AdminAuthAuditController : ControllerBase
             "all" => "Tất cả",
             "admin" => "Admin",
             "seller" => "Seller",
+            "customer" => "Người dùng",
             "unknown" => "Không xác định",
             "success" => "Thành công",
             "failed" => "Thất bại",
