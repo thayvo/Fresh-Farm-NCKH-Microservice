@@ -13,6 +13,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "AdminOnly")]
 public sealed class AdminUsersController : ControllerBase
 {
+    private const string UserNamePattern = @"^[a-zA-Z0-9._-]+$";
     private readonly FreshFarmIdentityDBContext _db;
     private readonly IPasswordHasher<User> _passwordHasher;
 
@@ -596,6 +597,11 @@ public sealed class AdminUsersController : ControllerBase
             return (false, "Ten dang nhap khong duoc de trong.", string.Empty, string.Empty, string.Empty, string.Empty, null, null, true, 0);
         }
 
+        if (!System.Text.RegularExpressions.Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", string.Empty, string.Empty, string.Empty, string.Empty, null, null, true, 0);
+        }
+
         if (string.IsNullOrWhiteSpace(fullName))
         {
             return (false, "Ho ten khong duoc de trong.", string.Empty, string.Empty, string.Empty, string.Empty, null, null, true, 0);
@@ -634,6 +640,11 @@ public sealed class AdminUsersController : ControllerBase
             return (false, "Ten dang nhap khong duoc de trong.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
         }
 
+        if (!System.Text.RegularExpressions.Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
+        }
+
         if (string.IsNullOrWhiteSpace(fullName))
         {
             return (false, "Ho ten khong duoc de trong.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
@@ -665,6 +676,7 @@ public sealed class AdminUsersController : ControllerBase
     public sealed class AdminCreateUserRequest
     {
         [Required]
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         [Required]
@@ -689,6 +701,7 @@ public sealed class AdminUsersController : ControllerBase
     public sealed class AdminUpdateUserRequest
     {
         [Required]
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         [Required]

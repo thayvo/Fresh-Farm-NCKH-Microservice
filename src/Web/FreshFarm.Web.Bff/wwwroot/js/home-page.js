@@ -13,6 +13,7 @@
         const homePageConfig = document.getElementById("homePageConfig");
         const fallbackImagePath = homePageConfig?.getAttribute("data-fallback-image") ?? "/Images/no-image.png";
         const uploadFolderPath = homePageConfig?.getAttribute("data-upload-folder") ?? "/uploads/products/";
+        const appHelpers = window.FreshFarmApp;
 
         if (!(categoryWrapper instanceof HTMLElement)
             || !(suggestionWrapper instanceof HTMLElement)
@@ -182,17 +183,13 @@
                     return null;
                 }
 
-                const text = await response.text();
-                let payload = null;
-
-                try {
-                    payload = text ? JSON.parse(text) : null;
-                } catch {
-                    payload = null;
-                }
+                const { payload } = appHelpers
+                    ? await appHelpers.tryParsePayload(response)
+                    : { payload: null };
 
                 if (!response.ok) {
-                    throw new Error(payload?.message || `HTTP ${response.status}`);
+                    throw (appHelpers?.createHttpError(response, payload, "Không thể thêm sản phẩm vào giỏ hàng lúc này.")
+                        ?? new Error(payload?.message || `HTTP ${response.status}`));
                 }
 
                 showCartToast(payload?.message || "Đã thêm sản phẩm vào giỏ hàng.");
@@ -440,11 +437,13 @@
                     headers: { Accept: "application/json" }
                 });
 
+                const { payload } = appHelpers
+                    ? await appHelpers.tryParsePayload(response)
+                    : { payload: await response.json() };
                 if (!response.ok) {
-                    throw new Error(`Không tải được sản phẩm: ${response.status}`);
+                    throw (appHelpers?.createHttpError(response, payload, "Không tải được sản phẩm.")
+                        ?? new Error(`Không tải được sản phẩm: ${response.status}`));
                 }
-
-                const payload = await response.json();
                 const products = Array.isArray(payload)
                     ? payload.map(normalizeProduct)
                     : [];

@@ -316,6 +316,7 @@ public class ShippingController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> CreateGhnSandboxOrder([FromBody] CreateGhnSandboxOrderRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)

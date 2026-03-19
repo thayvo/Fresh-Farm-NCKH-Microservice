@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication; // SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // CookieAuthenticationDefaults.
 using Microsoft.AspNetCore.Authorization; // [Authorize].
 using Microsoft.AspNetCore.Mvc; // Controller + IActionResult.
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers; // AuthenticationHeaderValue.
 using System.Globalization;
 using System.Text;
@@ -51,6 +52,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     }
 
     [HttpGet("/checkout")] // Render checkout từ dữ liệu cart hiện tại.
+    [EnableRateLimiting("checkout-read")]
     public async Task<IActionResult> Index()
     {
         await SeedDirectCheckoutItemFromQueryAsync();
@@ -90,6 +92,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     }
 
     [HttpGet("/checkout/success")] // Trang success sau đặt đơn.
+    [EnableRateLimiting("checkout-read")]
     public IActionResult Success()
     {
         ViewBag.OrderId = TempData["OrderId"];
@@ -247,6 +250,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     }
 
     [HttpGet("/checkout/ghn/provinces")]
+    [EnableRateLimiting("ghn-read")]
     public async Task<JsonResult> GetGhnProvinces(CancellationToken cancellationToken)
     {
         var items = await _ghnSandboxService.GetProvincesAsync(cancellationToken);
@@ -264,6 +268,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     }
 
     [HttpGet("/checkout/ghn/districts")]
+    [EnableRateLimiting("ghn-read")]
     public async Task<JsonResult> GetGhnDistricts(int provinceId, CancellationToken cancellationToken)
     {
         if (provinceId <= 0)
@@ -291,6 +296,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     }
 
     [HttpGet("/checkout/ghn/wards")]
+    [EnableRateLimiting("ghn-read")]
     public async Task<JsonResult> GetGhnWards(int districtId, CancellationToken cancellationToken)
     {
         if (districtId <= 0)
@@ -319,6 +325,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
 
     [HttpPost("/checkout/ghn/preview-fee")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("checkout-write")]
     public async Task<JsonResult> PreviewShippingFee(
         [FromForm] CheckoutShippingFeePreviewRequestDto request,
         CancellationToken cancellationToken)
@@ -348,6 +355,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
 
     [HttpPost("/checkout")] // Submit đặt đơn.
     [ValidateAntiForgeryToken] // Chặn CSRF.
+    [EnableRateLimiting("checkout-write")]
     public async Task<IActionResult> Index(CheckoutSubmitRequestDto request)
     {
         var token = HttpContext.Session.GetString(AccessTokenSessionKey); // Lấy JWT.

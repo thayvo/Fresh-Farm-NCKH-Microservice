@@ -23,7 +23,7 @@ namespace FreshFarm.Identity.Api.Controllers
     public class AuthController : ControllerBase
     {
         private const int MaxFailedLoginAttempts = 5;
-        private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+        private const int BaseLockoutDurationMinutes = 5;
         private static readonly Regex VietnamPhoneRegex = new(@"^(0\d{9}|\+84\d{9})$", RegexOptions.Compiled);
 
         private readonly FreshFarmIdentityDBContext _db;
@@ -70,10 +70,10 @@ namespace FreshFarm.Identity.Api.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password))
+            if (!TryValidateLoginRequest(request, out var validationProblem))
             {
-                _logger.LogWarning("Tu choi login do thieu identifier hoac password.");
-                return BadRequest("Vui lòng nhập đầy đủ Email/Username và Mật khẩu");
+                _logger.LogWarning("Tu choi login do thieu du lieu bat buoc.");
+                return validationProblem;
             }
 
             var id = request.Identifier.Trim();
@@ -140,7 +140,15 @@ namespace FreshFarm.Identity.Api.Controllers
                     success: false,
                     "account_locked",
                     user.UserAuth.FailedCount);
-                return Unauthorized(BuildLockoutMessage(user.UserAuth.LockedUntil.Value, now));
+                return Unauthorized(BuildLockoutResponse(user.UserAuth.LockedUntil.Value, now));
+            }
+
+            if (user.UserAuth.LockedUntil.HasValue && user.UserAuth.LockedUntil.Value <= now)
+            {
+                user.UserAuth.LockedUntil = null;
+                user.UserAuth.FailedCount = 0;
+                user.UserAuth.UpdatedAt = now;
+                await _db.SaveChangesAsync();
             }
 
             var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.UserAuth.PasswordHash, request.Password);
@@ -151,7 +159,8 @@ namespace FreshFarm.Identity.Api.Controllers
 
                 if (user.UserAuth.FailedCount >= MaxFailedLoginAttempts)
                 {
-                    user.UserAuth.LockedUntil = now.Add(LockoutDuration);
+                    user.UserAuth.LockoutLevel = Math.Max(1, user.UserAuth.LockoutLevel + 1);
+                    user.UserAuth.LockedUntil = now.Add(BuildLockoutDuration(user.UserAuth.LockoutLevel));
                     user.UserAuth.FailedCount = MaxFailedLoginAttempts;
                     await _db.SaveChangesAsync();
 
@@ -168,7 +177,7 @@ namespace FreshFarm.Identity.Api.Controllers
                         "too_many_failed_passwords",
                         user.UserAuth.FailedCount);
 
-                    return Unauthorized(BuildLockoutMessage(user.UserAuth.LockedUntil.Value, now));
+                    return Unauthorized(BuildLockoutResponse(user.UserAuth.LockedUntil.Value, now));
                 }
 
                 await _db.SaveChangesAsync();
@@ -185,13 +194,14 @@ namespace FreshFarm.Identity.Api.Controllers
                     success: false,
                     "wrong_password",
                     user.UserAuth.FailedCount);
-                return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
+                return Unauthorized(BuildRemainingAttemptsMessage(user.UserAuth.FailedCount));
             }
 
-            if (user.UserAuth.FailedCount > 0 || user.UserAuth.LockedUntil.HasValue)
+            if (user.UserAuth.FailedCount > 0 || user.UserAuth.LockedUntil.HasValue || user.UserAuth.LockoutLevel > 0)
             {
                 user.UserAuth.FailedCount = 0;
                 user.UserAuth.LockedUntil = null;
+                user.UserAuth.LockoutLevel = 0;
                 user.UserAuth.UpdatedAt = now;
                 await _db.SaveChangesAsync();
                 _logger.LogInformation("Dang nhap thanh cong va da reset trang thai lockout cho userId {UserId}.", user.UserId);
@@ -199,6 +209,23 @@ namespace FreshFarm.Identity.Api.Controllers
             else
             {
                 _logger.LogInformation("Dang nhap thanh cong cho userId {UserId}.", user.UserId);
+            }
+
+            if (!IsRoleAllowedForLane(request.ClientLane!, roleNames))
+            {
+                _logger.LogWarning(
+                    "Dang nhap bi tu choi: userId {UserId} khong co quyen vao lane {ClientLane}.",
+                    user.UserId,
+                    request.ClientLane);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_failed",
+                    success: false,
+                    "lane_access_denied",
+                    user.UserAuth.FailedCount);
+                return Unauthorized(BuildLaneAccessDeniedMessage(request.ClientLane!));
             }
 
             await WriteAuthAuditAsync(
@@ -246,7 +273,17 @@ namespace FreshFarm.Identity.Api.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.Ticket) || string.IsNullOrWhiteSpace(request.Code))
             {
-                return BadRequest("Thiếu phiên xác thực hai bước hoặc mã xác thực.");
+                if (string.IsNullOrWhiteSpace(request.Ticket))
+                {
+                    ModelState.AddModelError(nameof(request.Ticket), "Phiên xác thực hai bước là bắt buộc.");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Code))
+                {
+                    ModelState.AddModelError(nameof(request.Code), "Mã xác thực 6 số là bắt buộc.");
+                }
+
+                return ValidationProblem(ModelState);
             }
 
             if (!_twoFactorLoginTicketService.TryReadTicket(request.Ticket, out var twoFactorTicket) || twoFactorTicket is null)
@@ -340,14 +377,9 @@ namespace FreshFarm.Identity.Api.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) ||
-                string.IsNullOrWhiteSpace(request.UserName) ||
-                string.IsNullOrWhiteSpace(request.FullName) ||
-                string.IsNullOrWhiteSpace(request.Password) ||
-                string.IsNullOrWhiteSpace(request.Phone) ||
-                string.IsNullOrWhiteSpace(request.ConfirmPassword))
+            if (!ModelState.IsValid)
             {
-                return BadRequest("Toàn bộ thông tin là bắt buộc nhập.");
+                return ValidationProblem(ModelState);
             }
 
             var existingUser = await _db.Users.AnyAsync(u =>
@@ -1297,6 +1329,66 @@ namespace FreshFarm.Identity.Api.Controllers
             return "Unknown";
         }
 
+        private static bool IsRoleAllowedForLane(string clientLane, IEnumerable<string> roleNames)
+        {
+            if (string.Equals(clientLane, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return roleNames.Any(x => string.Equals(x, "Admin", StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (string.Equals(clientLane, "Seller", StringComparison.OrdinalIgnoreCase))
+            {
+                return roleNames.Any(x =>
+                    string.Equals(x, "Seller", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x, "Admin", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return true;
+        }
+
+        private static string BuildLaneAccessDeniedMessage(string clientLane)
+        {
+            if (string.Equals(clientLane, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Bạn không có quyền truy cập khu vực quản trị.";
+            }
+
+            if (string.Equals(clientLane, "Seller", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Bạn không có quyền truy cập khu vực nhà bán hàng.";
+            }
+
+            return "Bạn không có quyền truy cập khu vực này.";
+        }
+
+        private bool TryValidateLoginRequest(LoginRequest request, out IActionResult? validationProblem)
+        {
+            validationProblem = null;
+
+            if (string.IsNullOrWhiteSpace(request.Identifier))
+            {
+                ModelState.AddModelError(nameof(request.Identifier), "Email hoặc tên đăng nhập là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                ModelState.AddModelError(nameof(request.Password), "Mật khẩu là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ClientLane))
+            {
+                ModelState.AddModelError(nameof(request.ClientLane), "Loại luồng đăng nhập là bắt buộc.");
+            }
+
+            if (ModelState.IsValid)
+            {
+                return true;
+            }
+
+            validationProblem = ValidationProblem(ModelState);
+            return false;
+        }
+
         private Task WriteAuthAuditAsync(
             LoginRequest request,
             User? user,
@@ -1437,6 +1529,20 @@ namespace FreshFarm.Identity.Api.Controllers
             throw new InvalidOperationException("Không thể tạo số điện thoại tạm duy nhất cho tài khoản Google.");
         }
 
+        private static object BuildLockoutResponse(DateTime lockedUntilUtc, DateTime nowUtc)
+            => new
+            {
+                message = BuildLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc
+            };
+
+        private static TimeSpan BuildLockoutDuration(int lockoutLevel)
+        {
+            var normalizedLevel = Math.Max(1, lockoutLevel);
+            var multiplier = Math.Pow(2, normalizedLevel - 1);
+            return TimeSpan.FromMinutes(BaseLockoutDurationMinutes * multiplier);
+        }
+
         private static string BuildLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
         {
             var remaining = lockedUntilUtc - nowUtc;
@@ -1447,6 +1553,17 @@ namespace FreshFarm.Identity.Api.Controllers
 
             var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
             return $"Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau {roundedMinutes} phút.";
+        }
+
+        private static string BuildRemainingAttemptsMessage(int failedCount)
+        {
+            var remainingAttempts = Math.Max(0, MaxFailedLoginAttempts - failedCount);
+            if (remainingAttempts <= 0)
+            {
+                return "Tài khoản đã bị khóa tạm thời do nhập sai mật khẩu quá nhiều lần.";
+            }
+
+            return $"Tài khoản hoặc mật khẩu không đúng. Bạn còn {remainingAttempts} lần thử trước khi tài khoản bị khóa tạm thời.";
         }
 
         private static string MaskIdentifier(string raw)

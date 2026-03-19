@@ -47,6 +47,7 @@
     <script nonce="@cspNonce" src="~/lib/jquery/dist/jquery.min.js"></script>
     <script nonce="@cspNonce" src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script nonce="@cspNonce" src="~/js/site.js" asp-append-version="true"></script>
+    @await Html.PartialAsync("_IdleSessionMonitor")
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

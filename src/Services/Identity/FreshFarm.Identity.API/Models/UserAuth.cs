@@ -15,6 +15,8 @@ public partial class UserAuth
 
     public DateTime? LockedUntil { get; set; }
 
+    public int LockoutLevel { get; set; }
+
     public string Mfasecret { get; set; }
 
     public DateTime UpdatedAt { get; set; }

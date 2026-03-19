@@ -32,6 +32,7 @@
 
     const initShopPage = () => {
         const config = document.querySelector("[data-shop-page]");
+        const appHelpers = window.FreshFarmApp;
         const loadingNode = document.getElementById("shopLoading");
         const errorNode = document.getElementById("shopError");
         const rootNode = document.getElementById("shopRoot");
@@ -77,13 +78,21 @@
             window.fetch(productsEndpoint, { headers: { Accept: "application/json" } })
         ])
             .then(async ([shopResp, productsResp]) => {
-                const shopPayload = await shopResp.json();
-                const productsPayload = await productsResp.json();
+                const shopResult = appHelpers
+                    ? await appHelpers.tryParsePayload(shopResp)
+                    : { payload: await shopResp.json() };
+                const productsResult = appHelpers
+                    ? await appHelpers.tryParsePayload(productsResp)
+                    : { payload: await productsResp.json() };
+                const shopPayload = shopResult.payload;
+                const productsPayload = productsResult.payload;
                 if (!shopResp.ok) {
-                    throw new Error(shopPayload?.message || `HTTP ${shopResp.status}`);
+                    throw (appHelpers?.createHttpError(shopResp, shopPayload, "Không tải được gian hàng.")
+                        ?? new Error(shopPayload?.message || `HTTP ${shopResp.status}`));
                 }
                 if (!productsResp.ok) {
-                    throw new Error(productsPayload?.message || `HTTP ${productsResp.status}`);
+                    throw (appHelpers?.createHttpError(productsResp, productsPayload, "Không tải được sản phẩm của shop.")
+                        ?? new Error(productsPayload?.message || `HTTP ${productsResp.status}`));
                 }
 
                 return {

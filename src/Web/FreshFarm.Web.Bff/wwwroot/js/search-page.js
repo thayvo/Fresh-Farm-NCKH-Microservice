@@ -92,6 +92,7 @@
             const categoryPillWrap = document.getElementById("searchCategoryPills");
             const presetPillWrap = document.getElementById("searchPresetPills");
             const antiForgeryToken = document.querySelector("#searchAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
+            const appHelpers = window.FreshFarmApp;
 
             const searchForm = document.getElementById("headerSearchForm");
             const searchInput = document.getElementById("headerSearchInput");
@@ -797,9 +798,12 @@
                     headers: { Accept: "application/json" }
                 });
 
-                const payload = await response.json();
+                const { payload } = appHelpers
+                    ? await appHelpers.tryParsePayload(response)
+                    : { payload: await response.json() };
                 if (!response.ok) {
-                    throw new Error(payload?.message || `HTTP ${response.status}`);
+                    throw (appHelpers?.createHttpError(response, payload, "Không tải được tóm tắt chat.")
+                        ?? new Error(payload?.message || `HTTP ${response.status}`));
                 }
 
                 state.chatSummaries = new Map(sellerIds.map((sellerId) => [sellerId, null]));
@@ -909,17 +913,13 @@
                         return null;
                     }
 
-                    const text = await response.text();
-                    let payload = null;
-
-                    try {
-                        payload = text ? JSON.parse(text) : null;
-                    } catch {
-                        payload = null;
-                    }
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: null };
 
                     if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                        throw (appHelpers?.createHttpError(response, payload, "Không thể thêm sản phẩm vào giỏ hàng lúc này.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
                     }
 
                     showCartToast(payload?.message || "Đã thêm sản phẩm vào giỏ hàng.");
@@ -1394,11 +1394,13 @@
                     headers: { Accept: "application/json" }
                 });
 
+                const { payload } = appHelpers
+                    ? await appHelpers.tryParsePayload(response)
+                    : { payload: await response.json() };
                 if (!response.ok) {
-                    throw new Error(`Không tải được danh mục (${response.status}).`);
+                    throw (appHelpers?.createHttpError(response, payload, "Không tải được danh mục.")
+                        ?? new Error(`Không tải được danh mục (${response.status}).`));
                 }
-
-                const payload = await response.json();
                 state.availableCategories = Array.isArray(payload)
                     ? payload.map((raw) => ({
                         categoryId: toNumber(raw.categoryId ?? raw.CategoryId, 0),
@@ -1425,11 +1427,13 @@
                         headers: { Accept: "application/json" }
                     });
 
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: await response.json() };
                     if (!response.ok) {
-                        throw new Error(`Không tải được dữ liệu sản phẩm (${response.status}).`);
+                        throw (appHelpers?.createHttpError(response, payload, "Không tải được dữ liệu sản phẩm.")
+                            ?? new Error(`Không tải được dữ liệu sản phẩm (${response.status}).`));
                     }
-
-                    const payload = await response.json();
                     const items = Array.isArray(payload?.items) ? payload.items : [];
                     state.allProducts = items.map(normalizeProduct);
                     state.relatedProducts = Array.isArray(payload?.relatedItems)

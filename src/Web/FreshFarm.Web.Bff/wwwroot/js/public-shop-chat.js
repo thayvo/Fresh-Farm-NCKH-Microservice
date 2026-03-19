@@ -1,6 +1,8 @@
 (function () {
     "use strict";
 
+    const appHelpers = window.FreshFarmApp;
+
     function escapeHtml(value) {
         return (value ?? "")
             .toString()
@@ -181,7 +183,8 @@
 
                 const payload = await readJson(response);
                 if (!response.ok) {
-                    throw new Error(payload?.message || "Không thể tải hội thoại với shop.");
+                    throw (appHelpers?.createHttpError(response, payload, "Không thể tải hội thoại với shop.")
+                        ?? new Error(payload?.message || "Không thể tải hội thoại với shop."));
                 }
 
                 state.conversationId = Number(payload?.conversation?.conversationId || 0);
@@ -225,7 +228,8 @@
 
                 const payload = await readJson(response);
                 if (!response.ok) {
-                    throw new Error(payload?.message || "Không thể tải tin nhắn.");
+                    throw (appHelpers?.createHttpError(response, payload, "Không thể tải tin nhắn.")
+                        ?? new Error(payload?.message || "Không thể tải tin nhắn."));
                 }
 
                 renderMessages(messagesNode, payload?.messages || []);
@@ -284,14 +288,17 @@
 
                     const payload = await readJson(response);
                     if (!response.ok) {
-                        throw new Error(payload?.message || "Không thể gửi tin nhắn.");
+                        throw (appHelpers?.createHttpError(response, payload, "Không thể gửi tin nhắn.")
+                            ?? new Error(payload?.message || "Không thể gửi tin nhắn."));
                     }
 
                     inputNode.value = "";
                     await loadMessages();
                     await loadConversation(false);
                 } catch (error) {
-                    alert(error?.message || "Không thể gửi tin nhắn.");
+                    const message = error?.message || "Không thể gửi tin nhắn.";
+                    appHelpers?.showToast(message, "error");
+                    setStatus(message);
                 } finally {
                     state.isSending = false;
                     setComposerEnabled(true);

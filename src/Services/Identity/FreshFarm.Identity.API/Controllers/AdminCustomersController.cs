@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace FreshFarm.Identity.Api.Controllers;
@@ -13,6 +14,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOrAdmin")]
 public sealed class AdminCustomersController : ControllerBase
 {
+    private const string UserNamePattern = @"^[a-zA-Z0-9._-]+$";
     private static readonly Regex PhoneRegex = new("^\\d{10}$", RegexOptions.Compiled);
 
     private readonly FreshFarmIdentityDBContext _db;
@@ -384,6 +386,11 @@ public sealed class AdminCustomersController : ControllerBase
             return (false, "Ten dang nhap la bat buoc.", userName, fullName, email, phone, password, address);
         }
 
+        if (!Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", userName, fullName, email, phone, password, address);
+        }
+
         if (string.IsNullOrWhiteSpace(fullName))
         {
             return (false, "Ho va ten la bat buoc.", userName, fullName, email, phone, password, address);
@@ -445,6 +452,7 @@ public sealed class AdminCustomersController : ControllerBase
 
     public sealed class AdminCreateCustomerRequest
     {
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;

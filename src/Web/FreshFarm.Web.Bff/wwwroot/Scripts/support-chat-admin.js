@@ -34,6 +34,10 @@
         sendMessage: '/Seller/SupportChat/SendMessage'
     }, window.supportChatAdminRoutes || {});
 
+    function getAntiForgeryToken() {
+        return $('input[name="__RequestVerificationToken"]').first().val() || '';
+    }
+
     // ==========================================
     // UI Rendering & Interaction
     // ==========================================
@@ -453,7 +457,10 @@
                 ChatController.loadConversations();
                 if (ChatState.currentConvId === (payload && payload.conversationId)) {
                     ChatController.reloadCurrentConversationMessages();
-                    $.post(SupportRoutes.markAsRead, { conversationId: ChatState.currentConvId });
+                $.post(SupportRoutes.markAsRead, {
+                    conversationId: ChatState.currentConvId,
+                    __RequestVerificationToken: getAntiForgeryToken()
+                });
                 }
             });
 
@@ -608,7 +615,10 @@
                 }
             });
 
-            $.post(SupportRoutes.markAsRead, { conversationId: convId });
+                $.post(SupportRoutes.markAsRead, {
+                    conversationId: convId,
+                    __RequestVerificationToken: getAntiForgeryToken()
+                });
 
             // Join realtime group
             if (ChatState.hub && ChatState.isRealtimeReady) {
@@ -638,7 +648,8 @@
                 data: {
                     conversationId: ChatState.currentConvId,
                     content: msg,
-                    replyToMessageId: ChatState.currentReplyToId
+                    replyToMessageId: ChatState.currentReplyToId,
+                    __RequestVerificationToken: getAntiForgeryToken()
                 }
             }).done(function (res) {
                 if (!res || !res.ok) {
@@ -673,7 +684,10 @@
 
         closeConversation: function () {
             if (!ChatState.currentConvId) return;
-            $.post(SupportRoutes.close, { conversationId: ChatState.currentConvId }, function (res) {
+            $.post(SupportRoutes.close, {
+                conversationId: ChatState.currentConvId,
+                __RequestVerificationToken: getAntiForgeryToken()
+            }, function (res) {
                 if (res && res.ok) {
                     ChatController.loadConversations();
                     ChatUI.elements.closeBtn.prop('disabled', true);

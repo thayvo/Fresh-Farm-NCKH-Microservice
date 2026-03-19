@@ -274,6 +274,9 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
             entity.Property(e => e.UserId).ValueGeneratedNever();
             entity.Property(e => e.FailedCount).HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_FailedCount");
+            entity.Property(e => e.LockoutLevel)
+                .HasDefaultValue(0)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_LockoutLevel");
             entity.Property(e => e.LockedUntil).HasPrecision(0);
             entity.Property(e => e.Mfasecret)
                 .HasMaxLength(100)

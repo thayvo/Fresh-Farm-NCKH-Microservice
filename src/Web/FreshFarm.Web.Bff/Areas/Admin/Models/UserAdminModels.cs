@@ -16,6 +16,7 @@ public sealed class AdminUserViewModel
     public int AdminID { get; set; }
 
     [Required]
+    [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Tên đăng nhập chỉ được chứa chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang")]
     public string UserName { get; set; } = string.Empty;
 
     [Required]

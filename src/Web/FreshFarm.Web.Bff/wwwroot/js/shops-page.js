@@ -32,6 +32,7 @@
 
     const initShopsPage = () => {
         const form = document.querySelector("[data-shops-page]");
+        const appHelpers = window.FreshFarmApp;
         const input = document.getElementById("shopSearchInput");
         const grid = document.getElementById("shopGrid");
         const summary = document.getElementById("shopSummary");
@@ -83,7 +84,13 @@
         const load = async () => {
             const url = state.keyword ? `${endpointBase}?q=${encodeURIComponent(state.keyword)}` : endpointBase;
             const response = await window.fetch(url, { headers: { Accept: "application/json" } });
-            const payload = await response.json();
+            const { payload } = appHelpers
+                ? await appHelpers.tryParsePayload(response)
+                : { payload: await response.json() };
+            if (!response.ok) {
+                throw (appHelpers?.createHttpError(response, payload, "Không thể tải danh sách shop.")
+                    ?? new Error(payload?.message || `HTTP ${response.status}`));
+            }
             render(payload.merchants ?? payload.Merchants ?? [], Number(payload.total ?? payload.Total ?? 0));
             syncUrl();
         };
@@ -91,10 +98,20 @@
         form.addEventListener("submit", (event) => {
             event.preventDefault();
             state.keyword = (input.value || "").trim();
-            void load();
+            void load().catch((error) => {
+                empty.classList.remove("d-none");
+                empty.textContent = error?.message || "Không thể tải danh sách shop.";
+                grid.innerHTML = "";
+                summary.textContent = "Tìm thấy 0 shop";
+            });
         });
 
-        void load();
+        void load().catch((error) => {
+            empty.classList.remove("d-none");
+            empty.textContent = error?.message || "Không thể tải danh sách shop.";
+            grid.innerHTML = "";
+            summary.textContent = "Tìm thấy 0 shop";
+        });
     };
 
     if (document.readyState === "loading") {

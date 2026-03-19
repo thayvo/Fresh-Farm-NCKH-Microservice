@@ -1,63 +1,81 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Hoan thien phan `auth audit/log` cho chuan chinh truoc khi quay lai cac hang muc CSP/backoffice cleanup dang do.
+  - Ra soat ma nguon toan bo repo FreshFarm theo goc nhin bao mat va tao file Word tieng Viet `finalBaoMat.docx`.
   - Success criteria:
-    - `Audit Center` xem duoc auth log cua `Admin`, `Seller`, `Nguoi dung`.
-    - Moi dong log co IP thuc, forwarded IP, user-agent, device/browser/OS, failure reason va suspicion reasons.
-    - Da bo sung geolocation co ban (`Country/Region/City`) cho auth audit.
-    - Co SQL delta/verify, build xanh, docs/worklog cap nhat.
+    - Xac dinh duoc cac nhom co che bao mat da co trong code va cac diem can test.
+    - Chi ro duoc cac rui ro/chua day du trong code lien quan den XSS, SQL injection, phan quyen, log/audit, upload, session/cookie, CSRF, payment, headers, rate limiting, 2FA, reset mat khau.
+    - Tao duoc file `finalBaoMat.docx` huong dan test chi tiet bang tieng Viet, tong hop tu code va cac file Word co san.
 - **Constraints/Assumptions**:
   - Khong dung lenh git/destructive.
-  - User da quay lai that va CHO PHEP tiep tuc cac hang muc co can them DB/schema neu can.
-  - Van khong co ket noi SQL runtime truc tiep; moi thay doi DB can ban giao qua file SQL trong `docs/`.
-  - Auth audit/log van la priority gate truoc khi quay lai cac muc CSP dang do.
+  - Worktree dang co nhieu thay doi san; khong duoc revert hay ghi de cac thay doi khong phuc vu task nay.
+  - Uu tien doc cac file Word trong `docs/` de tan dung noi dung co san truoc khi viet file cuoi.
+  - Word COM da su dung duoc tren may nay, nen co the tao `finalBaoMat.docx` truc tiep.
 - **Key decisions**:
-  - DB/schema changes da duoc mo lai (2026-03-19), nen auth audit duoc phep them cot moi de dat muc bao cao/van hanh tot hon.
-  - Auth audit duoc nang cap truoc khi quay lai `P2.1` cleanup CSP cho `Admin/Seller`.
-  - Geolocation cho auth audit duoc lam theo huong best-effort, dung dich vu GeoIP ngoai (`ipwho.is`) + memory cache; neu lookup fail thi login flow khong duoc vo.
-  - Auth audit geo enrichment complete in code (2026-03-19): `AuthAuditLog` da them `CountryCode`, `CountryName`, `RegionName`, `CityName`; `AuthAuditService` resolve geo tu IP hieu luc (`X-Forwarded-For` uu tien neu hop le), them heuristic `foreign_backoffice_login` va `country_changed_recently`; `Audit Center` da hien quoc gia/khu vuc/thanh pho va thong ke `Backoffice ngoai quoc 24h`.
-  - Runtime auth audit issue fixed in code (2026-03-19): BFF auth flows da forward `User-Agent`, `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` sang Identity qua `ForwardedAuthRequestBuilder`, de auth audit khong con chi thay `::1`/`Unknown` tren cac log moi.
+  - Dung `aspnet-core` de ra soat dung pipeline/auth/MVC va dung `doc` de tao DOCX.
+  - Audit theo nhom rui ro thay vi doc tuyen tinh toan bo repo: host/config, auth/phong chong chiem quyen, phan quyen, input/query, upload/file, payment, logging/audit, frontend/browser security.
+  - File giao cuoi se la `D:\NCKH\DOAN\NCKH-FRESH-FARM\finalBaoMat.docx`.
+  - Muc uu tien test cao nhat trong tai lieu cuoi:
+    - Tampering gia/so tien don hang do cart/checkout/order dang tin `UnitPrice` tu request/session/query.
+    - Stored XSS o khu seller do JSON tra ve du lieu mo ta/ten san pham roi chen bang `.html(...)` va co `Html.Raw(...)` voi `TempData`.
+  - Tai lieu cuoi se ket hop noi dung tong hop tu `docs/` voi phat hien tu code, nhung uu tien dua theo bang chung source code.
 - **State**:
   - *Done*:
-    - Auth audit trail da persist cho `Admin`, `Seller`, `Nguoi dung`.
-    - `Audit Center` da co stats/filters cho auth log, suspicion reasons, IP/device metadata.
-    - Geo enrichment da duoc them vao code Identity + BFF Admin audit UI.
-    - Da tao SQL delta/verify cho geo columns va build xanh `Identity` + `BFF`.
-    - Da sua BFF auth flows (`buyer/admin/seller`, `2FA`, `external-login`, `register/verify/reset`) de forward browser headers/client IP sang Identity.
-    - Build `FreshFarm.Web.Bff` xanh sau patch header forwarding (`.codex-build\bff_auth_audit_forward_headers`).
+    - Da doc `CONTINUITY.md` cu va xac dinh can doi muc tieu sang audit bao mat tong the + tao file Word cuoi.
+    - Da xac dinh repo la he thong .NET 8 / ASP.NET Core gom `FreshFarm.Web.Bff`, `FreshFarm.Identity.API`, `FreshFarm.Catalog.Api`, `FreshFarm.Ordering.Api`.
+    - Da xac dinh trong `docs/` da co nhieu file Word lien quan den bao mat nhu `Huong dan test bao mat da lam v4.docx`, `Tong hop bao mat va Cloudflare.docx`, `Bao cao ket qua test bao mat va mau test.docx`, `GiamDDoS.docx`.
+    - Da xac nhan worktree dang co nhieu thay doi san; can tranh de len cac file dang sua.
+    - Da doc/trich noi dung tu cac file Word chinh trong `docs/` bang Word COM.
+    - Da xac nhan BFF co global rate limiter, limiter theo policy, session/cookie hardening, forwarded headers, CSP/HSTS/security headers, telemetry 429.
+    - Da xac nhan Identity co password hashing, email verification, forgot/reset password, lockout, auth audit, GeoIP, TOTP/2FA cho Admin/Seller.
+    - Da xac nhan Ordering co ownership check cho order cua buyer va doi soat VNPay voi duplicate/ref replay/amount mismatch.
+    - Da xac nhan repo dang commit nhieu secrets dev/noi bo trong appsettings (JWT key, internal service key, GHN token/shop id).
+    - Da xac nhan phat hien manh:
+      - Price tampering: `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`, `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`, `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CartController.cs`, `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`.
+      - Stored/admin-panel XSS: `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/ManageProducts.cshtml`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Create.cshtml`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Edit.cshtml`.
+      - Upload validation chua kiem tra MIME/magic bytes: `src/Web/FreshFarm.Web.Bff/Services/ProductImageStorageService.cs`.
+      - SQL injection co rui ro thap hon vi chua thay raw SQL trong code da ra soat.
+    - Da tao file nguon `finalBaoMat_source.md` va script `tools/generate_finalBaoMat.ps1` de sinh tai lieu Word.
+    - Da tao thanh cong `D:\NCKH\DOAN\NCKH-FRESH-FARM\finalBaoMat.docx` va doc lai nhanh noi dung dau file de xac nhan.
   - *Now*:
-    - Cho user restart runtime va retest auth audit voi log moi.
+    - San sang ban giao file Word cuoi cung cho nguoi dung.
   - *Next*:
-    - User chay SQL `FreshFarmIdentityDb.2026-03-19.auth-audit-geo.delta.sql` + `verify.sql`.
-    - User restart `FreshFarm.Identity.API` + `FreshFarm.Web.Bff`.
-    - Retest `/Admin/Audit/Index` voi login fail/success/lockout/2FA de xac nhan IP/thiet bi/quoc gia hien dung tren cac dong log moi.
+    - Neu nguoi dung can, co the tiep tuc toi uu hinh thuc/bo sung them ca test moi vao `finalBaoMat.docx`.
 - **Open questions** (UNCONFIRMED if needed):
-  - UNCONFIRMED user da apply `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-18.admin-auth-audit.delta.sql`.
-  - UNCONFIRMED user da apply `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-19.auth-audit-geo.delta.sql`.
-  - UNCONFIRMED `ipwho.is` co duoc phep goi outbound o moi truong runtime that hay bi chan boi mang/firewall.
-  - UNCONFIRMED user muon sau auth audit geo thi quay lai `P2.1` cleanup CSP lane `Admin/Seller` hay uu tien hang muc khac.
+  - Khong co.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
-  - `docs/security-hardening-worklog.txt`
-  - `docs/security-hardening-roadmap-2026-03-18.md`
-  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-19.auth-audit-geo.delta.sql`
-  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-19.auth-audit-geo.verify.sql`
-  - `src/Services/Identity/FreshFarm.Identity.API/Options/GeoIpOptions.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Services/GeoIpLookupService.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Services/AuthAuditService.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Models/AuthAuditLog.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Models/FreshFarmIdentityDBContext.Extras.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminAuthAuditController.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/appsettings.json`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AuditController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Models/AuditAdminModels.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Views/Audit/Index.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Utilities/ForwardedAuthRequestBuilder.cs`
+  - `docs/Bao cao ket qua test bao mat va mau test.docx`
+  - `docs/GiamDDoS.docx`
+  - `docs/GiamDDoS v2.docx`
+  - `docs/Huong dan test bao mat da lam v4.docx`
+  - `docs/Tong hop bao mat va Cloudflare.docx`
+  - `src/Web/FreshFarm.Web.Bff/Program.cs`
+  - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
   - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AdminAccountController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SellerAccountController.cs`
-  - `dotnet build src\Services\Identity\FreshFarm.Identity.API\FreshFarm.Identity.API.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\identity_auth_audit_geo\`
-  - `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_audit_geo\`
-  - `dotnet build src\Web\FreshFarm.Web.Bff\FreshFarm.Web.Bff.csproj -p:UseAppHost=false -p:BaseOutputPath=D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_audit_forward_headers\`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/RateLimitTelemetryController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`
+  - `src/Web/FreshFarm.Web.Bff/Services/ProductImageStorageService.cs`
+  - `src/Web/FreshFarm.Web.Bff/Services/VnPayService.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/ManageProducts.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Create.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Edit.cshtml`
+  - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminAuthAuditController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.Development.json`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.json`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CartController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.Development.json`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.json`
+  - `Get-ChildItem docs -Filter *.docx`
+  - `New-Object -ComObject Word.Application`
+  - `finalBaoMat_source.md`
+  - `tools/generate_finalBaoMat.ps1`
+  - `finalBaoMat.docx`

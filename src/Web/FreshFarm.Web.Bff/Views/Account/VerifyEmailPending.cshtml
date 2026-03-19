@@ -1,6 +1,7 @@
 @model FreshFarm.Web.Bff.Dtos.EmailVerificationPendingViewModel
 @{
     Layout = null;
+    const int resendCooldownSeconds = 60;
 }
 <!DOCTYPE html>
 <html lang="vi">
@@ -53,11 +54,20 @@
                 <div class="alert alert-danger small">@errorMessage</div>
             }
 
-            <form asp-action="ResendVerificationEmail" asp-controller="Account" method="post" class="mb-3">
+            <form asp-action="ResendVerificationEmail"
+                  asp-controller="Account"
+                  method="post"
+                  class="mb-3"
+                  id="resend-verification-form"
+                  data-cooldown-seconds="@resendCooldownSeconds"
+                  data-identifier="@Model.ResendRequest.Identifier">
                 @Html.AntiForgeryToken()
-                <input type="hidden" asp-for="ResendRequest.Identifier" />
-                <input type="hidden" asp-for="ResendRequest.ReturnUrl" />
-                <button type="submit" class="btn btn-outline-success">Gửi lại email xác minh</button>
+                <input type="hidden" name="Identifier" value="@Model.ResendRequest.Identifier" />
+                <input type="hidden" name="ReturnUrl" value="@Model.ResendRequest.ReturnUrl" />
+                <button type="submit" class="btn btn-outline-success" id="resend-verification-button">Gửi lại email xác minh</button>
+                <div class="form-text mt-2" id="resend-verification-hint">
+                    Bạn có thể gửi lại email xác minh nếu chưa nhận được thư.
+                </div>
             </form>
 
             <div class="d-flex flex-wrap gap-2">
@@ -67,4 +77,5 @@
         </div>
     </div>
 </body>
+<script src="~/js/verify-email-pending.js" asp-append-version="true"></script>
 </html>

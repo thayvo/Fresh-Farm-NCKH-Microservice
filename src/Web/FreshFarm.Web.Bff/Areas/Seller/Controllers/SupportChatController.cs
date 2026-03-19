@@ -190,6 +190,7 @@ public class SupportChatController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Close(int conversationId)
     {
         try
@@ -222,6 +223,7 @@ public class SupportChatController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> MarkAsRead(int conversationId)
     {
         try
@@ -254,6 +256,7 @@ public class SupportChatController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> SendMessage(int conversationId, string content, int? replyToMessageId = null)
     {
         try

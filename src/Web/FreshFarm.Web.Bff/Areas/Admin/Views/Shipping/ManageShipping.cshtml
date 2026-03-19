@@ -1357,7 +1357,15 @@
             };
             try {
                 setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo...');
-                const payload = await fetchJson(buildUrl('@Url.Action("CreateGhnSandboxOrderQuick", "Shipping", new { area = "Admin" })', params));
+                const payload = await fetchJson('@Url.Action("CreateGhnSandboxOrderQuick", "Shipping", new { area = "Admin" })', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'RequestVerificationToken': getToken()
+                    },
+                    body: JSON.stringify(params)
+                });
                 setResult('ghnCreateResult', payload);
                 if (payload?.orderCode) {
                     document.getElementById('ghnTrackingOrderCode').value = payload.orderCode;

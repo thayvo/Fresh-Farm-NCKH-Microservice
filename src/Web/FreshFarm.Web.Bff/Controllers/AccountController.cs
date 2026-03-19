@@ -32,7 +32,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpGet("/account/signin")] // Route GET signin.
     [AllowAnonymous] // Chua login van vao duoc.
-    public IActionResult SignIn(string? returnUrl = null, string? externalError = null) // Render view signin.
+    public IActionResult SignIn(string? returnUrl = null, string? externalError = null, bool rateLimitError = false, string? retryAfter = null) // Render view signin.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chuan hoa returnUrl cho redirect an toan.
         if (User.Identity?.IsAuthenticated == true) // Neu da dang nhap thi khong can vao form.
@@ -50,7 +50,22 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["PendingVerificationIdentifier"] = TempData["PendingVerificationIdentifier"] as string;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
+        ViewData["LockoutExpiresAtUtc"] = null;
+        ViewData["FormErrorMessage"] = null;
+        ViewData["RateLimitErrorMessage"] = rateLimitError
+            ? BuildRateLimitMessage(retryAfter)
+            : null;
         return View(); // Views/Account/SignIn.cshtml.
+    }
+
+    private static string BuildRateLimitMessage(string? retryAfter)
+    {
+        if (int.TryParse(retryAfter, out var retryAfterSeconds) && retryAfterSeconds > 0)
+        {
+            return $"Bạn thao tác quá nhanh. Vui lòng chờ khoảng {retryAfterSeconds} giây rồi thử lại.";
+        }
+
+        return "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.";
     }
 
     [HttpPost("/account/signin")] // Route POST signin.
@@ -63,6 +78,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Giu lai de form render lai khi co loi.
         ViewData["PendingVerificationIdentifier"] = null;
+        ViewData["LockoutExpiresAtUtc"] = null;
+        ViewData["FormErrorMessage"] = null;
+
+        request.ClientLane = "Customer";
 
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password)) // Validate input.
         {
@@ -80,12 +99,21 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         if (!loginResponse.IsSuccessStatusCode) // Neu login fail.
         {
-            var errorText = await loginResponse.Content.ReadAsStringAsync(); // Doc body loi.
+            var errorBody = await loginResponse.Content.ReadAsStringAsync();
+            var errorText = ApiErrorMessageParser.ExtractMessage(errorBody, "Đăng nhập chưa thành công"); // Doc body loi.
             if (RequiresEmailVerification(errorText))
             {
                 ViewData["PendingVerificationIdentifier"] = request.Identifier.Trim();
             }
-            ModelState.AddModelError(string.Empty, $"Đăng nhập thất bại: {errorText}"); // Show error.
+
+            if (ApiErrorMessageParser.TryExtractLockedUntilUtc(errorBody, out var lockoutExpiresAtUtc))
+            {
+                ViewData["LockoutExpiresAtUtc"] = lockoutExpiresAtUtc.ToString("O");
+                ViewData["FormErrorMessage"] = errorText;
+                return View(request);
+            }
+
+            ModelState.AddModelError(string.Empty, errorText); // Show error.
             return View(request); // O lai form login.
         }
 
@@ -167,10 +195,8 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         if (!exchangeResponse.IsSuccessStatusCode)
         {
-            var errorText = await exchangeResponse.Content.ReadAsStringAsync();
-            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorText)
-                ? "Không thể hoàn tất đăng nhập Google."
-                : $"Đăng nhập Google thất bại: {errorText}";
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(exchangeResponse, "Không thể hoàn tất đăng nhập Google");
+            TempData["ErrorMessage"] = errorText;
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }
 
@@ -255,12 +281,8 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         if (!registerResponse.IsSuccessStatusCode) // Register fail.
         {
-            var errorText = await registerResponse.Content.ReadAsStringAsync(); // Doc loi.
-            ModelState.AddModelError(
-                string.Empty,
-                string.IsNullOrWhiteSpace(errorText)
-                    ? "Đăng ký chưa thành công. Vui lòng kiểm tra lại thông tin và thử lại."
-                    : errorText); // Show loi.
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(registerResponse, "Đăng ký chưa thành công"); // Doc loi.
+            ModelState.AddModelError(string.Empty, errorText); // Show loi.
             return View(request); // O lai form.
         }
 
@@ -336,10 +358,8 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorText = await response.Content.ReadAsStringAsync();
-            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorText)
-                ? "Không thể gửi lại email xác minh lúc này."
-                : errorText;
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Không thể gửi lại email xác minh lúc này");
+            TempData["ErrorMessage"] = errorText;
             TempData["PendingVerificationIdentifier"] = request.Identifier;
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }

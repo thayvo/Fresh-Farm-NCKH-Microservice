@@ -213,6 +213,7 @@ public class ShippingController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> CreateGhnSandboxOrder([FromBody] CreateGhnSandboxOrderRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -277,7 +278,9 @@ public class ShippingController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<JsonResult> CreateGhnSandboxOrderQuick([FromQuery] CreateGhnSandboxOrderQuickRequest? request, CancellationToken cancellationToken)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> CreateGhnSandboxOrderQuick([FromBody] CreateGhnSandboxOrderQuickRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
         {

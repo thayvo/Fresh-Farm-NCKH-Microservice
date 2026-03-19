@@ -1,6 +1,7 @@
         (() => {
             const configNode = document.getElementById("profilePageConfig");
             const ghnConfigured = (configNode?.dataset.ghnConfigured || "false") === "true";
+            const appHelpers = window.FreshFarmApp;
 
             if (!ghnConfigured) {
                 return;
@@ -20,7 +21,8 @@
                 const response = await fetch(url, { credentials: "same-origin" });
                 const payload = await response.json().catch(() => null);
                 if (!response.ok || !payload) {
-                    throw new Error(payload?.message || `HTTP ${response.status}`);
+                    throw (appHelpers?.createHttpError(response, payload, "Chưa thể tải dữ liệu địa chỉ GHN.")
+                        ?? new Error(payload?.message || `HTTP ${response.status}`));
                 }
                 return payload;
             };
@@ -188,6 +190,7 @@
 
             document.querySelectorAll("form[data-ghn-form='true']").forEach((form) => {
                 initializeAddressForm(form).catch((error) => {
+                    appHelpers?.showToast(error?.message || "Chưa thể tải dữ liệu địa chỉ.", "error");
                     console.error(error);
                 });
             });

@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using FreshFarm.Web.Bff.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
@@ -20,6 +21,7 @@ public sealed class BffProductReviewsController : Controller
 
     [HttpGet("products/{productId:int}")]
     [AllowAnonymous]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetByProduct([FromRoute] int productId)
     {
         var client = _httpClientFactory.CreateClient("Ordering");
@@ -39,6 +41,7 @@ public sealed class BffProductReviewsController : Controller
     [HttpPost("products/{productId:int}")]
     [Authorize]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("review-write")]
     public async Task<IActionResult> Upsert([FromRoute] int productId, [FromForm] ProductReviewUpsertRequestDto request)
     {
         if (!ModelState.IsValid)

@@ -1,0 +1,6 @@
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.csproj.AssemblyReference.cache
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.GeneratedMSBuildEditorConfig.editorconfig
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.AssemblyInfoInputs.cache
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.AssemblyInfo.cs
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.csproj.CoreCompileInputs.cache
+D:\NCKH\DOAN\NCKH-FRESH-FARM\.codex-build\bff_auth_error_cleanup_obj\Debug\net8.0\FreshFarm.Contracts.sourcelink.json

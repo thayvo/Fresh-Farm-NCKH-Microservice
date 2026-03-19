@@ -2,10 +2,12 @@ using FreshFarm.Web.Bff.Areas.Seller.Hubs;
 using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
 using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 using StackExchange.Redis;
 using System.Net;
@@ -28,23 +30,82 @@ builder.Services.AddDataProtection()
 
 builder.Services.Configure<SessionStoreOptions>(
     builder.Configuration.GetSection(SessionStoreOptions.SectionName));
+builder.Services.Configure<IdleSessionOptions>(
+    builder.Configuration.GetSection(IdleSessionOptions.SectionName));
+builder.Services.AddSingleton<IRateLimitTelemetryService, RateLimitTelemetryService>();
 
 var sessionStoreOptions = builder.Configuration
     .GetSection(SessionStoreOptions.SectionName)
     .Get<SessionStoreOptions>() ?? new SessionStoreOptions();
+var idleSessionOptions = builder.Configuration
+    .GetSection(IdleSessionOptions.SectionName)
+    .Get<IdleSessionOptions>() ?? new IdleSessionOptions();
 
 builder.Services.AddControllersWithViews(); // Bat MVC + Razor views.
 builder.Services.AddEndpointsApiExplorer(); // Metadata endpoint cho swagger.
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // Gioi han upload/form body 10 MB cho request multipart.
+    options.ValueLengthLimit = 1024 * 1024; // Han che field text qua lon trong form.
+    options.MultipartHeadersLengthLimit = 32 * 1024; // Giam rui ro header multipart bat thuong.
+});
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {
+        var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger("FreshFarm.Web.Bff.RateLimiting");
+        var telemetryService = context.HttpContext.RequestServices.GetRequiredService<IRateLimitTelemetryService>();
+        var endpointName = context.HttpContext.GetEndpoint()?.DisplayName ?? "unknown-endpoint";
+        var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterValue)
+            ? retryAfterValue.ToString()
+            : null;
+        var client = ResolveRateLimitActor(context.HttpContext);
+        telemetryService.RecordRejectedRequest(
+            endpointName,
+            context.HttpContext.Request.Method,
+            context.HttpContext.Request.Path.Value ?? "/",
+            client,
+            context.HttpContext.TraceIdentifier,
+            retryAfter,
+            context.HttpContext.Request.Headers.UserAgent.ToString());
+        logger.LogWarning(
+            "Rate limiter chan request. Endpoint={Endpoint}, Method={Method}, Path={Path}, Client={Client}, TraceId={TraceId}, RetryAfter={RetryAfter}, UserAgent={UserAgent}",
+            endpointName,
+            context.HttpContext.Request.Method,
+            context.HttpContext.Request.Path.Value,
+            client,
+            context.HttpContext.TraceIdentifier,
+            retryAfter,
+            context.HttpContext.Request.Headers.UserAgent.ToString());
+
+        var loginRedirectPath = ResolveRateLimitLoginRedirectPath(context.HttpContext.Request.Path);
+        if (!string.IsNullOrWhiteSpace(loginRedirectPath))
+        {
+            var destination = string.IsNullOrWhiteSpace(retryAfter)
+                ? $"{loginRedirectPath}?rateLimitError=1"
+                : $"{loginRedirectPath}?rateLimitError=1&retryAfter={Uri.EscapeDataString(retryAfter)}";
+            context.HttpContext.Response.Redirect(destination, permanent: false);
+            return;
+        }
+
         context.HttpContext.Response.ContentType = "text/plain; charset=utf-8";
         await context.HttpContext.Response.WriteAsync(
             "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.",
             cancellationToken);
     };
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "global"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 
     options.AddPolicy("auth-form", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
@@ -86,6 +147,83 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("public-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "public-read"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 90,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("search-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "search-read"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromSeconds(30),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("cart-write", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "cart-write"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("review-write", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "review-write"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("checkout-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "checkout-read"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("checkout-write", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "checkout-write"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 12,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("ghn-read", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "ghn-read"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromSeconds(30),
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
@@ -131,7 +269,7 @@ builder.Services.AddSession(options => // Cau hinh session middleware.
     options.Cookie.IsEssential = true; // Session van chay du consent cookie.
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Cookie session chi gui qua HTTPS.
     options.Cookie.SameSite = SameSiteMode.Lax; // Giu top-level redirect flow nhu Google/VNPay.
-    options.IdleTimeout = TimeSpan.FromHours(2); // Het han session neu khong thao tac 2h.
+    options.IdleTimeout = TimeSpan.FromMinutes(idleSessionOptions.ServerSessionIdleTimeoutMinutes); // Het han session neu khong thao tac vuot nguong.
 });
 
 builder.Services // Dang ky cookie authentication cho user web.
@@ -146,11 +284,17 @@ builder.Services // Dang ky cookie authentication cho user web.
         options.LoginPath = "/account/signin"; // Chua login -> redirect signin.
         options.AccessDeniedPath = "/account/signin"; // Tam thoi redirect signin cho MVP.
         options.SlidingExpiration = true; // User hoat dong thi reset han cookie.
-        options.ExpireTimeSpan = TimeSpan.FromHours(2); // Han cookie auth.
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(idleSessionOptions.AuthenticationLifetimeMinutes); // Han cookie auth.
         options.Events = new CookieAuthenticationEvents
         {
             OnRedirectToLogin = context =>
             {
+                if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                }
+
                 var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
                 var loginPath = "/account/signin";
 
@@ -168,6 +312,12 @@ builder.Services // Dang ky cookie authentication cho user web.
             },
             OnRedirectToAccessDenied = context =>
             {
+                if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                }
+
                 var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
                 var loginPath = "/account/signin";
 
@@ -199,6 +349,11 @@ builder.Services.Configure<GoogleAuthenticationOptions>(
     builder.Configuration.GetSection(GoogleAuthenticationOptions.SectionName));
 builder.Services.Configure<VnPayOptions>(
     builder.Configuration.GetSection(VnPayOptions.SectionName));
+
+var vnpayOptionsForCsp = builder.Configuration
+    .GetSection(VnPayOptions.SectionName)
+    .Get<VnPayOptions>() ?? new VnPayOptions();
+var cspFormActionSources = BuildCspFormActionSources(vnpayOptionsForCsp);
 
 var googleAuthOptions = builder.Configuration
     .GetSection(GoogleAuthenticationOptions.SectionName)
@@ -317,7 +472,9 @@ app.Use(async (context, next) =>
             .Append("default-src 'self'; ")
             .Append("base-uri 'self'; ")
             .Append("frame-ancestors 'self'; ")
-            .Append("form-action 'self'; ")
+            .Append("form-action ")
+            .Append(cspFormActionSources)
+            .Append("; ")
             .Append("object-src 'none'; ")
             .Append("img-src 'self' data: https:; ")
             .Append("font-src 'self' data: https://cdn.jsdelivr.net; ")
@@ -401,11 +558,52 @@ app.Run(); // Chay app.
 
 static string BuildRateLimitKey(HttpContext context, string scope)
 {
-    var userKey =
+    return $"{scope}:{ResolveRateLimitActor(context)}";
+}
+
+static string? ResolveRateLimitLoginRedirectPath(PathString requestPath)
+{
+    if (requestPath.StartsWithSegments("/account/signin", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/account/signin";
+    }
+
+    if (requestPath.StartsWithSegments("/Admin/AdminAccount/Login", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/Admin/AdminAccount/Login";
+    }
+
+    if (requestPath.StartsWithSegments("/Seller/SellerAccount/Login", StringComparison.OrdinalIgnoreCase) ||
+        requestPath.StartsWithSegments("/Seller/AdminAccount/Login", StringComparison.OrdinalIgnoreCase))
+    {
+        return "/Seller/SellerAccount/Login";
+    }
+
+    return null;
+}
+
+static string ResolveRateLimitActor(HttpContext context)
+{
+    return
         context.User.FindFirst("sub")?.Value ??
         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
         context.Connection.RemoteIpAddress?.ToString() ??
         "anonymous";
+}
 
-    return $"{scope}:{userKey}";
+static string BuildCspFormActionSources(VnPayOptions vnPayOptions)
+{
+    var sources = new List<string> { "'self'" };
+
+    if (!string.IsNullOrWhiteSpace(vnPayOptions.BaseUrl)
+        && Uri.TryCreate(vnPayOptions.BaseUrl, UriKind.Absolute, out var vnPayUri))
+    {
+        var origin = $"{vnPayUri.Scheme}://{vnPayUri.Authority}";
+        if (!sources.Contains(origin, StringComparer.OrdinalIgnoreCase))
+        {
+            sources.Add(origin);
+        }
+    }
+
+    return string.Join(" ", sources);
 }

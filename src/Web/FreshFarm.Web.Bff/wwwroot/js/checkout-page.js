@@ -53,6 +53,7 @@
             const antiForgeryInput = checkoutForm instanceof HTMLFormElement
                 ? checkoutForm.querySelector('input[name="__RequestVerificationToken"]')
                 : null;
+            const appHelpers = window.FreshFarmApp;
 
             const toNumber = (value, fallback = 0) => {
                 const num = Number(value);
@@ -78,7 +79,8 @@
                 });
                 const payload = await response.json().catch(() => null);
                 if (!response.ok || !payload) {
-                    throw new Error(payload?.message || `HTTP ${response.status}`);
+                    throw (appHelpers?.createHttpError(response, payload, "Chưa thể xử lý yêu cầu lúc này.")
+                        ?? new Error(payload?.message || `HTTP ${response.status}`));
                 }
                 return payload;
             };
@@ -271,7 +273,9 @@
 
                     setShippingFeeValue(0);
                     renderShippingBreakdown([]);
-                    setShippingFeeStatus(error instanceof Error ? error.message : "Không tính được phí vận chuyển GHN.", true);
+                    const message = error instanceof Error ? error.message : "Không tính được phí vận chuyển GHN.";
+                    setShippingFeeStatus(message, true);
+                    appHelpers?.showToast(message, "error");
                     recalcTotal();
                 } finally {
                     if (requestVersion === shippingFeeRequestVersion) {

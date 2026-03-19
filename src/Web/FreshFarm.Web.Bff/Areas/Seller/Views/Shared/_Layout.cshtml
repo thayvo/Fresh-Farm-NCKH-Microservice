@@ -20,6 +20,7 @@
 
     <script nonce="@cspNonce" src="~/lib/jquery/dist/jquery.min.js"></script>
     <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @await Html.PartialAsync("~/Views/Shared/_IdleSessionMonitor.cshtml")
     @RenderSection("scripts", required: false)
 </body>
 </html>

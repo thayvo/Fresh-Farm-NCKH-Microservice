@@ -81,6 +81,7 @@ public class ReviewController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> ResolveReport(int reviewId, string decision)
     {
         try

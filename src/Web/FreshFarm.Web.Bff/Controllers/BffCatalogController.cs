@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
@@ -40,6 +41,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("products")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetProducts(
         [FromQuery] string? name,
         [FromQuery] int? sellerId = null,
@@ -96,6 +98,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("product-search")]
+    [EnableRateLimiting("search-read")]
     public async Task<IActionResult> SearchProducts(
         [FromQuery] string? name,
         [FromQuery] int[]? categoryIds = null,
@@ -327,6 +330,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("categories")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetCategories([FromQuery] string? search = null)
     {
         var client = _httpClientFactory.CreateClient("Catalog");
@@ -347,6 +351,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("products/{id:int}")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetProductById([FromRoute] int id)
     {
         var client = _httpClientFactory.CreateClient("Catalog");
@@ -364,6 +369,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("products/{id:int}/offers")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetProductOffers([FromRoute] int id)
     {
         var catalogClient = _httpClientFactory.CreateClient("Catalog");
@@ -427,6 +433,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("shops")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetShops([FromQuery] string? q = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 24)
     {
         var client = _httpClientFactory.CreateClient("Identity");
@@ -452,6 +459,7 @@ public sealed class BffCatalogController : ControllerBase
     }
 
     [HttpGet("shops/{sellerId:int}")]
+    [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetShopById([FromRoute] int sellerId)
     {
         var client = _httpClientFactory.CreateClient("Identity");

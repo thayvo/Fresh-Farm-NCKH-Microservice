@@ -32,7 +32,7 @@ public class SellerAccountController : LegacySellerControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public IActionResult Login(string? returnUrl)
+    public IActionResult Login(string? returnUrl, bool rateLimitError = false, string? retryAfter = null)
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
         ClearTwoFactorChallenge();
@@ -43,6 +43,9 @@ public class SellerAccountController : LegacySellerControllerBase
         }
 
         ViewBag.ReturnUrl = normalizedReturnUrl;
+        ViewBag.RateLimitErrorMessage = rateLimitError
+            ? BuildRateLimitMessage(retryAfter)
+            : null;
         return View(new SellerLoginViewModel());
     }
 
@@ -115,15 +118,15 @@ public class SellerAccountController : LegacySellerControllerBase
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorText = await response.Content.ReadAsStringAsync();
-            ModelState.AddModelError(string.Empty, $"Xác thực 2 bước chưa thành công: {errorText}");
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Xác thực 2 bước chưa thành công");
+            ModelState.AddModelError(string.Empty, errorText);
             return View(BuildTwoFactorViewModel(challenge, vm.Code));
         }
 
         var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
         if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
         {
-            ModelState.AddModelError(string.Empty, "Xác thực 2 bước chưa thành công: token không hợp lệ.");
+            ModelState.AddModelError(string.Empty, "Token xác thực không hợp lệ.");
             return View(BuildTwoFactorViewModel(challenge, vm.Code));
         }
 
@@ -177,15 +180,15 @@ public class SellerAccountController : LegacySellerControllerBase
         var loginResponse = await identityClient.SendAsync(loginHttpRequest);
         if (!loginResponse.IsSuccessStatusCode)
         {
-            var errorText = await loginResponse.Content.ReadAsStringAsync();
-            ModelState.AddModelError(string.Empty, $"Đăng nhập chưa thành công: {errorText}");
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(loginResponse, "Đăng nhập chưa thành công");
+            ModelState.AddModelError(string.Empty, errorText);
             return View(vm);
         }
 
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
         if (auth is null)
         {
-            ModelState.AddModelError(string.Empty, "Đăng nhập chưa thành công: phản hồi xác thực không hợp lệ.");
+            ModelState.AddModelError(string.Empty, "Phản hồi xác thực không hợp lệ.");
             return View(vm);
         }
 
@@ -209,7 +212,7 @@ public class SellerAccountController : LegacySellerControllerBase
 
         if (string.IsNullOrWhiteSpace(auth.AccessToken))
         {
-            ModelState.AddModelError(string.Empty, "Đăng nhập chưa thành công: token không hợp lệ.");
+            ModelState.AddModelError(string.Empty, "Token xác thực không hợp lệ.");
             return View(vm);
         }
 
@@ -228,7 +231,8 @@ public class SellerAccountController : LegacySellerControllerBase
         var hasSellerRole = roleValues.Contains("Seller", StringComparer.OrdinalIgnoreCase);
         if (!hasSellerRole)
         {
-            return Unauthorized();
+            TempData["ErrorMessage"] = "Bạn không có quyền truy cập khu vực nhà bán hàng.";
+            return RedirectToAction(nameof(Login), new { area = "Seller", returnUrl });
         }
 
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -383,6 +387,16 @@ public class SellerAccountController : LegacySellerControllerBase
     private void ClearTwoFactorChallenge()
     {
         HttpContext.Session.Remove(TwoFactorChallengeSessionKey);
+    }
+
+    private static string BuildRateLimitMessage(string? retryAfter)
+    {
+        if (int.TryParse(retryAfter, out var retryAfterSeconds) && retryAfterSeconds > 0)
+        {
+            return $"Bạn thao tác quá nhanh. Vui lòng chờ khoảng {retryAfterSeconds} giây rồi thử lại.";
+        }
+
+        return "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.";
     }
 
     private static SellerTwoFactorViewModel BuildTwoFactorViewModel(TwoFactorChallengeStateDto challenge, string? code = null)

@@ -452,6 +452,7 @@ public class ProductController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> ToggleStatus(int id)
     {
         var client = CreateCatalogClient();
@@ -477,6 +478,7 @@ public class ProductController : LegacySellerControllerBase
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<JsonResult> GetProductDetails(int id)
     {
         var product = await GetProductByIdAsync(id);

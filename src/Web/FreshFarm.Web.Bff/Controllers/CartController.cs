@@ -3,6 +3,7 @@ using FreshFarm.Web.Bff.Dtos;
 using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
@@ -20,6 +21,7 @@ public sealed class CartController : Controller
 
     [HttpPost("/cart/checkout-selected")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("cart-write")]
     public async Task<IActionResult> CheckoutSelected([FromForm] string[] selectedCartItemKeys)
     {
         var cartKeys = (await _cart.GetItemsAsync())
@@ -56,6 +58,7 @@ public sealed class CartController : Controller
 
     [HttpPost("/cart/add")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("cart-write")]
     public async Task<IActionResult> Add([FromForm] AddToCartRequestDto request)
     {
         if (request.ProductId <= 0)
@@ -88,6 +91,7 @@ public sealed class CartController : Controller
 
     [HttpPost("/cart/update")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("cart-write")]
     public async Task<IActionResult> Update([FromForm] UpdateCartItemRequestDto request)
     {
         if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey))
@@ -101,6 +105,7 @@ public sealed class CartController : Controller
 
     [HttpPost("/cart/remove")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("cart-write")]
     public async Task<IActionResult> Remove([FromForm] RemoveCartItemRequestDto request)
     {
         if (request.ProductId <= 0 && string.IsNullOrWhiteSpace(request.CartItemKey))
@@ -114,6 +119,7 @@ public sealed class CartController : Controller
 
     [HttpPost("/cart/clear")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("cart-write")]
     public async Task<IActionResult> Clear()
     {
         await _cart.ClearAsync();

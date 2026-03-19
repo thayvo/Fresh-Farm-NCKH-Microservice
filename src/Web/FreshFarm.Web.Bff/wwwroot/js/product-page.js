@@ -11,6 +11,7 @@
             const fallbackImage = configNode?.dataset.fallbackImage || "/uploads/products/no-image.png";
             const uploadRoot = configNode?.dataset.uploadRoot || "/uploads/products/";
             const antiForgeryToken = document.querySelector("#productAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
+            const appHelpers = window.FreshFarmApp;
             const loadingNode = document.getElementById("productLoading");
             const errorNode = document.getElementById("productError");
             const rootNode = document.getElementById("productDetailRoot");
@@ -454,10 +455,12 @@
                                 body: body.toString()
                             });
 
-                            const text = await response.text();
-                            const result = text ? JSON.parse(text) : null;
+                            const { payload: result } = appHelpers
+                                ? await appHelpers.tryParsePayload(response)
+                                : { payload: null };
                             if (!response.ok) {
-                                throw new Error(result?.message || `HTTP ${response.status}`);
+                                throw (appHelpers?.createHttpError(response, result, "Chưa thể gửi đánh giá lúc này.")
+                                    ?? new Error(result?.message || `HTTP ${response.status}`));
                             }
 
                             setReviewNotice(result?.message || "Đã lưu đánh giá của bạn.");
@@ -480,11 +483,13 @@
 
                 try {
                     const response = await fetch(reviewsEndpoint, { headers: { "Accept": "application/json" } });
-                    const text = await response.text();
-                    const payload = text ? JSON.parse(text) : null;
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: null };
 
                     if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                        throw (appHelpers?.createHttpError(response, payload, "Chưa thể tải đánh giá sản phẩm.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
                     }
 
                     renderReviewSection(payload);
@@ -616,17 +621,13 @@
                         return null;
                     }
 
-                    const text = await response.text();
-                    let payload = null;
-
-                    try {
-                        payload = text ? JSON.parse(text) : null;
-                    } catch {
-                        payload = null;
-                    }
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: null };
 
                     if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                        throw (appHelpers?.createHttpError(response, payload, "Không thể thêm sản phẩm vào giỏ hàng lúc này.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
                     }
 
                     return payload;
@@ -734,11 +735,13 @@
             const loadOffers = async (product) => {
                 try {
                     const response = await fetch(offersEndpoint, { headers: { "Accept": "application/json" } });
-                    const text = await response.text();
-                    const payload = text ? JSON.parse(text) : [];
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: [] };
 
                     if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                        throw (appHelpers?.createHttpError(response, payload, "Chưa thể tải danh sách shop.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
                     }
 
                     renderOffers(product, payload);
@@ -983,7 +986,8 @@
                     }
 
                     if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
+                        throw (appHelpers?.createHttpError(response, payload, "Không thể tải dữ liệu sản phẩm.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
                     }
 
                     return payload;

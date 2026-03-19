@@ -1144,6 +1144,7 @@
     <script>
         $(document).ready(function () {
             setTimeout(function () { $('.alert').fadeOut('slow'); }, 5000);
+            const antiForgeryToken = $('input[name="__RequestVerificationToken"]').first().val();
 
             // direct bindings (sẽ được override bằng delegated bên dưới, nhưng giữ cho lần load đầu)
             $('#selectAll').on('change', function () {
@@ -1162,7 +1163,10 @@
                 $.ajax({
                     url: '@Url.Action("ToggleStatus", "Product")',
                     type: 'POST',
-                    data: { id: id },
+                    data: {
+                        id: id,
+                        __RequestVerificationToken: antiForgeryToken
+                    },
                     success: function (response) {
                         if (response.success) {
                             showToast('success', response.message);
@@ -1213,7 +1217,10 @@
             $.ajax({
                 url: '@Url.Action("GetProductDetails", "Product")',
                 type: 'POST',
-                data: { id: id },
+                data: {
+                    id: id,
+                    __RequestVerificationToken: antiForgeryToken
+                },
                 success: function (response) {
                     if (response.success) {
                         const p = response.product;

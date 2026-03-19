@@ -4,7 +4,12 @@ namespace FreshFarm.Web.Bff.Dtos
 {
     public sealed class LoginRequestDto // Payload gui den Identity /auth/login.
     {
+        [Required(ErrorMessage = "Tên đăng nhập hoặc email không được để trống.")]
+        [StringLength(100, ErrorMessage = "Tên đăng nhập hoặc email tối đa 100 ký tự.")]
         public string Identifier { get; set; } = string.Empty; // Email hoac username.
+
+        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        [StringLength(100, ErrorMessage = "Mật khẩu tối đa 100 ký tự.")]
         public string Password { get; set; } = string.Empty; // Mat khau.
         public string? ClientLane { get; set; } // Buyer/Seller/Admin lane khoi tao request.
     }
