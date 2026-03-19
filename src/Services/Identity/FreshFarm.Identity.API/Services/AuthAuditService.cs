@@ -24,14 +24,17 @@ public sealed class AuthAuditWriteRequest
 public sealed class AuthAuditService : IAuthAuditService
 {
     private readonly FreshFarmIdentityDBContext _db;
+    private readonly IGeoIpLookupService _geoIpLookupService;
     private readonly ILogger<AuthAuditService> _logger;
     private static readonly string[] SuspiciousAutomationMarkers = ["bot", "crawler", "spider", "curl", "postman", "python-requests", "powershell", "wget"];
 
     public AuthAuditService(
         FreshFarmIdentityDBContext db,
+        IGeoIpLookupService geoIpLookupService,
         ILogger<AuthAuditService> logger)
     {
         _db = db;
+        _geoIpLookupService = geoIpLookupService;
         _logger = logger;
     }
 
@@ -46,6 +49,7 @@ public sealed class AuthAuditService : IAuthAuditService
         var userAgent = httpContext?.Request.Headers.UserAgent.ToString();
         var forwardedFor = httpContext?.Request.Headers["X-Forwarded-For"].ToString();
         var remoteIp = httpContext?.Connection.RemoteIpAddress?.ToString();
+        var geo = await _geoIpLookupService.ResolveAsync(remoteIp, forwardedFor, cancellationToken);
         var deviceInfo = ParseUserAgent(userAgent);
 
         var suspicionReasons = await BuildSuspicionReasonsAsync(
@@ -55,7 +59,8 @@ public sealed class AuthAuditService : IAuthAuditService
             request.FailureReason,
             request.FailedAttemptCount,
             userAgent,
-            remoteIp,
+            geo.EffectiveIp ?? remoteIp,
+            geo.CountryCode,
             request.Identifier,
             cancellationToken);
 
@@ -71,8 +76,12 @@ public sealed class AuthAuditService : IAuthAuditService
             Success = request.Success,
             FailureReason = TrimToLength(request.FailureReason, 100),
             FailedAttemptCount = request.FailedAttemptCount,
-            IpAddress = TrimToLength(remoteIp, 64),
+            IpAddress = TrimToLength(geo.EffectiveIp ?? remoteIp, 64),
             ForwardedFor = TrimToLength(forwardedFor, 200),
+            CountryCode = TrimToLength(geo.CountryCode, 8),
+            CountryName = TrimToLength(geo.CountryName, 120),
+            RegionName = TrimToLength(geo.RegionName, 120),
+            CityName = TrimToLength(geo.CityName, 120),
             UserAgent = TrimToLength(userAgent, 500),
             DeviceType = deviceInfo.DeviceType,
             BrowserFamily = deviceInfo.BrowserFamily,
@@ -154,6 +163,7 @@ public sealed class AuthAuditService : IAuthAuditService
         int? failedAttemptCount,
         string? userAgent,
         string? remoteIp,
+        string? countryCode,
         string identifier,
         CancellationToken cancellationToken)
     {
@@ -200,6 +210,13 @@ public sealed class AuthAuditService : IAuthAuditService
             reasons.Add("lane_role_mismatch");
         }
 
+        if (IsBackofficeLane(clientLane) &&
+            !string.IsNullOrWhiteSpace(countryCode) &&
+            !string.Equals(countryCode, "VN", StringComparison.OrdinalIgnoreCase))
+        {
+            reasons.Add("foreign_backoffice_login");
+        }
+
         if (!string.IsNullOrWhiteSpace(remoteIp))
         {
             var since = DateTime.UtcNow.AddMinutes(-15);
@@ -237,6 +254,25 @@ public sealed class AuthAuditService : IAuthAuditService
             if (repeatedAccountFailures >= 5)
             {
                 reasons.Add("account_under_attack");
+            }
+
+            if (!string.IsNullOrWhiteSpace(countryCode))
+            {
+                var countryChangeWindowStart = DateTime.UtcNow.AddDays(-7);
+                var recentCountryChange = await _db.AuthAuditLogs.AsNoTracking()
+                    .Where(x => x.OccurredAt >= countryChangeWindowStart &&
+                                x.Identifier == identifier &&
+                                x.Success &&
+                                x.CountryCode != null &&
+                                x.CountryCode != string.Empty)
+                    .Select(x => x.CountryCode!)
+                    .Distinct()
+                    .AnyAsync(x => x != countryCode, cancellationToken);
+
+                if (recentCountryChange)
+                {
+                    reasons.Add("country_changed_recently");
+                }
             }
         }
 

@@ -28,6 +28,14 @@ public partial class AuthAuditLog
 
     public string? ForwardedFor { get; set; }
 
+    public string? CountryCode { get; set; }
+
+    public string? CountryName { get; set; }
+
+    public string? RegionName { get; set; }
+
+    public string? CityName { get; set; }
+
     public string? UserAgent { get; set; }
 
     public string? DeviceType { get; set; }

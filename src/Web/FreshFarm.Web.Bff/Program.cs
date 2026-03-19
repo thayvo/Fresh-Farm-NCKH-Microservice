@@ -313,7 +313,7 @@ app.Use(async (context, next) =>
     {
         var headers = context.Response.Headers;
         var cspNonce = context.Items["CspNonce"] as string ?? string.Empty;
-        var cspHeader = new StringBuilder()
+        var cspPrefix = new StringBuilder()
             .Append("default-src 'self'; ")
             .Append("base-uri 'self'; ")
             .Append("frame-ancestors 'self'; ")
@@ -321,18 +321,40 @@ app.Use(async (context, next) =>
             .Append("object-src 'none'; ")
             .Append("img-src 'self' data: https:; ")
             .Append("font-src 'self' data: https://cdn.jsdelivr.net; ")
-            .Append("connect-src 'self' https: wss:; ")
+            .Append("connect-src 'self' https: wss:; ");
+
+        var strictScriptDirective = new StringBuilder()
+            .Append("script-src 'self' https://cdn.jsdelivr.net https://cdn.ckeditor.com; ")
+            .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
+            .Append("frame-src 'self' https:;");
+
+        var legacyScriptDirective = new StringBuilder()
             .Append("script-src 'self' 'unsafe-inline' 'nonce-")
             .Append(cspNonce)
             .Append("' https://cdn.jsdelivr.net https://cdn.ckeditor.com; ")
             .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
             .Append("frame-src 'self' https:;");
 
+        var requestPath = context.Request.Path;
+        var useReportOnly =
+            requestPath.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase) ||
+            requestPath.StartsWithSegments("/Seller", StringComparison.OrdinalIgnoreCase) ||
+            requestPath.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
+
         headers["X-Content-Type-Options"] = "nosniff";
         headers["X-Frame-Options"] = "SAMEORIGIN";
         headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
         headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), browsing-topics=()";
-        headers["Content-Security-Policy-Report-Only"] = cspHeader.ToString();
+        if (useReportOnly)
+        {
+            headers["Content-Security-Policy-Report-Only"] = cspPrefix.ToString() + legacyScriptDirective.ToString();
+            headers.Remove("Content-Security-Policy");
+        }
+        else
+        {
+            headers["Content-Security-Policy"] = cspPrefix.ToString() + strictScriptDirective.ToString();
+            headers.Remove("Content-Security-Policy-Report-Only");
+        }
         return Task.CompletedTask;
     });
 

@@ -19,6 +19,65 @@
             "customer" => "Người dùng",
             _ => "Không xác định"
         };
+
+    static string FormatEventLabel(string? eventType)
+        => (eventType ?? string.Empty).ToLowerInvariant() switch
+        {
+            "login_success" => "Đăng nhập thành công",
+            "login_failed" => "Đăng nhập thất bại",
+            "login_locked" => "Tài khoản bị khóa tạm thời",
+            "two_factor_success" => "Xác thực 2 bước thành công",
+            "two_factor_failed" => "Xác thực 2 bước thất bại",
+            "external_login_success" => "Đăng nhập ngoài thành công",
+            "external_login_failed" => "Đăng nhập ngoài thất bại",
+            _ => (eventType ?? string.Empty).Replace("_", " ")
+        };
+
+    static string FormatReasonLabel(string? value)
+        => (value ?? string.Empty).ToLowerInvariant() switch
+        {
+            "account_not_found" => "Không tìm thấy tài khoản",
+            "invalid_password" => "Sai mật khẩu",
+            "inactive_account" => "Tài khoản bị vô hiệu hóa",
+            "account_locked" => "Tài khoản đang bị khóa tạm thời",
+            "invalid_request" => "Yêu cầu không hợp lệ",
+            "unsupported_provider" => "Nhà cung cấp đăng nhập không được hỗ trợ",
+            "invalid_two_factor_code" => "Mã xác thực 2 bước không hợp lệ",
+            "invalid_or_expired_ticket" => "Phiên xác thực 2 bước không hợp lệ hoặc đã hết hạn",
+            _ => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace("_", " ")
+        };
+
+    static IReadOnlyList<string> FormatSuspicionReasons(string? reasons)
+        => string.IsNullOrWhiteSpace(reasons)
+            ? Array.Empty<string>()
+            : reasons
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(reason => reason.ToLowerInvariant() switch
+                {
+                    "missing_user_agent" => "Thiếu User-Agent",
+                    "lockout_triggered" => "Kích hoạt khóa tạm thời",
+                    "two_factor_failed" => "Sai mã 2FA",
+                    "repeated_failed_login" => "Đăng nhập sai lặp lại",
+                    "automation_user_agent" => "Dấu hiệu tự động hóa/bot",
+                    "unknown_account_probe" => "Dò quét tài khoản không tồn tại",
+                    "lane_role_mismatch" => "Role không khớp lane truy cập",
+                    "repeated_failed_ip" => "IP đăng nhập sai liên tục",
+                    "multi_account_probe" => "IP thử nhiều tài khoản",
+                    "account_under_attack" => "Tài khoản có dấu hiệu bị dò quét",
+                    "foreign_backoffice_login" => "Backoffice đăng nhập ngoài Việt Nam",
+                    "country_changed_recently" => "Quốc gia đăng nhập thay đổi gần đây",
+                    _ => reason.Replace("_", " ")
+                })
+                .ToArray();
+
+    static string FormatGeo(FreshFarm.Web.Bff.Areas.Admin.Models.AuthAuditRowViewModel item)
+    {
+        var parts = new[] { item.CityName, item.RegionName, item.CountryName }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+
+        return parts.Length == 0 ? string.Empty : string.Join(", ", parts);
+    }
 }
 
 <section class="audit-console audit-page ff-admin-shell">
@@ -95,6 +154,15 @@
             <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Thất bại</span><strong>@Model.AuthStats.Failed24h</strong><small>sai thông tin/OTP</small></div></div>
             <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Lockout</span><strong>@Model.AuthStats.Locked24h</strong><small>tài khoản bị khóa</small></div></div>
             <div class="col-md-6 col-xl-4"><div class="metric-card metric-card-sm danger-glow"><span class="metric-label">Đáng ngờ</span><strong>@Model.AuthStats.Suspicious24h</strong><small>sự kiện bị gắn cờ cần theo dõi</small></div></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">IP khác nhau</span><strong>@Model.AuthStats.UniqueIp24h</strong><small>nguồn truy cập 24 giờ</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Admin</span><strong>@Model.AuthStats.Admin24h</strong><small>sự kiện lane admin</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Seller</span><strong>@Model.AuthStats.Seller24h</strong><small>sự kiện lane seller</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Người dùng</span><strong>@Model.AuthStats.Customer24h</strong><small>sự kiện lane buyer</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Backoffice ngoại quốc</span><strong>@Model.AuthStats.ForeignBackoffice24h</strong><small>success ngoài VN</small></div></div>
+            <div class="col-md-6 col-xl-2"><div class="metric-card metric-card-sm"><span class="metric-label">Không xác định</span><strong>@Model.AuthStats.Unknown24h</strong><small>cần rà soát thêm</small></div></div>
         </div>
 
         <form method="get" asp-action="Index" asp-controller="Audit" asp-area="Admin" class="filter-card row g-3 mb-4">
@@ -175,10 +243,10 @@
                                         }
                                     </td>
                                     <td>
-                                        <div class="fw-semibold">@item.EventType.Replace("_", " ")</div>
+                                        <div class="fw-semibold">@FormatEventLabel(item.EventType)</div>
                                         @if (!string.IsNullOrWhiteSpace(item.FailureReason))
                                         {
-                                            <div class="small text-muted">Lý do: @item.FailureReason.Replace("_", " ")</div>
+                                            <div class="small text-muted">Lý do: @FormatReasonLabel(item.FailureReason)</div>
                                         }
                                         @if (item.FailedAttemptCount.HasValue)
                                         {
@@ -186,7 +254,12 @@
                                         }
                                         @if (item.IsSuspicious)
                                         {
-                                            <div class="small suspicious-text mt-1">Đáng ngờ: @item.SuspicionReasons</div>
+                                            var suspicionLabels = FormatSuspicionReasons(item.SuspicionReasons);
+                                            <div class="small suspicious-text mt-1">Đáng ngờ:</div>
+                                            @foreach (var reason in suspicionLabels)
+                                            {
+                                                <span class="badge badge-status badge-warning me-1 mt-1">@reason</span>
+                                            }
                                         }
                                     </td>
                                     <td>
@@ -199,6 +272,17 @@
                                     </td>
                                     <td>
                                         <div class="fw-semibold">@(item.IpAddress ?? "-")</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.CountryCode) || !string.IsNullOrWhiteSpace(item.CountryName))
+                                        {
+                                            <div class="small text-muted">@(string.IsNullOrWhiteSpace(item.CountryCode) ? item.CountryName : $"{item.CountryCode} - {item.CountryName}")</div>
+                                        }
+                                        @{
+                                            var geoText = FormatGeo(item);
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(geoText))
+                                        {
+                                            <div class="small text-muted text-break">@geoText</div>
+                                        }
                                         @if (!string.IsNullOrWhiteSpace(item.ForwardedFor))
                                         {
                                             <div class="small text-muted text-break">X-Forwarded-For: @item.ForwardedFor</div>
@@ -212,6 +296,10 @@
                                         else
                                         {
                                             <span class="badge badge-status badge-danger">Thất bại</span>
+                                        }
+                                        @if (item.EventType == "login_locked")
+                                        {
+                                            <div class="mt-2"><span class="badge badge-status badge-warning">Tạm khóa</span></div>
                                         }
                                     </td>
                                 </tr>
@@ -744,6 +832,12 @@
     .audit-console .badge-danger {
         color: #fff;
         background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .audit-console .badge-warning {
+        color: #7c2d12;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 1px solid rgba(217, 119, 6, .18);
     }
 
     .audit-console .suspicious-text {

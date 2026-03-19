@@ -1,3 +1,4 @@
+@using FreshFarm.Web.Bff.Services
 @{
     Layout = null;
     var productId = ViewData["ProductId"] is int idValue ? idValue : 0;
@@ -1046,6 +1047,20 @@
 
     @await Html.PartialAsync("_FooterLegacy")
 
+    <div id="productPageConfig"
+         data-product-id="@productId"
+         data-search-keyword="@keyword"
+         data-is-authenticated="@(isAuthenticated ? "true" : "false")"
+         data-is-buyer-eligible="@(isBuyerEligible ? "true" : "false")"
+         data-sign-in-url="@signInUrl"
+         data-endpoint="/bff/products/@productId"
+         data-offers-endpoint="/bff/products/@productId/offers"
+         data-reviews-endpoint="/bff/reviews/products/@productId"
+         data-fallback-image="@ProductImagePaths.FallbackImageRequestPath"
+         data-upload-root="@ProductImagePaths.UploadFolderRequestPath"
+         hidden></div>
+
+    @*
     <script>
         (() => {
             const productId = @productId;
@@ -2038,5 +2053,7 @@
                 .catch((error) => showError(error?.message || "Không thể tải dữ liệu sản phẩm."));
         })();
     </script>
+    *@
+    <script src="~/js/product-page.js" asp-append-version="true"></script>
 </body>
 </html>

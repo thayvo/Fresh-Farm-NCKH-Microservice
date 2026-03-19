@@ -129,7 +129,10 @@
                             </div>
                         }
 
-                        <p class="mt-4 mb-2 text-muted small">
+                        <p class="mt-4 mb-2 text-muted small"
+                           data-checkout-success-countdown
+                           data-checkout-success-seconds="8"
+                           data-checkout-success-redirect="/?from=thankyou">
                             Tự động chuyển về trang chủ sau <span id="countdown">8</span> giây.
                         </p>
 
@@ -176,22 +179,7 @@
 
     @if (hasOrderData)
     {
-        <script>
-            (() => {
-                let seconds = 8;
-                const countdownEl = document.getElementById("countdown");
-                const timer = setInterval(() => {
-                    seconds--;
-                    if (countdownEl) {
-                        countdownEl.textContent = seconds.toString();
-                    }
-                    if (seconds <= 0) {
-                        clearInterval(timer);
-                        window.location.href = "/?from=thankyou";
-                    }
-                }, 1000);
-            })();
-        </script>
+        <script src="~/js/checkout-success.js"></script>
     }
 </body>
 </html>

@@ -102,11 +102,16 @@ public class SellerAccountController : LegacySellerControllerBase
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var response = await identityClient.PostAsJsonAsync("/auth/login/2fa", new VerifyTwoFactorLoginRequestDto
-        {
-            Ticket = challenge.Ticket,
-            Code = vm.Code?.Trim() ?? string.Empty
-        });
+        using var verifyHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login/2fa",
+            new VerifyTwoFactorLoginRequestDto
+            {
+                Ticket = challenge.Ticket,
+                Code = vm.Code?.Trim() ?? string.Empty
+            });
+        var response = await identityClient.SendAsync(verifyHttpRequest);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -164,7 +169,12 @@ public class SellerAccountController : LegacySellerControllerBase
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var loginResponse = await identityClient.PostAsJsonAsync("/auth/login", request);
+        using var loginHttpRequest = FreshFarm.Web.Bff.Utilities.ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login",
+            request);
+        var loginResponse = await identityClient.SendAsync(loginHttpRequest);
         if (!loginResponse.IsSuccessStatusCode)
         {
             var errorText = await loginResponse.Content.ReadAsStringAsync();

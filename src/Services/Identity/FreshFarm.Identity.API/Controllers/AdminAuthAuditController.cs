@@ -40,6 +40,9 @@ public sealed class AdminAuthAuditController : ControllerBase
                 (x.UserName != null && x.UserName.Contains(normalizedQuery)) ||
                 (x.Email != null && x.Email.Contains(normalizedQuery)) ||
                 (x.IpAddress != null && x.IpAddress.Contains(normalizedQuery)) ||
+                (x.CountryName != null && x.CountryName.Contains(normalizedQuery)) ||
+                (x.RegionName != null && x.RegionName.Contains(normalizedQuery)) ||
+                (x.CityName != null && x.CityName.Contains(normalizedQuery)) ||
                 (x.ForwardedFor != null && x.ForwardedFor.Contains(normalizedQuery)) ||
                 (x.UserAgent != null && x.UserAgent.Contains(normalizedQuery)) ||
                 (x.FailureReason != null && x.FailureReason.Contains(normalizedQuery)));
@@ -77,6 +80,22 @@ public sealed class AdminAuthAuditController : ControllerBase
         var failed24h = await statsBase.CountAsync(x => !x.Success, cancellationToken);
         var locked24h = await statsBase.CountAsync(x => x.EventType == "login_locked", cancellationToken);
         var suspicious24h = await statsBase.CountAsync(x => x.IsSuspicious, cancellationToken);
+        var uniqueIp24h = await statsBase
+            .Where(x => x.IpAddress != null && x.IpAddress != string.Empty)
+            .Select(x => x.IpAddress!)
+            .Distinct()
+            .CountAsync(cancellationToken);
+        var foreignBackoffice24h = await statsBase.CountAsync(
+            x => (x.RoleName == "Admin" || x.RoleName == "Seller") &&
+                 x.Success &&
+                 x.CountryCode != null &&
+                 x.CountryCode != string.Empty &&
+                 x.CountryCode != "VN",
+            cancellationToken);
+        var admin24h = await statsBase.CountAsync(x => x.RoleName == "Admin", cancellationToken);
+        var seller24h = await statsBase.CountAsync(x => x.RoleName == "Seller", cancellationToken);
+        var customer24h = await statsBase.CountAsync(x => x.RoleName == "Customer", cancellationToken);
+        var unknown24h = await statsBase.CountAsync(x => x.RoleName == "Unknown", cancellationToken);
 
         var rows = await authEvents
             .OrderByDescending(x => x.OccurredAt)
@@ -95,6 +114,10 @@ public sealed class AdminAuthAuditController : ControllerBase
                 failedAttemptCount = x.FailedAttemptCount,
                 ipAddress = x.IpAddress,
                 forwardedFor = x.ForwardedFor,
+                countryCode = x.CountryCode,
+                countryName = x.CountryName,
+                regionName = x.RegionName,
+                cityName = x.CityName,
                 userAgent = x.UserAgent,
                 deviceType = x.DeviceType,
                 browserFamily = x.BrowserFamily,
@@ -114,7 +137,13 @@ public sealed class AdminAuthAuditController : ControllerBase
                 success24h,
                 failed24h,
                 locked24h,
-                suspicious24h
+                suspicious24h,
+                uniqueIp24h,
+                foreignBackoffice24h,
+                admin24h,
+                seller24h,
+                customer24h,
+                unknown24h
             },
             filters = new
             {

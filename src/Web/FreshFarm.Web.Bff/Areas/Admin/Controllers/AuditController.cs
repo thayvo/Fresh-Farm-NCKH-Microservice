@@ -146,7 +146,13 @@ public sealed class AuditController : LegacySellerControllerBase
                 Success24h = payload.Stats?.Success24h ?? 0,
                 Failed24h = payload.Stats?.Failed24h ?? 0,
                 Locked24h = payload.Stats?.Locked24h ?? 0,
-                Suspicious24h = payload.Stats?.Suspicious24h ?? 0
+                Suspicious24h = payload.Stats?.Suspicious24h ?? 0,
+                UniqueIp24h = payload.Stats?.UniqueIp24h ?? 0,
+                ForeignBackoffice24h = payload.Stats?.ForeignBackoffice24h ?? 0,
+                Admin24h = payload.Stats?.Admin24h ?? 0,
+                Seller24h = payload.Stats?.Seller24h ?? 0,
+                Customer24h = payload.Stats?.Customer24h ?? 0,
+                Unknown24h = payload.Stats?.Unknown24h ?? 0
             };
             model.AuthRoleOptions = payload.Filters?.RoleOptions?.Select(MapOption).ToList() ?? model.AuthRoleOptions;
             model.AuthOutcomeOptions = payload.Filters?.OutcomeOptions?.Select(MapOption).ToList() ?? model.AuthOutcomeOptions;
@@ -165,6 +171,10 @@ public sealed class AuditController : LegacySellerControllerBase
                 FailedAttemptCount = x.FailedAttemptCount,
                 IpAddress = x.IpAddress,
                 ForwardedFor = x.ForwardedFor,
+                CountryCode = x.CountryCode,
+                CountryName = x.CountryName,
+                RegionName = x.RegionName,
+                CityName = x.CityName,
                 UserAgent = x.UserAgent,
                 DeviceType = x.DeviceType,
                 BrowserFamily = x.BrowserFamily,
@@ -367,6 +377,18 @@ public sealed class AuditController : LegacySellerControllerBase
         public int Locked24h { get; set; }
 
         public int Suspicious24h { get; set; }
+
+        public int UniqueIp24h { get; set; }
+
+        public int ForeignBackoffice24h { get; set; }
+
+        public int Admin24h { get; set; }
+
+        public int Seller24h { get; set; }
+
+        public int Customer24h { get; set; }
+
+        public int Unknown24h { get; set; }
     }
 
     private sealed class AuthAuditFiltersApiModel
@@ -507,6 +529,14 @@ public sealed class AuditController : LegacySellerControllerBase
         public string? IpAddress { get; set; }
 
         public string? ForwardedFor { get; set; }
+
+        public string? CountryCode { get; set; }
+
+        public string? CountryName { get; set; }
+
+        public string? RegionName { get; set; }
+
+        public string? CityName { get; set; }
 
         public string? UserAgent { get; set; }
 

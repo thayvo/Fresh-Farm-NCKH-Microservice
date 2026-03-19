@@ -59,6 +59,18 @@ public sealed class AuthAuditStatsViewModel
     public int Locked24h { get; set; }
 
     public int Suspicious24h { get; set; }
+
+    public int UniqueIp24h { get; set; }
+
+    public int ForeignBackoffice24h { get; set; }
+
+    public int Admin24h { get; set; }
+
+    public int Seller24h { get; set; }
+
+    public int Customer24h { get; set; }
+
+    public int Unknown24h { get; set; }
 }
 
 public sealed class AuditOptionViewModel
@@ -160,6 +172,14 @@ public sealed class AuthAuditRowViewModel
     public string? IpAddress { get; set; }
 
     public string? ForwardedFor { get; set; }
+
+    public string? CountryCode { get; set; }
+
+    public string? CountryName { get; set; }
+
+    public string? RegionName { get; set; }
+
+    public string? CityName { get; set; }
 
     public string? UserAgent { get; set; }
 

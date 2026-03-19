@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddMemoryCache();
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 {
@@ -28,10 +29,18 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<User>, 
 builder.Services.Configure<PasswordResetOptions>(builder.Configuration.GetSection(PasswordResetOptions.SectionName));
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection(EmailVerificationOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.Configure<GeoIpOptions>(builder.Configuration.GetSection(GeoIpOptions.SectionName));
 builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
 builder.Services.AddScoped<IEmailVerificationTokenService, EmailVerificationTokenService>();
 builder.Services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
 builder.Services.AddScoped<IAuthAuditService, AuthAuditService>();
+builder.Services.AddHttpClient<IGeoIpLookupService, GeoIpLookupService>((serviceProvider, client) =>
+{
+    var geoIpOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GeoIpOptions>>().Value;
+    var baseUrl = string.IsNullOrWhiteSpace(geoIpOptions.BaseUrl) ? "https://ipwho.is/" : geoIpOptions.BaseUrl;
+    client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+    client.Timeout = TimeSpan.FromSeconds(Math.Max(1, geoIpOptions.TimeoutSeconds));
+});
 builder.Services.AddSingleton<ITotpService, TotpService>();
 builder.Services.AddSingleton<ITwoFactorLoginTicketService, TwoFactorLoginTicketService>();
 

@@ -25,7 +25,10 @@ public partial class FreshFarmIdentityDBContext
             entity.Property(e => e.ClientLane)
                 .IsRequired()
                 .HasMaxLength(20);
+            entity.Property(e => e.CityName).HasMaxLength(120);
             entity.Property(e => e.DeviceType).HasMaxLength(30);
+            entity.Property(e => e.CountryCode).HasMaxLength(8);
+            entity.Property(e => e.CountryName).HasMaxLength(120);
             entity.Property(e => e.Email).HasMaxLength(100);
             entity.Property(e => e.EventType)
                 .IsRequired()
@@ -44,6 +47,7 @@ public partial class FreshFarmIdentityDBContext
                 .HasDefaultValueSql("(sysutcdatetime())")
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_AuthAuditLog_OccurredAt");
             entity.Property(e => e.OperatingSystem).HasMaxLength(50);
+            entity.Property(e => e.RegionName).HasMaxLength(120);
             entity.Property(e => e.RoleName)
                 .IsRequired()
                 .HasMaxLength(50);

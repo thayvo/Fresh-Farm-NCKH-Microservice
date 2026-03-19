@@ -3,6 +3,7 @@ using System.Security.Claims; // Dung Claim/ClaimsPrincipal.
 using FreshFarm.Web.Bff.Dtos; // Dung DTO vua tao.
 using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Dung service GHN.
+using FreshFarm.Web.Bff.Utilities;
 using Microsoft.AspNetCore.Authentication; // Dung SignInAsync/SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // Cookie auth scheme.
 using Microsoft.AspNetCore.RateLimiting;
@@ -70,7 +71,12 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Lay client goi Identity API.
-        var loginResponse = await identityClient.PostAsJsonAsync("/auth/login", request); // Goi login API.
+        using var loginHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login",
+            request);
+        var loginResponse = await identityClient.SendAsync(loginHttpRequest); // Goi login API.
 
         if (!loginResponse.IsSuccessStatusCode) // Neu login fail.
         {
@@ -144,13 +150,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             ?? externalAuth.Principal.FindFirstValue("urn:google:picture");
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var exchangeResponse = await identityClient.PostAsJsonAsync("/auth/external-login", new ExternalLoginExchangeRequestDto
-        {
-            Provider = "Google",
-            Email = email,
-            FullName = fullName,
-            AvatarUrl = avatarUrl
-        });
+        using var externalLoginHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/external-login",
+            new ExternalLoginExchangeRequestDto
+            {
+                Provider = "Google",
+                Email = email,
+                FullName = fullName,
+                AvatarUrl = avatarUrl
+            });
+        var exchangeResponse = await identityClient.SendAsync(externalLoginHttpRequest);
 
         await HttpContext.SignOutAsync("GoogleExternal");
 
@@ -226,16 +237,21 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // HttpClient cho Identity.
-        var registerResponse = await identityClient.PostAsJsonAsync("/auth/register", new
-        {
-            request.UserName,
-            request.FullName,
-            request.Email,
-            request.Phone,
-            request.Password,
-            request.ConfirmPassword,
-            request.RoleName
-        }); // Goi register API.
+        using var registerHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/register",
+            new
+            {
+                request.UserName,
+                request.FullName,
+                request.Email,
+                request.Phone,
+                request.Password,
+                request.ConfirmPassword,
+                request.RoleName
+            });
+        var registerResponse = await identityClient.SendAsync(registerHttpRequest); // Goi register API.
 
         if (!registerResponse.IsSuccessStatusCode) // Register fail.
         {
@@ -308,10 +324,15 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var response = await identityClient.PostAsJsonAsync("/auth/resend-email-verification", new
-        {
-            identifier = request.Identifier
-        });
+        using var resendHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/resend-email-verification",
+            new
+            {
+                identifier = request.Identifier
+            });
+        var response = await identityClient.SendAsync(resendHttpRequest);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -358,11 +379,16 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var response = await identityClient.PostAsJsonAsync("/auth/verify-email", new
-        {
-            email = normalizedEmail,
-            token
-        });
+        using var verifyEmailHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/verify-email",
+            new
+            {
+                email = normalizedEmail,
+                token
+            });
+        var response = await identityClient.SendAsync(verifyEmailHttpRequest);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -411,10 +437,15 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         request.Email = request.Email.Trim(); // Chuẩn hóa email trước khi gọi API.
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
-        var response = await identityClient.PostAsJsonAsync("/auth/forgot-password", new
-        {
-            email = request.Email
-        }); // Gửi yêu cầu quên mật khẩu.
+        using var forgotPasswordHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/forgot-password",
+            new
+            {
+                email = request.Email
+            });
+        var response = await identityClient.SendAsync(forgotPasswordHttpRequest); // Gửi yêu cầu quên mật khẩu.
 
         if (!response.IsSuccessStatusCode) // Nếu API trả lỗi.
         {
@@ -461,13 +492,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         request.Email = request.Email.Trim(); // Chuẩn hóa email.
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
-        var response = await identityClient.PostAsJsonAsync("/auth/reset-password", new
-        {
-            email = request.Email,
-            token = request.Token,
-            newPassword = request.NewPassword,
-            confirmPassword = request.ConfirmPassword
-        }); // Gọi API đặt lại mật khẩu.
+        using var resetPasswordHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/reset-password",
+            new
+            {
+                email = request.Email,
+                token = request.Token,
+                newPassword = request.NewPassword,
+                confirmPassword = request.ConfirmPassword
+            });
+        var response = await identityClient.SendAsync(resetPasswordHttpRequest); // Gọi API đặt lại mật khẩu.
 
         if (!response.IsSuccessStatusCode) // Nếu API fail.
         {
