@@ -46,6 +46,10 @@ namespace FreshFarm.Web.Bff.Dtos
 
         [Range(typeof(bool), "true", "true", ErrorMessage = "Bạn cần đồng ý với điều khoản sử dụng và chính sách quyền riêng tư.")]
         public bool AcceptTerms { get; set; }
+
+        [Required(ErrorMessage = "Vui lòng nhập mã xác nhận.")]
+        [StringLength(10, MinimumLength = 4, ErrorMessage = "Mã xác nhận không hợp lệ.")]
+        public string CaptchaCode { get; set; } = string.Empty;
     }
 
     public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.

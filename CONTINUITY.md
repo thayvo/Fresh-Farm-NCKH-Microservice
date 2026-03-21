@@ -1,81 +1,42 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Ra soat ma nguon toan bo repo FreshFarm theo goc nhin bao mat va tao file Word tieng Viet `finalBaoMat.docx`.
+  - Xac minh trong repo FreshFarm hien da co hay chua co 3 hang muc bao mat: CSP enforce, mTLS giua microservices, va Penetration Testing dinh ky.
   - Success criteria:
-    - Xac dinh duoc cac nhom co che bao mat da co trong code va cac diem can test.
-    - Chi ro duoc cac rui ro/chua day du trong code lien quan den XSS, SQL injection, phan quyen, log/audit, upload, session/cookie, CSRF, payment, headers, rate limiting, 2FA, reset mat khau.
-    - Tao duoc file `finalBaoMat.docx` huong dan test chi tiet bang tieng Viet, tong hop tu code va cac file Word co san.
+    - Ket luan ro tung muc: da co, co mot phan, hay chua co.
+    - Dua tren code/cau hinh/tai lieu hien co trong repo, khong suy doan.
 - **Constraints/Assumptions**:
   - Khong dung lenh git/destructive.
   - Worktree dang co nhieu thay doi san; khong duoc revert hay ghi de cac thay doi khong phuc vu task nay.
-  - Uu tien doc cac file Word trong `docs/` de tan dung noi dung co san truoc khi viet file cuoi.
-  - Word COM da su dung duoc tren may nay, nen co the tao `finalBaoMat.docx` truc tiep.
+  - Can dua tren code hien tai cua repo, khong suy doan theo kien truc ly thuyet.
+  - `rg` bi loi quyen truy cap trong moi truong nay; tam dung `Get-ChildItem` + `Select-String`.
 - **Key decisions**:
-  - Dung `aspnet-core` de ra soat dung pipeline/auth/MVC va dung `doc` de tao DOCX.
-  - Audit theo nhom rui ro thay vi doc tuyen tinh toan bo repo: host/config, auth/phong chong chiem quyen, phan quyen, input/query, upload/file, payment, logging/audit, frontend/browser security.
-  - File giao cuoi se la `D:\NCKH\DOAN\NCKH-FRESH-FARM\finalBaoMat.docx`.
-  - Muc uu tien test cao nhat trong tai lieu cuoi:
-    - Tampering gia/so tien don hang do cart/checkout/order dang tin `UnitPrice` tu request/session/query.
-    - Stored XSS o khu seller do JSON tra ve du lieu mo ta/ten san pham roi chen bang `.html(...)` va co `Html.Raw(...)` voi `TempData`.
-  - Tai lieu cuoi se ket hop noi dung tong hop tu `docs/` voi phat hien tu code, nhung uu tien dua theo bang chung source code.
+  - Danh gia truc tiep cac `Program.cs`, controller internal, va workflow/docs thay vi chi dua tren bao cao tong hop.
+  - Xem `CSP` theo lane/public vs admin/seller/swagger.
+  - Xem `mTLS` theo bang chung cert/client cert thay vi chi co HTTPS/JWT/header secret.
 - **State**:
   - *Done*:
-    - Da doc `CONTINUITY.md` cu va xac dinh can doi muc tieu sang audit bao mat tong the + tao file Word cuoi.
-    - Da xac dinh repo la he thong .NET 8 / ASP.NET Core gom `FreshFarm.Web.Bff`, `FreshFarm.Identity.API`, `FreshFarm.Catalog.Api`, `FreshFarm.Ordering.Api`.
-    - Da xac dinh trong `docs/` da co nhieu file Word lien quan den bao mat nhu `Huong dan test bao mat da lam v4.docx`, `Tong hop bao mat va Cloudflare.docx`, `Bao cao ket qua test bao mat va mau test.docx`, `GiamDDoS.docx`.
-    - Da xac nhan worktree dang co nhieu thay doi san; can tranh de len cac file dang sua.
-    - Da doc/trich noi dung tu cac file Word chinh trong `docs/` bang Word COM.
-    - Da xac nhan BFF co global rate limiter, limiter theo policy, session/cookie hardening, forwarded headers, CSP/HSTS/security headers, telemetry 429.
-    - Da xac nhan Identity co password hashing, email verification, forgot/reset password, lockout, auth audit, GeoIP, TOTP/2FA cho Admin/Seller.
-    - Da xac nhan Ordering co ownership check cho order cua buyer va doi soat VNPay voi duplicate/ref replay/amount mismatch.
-    - Da xac nhan repo dang commit nhieu secrets dev/noi bo trong appsettings (JWT key, internal service key, GHN token/shop id).
-    - Da xac nhan phat hien manh:
-      - Price tampering: `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`, `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`, `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CartController.cs`, `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`.
-      - Stored/admin-panel XSS: `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/ManageProducts.cshtml`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Create.cshtml`, `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Edit.cshtml`.
-      - Upload validation chua kiem tra MIME/magic bytes: `src/Web/FreshFarm.Web.Bff/Services/ProductImageStorageService.cs`.
-      - SQL injection co rui ro thap hon vi chua thay raw SQL trong code da ra soat.
-    - Da tao file nguon `finalBaoMat_source.md` va script `tools/generate_finalBaoMat.ps1` de sinh tai lieu Word.
-    - Da tao thanh cong `D:\NCKH\DOAN\NCKH-FRESH-FARM\finalBaoMat.docx` va doc lai nhanh noi dung dau file de xac nhan.
+    - Da doc lai `CONTINUITY.md`.
+    - Da doi chieu `src/Web/FreshFarm.Web.Bff/Program.cs` va xac nhan BFF co security headers + CSP.
+    - Da xac nhan BFF tra `Content-Security-Policy` enforce cho buyer/public, nhung `Content-Security-Policy-Report-Only` cho `/Admin`, `/Seller`, `/swagger`.
+    - Da doi chieu `Program.cs` cua `Identity`, `Catalog`, `Ordering`; cac service dang dung JWT Bearer cho API auth thong thuong.
+    - Da doi chieu giao tiep noi bo `Ordering -> Catalog`; hien dang dung header chia se `X-Service-Key`, khong thay client certificate hay mTLS.
+    - Da quet `.github`, `docs`, `scripts`, `tools`; chua thay workflow/script OWASP ZAP hay Burp Suite dinh ky trong repo.
   - *Now*:
-    - San sang ban giao file Word cuoi cung cho nguoi dung.
+    - Tong hop ket qua cho user ve 3 hang muc bao mat.
   - *Next*:
-    - Neu nguoi dung can, co the tiep tuc toi uu hinh thuc/bo sung them ca test moi vao `finalBaoMat.docx`.
+    - Neu user can, de xuat roadmap de nang CSP len enforce toan lane va thay `X-Service-Key` bang co che manh hon.
 - **Open questions** (UNCONFIRMED if needed):
   - Khong co.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
-  - `docs/Bao cao ket qua test bao mat va mau test.docx`
-  - `docs/GiamDDoS.docx`
-  - `docs/GiamDDoS v2.docx`
-  - `docs/Huong dan test bao mat da lam v4.docx`
-  - `docs/Tong hop bao mat va Cloudflare.docx`
   - `src/Web/FreshFarm.Web.Bff/Program.cs`
-  - `src/Web/FreshFarm.Web.Bff/appsettings.Development.json`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/AccountController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Controllers/RateLimitTelemetryController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Services/CartSessionService.cs`
-  - `src/Web/FreshFarm.Web.Bff/Services/ProductImageStorageService.cs`
-  - `src/Web/FreshFarm.Web.Bff/Services/VnPayService.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/ManageProducts.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Create.cshtml`
-  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Product/Edit.cshtml`
   - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AuthController.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminAuthAuditController.cs`
-  - `src/Services/Identity/FreshFarm.Identity.API/appsettings.Development.json`
   - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.Development.json`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/appsettings.json`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/InternalInventoryReservationsController.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Options/InternalInventoryOptions.cs`
   - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/CartController.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/OrdersController.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.Development.json`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/appsettings.json`
-  - `Get-ChildItem docs -Filter *.docx`
-  - `New-Object -ComObject Word.Application`
-  - `finalBaoMat_source.md`
-  - `tools/generate_finalBaoMat.ps1`
-  - `finalBaoMat.docx`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/CatalogInventoryClient.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Options/InternalServiceAuthOptions.cs`
+  - `docs/security-hardening-roadmap-2026-03-18.md`
+  - `Get-ChildItem ... | Select-String ...`

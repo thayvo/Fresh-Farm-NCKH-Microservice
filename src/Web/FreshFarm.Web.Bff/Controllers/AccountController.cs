@@ -16,18 +16,22 @@ namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 public sealed class AccountController : Controller // MVC controller cho auth/account pages.
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key luu JWT trong session.
+    private const string SignUpCaptchaSessionKey = "SIGNUP_CAPTCHA_CODE";
     private readonly IHttpClientFactory _httpClientFactory; // Factory tao HttpClient theo ten.
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
     private readonly GoogleAuthenticationOptions _googleAuthenticationOptions;
+    private readonly ISignUpCaptchaService _signUpCaptchaService;
 
     public AccountController(
         IHttpClientFactory httpClientFactory,
         IGhnSandboxService ghnSandboxService,
-        IOptions<GoogleAuthenticationOptions> googleAuthenticationOptions) // Inject factory qua DI.
+        IOptions<GoogleAuthenticationOptions> googleAuthenticationOptions,
+        ISignUpCaptchaService signUpCaptchaService) // Inject factory qua DI.
     {
         _httpClientFactory = httpClientFactory; // Gan vao field.
         _ghnSandboxService = ghnSandboxService;
         _googleAuthenticationOptions = googleAuthenticationOptions.Value;
+        _signUpCaptchaService = signUpCaptchaService;
     }
 
     [HttpGet("/account/signin")] // Route GET signin.
@@ -219,6 +223,22 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         return View(new RegisterRequestDto()); // Views/Account/SignUp.cshtml.
     }
 
+    [HttpGet("/account/signup/captcha")]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult SignUpCaptcha()
+    {
+        var captchaCode = _signUpCaptchaService.GenerateCode();
+        HttpContext.Session.SetString(SignUpCaptchaSessionKey, captchaCode);
+
+        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+
+        var svg = _signUpCaptchaService.BuildSvg(captchaCode);
+        return Content(svg, "image/svg+xml; charset=utf-8", System.Text.Encoding.UTF8);
+    }
+
     [HttpGet("/account/terms")]
     [AllowAnonymous]
     public IActionResult Terms()
@@ -236,6 +256,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/signup")] // Route POST signup.
     [ValidateAntiForgeryToken] // Chặn submit giả mạo từ site khác.
     [AllowAnonymous] // Anonymous dang ky.
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> SignUp(RegisterRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
@@ -246,6 +267,15 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         request.Email = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
         request.Phone = request.Phone?.Trim() ?? string.Empty;
         request.RoleName = "Customer";
+        request.CaptchaCode = request.CaptchaCode?.Trim().ToUpperInvariant() ?? string.Empty;
+
+        var expectedCaptchaCode = HttpContext.Session.GetString(SignUpCaptchaSessionKey);
+        if (!_signUpCaptchaService.Matches(expectedCaptchaCode, request.CaptchaCode))
+        {
+            ModelState.AddModelError(nameof(RegisterRequestDto.CaptchaCode), "Mã xác nhận không đúng hoặc đã hết hạn. Vui lòng thử lại.");
+        }
+
+        HttpContext.Session.Remove(SignUpCaptchaSessionKey);
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {

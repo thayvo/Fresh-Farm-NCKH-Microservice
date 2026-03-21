@@ -443,6 +443,7 @@ builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionServic
 builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
 builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
 builder.Services.AddSingleton<IVnPayService, VnPayService>(); // Ký URL + verify callback VNPay sandbox.
+builder.Services.AddSingleton<ISignUpCaptchaService, SignUpCaptchaService>();
 
 var app = builder.Build(); // Build app pipeline.
 

@@ -30,6 +30,7 @@
             @using (Html.BeginForm("Create", "Category", FormMethod.Post, new { area = currentArea, enctype = "multipart/form-data" }))
             {
                 @Html.AntiForgeryToken()
+                @Html.ValidationSummary(excludePropertyErrors: true, message: null, htmlAttributes: new { @class = "alert alert-danger small py-2 mb-3" })
 
                 <div class="row g-4">
                     <div class="col-md-8">
@@ -52,13 +53,15 @@
                             <div class="card-body">
                                 <h6 class="card-title">Ảnh danh mục</h6>
                                 <div class="mb-3 text-center">
-                <img id="imgPreview" src="@Url.Content("~/images/legacy/no-image.png")"
+                                    <img id="imgPreview" src="@Url.Content("~/images/legacy/no-image.png")"
                                          class="rounded border"
                                          style="width:160px;height:160px;object-fit:cover;" />
                                 </div>
                                 <div class="mb-3">
                                     <input type="file" name="ImageFile" id="ImageFile" class="form-control"
                                            accept=".jpg,.jpeg,.png,.gif,.webp" />
+                                    @Html.ValidationMessage("ImageFile", "", new { @class = "text-danger small d-block mt-2", id = "imageFileServerError" })
+                                    <div id="imageFileClientError" class="text-danger small mt-2 d-none"></div>
                                     <small class="text-muted d-block mt-1">Tối đa 2MB. Hỗ trợ: JPG, PNG, GIF, WEBP.</small>
                                 </div>
                                 <div class="form-check form-switch">
@@ -86,12 +89,51 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script>
-        document.getElementById('ImageFile').addEventListener('change', function (e) {
-            const f = e.target.files && e.target.files[0];
-            if (!f) return;
-            const url = URL.createObjectURL(f);
+        (function () {
+            const input = document.getElementById('ImageFile');
             const img = document.getElementById('imgPreview');
-            img.src = url;
-        });
+            const error = document.getElementById('imageFileClientError');
+            const defaultSrc = '@Url.Content("~/images/legacy/no-image.png")';
+            const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+            const maxBytes = 2 * 1024 * 1024;
+
+            function showError(message) {
+                error.textContent = message;
+                error.classList.remove('d-none');
+            }
+
+            function clearError() {
+                error.textContent = '';
+                error.classList.add('d-none');
+            }
+
+            input.addEventListener('change', function (e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) {
+                    clearError();
+                    img.src = defaultSrc;
+                    return;
+                }
+
+                const lowerName = file.name.toLowerCase();
+                const isValidExtension = allowedExtensions.some(ext => lowerName.endsWith(ext));
+                if (!isValidExtension) {
+                    input.value = '';
+                    img.src = defaultSrc;
+                    showError('Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, JPEG, PNG, GIF hoặc WEBP.');
+                    return;
+                }
+
+                if (file.size > maxBytes) {
+                    input.value = '';
+                    img.src = defaultSrc;
+                    showError('Ảnh vượt quá dung lượng 2MB.');
+                    return;
+                }
+
+                clearError();
+                img.src = URL.createObjectURL(file);
+            });
+        })();
     </script>
 }

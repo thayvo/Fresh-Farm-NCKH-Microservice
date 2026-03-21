@@ -15,8 +15,10 @@ namespace FreshFarm.Web.Bff.Areas.Admin.Controllers;
 [Area("Admin")]
 public sealed class CategoryController : LegacySellerControllerBase
 {
+    private const string ImageFileFieldName = "ImageFile";
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
     private static readonly string[] AllowedExts = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+    private static readonly string[] AllowedContentTypes = { "image/jpeg", "image/png", "image/gif", "image/webp" };
     private const int MaxFileSizeBytes = 2 * 1024 * 1024;
     private const string UploadFolderVPath = "~/uploads/categories/";
     private const string FallbackImg = "no-image.png";
@@ -372,13 +374,19 @@ public sealed class CategoryController : LegacySellerControllerBase
         var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(ext) || !AllowedExts.Contains(ext))
         {
-            ModelState.AddModelError(string.Empty, "Định dạng ảnh không hợp lệ! Chỉ hỗ trợ: .jpg, .jpeg, .png, .gif, .webp");
+            ModelState.AddModelError(ImageFileFieldName, "Định dạng ảnh không hợp lệ. Chỉ hỗ trợ JPG, JPEG, PNG, GIF hoặc WEBP.");
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(file.ContentType) || !AllowedContentTypes.Contains(file.ContentType))
+        {
+            ModelState.AddModelError(ImageFileFieldName, "Loại nội dung ảnh không hợp lệ. Vui lòng chọn đúng file ảnh JPG, JPEG, PNG, GIF hoặc WEBP.");
             return null;
         }
 
         if (file.Length > MaxFileSizeBytes)
         {
-            ModelState.AddModelError(string.Empty, "Ảnh vượt quá dung lượng 2MB!");
+            ModelState.AddModelError(ImageFileFieldName, "Ảnh vượt quá dung lượng 2MB.");
             return null;
         }
 
