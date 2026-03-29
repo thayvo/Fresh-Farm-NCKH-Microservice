@@ -66,17 +66,17 @@ public sealed class FreshOpsController : LegacySellerControllerBase
                 OpenRecalls = payload.Stats?.OpenRecalls ?? 0,
                 TraceCoverage = payload.Stats?.TraceCoverage ?? 0
             };
-            model.SellerOptions = payload.Filters?.Sellers?.Select(x => new FreshOpsOptionViewModel
+            model.SellerOptions = DeduplicateSellerOptions(payload.Filters?.Sellers).Select(x => new FreshOpsOptionViewModel
             {
                 Value = x.SellerId.ToString(),
                 Text = x.Text ?? string.Empty
-            }).ToList() ?? model.SellerOptions;
-            model.StatusOptions = payload.Filters?.StatusOptions?.Select(x => new FreshOpsOptionViewModel
+            }).ToList();
+            model.StatusOptions = DeduplicateStatusOptions(payload.Filters?.StatusOptions).Select(x => new FreshOpsOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
-            }).ToList() ?? model.StatusOptions;
-            model.Lots = payload.Lots?.Select(x => new FreshLotRowViewModel
+            }).ToList();
+            model.Lots = DeduplicateLots(payload.Lots).Select(x => new FreshLotRowViewModel
             {
                 FreshInventoryLotId = x.FreshInventoryLotId,
                 ProductId = x.ProductId,
@@ -98,8 +98,8 @@ public sealed class FreshOpsController : LegacySellerControllerBase
                 QualityStatus = x.QualityStatus ?? string.Empty,
                 Notes = x.Notes,
                 DaysToExpiry = x.DaysToExpiry
-            }).ToList() ?? new List<FreshLotRowViewModel>();
-            model.Recalls = payload.Recalls?.Select(x => new FreshRecallRowViewModel
+            }).ToList();
+            model.Recalls = DeduplicateRecalls(payload.Recalls).Select(x => new FreshRecallRowViewModel
             {
                 FreshQualityRecallId = x.FreshQualityRecallId,
                 RecallCode = x.RecallCode ?? string.Empty,
@@ -116,8 +116,8 @@ public sealed class FreshOpsController : LegacySellerControllerBase
                 ActionRequired = x.ActionRequired,
                 StartedAt = x.StartedAt,
                 ResolvedAt = x.ResolvedAt
-            }).ToList() ?? new List<FreshRecallRowViewModel>();
-            model.FefoQueue = payload.FefoQueue?.Select(x => new FreshFefoRowViewModel
+            }).ToList();
+            model.FefoQueue = DeduplicateFefoQueue(payload.FefoQueue).Select(x => new FreshFefoRowViewModel
             {
                 FreshInventoryLotId = x.FreshInventoryLotId,
                 ProductName = x.ProductName ?? string.Empty,
@@ -128,7 +128,7 @@ public sealed class FreshOpsController : LegacySellerControllerBase
                 ExpiresAt = x.ExpiresAt,
                 DaysToExpiry = x.DaysToExpiry,
                 QualityStatus = x.QualityStatus ?? string.Empty
-            }).ToList() ?? new List<FreshFefoRowViewModel>();
+            }).ToList();
 
             if (!model.NewLot.SellerId.Equals(0) || !model.SellerId.HasValue)
             {
@@ -251,6 +251,185 @@ public sealed class FreshOpsController : LegacySellerControllerBase
             new FreshOpsOptionViewModel { Value = "recalled", Text = "Lô bị thu hồi" }
         ];
     }
+
+    private static List<FreshSellerOptionApiModel> DeduplicateSellerOptions(IEnumerable<FreshSellerOptionApiModel>? sellers)
+    {
+        return (sellers ?? [])
+            .Where(seller => seller.SellerId > 0)
+            .GroupBy(seller => seller.SellerId)
+            .Select(group => group
+                .OrderByDescending(seller => HasMeaningfulValue(seller.Text))
+                .ThenByDescending(CalculateSellerSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static List<FreshStatusOptionApiModel> DeduplicateStatusOptions(IEnumerable<FreshStatusOptionApiModel>? statuses)
+    {
+        return (statuses ?? [])
+            .Where(status => HasMeaningfulValue(status.Value))
+            .GroupBy(status => status.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(status => HasMeaningfulValue(status.Text))
+                .ThenByDescending(CalculateStatusSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static List<FreshLotApiModel> DeduplicateLots(IEnumerable<FreshLotApiModel>? lots)
+    {
+        return (lots ?? [])
+            .Where(lot => lot.FreshInventoryLotId > 0)
+            .GroupBy(lot => lot.FreshInventoryLotId)
+            .Select(group => group
+                .OrderByDescending(CalculateLotScore)
+                .ThenByDescending(CalculateLotSignalLength)
+                .ThenByDescending(lot => lot.ReceivedAt)
+                .ThenByDescending(lot => lot.ExpiresAt ?? DateTime.MinValue)
+                .First())
+            .ToList();
+    }
+
+    private static List<FreshRecallApiModel> DeduplicateRecalls(IEnumerable<FreshRecallApiModel>? recalls)
+    {
+        return (recalls ?? [])
+            .Where(recall => recall.FreshQualityRecallId > 0)
+            .GroupBy(recall => recall.FreshQualityRecallId)
+            .Select(group => group
+                .OrderByDescending(CalculateRecallScore)
+                .ThenByDescending(CalculateRecallSignalLength)
+                .ThenByDescending(recall => recall.ResolvedAt ?? recall.StartedAt)
+                .First())
+            .ToList();
+    }
+
+    private static List<FreshFefoApiModel> DeduplicateFefoQueue(IEnumerable<FreshFefoApiModel>? queue)
+    {
+        return (queue ?? [])
+            .Where(item => item.FreshInventoryLotId > 0)
+            .GroupBy(item => item.FreshInventoryLotId)
+            .Select(group => group
+                .OrderByDescending(CalculateFefoScore)
+                .ThenByDescending(CalculateFefoSignalLength)
+                .ThenByDescending(item => item.ExpiresAt)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateSellerSignalLength(FreshSellerOptionApiModel seller)
+        => seller.Text?.Length ?? 0;
+
+    private static int CalculateStatusSignalLength(FreshStatusOptionApiModel status)
+        => (status.Text?.Length ?? 0) + (status.Value?.Length ?? 0);
+
+    private static int CalculateLotScore(FreshLotApiModel lot)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(lot.ProductName) ? 2 : 0;
+        score += HasMeaningfulValue(lot.Sku) ? 2 : 0;
+        score += HasMeaningfulValue(lot.LotCode) ? 2 : 0;
+        score += HasMeaningfulValue(lot.TraceCode) ? 1 : 0;
+        score += HasMeaningfulValue(lot.FarmName) ? 1 : 0;
+        score += HasMeaningfulValue(lot.OriginRegion) ? 1 : 0;
+        score += HasMeaningfulValue(lot.Status) ? 1 : 0;
+        score += HasMeaningfulValue(lot.QualityStatus) ? 1 : 0;
+        score += HasMeaningfulValue(lot.Notes) ? 1 : 0;
+        score += lot.ProductId > 0 ? 1 : 0;
+        score += lot.SellerId > 0 ? 1 : 0;
+        score += lot.InitialQuantity > 0 ? 1 : 0;
+        score += lot.RemainingQuantity > 0 ? 1 : 0;
+        score += lot.UnitCost.HasValue && lot.UnitCost.Value > 0 ? 1 : 0;
+        score += lot.DaysToExpiry.HasValue ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateLotSignalLength(FreshLotApiModel lot)
+    {
+        var values = new[]
+        {
+            lot.ProductName,
+            lot.Sku,
+            lot.LotCode,
+            lot.TraceCode,
+            lot.FarmName,
+            lot.OriginRegion,
+            lot.Status,
+            lot.QualityStatus,
+            lot.Notes
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateRecallScore(FreshRecallApiModel recall)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(recall.RecallCode) ? 2 : 0;
+        score += recall.ProductId.HasValue && recall.ProductId.Value > 0 ? 1 : 0;
+        score += HasMeaningfulValue(recall.ProductName) ? 2 : 0;
+        score += recall.FreshInventoryLotId.HasValue && recall.FreshInventoryLotId.Value > 0 ? 1 : 0;
+        score += HasMeaningfulValue(recall.LotCode) ? 1 : 0;
+        score += recall.SellerId.HasValue && recall.SellerId.Value > 0 ? 1 : 0;
+        score += HasMeaningfulValue(recall.RecallType) ? 1 : 0;
+        score += HasMeaningfulValue(recall.Severity) ? 1 : 0;
+        score += HasMeaningfulValue(recall.Status) ? 1 : 0;
+        score += HasMeaningfulValue(recall.Title) ? 2 : 0;
+        score += HasMeaningfulValue(recall.Reason) ? 1 : 0;
+        score += HasMeaningfulValue(recall.ActionRequired) ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateRecallSignalLength(FreshRecallApiModel recall)
+    {
+        var values = new[]
+        {
+            recall.RecallCode,
+            recall.ProductName,
+            recall.LotCode,
+            recall.RecallType,
+            recall.Severity,
+            recall.Status,
+            recall.Title,
+            recall.Reason,
+            recall.ActionRequired
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateFefoScore(FreshFefoApiModel item)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(item.ProductName) ? 2 : 0;
+        score += HasMeaningfulValue(item.Sku) ? 2 : 0;
+        score += item.SellerId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.LotCode) ? 2 : 0;
+        score += item.RemainingQuantity > 0 ? 1 : 0;
+        score += item.DaysToExpiry != 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.QualityStatus) ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateFefoSignalLength(FreshFefoApiModel item)
+    {
+        var values = new[]
+        {
+            item.ProductName,
+            item.Sku,
+            item.LotCode,
+            item.QualityStatus
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
     {

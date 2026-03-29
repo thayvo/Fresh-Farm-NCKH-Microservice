@@ -64,8 +64,13 @@
                 activePreset: initialPreset,
                 sortBy: initialSort || "related",
                 page: Number.isFinite(initialPage) && initialPage > 0 ? Math.floor(initialPage) : 1,
-                pageSize: 12
+                pageSize: 12,
+                latestSearchEventId: null
             };
+            const relatedRecommendationPlacement = "search_related";
+            const relatedRecommendationAlgorithm = "search_related_heuristic";
+            let relatedRecommendationRunId = "";
+            const relatedImpressionIds = new Map();
 
             const grid = document.getElementById("resultGrid");
             const emptyNode = document.getElementById("resultEmpty");
@@ -212,6 +217,53 @@
             const buildShopChatUrl = (product) => {
                 const shopUrl = buildShopUrl(product);
                 return shopUrl ? `${shopUrl}#shop-chat` : "";
+            };
+
+            const buildRelatedImpressionKey = (productId, rank) =>
+                `${toNumber(productId, 0)}:${Math.max(0, toNumber(rank, 0))}`;
+
+            const buildSearchFilterPayload = () => ({
+                categoryIds: [...state.selectedCategoryIds].sort((a, b) => a - b),
+                sellerIds: [...state.selectedSellerIds].sort((a, b) => a - b),
+                availability: [...state.selectedAvailability].sort(),
+                deliveryScopes: [...state.selectedDeliveryScopes].sort(),
+                locations: [...state.selectedLocations].sort((a, b) => a.localeCompare(b, "vi-VN")),
+                units: [...state.selectedUnits].sort((a, b) => a.localeCompare(b, "vi-VN")),
+                certifications: [...state.selectedCertifications].sort((a, b) => a.localeCompare(b, "vi-VN")),
+                minPrice: state.minPrice,
+                maxPrice: state.maxPrice,
+                minRating: state.minRating,
+                sort: state.sortBy,
+                page: state.page,
+                pageSize: state.pageSize,
+                preset: state.activePreset || null
+            });
+
+            const registerRelatedImpressions = (relatedItems) => {
+                if (!appHelpers?.trackRecommendationImpression || !Array.isArray(relatedItems) || relatedItems.length === 0) {
+                    relatedImpressionIds.clear();
+                    return;
+                }
+
+                relatedRecommendationRunId = appHelpers.createRecommendationRunId?.(relatedRecommendationPlacement) ?? "";
+                relatedImpressionIds.clear();
+
+                relatedItems.forEach((product, index) => {
+                    const rank = index + 1;
+                    const impressionKey = buildRelatedImpressionKey(product.productId, rank);
+
+                    void appHelpers.trackRecommendationImpression({
+                        placement: relatedRecommendationPlacement,
+                        recommendationRunId: relatedRecommendationRunId,
+                        productId: product.productId,
+                        rank,
+                        algorithm: relatedRecommendationAlgorithm
+                    }).then((eventId) => {
+                        if (eventId) {
+                            relatedImpressionIds.set(impressionKey, eventId);
+                        }
+                    });
+                });
             };
 
             const getSelectedCategories = () => state.availableCategories.filter((category) => state.selectedCategoryIds.has(category.categoryId));
@@ -1054,14 +1106,19 @@
                 const relatedItems = state.relatedProducts.slice(0, 4);
                 if (relatedItems.length === 0) {
                     relatedWrap.innerHTML = "<div class='text-muted small'>Chưa có sản phẩm liên quan.</div>";
+                    relatedImpressionIds.clear();
                     return;
                 }
 
                 relatedWrap.innerHTML = relatedItems
-                    .map((product) => {
+                    .map((product, index) => {
                         const availability = getAvailabilityMeta(product);
                         return `
-                            <a href="${buildProductUrl(product)}" class="shop-related-item">
+                            <a href="${buildProductUrl(product)}"
+                               class="shop-related-item"
+                               data-action="related-recommendation-click"
+                               data-product-id="${product.productId}"
+                               data-rank="${index + 1}">
                                 <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" />
                                 <div class="shop-related-meta">
                                     <div class="shop-related-name">${escapeHtml(product.productName)}</div>
@@ -1072,6 +1129,8 @@
                         `;
                     })
                     .join("");
+
+                registerRelatedImpressions(relatedItems);
             };
 
             const applyFilters = () => {
@@ -1107,14 +1166,20 @@
                 const startIndex = (state.page - 1) * state.pageSize;
 
                 grid.innerHTML = products
-                    .map((product) => {
+                    .map((product, index) => {
                         const availability = getAvailabilityMeta(product);
                         const deliveryScope = getDeliveryScopeMeta(product);
                         const shop = getShopSummary(product.primarySellerId);
+                        const resultRank = startIndex + index + 1;
                         return `
                             <div class="col-6 col-md-4 col-xl-3">
                                 <article class="search-product-card">
-                                    <a href="${buildProductUrl(product)}" class="search-product-thumb-link">
+                                    <a href="${buildProductUrl(product)}"
+                                       class="search-product-thumb-link"
+                                       data-action="search-result-click"
+                                       data-product-id="${product.productId}"
+                                       data-seller-id="${toNumber(product.primarySellerId, 0)}"
+                                       data-rank="${resultRank}">
                                         <img src="${product.image}" class="search-product-thumb" alt="${escapeHtml(product.productName)}" />
                                     </a>
                                     <div class="search-product-body">
@@ -1122,7 +1187,12 @@
                                             <span class="search-badge">${escapeHtml(product.categoryName)}</span>
                                             <span class="search-unit">${escapeHtml(product.unitName)}</span>
                                         </div>
-                                        <a href="${buildProductUrl(product)}" class="search-product-name search-product-name-link">${escapeHtml(product.productName)}</a>
+                                        <a href="${buildProductUrl(product)}"
+                                           class="search-product-name search-product-name-link"
+                                           data-action="search-result-click"
+                                           data-product-id="${product.productId}"
+                                           data-seller-id="${toNumber(product.primarySellerId, 0)}"
+                                           data-rank="${resultRank}">${escapeHtml(product.productName)}</a>
                                         <div class="small text-success fw-semibold">${escapeHtml(product.standard || product.origin || "Chưa có chuẩn nông sản")}</div>
                                         <div class="search-product-price">${vnd(product.price)}</div>
                                         <div class="search-product-stats">
@@ -1175,7 +1245,12 @@
                                         })()
                                         }
                                         <div class="search-product-actions">
-                                            <a href="${buildProductUrl(product)}" class="btn-view-detail">Xem chi tiết</a>
+                                            <a href="${buildProductUrl(product)}"
+                                               class="btn-view-detail"
+                                               data-action="search-result-click"
+                                               data-product-id="${product.productId}"
+                                               data-seller-id="${toNumber(product.primarySellerId, 0)}"
+                                               data-rank="${resultRank}">Xem chi tiết</a>
                                             <button type="button"
                                                     class="btn-add-cart"
                                                     data-action="add-cart"
@@ -1482,6 +1557,7 @@
                     state.page = Math.max(1, toNumber(payload?.page, state.page));
                     state.pageSize = Math.max(1, toNumber(payload?.pageSize, state.pageSize));
                     state.totalPages = Math.max(1, toNumber(payload?.totalPages, 1));
+                    state.latestSearchEventId = null;
                     applyChatSummaries(state.allProducts);
 
                     try {
@@ -1506,6 +1582,13 @@
                     renderResultGrid(filtered);
                     updateSummary(state.totalCount);
                     ensureChatSummaryPolling();
+                    void appHelpers?.trackSearch?.({
+                        keyword: state.keyword || "__all_products__",
+                        filters: buildSearchFilterPayload(),
+                        resultCount: state.totalCount
+                    }).then((eventId) => {
+                        state.latestSearchEventId = eventId ?? null;
+                    });
                 } catch (error) {
                     console.error(error);
                     state.allProducts = [];
@@ -1518,6 +1601,7 @@
                     state.availableStandards = [];
                     state.totalCount = 0;
                     state.totalPages = 1;
+                    state.latestSearchEventId = null;
                     renderCategoryFilters();
                     renderCategoryPills();
                     renderPresetPills();
@@ -1641,6 +1725,30 @@
             document.addEventListener("click", (event) => {
                 const target = event.target;
                 if (!(target instanceof HTMLElement)) return;
+
+                const searchResultLink = target.closest("a[data-action='search-result-click']");
+                if (searchResultLink instanceof HTMLAnchorElement) {
+                    void appHelpers?.trackSearchClick?.({
+                        searchEventId: state.latestSearchEventId,
+                        productId: toNumber(searchResultLink.getAttribute("data-product-id"), 0),
+                        sellerId: toNumber(searchResultLink.getAttribute("data-seller-id"), 0),
+                        rank: toNumber(searchResultLink.getAttribute("data-rank"), 0)
+                    });
+                }
+
+                const relatedLink = target.closest("a[data-action='related-recommendation-click']");
+                if (relatedLink instanceof HTMLAnchorElement) {
+                    const productId = toNumber(relatedLink.getAttribute("data-product-id"), 0);
+                    const rank = toNumber(relatedLink.getAttribute("data-rank"), 0);
+                    const impressionKey = buildRelatedImpressionKey(productId, rank);
+
+                    void appHelpers?.trackRecommendationClick?.({
+                        recommendationImpressionEventId: relatedImpressionIds.get(impressionKey) ?? null,
+                        productId,
+                        placement: relatedRecommendationPlacement,
+                        algorithm: relatedRecommendationAlgorithm
+                    });
+                }
 
                 const sortButton = target.closest(".btn-sort");
                 if (sortButton instanceof HTMLButtonElement) {

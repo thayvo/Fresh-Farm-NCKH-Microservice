@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Hubs;
 
-[Authorize(Roles = "Seller")]
+[Authorize]
 public sealed class SupportChatHub : Hub
 {
     public override async Task OnConnectedAsync()
@@ -51,6 +51,11 @@ public sealed class SupportChatHub : Hub
 
     private async Task JoinSellerInternalAsync()
     {
+        if (!(Context.User?.IsInRole("Seller") ?? false))
+        {
+            return;
+        }
+
         var sellerId = TryGetSellerId();
         if (!sellerId.HasValue)
         {

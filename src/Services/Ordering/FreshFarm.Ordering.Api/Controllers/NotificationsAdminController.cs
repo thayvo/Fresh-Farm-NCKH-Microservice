@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FreshFarm.Ordering.Api.Controllers;
 
@@ -11,10 +15,17 @@ namespace FreshFarm.Ordering.Api.Controllers;
 public sealed class NotificationsAdminController : ControllerBase
 {
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly InternalServiceAuthOptions _internalServiceAuthOptions;
+    private readonly ILogger<NotificationsAdminController> _logger;
 
-    public NotificationsAdminController(FreshFarmOrderingDBContext db)
+    public NotificationsAdminController(
+        FreshFarmOrderingDBContext db,
+        IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
+        ILogger<NotificationsAdminController> logger)
     {
         _db = db;
+        _internalServiceAuthOptions = internalServiceAuthOptions.Value;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -129,6 +140,61 @@ public sealed class NotificationsAdminController : ControllerBase
         return Ok(new { success = true, message = "Đã đánh dấu đã đọc." });
     }
 
+    [AllowAnonymous]
+    [HttpPost("internal")]
+    public async Task<IActionResult> CreateInternalNotification(
+        [FromBody] CreateInternalNotificationRequest? request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsValidInternalServiceRequest())
+        {
+            _logger.LogWarning(
+                "Customer notification internal create bi tu choi do internal service key khong hop le. UserId={UserId}",
+                request?.UserId);
+            return Unauthorized(new { success = false, message = "Yeu cau noi bo khong hop le." });
+        }
+
+        if (request is null)
+        {
+            return BadRequest(new { success = false, message = "Payload thong bao khong hop le." });
+        }
+
+        if (request.UserId <= 0)
+        {
+            return BadRequest(new { success = false, message = "UserId khong hop le." });
+        }
+
+        var title = NormalizeRequiredText(request.Title, 255);
+        var message = NormalizeRequiredText(request.Message, 2000);
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(message))
+        {
+            return BadRequest(new { success = false, message = "Title va message la bat buoc." });
+        }
+
+        var notification = new CustomerNotification
+        {
+            UserId = request.UserId,
+            OrderId = request.OrderId > 0 ? request.OrderId : 0,
+            NotificationType = NormalizeNotificationType(request.NotificationType),
+            Title = title,
+            Message = message,
+            IsRead = false,
+            IsPushNotification = request.IsPushNotification,
+            CreatedAt = request.CreatedAt ?? DateTime.UtcNow,
+            ReadAt = null
+        };
+
+        _db.CustomerNotifications.Add(notification);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Da tao thong bao khach hang.",
+            notificationId = notification.NotificationId
+        });
+    }
+
     [HttpPost("mark-all-read")]
     public async Task<IActionResult> MarkAllAsRead([FromBody] MarkAllNotificationsReadRequest? request, CancellationToken cancellationToken = default)
     {
@@ -201,6 +267,42 @@ public sealed class NotificationsAdminController : ControllerBase
         return query;
     }
 
+    private bool IsValidInternalServiceRequest()
+    {
+        var configuredKey = _internalServiceAuthOptions.InternalServiceKey?.Trim();
+        var incomingKey = Request.Headers["X-Internal-Service-Key"].ToString().Trim();
+
+        if (string.IsNullOrWhiteSpace(configuredKey) || string.IsNullOrWhiteSpace(incomingKey))
+        {
+            return false;
+        }
+
+        var configuredBytes = Encoding.UTF8.GetBytes(configuredKey);
+        var incomingBytes = Encoding.UTF8.GetBytes(incomingKey);
+        return CryptographicOperations.FixedTimeEquals(configuredBytes, incomingBytes);
+    }
+
+    private static string NormalizeNotificationType(string? value)
+    {
+        var normalized = NormalizeRequiredText(value, 50)?.ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(normalized)
+            ? "seller_review_update"
+            : normalized;
+    }
+
+    private static string? NormalizeRequiredText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength
+            ? trimmed
+            : trimmed[..maxLength];
+    }
+
     public sealed class MarkAllNotificationsReadRequest
     {
         public string? Q { get; set; }
@@ -212,5 +314,22 @@ public sealed class NotificationsAdminController : ControllerBase
         public int? UserId { get; set; }
 
         public int? OrderId { get; set; }
+    }
+
+    public sealed class CreateInternalNotificationRequest
+    {
+        public int UserId { get; set; }
+
+        public int OrderId { get; set; }
+
+        public string? NotificationType { get; set; }
+
+        public string? Title { get; set; }
+
+        public string? Message { get; set; }
+
+        public bool IsPushNotification { get; set; }
+
+        public DateTime? CreatedAt { get; set; }
     }
 }

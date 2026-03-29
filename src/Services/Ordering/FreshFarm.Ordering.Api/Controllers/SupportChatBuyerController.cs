@@ -35,14 +35,17 @@ public sealed class SupportChatBuyerController : ControllerBase
             .Take(50)
             .ToArray();
 
-        if (normalizedSellerIds.Length == 0)
+        var conversationsQuery = _db.SupportConversations
+            .AsNoTracking()
+            .Where(x => x.UserId == buyerId.Value && x.AdminId.HasValue);
+
+        if (normalizedSellerIds.Length > 0)
         {
-            return Ok(new { ok = true, summaries = Array.Empty<object>() });
+            conversationsQuery = conversationsQuery
+                .Where(x => normalizedSellerIds.Contains(x.AdminId!.Value));
         }
 
-        var conversations = await _db.SupportConversations
-            .AsNoTracking()
-            .Where(x => x.UserId == buyerId.Value && x.AdminId.HasValue && normalizedSellerIds.Contains(x.AdminId.Value))
+        var conversations = await conversationsQuery
             .OrderByDescending(x => x.StartedAt)
             .ToListAsync(cancellationToken);
 
@@ -99,7 +102,9 @@ public sealed class SupportChatBuyerController : ControllerBase
                     hasUnread = unreadConversationSet.Contains(conversation.ConversationId)
                 };
             })
-            .OrderBy(x => x.sellerId)
+            .OrderByDescending(x => x.lastTime)
+            .ThenByDescending(x => x.startedAt)
+            .ThenBy(x => x.sellerId)
             .ToList();
 
         return Ok(new { ok = true, summaries });
@@ -128,7 +133,10 @@ public sealed class SupportChatBuyerController : ControllerBase
             .OrderByDescending(x => x.StartedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (conversation is null && createIfMissing)
+        var shouldCreateConversation = createIfMissing &&
+            (conversation is null || string.Equals(conversation.Status, "Closed", StringComparison.OrdinalIgnoreCase));
+
+        if (shouldCreateConversation)
         {
             var now = DateTime.UtcNow;
             var newConversation = new SupportConversation

@@ -1,12 +1,15 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
@@ -19,19 +22,25 @@ public class ShippingController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
 
     private static readonly string[] PaidStatuses = { "Đã thanh toán", "Da thanh toan", "Hoàn tất", "Hoan tat" };
+    private static readonly Regex VietnamPhoneRegex = new(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", RegexOptions.Compiled);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGhnSandboxService _ghnSandboxService;
+    private readonly OrderingServiceOptions _orderingServiceOptions;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public ShippingController(IHttpClientFactory httpClientFactory, IGhnSandboxService ghnSandboxService)
+    public ShippingController(
+        IHttpClientFactory httpClientFactory,
+        IGhnSandboxService ghnSandboxService,
+        IOptions<OrderingServiceOptions> orderingServiceOptions)
     {
         _httpClientFactory = httpClientFactory;
         _ghnSandboxService = ghnSandboxService;
+        _orderingServiceOptions = orderingServiceOptions.Value;
     }
 
     public async Task<IActionResult> ManageShipping(
@@ -347,50 +356,112 @@ public class ShippingController : LegacySellerControllerBase
             });
         }
 
+        if (!string.IsNullOrWhiteSpace(orderInfo.ghnOrderCode) || !string.IsNullOrWhiteSpace(orderInfo.ghnClientOrderCode))
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Đơn này đã có vận đơn GHN. Hãy dùng tra cứu hoặc đồng bộ thay vì tạo thêm vận đơn mới."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(orderInfo.fullName)
+            || string.IsNullOrWhiteSpace(orderInfo.phone)
+            || string.IsNullOrWhiteSpace(orderInfo.address))
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Đơn hàng chưa có đủ thông tin người nhận để tạo vận đơn GHN."
+            });
+        }
+
+        if (request.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(request.ToWardCode))
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Không xác định được quận/phường GHN cho đơn hàng này."
+            });
+        }
+
         var originOverride = await GetCurrentOriginOverrideAsync(cancellationToken);
         if (originOverride is null)
         {
             return Json(new
             {
                 success = false,
-                message = "Bạn chưa lưu đủ địa chỉ lấy hàng. Hãy cập nhật trong Cài đặt cửa hàng trước."
+                message = "Bạn chưa lưu đủ thông tin lấy hàng hợp lệ. Hãy cập nhật địa chỉ và số điện thoại trong Cài đặt cửa hàng trước."
             });
         }
 
+        var boundedContent = BuildBoundShipmentContent(request.OrderId);
+        var boundedQuantity = NormalizePositiveInt(orderInfo.totalQuantity, fallback: 1);
+        var boundedItemPrice = ConvertCurrencyAmountToInt(orderInfo.itemsAmount);
+        var boundedInsuranceValue = ConvertCurrencyAmountToInt(orderInfo.totalAmount);
+        var boundedCodAmount = orderInfo.isCod
+            ? ConvertCurrencyAmountToInt(orderInfo.codAmount ?? orderInfo.totalAmount)
+            : 0;
+        var packageHeight = NormalizePositiveInt(request.Height, fallback: 10);
+        var packageLength = NormalizePositiveInt(request.Length, fallback: 20);
+        var packageWidth = NormalizePositiveInt(request.Width, fallback: 20);
+        var packageWeight = NormalizePositiveInt(request.Weight, fallback: 500);
+
         var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
         {
-            ToName = request.ToName ?? string.Empty,
-            ToPhone = request.ToPhone ?? string.Empty,
-            ToAddress = request.ToAddress ?? string.Empty,
+            ToName = orderInfo.fullName.Trim(),
+            ToPhone = orderInfo.phone.Trim(),
+            ToAddress = orderInfo.address.Trim(),
             ToDistrictId = request.ToDistrictId,
             ToWardCode = request.ToWardCode ?? string.Empty,
             ServiceTypeId = request.ServiceTypeId,
-            ClientOrderCode = request.ClientOrderCode ?? string.Empty,
-            Content = request.Content ?? string.Empty,
+            ClientOrderCode = BuildBoundClientOrderCode(request.OrderId),
+            Content = boundedContent,
             Note = request.Note ?? string.Empty,
             RequiredNote = request.RequiredNote ?? string.Empty,
             PaymentTypeId = request.PaymentTypeId,
-            CodAmount = request.CodAmount,
-            InsuranceValue = request.InsuranceValue,
-            Height = request.Height,
-            Length = request.Length,
-            Width = request.Width,
-            Weight = request.Weight,
+            CodAmount = boundedCodAmount,
+            InsuranceValue = boundedInsuranceValue,
+            Height = packageHeight,
+            Length = packageLength,
+            Width = packageWidth,
+            Weight = packageWeight,
             OriginOverride = originOverride,
-            Items = request.Items?
-                .Select(item => new GhnSandboxOrderItemRequest
+            Items = new List<GhnSandboxOrderItemRequest>
+            {
+                new()
                 {
-                    Name = item.Name ?? string.Empty,
-                    Code = item.Code ?? string.Empty,
-                    Quantity = item.Quantity,
-                    Price = item.Price,
-                    Height = item.Height,
-                    Length = item.Length,
-                    Width = item.Width,
-                    Weight = item.Weight
-                })
-                .ToList() ?? new List<GhnSandboxOrderItemRequest>()
+                    Name = string.IsNullOrWhiteSpace(orderInfo.itemSummary) ? "Gói hàng tổng hợp" : orderInfo.itemSummary.Trim(),
+                    Code = BuildBoundItemCode(request.OrderId),
+                    Quantity = boundedQuantity,
+                    Price = boundedItemPrice,
+                    Height = packageHeight,
+                    Length = packageLength,
+                    Width = packageWidth,
+                    Weight = packageWeight
+                }
+            }
         }, cancellationToken);
+
+        if (result.Success)
+        {
+            var metadataPersisted = await PersistGhnMetadataAsync(request.OrderId, new GhnMetadataUpsertRequest
+            {
+                OrderCode = result.OrderCode,
+                ClientOrderCode = result.ClientOrderCode,
+                TotalFee = result.TotalFee,
+                CreatedAt = DateTime.UtcNow,
+                ExpectedDeliveryTime = result.ExpectedDeliveryTime?.UtcDateTime,
+                LastSyncedAt = DateTime.UtcNow
+            }, cancellationToken);
+
+            if (!metadataPersisted)
+            {
+                result.Message = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Tạo đơn GHN sandbox thành công nhưng chưa lưu được metadata nội bộ."
+                    : $"{result.Message} Tuy nhiên metadata GHN nội bộ chưa được lưu ngay.";
+            }
+        }
 
         return Json(new
         {
@@ -427,6 +498,22 @@ public class ShippingController : LegacySellerControllerBase
             OrderCode = request.OrderCode ?? string.Empty,
             ClientOrderCode = request.ClientOrderCode ?? string.Empty
         }, cancellationToken);
+
+        var selectedOrderId = ParseNullableInt(Request.Query["orderId"].ToString());
+        if (result.Success && selectedOrderId.HasValue)
+        {
+            await PersistGhnMetadataAsync(selectedOrderId.Value, new GhnMetadataUpsertRequest
+            {
+                OrderCode = result.OrderCode,
+                ClientOrderCode = result.ClientOrderCode,
+                Status = result.Status,
+                StatusLabel = result.StatusLabel,
+                TotalFee = result.TotalFee,
+                CreatedAt = result.CreatedDate?.UtcDateTime,
+                ExpectedDeliveryTime = result.LeadTime?.UtcDateTime,
+                LastSyncedAt = DateTime.UtcNow
+            }, cancellationToken);
+        }
 
         return Json(new
         {
@@ -507,45 +594,13 @@ public class ShippingController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Create(Shipping shipping)
+    public JsonResult Create(Shipping shipping)
     {
-        try
+        return Json(new
         {
-            var client = CreateAuthorizedClient("Ordering");
-
-            var response = await client.PostAsJsonAsync("/api/orders/admin/shippings", new
-            {
-                orderID = shipping.OrderID,
-                shippingType = shipping.ShippingType,
-                fullName = shipping.FullName,
-                phone = shipping.Phone,
-                email = shipping.Email,
-                addressDetail = shipping.AddressDetail,
-                provinceId = shipping.ProvinceId,
-                communeId = shipping.CommuneId,
-                isStorePickup = shipping.IsStorePickup,
-                storeAddress = shipping.StoreAddress,
-                deliveryStaffId = ParseNullableInt(Request.Form["DeliveryStaffId"].ToString())
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the them van chuyen") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Them van chuyen thanh cong"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+            success = false,
+            message = "Đơn hàng đã có dòng vận chuyển tự tạo từ lúc checkout. Seller không thể thêm vận chuyển thủ công nữa; hãy chỉnh sửa bản ghi hiện có hoặc tạo vận đơn GHN theo đơn đã chọn."
+        });
     }
 
     [HttpGet]
@@ -780,13 +835,83 @@ public class ShippingController : LegacySellerControllerBase
         }
     }
 
+    private static string BuildBoundClientOrderCode(int orderId)
+    {
+        return $"FF-ORD-{orderId:D6}";
+    }
+
+    private static string BuildBoundItemCode(int orderId)
+    {
+        return $"ORDER-{orderId}";
+    }
+
+    private static string BuildBoundShipmentContent(int orderId)
+    {
+        return $"Đơn giao vận cho #DH{orderId:D5}";
+    }
+
+    private static int NormalizePositiveInt(int? value, int fallback)
+    {
+        return value.HasValue && value.Value > 0 ? value.Value : fallback;
+    }
+
+    private static int ConvertCurrencyAmountToInt(decimal? value)
+    {
+        if (!value.HasValue || value.Value <= 0)
+        {
+            return 0;
+        }
+
+        return (int)Math.Round(value.Value, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task<bool> PersistGhnMetadataAsync(int orderId, GhnMetadataUpsertRequest request, CancellationToken cancellationToken)
+    {
+        if (orderId <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Ordering");
+            if (!string.IsNullOrWhiteSpace(_orderingServiceOptions.InternalServiceKey))
+            {
+                using var internalMessage = new HttpRequestMessage(HttpMethod.Post, $"/api/orders/admin/shippings/internal/{orderId}/ghn-metadata")
+                {
+                    Content = JsonContent.Create(request)
+                };
+                internalMessage.Headers.Add("X-Internal-Service-Key", _orderingServiceOptions.InternalServiceKey);
+
+                using var internalResponse = await client.SendAsync(internalMessage, cancellationToken);
+                if (internalResponse.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+            }
+
+            using var fallbackResponse = await client.PostAsJsonAsync($"/api/orders/admin/shippings/{orderId}/ghn-metadata", request, cancellationToken);
+            return fallbackResponse.IsSuccessStatusCode;
+        }
+        catch
+        {
+            // Best-effort sync only. UI flow should not fail because metadata persistence is unavailable.
+            return false;
+        }
+    }
+
     private static GhnSandboxOriginOverride? BuildOriginOverride(SellerSettingViewModel? settings)
     {
+        var pickupPhone = !string.IsNullOrWhiteSpace(settings?.GhnPickupPhone)
+            ? settings.GhnPickupPhone.Trim()
+            : settings?.StorePhone.Trim();
+
         if (settings is null
             || !settings.GhnDistrictId.HasValue
             || settings.GhnDistrictId.Value <= 0
             || string.IsNullOrWhiteSpace(settings.GhnWardCode)
-            || string.IsNullOrWhiteSpace(settings.GhnPickupAddress))
+            || string.IsNullOrWhiteSpace(settings.GhnPickupAddress)
+            || !IsVietnamPhone(pickupPhone))
         {
             return null;
         }
@@ -796,13 +921,16 @@ public class ShippingController : LegacySellerControllerBase
             FromDistrictId = settings.GhnDistrictId,
             FromWardCode = settings.GhnWardCode.Trim(),
             ReturnAddress = settings.GhnPickupAddress.Trim(),
-            ReturnPhone = !string.IsNullOrWhiteSpace(settings.GhnPickupPhone)
-                ? settings.GhnPickupPhone.Trim()
-                : settings.StorePhone.Trim(),
+            ReturnPhone = pickupPhone!,
             PickupName = !string.IsNullOrWhiteSpace(settings.GhnPickupName)
                 ? settings.GhnPickupName.Trim()
                 : settings.StoreName.Trim()
         };
+    }
+
+    private static bool IsVietnamPhone(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && VietnamPhoneRegex.IsMatch(value.Trim());
     }
 
     private static Shipping MapShipping(ShippingItemDto item)
@@ -818,6 +946,14 @@ public class ShippingController : LegacySellerControllerBase
             AddressDetail = item.addressDetail,
             ProvinceId = item.provinceId,
             CommuneId = item.communeId,
+            GhnOrderCode = item.ghnOrderCode,
+            GhnClientOrderCode = item.ghnClientOrderCode,
+            GhnStatus = item.ghnStatus,
+            GhnStatusLabel = item.ghnStatusLabel,
+            GhnTotalFee = item.ghnTotalFee,
+            GhnCreatedAt = item.ghnCreatedAt,
+            GhnExpectedDeliveryTime = item.ghnExpectedDeliveryTime,
+            GhnLastSyncedAt = item.ghnLastSyncedAt,
             IsStorePickup = item.isStorePickup,
             StoreAddress = item.storeAddress,
             Province = item.province is null
@@ -949,6 +1085,22 @@ public class ShippingController : LegacySellerControllerBase
 
         public int? communeId { get; set; }
 
+        public string? ghnOrderCode { get; set; }
+
+        public string? ghnClientOrderCode { get; set; }
+
+        public string? ghnStatus { get; set; }
+
+        public string? ghnStatusLabel { get; set; }
+
+        public decimal? ghnTotalFee { get; set; }
+
+        public DateTime? ghnCreatedAt { get; set; }
+
+        public DateTime? ghnExpectedDeliveryTime { get; set; }
+
+        public DateTime? ghnLastSyncedAt { get; set; }
+
         public bool isStorePickup { get; set; }
 
         public string? storeAddress { get; set; }
@@ -1050,6 +1202,22 @@ public class ShippingController : LegacySellerControllerBase
         public int? totalQuantity { get; set; }
 
         public string? itemSummary { get; set; }
+
+        public string? ghnOrderCode { get; set; }
+
+        public string? ghnClientOrderCode { get; set; }
+
+        public string? ghnStatus { get; set; }
+
+        public string? ghnStatusLabel { get; set; }
+
+        public decimal? ghnTotalFee { get; set; }
+
+        public DateTime? ghnCreatedAt { get; set; }
+
+        public DateTime? ghnExpectedDeliveryTime { get; set; }
+
+        public DateTime? ghnLastSyncedAt { get; set; }
 
         public string? paymentMethod { get; set; }
 
@@ -1184,5 +1352,24 @@ public class ShippingController : LegacySellerControllerBase
         public string? OrderCode { get; set; }
 
         public string? ClientOrderCode { get; set; }
+    }
+
+    private sealed class GhnMetadataUpsertRequest
+    {
+        public string? OrderCode { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? Status { get; set; }
+
+        public string? StatusLabel { get; set; }
+
+        public decimal? TotalFee { get; set; }
+
+        public DateTime? CreatedAt { get; set; }
+
+        public DateTime? ExpectedDeliveryTime { get; set; }
+
+        public DateTime? LastSyncedAt { get; set; }
     }
 }

@@ -704,7 +704,7 @@
     <script>
         // ===== Dữ liệu JS cho bảng đơn hàng gần đây =====
         var recentOrdersData = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(
-            Model.RecentOrders.Select(o => new {
+            (Model?.RecentOrders ?? Enumerable.Empty<FreshFarm.Web.Bff.Areas.Seller.Models.OrderRecentItemViewModel>()).Select(o => new {
                 id = o.OrderID,
                 code = o.OrderCode,
                 customer = o.CustomerName,
@@ -876,15 +876,15 @@
             renderRecentOrdersTable();
 
             // --- Biểu đồ từ server ---
-            var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendLabels));
-            var trendTotalData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendTotalData));
-            var trendSuccessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendSuccessData));
-            var trendCancelledData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TrendCancelledData));
+            var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendLabels ?? new List<string>()));
+            var trendTotalData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendTotalData ?? new List<int>()));
+            var trendSuccessData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendSuccessData ?? new List<int>()));
+            var trendCancelledData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.TrendCancelledData ?? new List<int>()));
 
-            var statusSuccessCount = @Model.StatusSuccessCount;
-            var statusShippingCount = @Model.StatusShippingCount;
-            var statusPendingCount = @Model.StatusPendingCount;
-            var statusCancelledCount = @Model.StatusCancelledCount;
+            var statusSuccessCount = @(Model?.StatusSuccessCount ?? 0);
+            var statusShippingCount = @(Model?.StatusShippingCount ?? 0);
+            var statusPendingCount = @(Model?.StatusPendingCount ?? 0);
+            var statusCancelledCount = @(Model?.StatusCancelledCount ?? 0);
 
             // Biểu đồ Xu hướng đơn hàng (Line)
             var orderTrendCtx = document.getElementById("orderTrendChart");

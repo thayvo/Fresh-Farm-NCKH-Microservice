@@ -26,7 +26,7 @@
 
     var paidStatuses = new[] { "Đã thanh toán", "Da thanh toan", "Hoàn tất", "Hoan tat" };
 
-    Func<FreshFarm.Web.Bff.Areas.Seller.Models.Order, IHtmlContent> RenderStatus = (o) =>
+    Func<FreshFarm.Web.Bff.Areas.Seller.Models.Order?, IHtmlContent> RenderStatus = (o) =>
     {
         if (o == null) return SoftBadge("N/A", "bg-light text-secondary border-secondary-subtle");
         switch (o.Status)
@@ -479,8 +479,13 @@
                     <div class="row g-3" id="ghnCreateOrderPanel">
                         <div class="col-12">
                             <label class="form-label fw-semibold text-primary-blue">Đơn đang chuẩn bị gửi GHN</label>
+                            <input type="hidden" id="ghnSelectedOrderId" value="" />
                             <input type="text" class="form-control" id="ghnSourceLabel" value="Chưa chọn dòng đơn" readonly />
-                            <div class="ghn-field-note mt-1">Bấm nút xe tải ở từng dòng để đổ sẵn người nhận và địa chỉ vào form này.</div>
+                            <div class="ghn-field-note mt-1">Chỉ tạo vận đơn cho đơn đã bind `OrderId`. Bấm nút xe tải ở từng dòng hoặc chọn đơn trong form thêm vận chuyển để đổ dữ liệu vào đây.</div>
+                            <div class="shipping-readonly-note mt-2" id="ghnOrderFinanceNote">
+                                <i class="bi bi-cash-stack"></i>
+                                Phí ship và COD của buyer được lấy từ đơn nội bộ đã chọn; khu vực GHN chỉ dùng để đối chiếu và tạo vận đơn đúng luồng.
+                            </div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label fw-semibold text-primary-blue">Người nhận</label>
@@ -537,7 +542,8 @@
                         </div>
                         <div class="col-12 col-md-4">
                             <label class="form-label fw-semibold text-primary-blue">Mã theo dõi nội bộ</label>
-                            <input type="text" class="form-control" id="ghnClientOrderCode" placeholder="Tự sinh nếu bỏ trống" />
+                            <input type="text" class="form-control" id="ghnClientOrderCode" placeholder="Sinh tự động theo đơn đã chọn" readonly />
+                            <div class="ghn-field-note">Mã này luôn bám theo `OrderId` để tránh tạo vận đơn tay ngoài luồng.</div>
                         </div>
                         <div class="col-12 col-md-8">
                             <label class="form-label fw-semibold text-primary-blue">Nội dung vận đơn</label>
@@ -569,7 +575,7 @@
                             <button type="button" class="btn btn-outline-secondary btn-pill px-4" id="btnGhnPreviewLeadTime">
                                 <i class="bi bi-clock-history me-2"></i>Lấy leadtime
                             </button>
-                            <button type="button" class="btn btn-primary btn-pill px-4" id="btnGhnCreateOrder">
+                            <button type="button" class="btn btn-primary btn-pill px-4" id="btnGhnCreateOrder" disabled>
                                 <i class="bi bi-send-check me-2"></i>Tạo đơn GHN
                             </button>
                         </div>
@@ -612,13 +618,21 @@
                                     <div class="col-12 col-md-7">
                                         <input type="text" class="form-control" id="ghnTrackingOrderCode" placeholder="Nhập orderCode GHN" />
                                     </div>
-                                    <div class="col-12 col-md-5 d-grid">
-                                        <button type="button" class="btn btn-outline-primary btn-pill" id="btnGhnTrackOrder">
+                                    <div class="col-12 col-md-5 d-grid gap-2 d-md-flex">
+                                        <button type="button" class="btn btn-outline-primary btn-pill flex-fill" id="btnGhnTrackOrder">
                                             <i class="bi bi-search me-2"></i>Tra cứu
+                                        </button>
+                                        <button type="button" class="btn btn-primary btn-pill flex-fill" id="btnGhnSyncMetadata">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ vào bảng
                                         </button>
                                     </div>
                                 </div>
                                 <div class="ghn-result-box p-3 mt-3">
+                                    <div class="d-flex justify-content-end mb-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-pill btn-sm" id="btnGhnSyncVisibleRows">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ các đơn GHN trên trang
+                                        </button>
+                                    </div>
                                     <pre id="ghnTrackingResult">Chưa tra cứu vận đơn.</pre>
                                 </div>
                             </div>
@@ -740,7 +754,13 @@
                                         data-ghn-phone="@item.Phone"
                                         data-ghn-address="@item.AddressDetail"
                                         data-ghn-province-name="@item.Province?.ProvinceName"
-                                        data-ghn-commune-name="@item.Commune?.CommuneName">
+                                        data-ghn-commune-name="@item.Commune?.CommuneName"
+                                        data-ghn-order-code="@item.GhnOrderCode"
+                                        data-ghn-client-order-code="@item.GhnClientOrderCode"
+                                        data-ghn-status="@item.GhnStatus"
+                                        data-ghn-status-label="@item.GhnStatusLabel"
+                                        data-ghn-total-fee="@((item.GhnTotalFee ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-last-synced-at="@(item.GhnLastSyncedAt?.ToString("O") ?? string.Empty)">
                                         <td class="px-4"><span class="badge bg-primary-blue text-white border">@(startIndex + i)</span></td>
                                         <td class="px-4">
                                             <div class="d-flex align-items-center gap-2">
@@ -758,7 +778,7 @@
                                                 var staffName = activeAssign != null
                                                     ? (!string.IsNullOrWhiteSpace(activeAssign.UserAdmin?.FullName)
                                                         ? activeAssign.UserAdmin.FullName
-                                                        : ("NV #" + activeAssign.AssignedToAdminID.Value.ToString("D4")))
+                                                        : (activeAssign.AssignedToAdminID is int assignedAdminId ? $"NV #{assignedAdminId:D4}" : "Chưa phân công"))
                                                     : "Chưa phân công";
                                             }
                                             <div class="d-flex align-items-center gap-2">
@@ -792,7 +812,24 @@
                                                 </div>
                                             }
                                         </td>
-                                        <td class="px-4">@RenderStatus(item.Order)</td>
+                                        <td class="px-4">
+                                            <div class="d-flex flex-column gap-2">
+                                                @RenderStatus(item.Order)
+                                                @if (!string.IsNullOrWhiteSpace(item.GhnOrderCode))
+                                                {
+                                                    <div class="small text-muted">
+                                                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle mb-1">
+                                                            GHN: @(item.GhnStatusLabel ?? item.GhnStatus ?? "Đã tạo vận đơn")
+                                                        </span>
+                                                        <div class="font-monospace">@(item.GhnOrderCode)</div>
+                                                        @if (item.GhnTotalFee is decimal ghnTotalFee)
+                                                        {
+                                                            <div>Phí hãng: @ghnTotalFee.ToString("N0") đ</div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </td>
                                         <td class="text-center px-4">
                                             <div class="btn-group" role="group">
                                                 <button type="button"
@@ -1059,6 +1096,54 @@
         function getTextValue(id) {
             return document.getElementById(id)?.value?.trim() || '';
         }
+        function collectVisibleGhnRowsForSync() {
+            return Array.from(document.querySelectorAll('tr[data-ghn-order-id]'))
+                .map(function (row) {
+                    return {
+                        orderId: (row.dataset.ghnOrderId || '').trim(),
+                        orderCode: (row.dataset.ghnOrderCode || '').trim(),
+                        orderLabel: (row.dataset.ghnOrderLabel || '').trim(),
+                        lastSyncedAt: (row.dataset.ghnLastSyncedAt || '').trim()
+                    };
+                })
+                .filter(function (item) {
+                    return item.orderId && item.orderCode;
+                });
+        }
+        function collectAutoSyncCandidates(maxAgeMinutes = 20, maxItems = 3) {
+            const now = Date.now();
+            const maxAgeMs = maxAgeMinutes * 60 * 1000;
+            return collectVisibleGhnRowsForSync()
+                .filter(function (item) {
+                    if (!item.lastSyncedAt) {
+                        return true;
+                    }
+                    const parsed = Date.parse(item.lastSyncedAt);
+                    if (!Number.isFinite(parsed)) {
+                        return true;
+                    }
+                    return (now - parsed) >= maxAgeMs;
+                })
+                .slice(0, maxItems);
+        }
+        function buildBoundClientOrderCode(orderId) {
+            const numeric = Number(orderId);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return '';
+            }
+
+            return `FF-ORD-${String(Math.trunc(numeric)).padStart(6, '0')}`;
+        }
+        function setBoundClientOrderCode(orderId) {
+            const input = document.getElementById('ghnClientOrderCode');
+            if (!input) return;
+            input.value = buildBoundClientOrderCode(orderId);
+        }
+        function updateCreateButtonState() {
+            const button = document.getElementById('btnGhnCreateOrder');
+            if (!button) return;
+            button.disabled = !getTextValue('ghnSelectedOrderId');
+        }
         function getSelectedText(id) {
             const select = document.getElementById(id);
             if (!select || select.selectedIndex < 0) return '';
@@ -1076,6 +1161,7 @@
             if (button.dataset.originalHtml) {
                 button.innerHTML = button.dataset.originalHtml;
             }
+            updateCreateButtonState();
         }
         function setGhnRecipientLocationStatus(message, tone = 'info') {
             const node = document.getElementById('ghnRecipientLocationStatus');
@@ -1176,10 +1262,23 @@
                 return false;
             }
         }
+        function formatCurrency(value) {
+            const amount = Number(value || 0);
+            return new Intl.NumberFormat('vi-VN', {
+                style: 'currency',
+                currency: 'VND',
+                maximumFractionDigits: 0
+            }).format(Number.isFinite(amount) ? amount : 0);
+        }
         async function ensureGhnRecipient() {
+            const orderId = getTextValue('ghnSelectedOrderId');
             const toName = getTextValue('ghnToName');
             const toPhone = getTextValue('ghnToPhone');
             const toAddress = getTextValue('ghnToAddress');
+            if (!orderId) {
+                showNotification('Cần bind một đơn hàng trước khi tạo vận đơn GHN.', 'warning');
+                return null;
+            }
             if (!toName || !toPhone || !toAddress) {
                 showNotification('Cần điền đủ người nhận, số điện thoại và địa chỉ chi tiết.', 'warning');
                 return null;
@@ -1197,7 +1296,7 @@
                 wardCode = getTextValue('ghnWardCode');
             }
 
-            return { toName, toPhone, toAddress, districtId, wardCode };
+            return { orderId, toName, toPhone, toAddress, districtId, wardCode };
         }
         async function fetchJson(url, options) {
             const response = await fetch(url, { credentials: 'same-origin', ...(options || {}) });
@@ -1263,27 +1362,60 @@
                 ItemQuantity: getNumericValue('ghnItemQuantity', 1)
             };
         }
-        async function fillGhnFormFromRow(button) {
-            const row = button.closest('tr');
-            if (!row) return;
-            const orderLabel = row.dataset.ghnOrderLabel || 'Đơn nội bộ';
-            const provinceName = row.dataset.ghnProvinceName || '';
-            const communeName = row.dataset.ghnCommuneName || '';
-            const addressParts = [row.dataset.ghnAddress || '', communeName, provinceName].filter(Boolean);
-            document.getElementById('ghnSourceLabel').value = `${orderLabel} - ${provinceName}${provinceName && communeName ? ' / ' : ''}${communeName}`.trim();
-            document.getElementById('ghnToName').value = row.dataset.ghnName || '';
-            document.getElementById('ghnToPhone').value = row.dataset.ghnPhone || '';
-            document.getElementById('ghnToAddress').value = addressParts.join(', ');
+        async function bindOrderToGhnPanel(orderId, sourceLabel) {
+            const payload = await fetchJson('@Url.Action("GetOrderInfo", "Shipping", new { area = "Admin" })?orderId=' + orderId);
+            if (!payload?.success) {
+                throw new Error(payload?.message || 'Không tải được thông tin đơn hàng để tạo vận đơn.');
+            }
+
+            const resolvedLabel = sourceLabel || `#DH${String(orderId).padStart(5, '0')}`;
+            document.getElementById('ghnSelectedOrderId').value = String(orderId);
+            document.getElementById('ghnSourceLabel').value = resolvedLabel;
+            document.getElementById('ghnToName').value = payload.fullName || '';
+            document.getElementById('ghnToPhone').value = payload.phone || '';
+            document.getElementById('ghnToAddress').value = payload.address || '';
             document.getElementById('ghnProvinceId').value = '';
             document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện GHN</option>';
             document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã GHN</option>';
-            document.getElementById('ghnClientOrderCode').value = `FF-ORD-${row.dataset.ghnOrderId}-${Date.now()}`;
-            document.getElementById('ghnContent').value = `Đơn giao vận cho ${orderLabel}`;
-            document.getElementById('ghnItemCode').value = `ORDER-${row.dataset.ghnOrderId}`;
+            setBoundClientOrderCode(orderId);
+            document.getElementById('ghnContent').value = `Đơn giao vận cho ${resolvedLabel}`;
+            document.getElementById('ghnItemName').value = payload.itemSummary || 'Gói hàng tổng hợp';
+            document.getElementById('ghnItemCode').value = `ORDER-${orderId}`;
+            document.getElementById('ghnItemQuantity').value = payload.totalQuantity && payload.totalQuantity > 0 ? String(payload.totalQuantity) : '1';
+            document.getElementById('ghnItemPrice').value = payload.itemsAmount && payload.itemsAmount > 0 ? String(Math.round(payload.itemsAmount)) : '';
+            document.getElementById('ghnInsuranceValue').value = payload.totalAmount && payload.totalAmount > 0 ? String(Math.round(payload.totalAmount)) : '0';
+            document.getElementById('ghnCodAmount').value = payload.isCod && payload.codAmount && payload.codAmount > 0 ? String(Math.round(payload.codAmount)) : '0';
             document.getElementById('ghnTrackingOrderCode').value = '';
-            await autoResolveGhnRecipientLocation(addressParts.join(', '));
-            showNotification(`Đã đổ thông tin ${orderLabel} vào bảng điều khiển GHN.`, 'info');
-            document.getElementById('ghnCreateOrderPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            const financeNote = document.getElementById('ghnOrderFinanceNote');
+            if (financeNote) {
+                const shippingFee = Number(payload.shippingFee || 0);
+                const totalQuantity = Number(payload.totalQuantity || 0);
+                financeNote.innerHTML = `<i class="bi bi-cash-stack"></i> Buyer đã chốt phí ship ${formatCurrency(shippingFee)} cho ${resolvedLabel}. Gói hàng hiện lấy ${totalQuantity > 0 ? totalQuantity : 1} sản phẩm với tên tổng hợp "${payload.itemSummary || 'Gói hàng tổng hợp'}".`;
+            }
+
+            updateCreateButtonState();
+            await autoResolveGhnRecipientLocation(payload.address || '');
+            return payload;
+        }
+        async function fillGhnFormFromRow(button) {
+            const row = button.closest('tr');
+            if (!row) return;
+            const orderId = row.dataset.ghnOrderId || '';
+            if (!orderId) {
+                showNotification('Không xác định được đơn hàng để bind GHN.', 'warning');
+                return;
+            }
+
+            const orderLabel = row.dataset.ghnOrderLabel || `#DH${String(orderId).padStart(5, '0')}`;
+            try {
+                await bindOrderToGhnPanel(orderId, orderLabel);
+                showNotification(`Đã bind ${orderLabel} vào bảng điều khiển GHN.`, 'info');
+                document.getElementById('ghnCreateOrderPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Không tải được thông tin đơn hàng.';
+                showNotification(message, 'danger');
+            }
         }
         async function loadShopProfile() {
             const button = document.getElementById('btnGhnLoadShopProfile');
@@ -1337,12 +1469,13 @@
             const recipient = await ensureGhnRecipient();
             if (!recipient) return;
             const params = {
+                orderId: Number(recipient.orderId),
                 ToName: recipient.toName,
                 ToPhone: recipient.toPhone,
                 ToAddress: recipient.toAddress,
-                ToDistrictId: recipient.districtId,
+                ToDistrictId: Number(recipient.districtId),
                 ToWardCode: recipient.wardCode,
-                Content: getTextValue('ghnContent') || 'Đơn hàng thử nghiệm FreshFarm',
+                Content: getTextValue('ghnContent') || `Vận đơn cho đơn #${recipient.orderId}`,
                 ClientOrderCode: getTextValue('ghnClientOrderCode'),
                 CodAmount: getNumericValue('ghnCodAmount', 0),
                 InsuranceValue: getNumericValue('ghnInsuranceValue', 0),
@@ -1350,14 +1483,22 @@
                 Length: getNumericValue('ghnLength', 20),
                 Width: getNumericValue('ghnWidth', 20),
                 Weight: getNumericValue('ghnWeight', 500),
-                ItemName: getTextValue('ghnItemName') || 'Nông sản FreshFarm',
-                ItemCode: getTextValue('ghnItemCode'),
-                ItemQuantity: getNumericValue('ghnItemQuantity', 1),
-                ItemPrice: getNumericValue('ghnItemPrice', 0)
+                items: [
+                    {
+                        name: getTextValue('ghnItemName') || 'Nông sản FreshFarm',
+                        code: getTextValue('ghnItemCode'),
+                        quantity: getNumericValue('ghnItemQuantity', 1),
+                        price: getNumericValue('ghnItemPrice', 0),
+                        height: getNumericValue('ghnHeight', 10),
+                        length: getNumericValue('ghnLength', 20),
+                        width: getNumericValue('ghnWidth', 20),
+                        weight: getNumericValue('ghnWeight', 500)
+                    }
+                ]
             };
             try {
                 setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo...');
-                const payload = await fetchJson('@Url.Action("CreateGhnSandboxOrderQuick", "Shipping", new { area = "Admin" })', {
+                const payload = await fetchJson('@Url.Action("CreateGhnSandboxOrder", "Shipping", new { area = "Admin" })', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1377,24 +1518,171 @@
                 setButtonBusy(button, false);
             }
         }
-        async function trackGhnOrder() {
-            const button = document.getElementById('btnGhnTrackOrder');
+        async function trackGhnOrder(options) {
+            const shouldPersist = options?.persist ?? false;
+            const shouldReload = options?.reloadOnSuccess ?? false;
+            const button = document.getElementById(shouldPersist ? 'btnGhnSyncMetadata' : 'btnGhnTrackOrder');
             const orderCode = getTextValue('ghnTrackingOrderCode');
             if (!orderCode) {
-                showNotification('Cần nhập mã vận đơn GHN để tra cứu.', 'warning');
+                showNotification(`Cần nhập mã vận đơn GHN để ${shouldPersist ? 'đồng bộ' : 'tra cứu'}.`, 'warning');
+                return;
+            }
+            const orderId = getTextValue('ghnSelectedOrderId');
+            if (shouldPersist && !orderId) {
+                showNotification('Cần chọn đơn hàng trong bảng trước khi đồng bộ GHN.', 'warning');
                 return;
             }
             try {
-                setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tra...');
+                setButtonBusy(button, true, shouldPersist
+                    ? '<span class="spinner-border spinner-border-sm me-2"></span>Đang đồng bộ...'
+                    : '<span class="spinner-border spinner-border-sm me-2"></span>Đang tra...');
                 const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Admin" })', {
-                    orderCode
+                    orderCode,
+                    orderId
                 }));
                 setResult('ghnTrackingResult', payload);
-                showNotification(payload?.message || 'Đã tra cứu đơn GHN.', payload?.success ? 'success' : 'warning');
+                showNotification(
+                    payload?.message || (shouldPersist ? 'Đã đồng bộ metadata GHN.' : 'Đã tra cứu đơn GHN.'),
+                    payload?.success ? 'success' : 'warning');
+                if (payload?.success && shouldReload) {
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 700);
+                }
             } catch {
-                showNotification('Không tra cứu được đơn GHN.', 'danger');
+                showNotification(shouldPersist ? 'Không đồng bộ được metadata GHN.' : 'Không tra cứu được đơn GHN.', 'danger');
             } finally {
                 setButtonBusy(button, false);
+            }
+        }
+        async function syncVisibleGhnRows() {
+            const button = document.getElementById('btnGhnSyncVisibleRows');
+            const candidates = collectVisibleGhnRowsForSync();
+            if (!candidates.length) {
+                showNotification('Trang này chưa có đơn nào có mã GHN để đồng bộ.', 'warning');
+                return;
+            }
+
+            const summary = {
+                total: candidates.length,
+                synced: 0,
+                failed: 0,
+                items: []
+            };
+
+            try {
+                setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đồng bộ trang...');
+                for (let index = 0; index < candidates.length; index += 1) {
+                    const candidate = candidates[index];
+                    setResult('ghnTrackingResult', {
+                        message: `Đang đồng bộ ${index + 1}/${candidates.length}`,
+                        current: candidate.orderLabel || `Đơn #${candidate.orderId}`,
+                        orderCode: candidate.orderCode,
+                        progress: `${index + 1}/${candidates.length}`
+                    });
+
+                    try {
+                        const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Admin" })', {
+                            orderCode: candidate.orderCode,
+                            orderId: candidate.orderId
+                        }));
+
+                        if (payload?.success) {
+                            summary.synced += 1;
+                        } else {
+                            summary.failed += 1;
+                        }
+
+                        summary.items.push({
+                            orderId: candidate.orderId,
+                            orderLabel: candidate.orderLabel,
+                            orderCode: candidate.orderCode,
+                            success: !!payload?.success,
+                            statusLabel: payload?.statusLabel || payload?.status || '',
+                            message: payload?.message || ''
+                        });
+                    } catch (error) {
+                        summary.failed += 1;
+                        summary.items.push({
+                            orderId: candidate.orderId,
+                            orderLabel: candidate.orderLabel,
+                            orderCode: candidate.orderCode,
+                            success: false,
+                            message: error?.message || 'Không đồng bộ được đơn GHN này.'
+                        });
+                    }
+                }
+
+                setResult('ghnTrackingResult', {
+                    message: `Đã đồng bộ ${summary.synced}/${summary.total} đơn GHN trên trang.`,
+                    total: summary.total,
+                    synced: summary.synced,
+                    failed: summary.failed,
+                    items: summary.items
+                });
+
+                showNotification(
+                    summary.failed
+                        ? `Đã đồng bộ ${summary.synced}/${summary.total} đơn GHN. Có ${summary.failed} đơn cần kiểm tra lại.`
+                        : `Đã đồng bộ ${summary.synced} đơn GHN trên trang.`,
+                    summary.failed ? 'warning' : 'success');
+
+                if (summary.synced > 0) {
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 900);
+                }
+            } finally {
+                setButtonBusy(button, false);
+            }
+        }
+        async function autoSyncStaleGhnRows() {
+            const candidates = collectAutoSyncCandidates();
+            if (!candidates.length) {
+                return;
+            }
+
+            const summary = {
+                total: candidates.length,
+                synced: 0,
+                failed: 0
+            };
+
+            setResult('ghnTrackingResult', {
+                message: `Đang tự đồng bộ ${candidates.length} đơn GHN cũ trên trang...`,
+                auto: true,
+                total: candidates.length
+            });
+
+            for (let index = 0; index < candidates.length; index += 1) {
+                const candidate = candidates[index];
+                try {
+                    const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Admin" })', {
+                        orderCode: candidate.orderCode,
+                        orderId: candidate.orderId
+                    }));
+                    if (payload?.success) {
+                        summary.synced += 1;
+                    } else {
+                        summary.failed += 1;
+                    }
+                } catch {
+                    summary.failed += 1;
+                }
+            }
+
+            if (summary.synced > 0) {
+                setResult('ghnTrackingResult', {
+                    message: `Đã tự đồng bộ ${summary.synced}/${summary.total} đơn GHN cũ trên trang.`,
+                    auto: true,
+                    total: summary.total,
+                    synced: summary.synced,
+                    failed: summary.failed
+                });
+                showNotification(`Đã tự đồng bộ ${summary.synced}/${summary.total} đơn GHN cũ trên trang.`, summary.failed ? 'warning' : 'info');
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 900);
             }
         }
 
@@ -1479,6 +1767,7 @@
         loadGhnProvinces().catch(() => {
             setResult('ghnShopProfileResult', 'Không tải được danh sách tỉnh/thành GHN.');
         });
+        updateCreateButtonState();
 
         document.getElementById('btnGhnLoadShopProfile')?.addEventListener('click', function () {
             loadShopProfile();
@@ -1499,6 +1788,15 @@
         document.getElementById('btnGhnTrackOrder')?.addEventListener('click', function () {
             trackGhnOrder();
         });
+        document.getElementById('btnGhnSyncMetadata')?.addEventListener('click', function () {
+            trackGhnOrder({ persist: true, reloadOnSuccess: true });
+        });
+        document.getElementById('btnGhnSyncVisibleRows')?.addEventListener('click', function () {
+            syncVisibleGhnRows();
+        });
+        window.setTimeout(function () {
+            void autoSyncStaleGhnRows();
+        }, 1200);
 
         document.getElementById('btnUseCreatedOrderForTracking')?.addEventListener('click', function () {
             const text = document.getElementById('ghnCreateResult')?.textContent || '';
@@ -1534,7 +1832,12 @@
         document.getElementById('EditIsStorePickup')?.addEventListener('change', function(){ toggleEditFormValidation(this.checked); });
 
         document.getElementById('OrderID')?.addEventListener('change', function(){
-          const id=this.value; if(!id) return;
+          const id=this.value;
+          if(!id) {
+            document.getElementById('ghnSelectedOrderId').value = '';
+            updateCreateButtonState();
+            return;
+          }
           fetch('@Url.Action("GetOrderInfo","Shipping", new { area = "Admin" })?orderId='+id, { credentials:'same-origin' })
             .then(r=>r.json())
             .then(d=>{
@@ -1550,6 +1853,31 @@
                     if(d.communeId) document.getElementById('CommuneId').value = d.communeId;
                 });
               }
+              document.getElementById('ghnSelectedOrderId').value = id;
+              document.getElementById('ghnSourceLabel').value = `#DH${String(id).padStart(5, '0')}`;
+              document.getElementById('ghnToName').value = d.fullName || '';
+              document.getElementById('ghnToPhone').value = d.phone || '';
+              document.getElementById('ghnToAddress').value = d.address || '';
+              document.getElementById('ghnProvinceId').value = '';
+              document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện GHN</option>';
+              document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã GHN</option>';
+              setBoundClientOrderCode(id);
+              document.getElementById('ghnContent').value = `Đơn giao vận cho #DH${String(id).padStart(5, '0')}`;
+              document.getElementById('ghnItemName').value = d.itemSummary || 'Gói hàng tổng hợp';
+              document.getElementById('ghnItemCode').value = `ORDER-${id}`;
+              document.getElementById('ghnItemQuantity').value = d.totalQuantity && d.totalQuantity > 0 ? String(d.totalQuantity) : '1';
+              document.getElementById('ghnItemPrice').value = d.itemsAmount && d.itemsAmount > 0 ? String(Math.round(d.itemsAmount)) : '';
+              document.getElementById('ghnInsuranceValue').value = d.totalAmount && d.totalAmount > 0 ? String(Math.round(d.totalAmount)) : '0';
+              document.getElementById('ghnCodAmount').value = d.isCod && d.codAmount && d.codAmount > 0 ? String(Math.round(d.codAmount)) : '0';
+              document.getElementById('ghnTrackingOrderCode').value = payload.ghnOrderCode || '';
+              const financeNote = document.getElementById('ghnOrderFinanceNote');
+              if (financeNote) {
+                const shippingFee = Number(d.shippingFee || 0);
+                const totalQuantity = Number(d.totalQuantity || 0);
+                financeNote.innerHTML = `<i class="bi bi-cash-stack"></i> Buyer đã chốt phí ship ${formatCurrency(shippingFee)} cho #DH${String(id).padStart(5, '0')}. Gói hàng hiện lấy ${totalQuantity > 0 ? totalQuantity : 1} sản phẩm với tên tổng hợp "${d.itemSummary || 'Gói hàng tổng hợp'}".`;
+              }
+              updateCreateButtonState();
+              void autoResolveGhnRecipientLocation(d.address || '');
             });
         });
 

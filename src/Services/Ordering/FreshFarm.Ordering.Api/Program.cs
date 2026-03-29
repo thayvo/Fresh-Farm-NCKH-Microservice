@@ -98,7 +98,10 @@ builder.Services.AddHttpClient("Catalog", client =>
 builder.Services.AddScoped<CatalogInventoryClient>();
 builder.Services.AddScoped<OrderReservationService>();
 builder.Services.AddScoped<InventoryReconciliationService>();
+builder.Services.AddScoped<CustomerNotificationService>();
+builder.Services.AddScoped<RecommendationAffinityService>();
 builder.Services.AddHostedService<PendingPaymentExpirationBackgroundService>();
+builder.Services.AddHostedService<RecommendationAffinityRefreshBackgroundService>();
 
 var app = builder.Build();
 

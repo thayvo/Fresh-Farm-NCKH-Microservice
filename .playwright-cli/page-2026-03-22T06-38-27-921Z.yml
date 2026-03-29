@@ -1,0 +1,363 @@
+- generic [active] [ref=e1]:
+  - heading "An unhandled exception occurred while processing the request." [level=1] [ref=e2]
+  - generic [ref=e3]: "SocketException: No connection could be made because the target machine actively refused it."
+  - paragraph [ref=e4]: System.Net.Sockets.Socket+AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)
+  - generic [ref=e5]: "HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:7018)"
+  - paragraph [ref=e6]: System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(string host, int port, HttpRequestMessage initialRequest, bool async, CancellationToken cancellationToken)
+  - list [ref=e7]:
+    - listitem [ref=e8] [cursor=pointer]: Stack
+    - listitem [ref=e9] [cursor=pointer]: Query
+    - listitem [ref=e10] [cursor=pointer]: Cookies
+    - listitem [ref=e11] [cursor=pointer]: Headers
+    - listitem [ref=e12] [cursor=pointer]: Routing
+  - list [ref=e14]:
+    - listitem [ref=e15]:
+      - 'heading "SocketException: No connection could be made because the target machine actively refused it." [level=2] [ref=e16]'
+      - list [ref=e17]:
+        - listitem [ref=e18]:
+          - heading "System.Net.Sockets.Socket+AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken)" [level=3] [ref=e19]
+        - listitem [ref=e20]:
+          - heading "System.Net.Sockets.Socket+AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(short token)" [level=3] [ref=e21]
+        - listitem [ref=e22]:
+          - heading "System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken)" [level=3] [ref=e23]
+        - listitem [ref=e24]:
+          - heading "System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(string host, int port, HttpRequestMessage initialRequest, bool async, CancellationToken cancellationToken)" [level=3] [ref=e25]
+    - listitem [ref=e26]:
+      - generic [ref=e27]:
+        - button "Show raw exception details" [ref=e28] [cursor=pointer]
+        - generic [ref=e30]: "System.Net.Sockets.SocketException (10061): No connection could be made because the target machine actively refused it. at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken) at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token) at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken)"
+    - listitem [ref=e31]:
+      - 'heading "HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:7018)" [level=2] [ref=e32]'
+      - list [ref=e33]:
+        - listitem [ref=e34]:
+          - heading "System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(string host, int port, HttpRequestMessage initialRequest, bool async, CancellationToken cancellationToken)" [level=3] [ref=e35]
+        - listitem [ref=e36]:
+          - heading "System.Threading.Tasks.ValueTask<TResult>.get_Result()" [level=3] [ref=e37]
+        - listitem [ref=e38]:
+          - heading "System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, bool async, CancellationToken cancellationToken)" [level=3] [ref=e39]
+        - listitem [ref=e40]:
+          - heading "System.Threading.Tasks.ValueTask<TResult>.get_Result()" [level=3] [ref=e41]
+        - listitem [ref=e42]:
+          - heading "System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, bool async, CancellationToken cancellationToken)" [level=3] [ref=e43]
+        - listitem [ref=e44]:
+          - heading "System.Threading.Tasks.ValueTask<TResult>.get_Result()" [level=3] [ref=e45]
+        - listitem [ref=e46]:
+          - heading "System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem)" [level=3] [ref=e47]
+        - listitem [ref=e48]:
+          - heading "System.Threading.Tasks.TaskCompletionSourceWithCancellation<T>.WaitWithCancellationAsync(CancellationToken cancellationToken)" [level=3] [ref=e49]
+        - listitem [ref=e50]:
+          - heading "System.Threading.Tasks.ValueTask<TResult>.get_Result()" [level=3] [ref=e51]
+        - listitem [ref=e52]:
+          - heading "System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, bool async, bool doRequestAuth, CancellationToken cancellationToken)" [level=3] [ref=e53]
+        - listitem [ref=e54]:
+          - heading "System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, bool async, CancellationToken cancellationToken)" [level=3] [ref=e55]
+        - listitem [ref=e56]:
+          - heading "System.Threading.Tasks.ValueTask<TResult>.get_Result()" [level=3] [ref=e57]
+        - listitem [ref=e58]:
+          - heading "System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, bool async, CancellationToken cancellationToken)" [level=3] [ref=e59]
+        - listitem [ref=e60]:
+          - heading "Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, bool useAsync, CancellationToken cancellationToken)" [level=3] [ref=e61]
+        - listitem [ref=e62]:
+          - heading "Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, bool useAsync, CancellationToken cancellationToken)" [level=3] [ref=e63]
+        - listitem [ref=e64]:
+          - heading "System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, bool disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken)" [level=3] [ref=e65]
+        - listitem [ref=e66]:
+          - heading "FreshFarm.Web.Bff.Services.CartSessionService.GetItemsFromApiAsync(string token) in CartSessionService.cs" [level=3] [ref=e67]:
+            - text: FreshFarm.Web.Bff.Services.CartSessionService.GetItemsFromApiAsync(string token) in
+            - code [ref=e68]: CartSessionService.cs
+          - button "+" [ref=e69] [cursor=pointer]
+          - generic [ref=e70]:
+            - list [ref=e71]:
+              - listitem [ref=e72]: context.Items[LegacyMigrationFlagKey] = true;
+              - listitem [ref=e73]: "}"
+              - listitem [ref=e74]
+              - listitem [ref=e75]: private async Task<List<CartItemDto>> GetItemsFromApiAsync(string token)
+              - listitem [ref=e76]: "{"
+              - listitem [ref=e77]: var client = CreateAuthorizedOrderingClient(token);
+            - list [ref=e78]:
+              - listitem [ref=e79]: var response = await client.GetAsync("/api/cart/me");
+            - list [ref=e80]:
+              - listitem [ref=e81]: response.EnsureSuccessStatusCode();
+              - listitem [ref=e82]: return await ReadCartItemsResponseAsync(response);
+              - listitem [ref=e83]: "}"
+              - listitem [ref=e84]
+              - listitem [ref=e85]: private async Task<List<CartItemDto>> BackfillMissingSnapshotsAsync(List<CartItemDto> items, string? token)
+              - listitem [ref=e86]: "{"
+        - listitem [ref=e87]:
+          - heading "FreshFarm.Web.Bff.Services.CartSessionService.GetItemsAsync() in CartSessionService.cs" [level=3] [ref=e88]:
+            - text: FreshFarm.Web.Bff.Services.CartSessionService.GetItemsAsync() in
+            - code [ref=e89]: CartSessionService.cs
+          - button "+" [ref=e90] [cursor=pointer]
+          - generic [ref=e91]:
+            - list [ref=e92]:
+              - listitem [ref=e93]: var legacyItems = GetLegacySessionItems();
+              - listitem [ref=e94]: "var enrichedLegacyItems = await BackfillMissingSnapshotsAsync(legacyItems, token: null);"
+              - listitem [ref=e95]: CacheItems(enrichedLegacyItems);
+              - listitem [ref=e96]: return enrichedLegacyItems;
+              - listitem [ref=e97]: "}"
+              - listitem [ref=e98]
+            - list [ref=e99]:
+              - listitem [ref=e100]: var items = await GetItemsFromApiAsync(token);
+            - list [ref=e101]:
+              - listitem [ref=e102]: var enrichedItems = await BackfillMissingSnapshotsAsync(items, token);
+              - listitem [ref=e103]: CacheItems(enrichedItems);
+              - listitem [ref=e104]: return enrichedItems;
+              - listitem [ref=e105]: "}"
+              - listitem [ref=e106]
+              - listitem [ref=e107]: public async Task SetItemsAsync(List<CartItemDto> items)
+        - listitem [ref=e108]:
+          - heading "AspNetCoreGeneratedDocument.Views_Shared__HeaderLegacy.ExecuteAsync() in _HeaderLegacy.cshtml" [level=3] [ref=e109]:
+            - text: AspNetCoreGeneratedDocument.Views_Shared__HeaderLegacy.ExecuteAsync() in
+            - code [ref=e110]: _HeaderLegacy.cshtml
+          - button "+" [ref=e111] [cursor=pointer]
+          - generic [ref=e112]:
+            - list [ref=e113]:
+              - listitem [ref=e114]: "@using FreshFarm.Web.Bff.Dtos"
+              - listitem [ref=e115]: "@using FreshFarm.Web.Bff.Services"
+              - listitem [ref=e116]: "@inject ICartSessionService CartSessionService"
+              - listitem [ref=e117]: "@{"
+              - listitem [ref=e118]: var isAuthenticated = User.Identity?.IsAuthenticated == true;
+              - listitem [ref=e119]: var searchKeyword = Context.Request.Query["q"].ToString();
+            - list [ref=e120]:
+              - listitem [ref=e121]: "var cartItems = isAuthenticated ? await CartSessionService.GetItemsAsync() : new List<CartItemDto>();"
+            - list [ref=e122]:
+              - listitem [ref=e123]: "var totalQuantity = cartItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);"
+              - listitem [ref=e124]: var previewItems = cartItems.AsEnumerable().Reverse().Take(5).ToList();
+              - listitem [ref=e125]: "var previewQuantity = previewItems.Sum(x => x.Quantity <= 0 ? 1 : x.Quantity);"
+              - listitem [ref=e126]: var remainingQuantity = Math.Max(0, totalQuantity - previewQuantity);
+              - listitem [ref=e127]: "string Vnd(decimal amount) => string.Format(CultureInfo.GetCultureInfo(\"vi-VN\"), \"{0:N0} ₫\", amount);"
+              - listitem [ref=e128]: string ProductThumb(CartItemDto item) => ProductImagePaths.ResolveRequestPath(item.ImageFileName);
+        - listitem [ref=e129]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageCoreAsync(IRazorPage page, ViewContext context)" [level=3] [ref=e130]
+        - listitem [ref=e131]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageAsync(IRazorPage page, ViewContext context, bool invokeViewStarts)" [level=3] [ref=e132]
+        - listitem [ref=e133]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderAsync(ViewContext context)" [level=3] [ref=e134]
+        - listitem [ref=e135]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.HtmlHelper.RenderPartialCoreAsync(string partialViewName, object model, ViewDataDictionary viewData, TextWriter writer)" [level=3] [ref=e136]
+        - listitem [ref=e137]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.HtmlHelper.PartialAsync(string partialViewName, object model, ViewDataDictionary viewData)" [level=3] [ref=e138]
+        - listitem [ref=e139]:
+          - heading "AspNetCoreGeneratedDocument.Views_Home_Index.<ExecuteAsync>b__19_1()" [level=3] [ref=e140]
+        - listitem [ref=e141]:
+          - heading "Microsoft.AspNetCore.Razor.Runtime.TagHelpers.TagHelperExecutionContext.SetOutputContentAsync()" [level=3] [ref=e142]
+        - listitem [ref=e143]:
+          - heading "AspNetCoreGeneratedDocument.Views_Home_Index.ExecuteAsync() in Index.cshtml" [level=3] [ref=e144]:
+            - text: AspNetCoreGeneratedDocument.Views_Home_Index.ExecuteAsync() in
+            - code [ref=e145]: Index.cshtml
+          - button "+" [ref=e146] [cursor=pointer]
+          - generic [ref=e147]:
+            - list [ref=e148]:
+              - listitem [ref=e149]: "@{"
+            - list [ref=e150]:
+              - listitem [ref=e151]: Layout = null;
+            - list [ref=e152]:
+              - listitem [ref=e153]: "}"
+              - listitem [ref=e154]: "@using FreshFarm.Web.Bff.Services"
+              - listitem [ref=e155]: <!DOCTYPE html>
+              - listitem [ref=e156]: <html lang="vi">
+              - listitem [ref=e157]: <head>
+              - listitem [ref=e158]: <meta charset="utf-8" />
+        - listitem [ref=e159]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageCoreAsync(IRazorPage page, ViewContext context)" [level=3] [ref=e160]
+        - listitem [ref=e161]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageAsync(IRazorPage page, ViewContext context, bool invokeViewStarts)" [level=3] [ref=e162]
+        - listitem [ref=e163]:
+          - heading "Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderAsync(ViewContext context)" [level=3] [ref=e164]
+        - listitem [ref=e165]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, string contentType, Nullable<int> statusCode)" [level=3] [ref=e166]
+        - listitem [ref=e167]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, string contentType, Nullable<int> statusCode)" [level=3] [ref=e168]
+        - listitem [ref=e169]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ActionContext actionContext, IView view, ViewDataDictionary viewData, ITempDataDictionary tempData, string contentType, Nullable<int> statusCode)" [level=3] [ref=e170]
+        - listitem [ref=e171]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewFeatures.ViewResultExecutor.ExecuteAsync(ActionContext context, ViewResult result)" [level=3] [ref=e172]
+        - listitem [ref=e173]:
+          - heading "Microsoft.AspNetCore.Mvc.ViewResult.ExecuteResultAsync(ActionContext context)" [level=3] [ref=e174]
+        - listitem [ref=e175]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResultFilterAsync>g__Awaited|30_0<TFilter, TFilterAsync>(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)" [level=3] [ref=e176]
+        - listitem [ref=e177]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResultExecutedContextSealed context)" [level=3] [ref=e178]
+        - listitem [ref=e179]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.ResultNext<TFilter, TFilterAsync>(ref State next, ref Scope scope, ref object state, ref bool isCompleted)" [level=3] [ref=e180]
+        - listitem [ref=e181]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeResultFilters>g__Awaited|28_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)" [level=3] [ref=e182]
+        - listitem [ref=e183]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)" [level=3] [ref=e184]
+        - listitem [ref=e185]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context)" [level=3] [ref=e186]
+        - listitem [ref=e187]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(ref State next, ref Scope scope, ref object state, ref bool isCompleted)" [level=3] [ref=e188]
+        - listitem [ref=e189]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, object state, bool isCompleted)" [level=3] [ref=e190]
+        - listitem [ref=e191]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)" [level=3] [ref=e192]
+        - listitem [ref=e193]:
+          - heading "Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope)" [level=3] [ref=e194]
+        - listitem [ref=e195]:
+          - heading "Program+<>c+<<<Main>$>b__0_15>d.MoveNext() in Program.cs" [level=3] [ref=e196]:
+            - text: Program+<>c+<<<Main>$>b__0_15>d.MoveNext() in
+            - code [ref=e197]: Program.cs
+          - button "+" [ref=e198] [cursor=pointer]
+          - generic [ref=e199]:
+            - list [ref=e200]:
+              - listitem [ref=e201]: "{"
+              - listitem [ref=e202]: context.Response.Redirect("/Seller/Home/Dashboard");
+              - listitem [ref=e203]: return;
+              - listitem [ref=e204]: "}"
+              - listitem [ref=e205]: "}"
+              - listitem [ref=e206]
+            - list [ref=e207]:
+              - listitem [ref=e208]: await next();
+            - list [ref=e209]:
+              - listitem [ref=e210]: "});"
+              - listitem [ref=e211]
+              - listitem [ref=e212]: app.MapControllers(); // Map API controllers.
+              - listitem [ref=e213]: app.MapHub<SupportChatHub>("/hubs/support-chat").RequireRateLimiting("support-chat-hub");
+              - listitem [ref=e214]: app.MapControllerRoute( // Map MVC area route cho Seller/Admin modules.
+              - listitem [ref=e215]: "name: \"areas\","
+        - listitem [ref=e216]:
+          - heading "Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context)" [level=3] [ref=e217]
+        - listitem [ref=e218]:
+          - heading "Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context)" [level=3] [ref=e219]
+        - listitem [ref=e220]:
+          - heading "Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context)" [level=3] [ref=e221]
+        - listitem [ref=e222]:
+          - heading "Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context)" [level=3] [ref=e223]
+        - listitem [ref=e224]:
+          - heading "Microsoft.AspNetCore.RateLimiting.RateLimitingMiddleware.InvokeInternal(HttpContext context, EnableRateLimitingAttribute enableRateLimitingAttribute)" [level=3] [ref=e225]
+        - listitem [ref=e226]:
+          - heading "Program+<>c__DisplayClass0_0+<<<Main>$>b__14>d.MoveNext() in Program.cs" [level=3] [ref=e227]:
+            - text: Program+<>c__DisplayClass0_0+<<<Main>$>b__14>d.MoveNext() in
+            - code [ref=e228]: Program.cs
+          - button "+" [ref=e229] [cursor=pointer]
+          - generic [ref=e230]:
+            - list [ref=e231]:
+              - listitem [ref=e232]: headers["Content-Security-Policy"] = cspPrefix.ToString() + strictScriptDirective.ToString();
+              - listitem [ref=e233]: headers.Remove("Content-Security-Policy-Report-Only");
+              - listitem [ref=e234]: "}"
+              - listitem [ref=e235]: return Task.CompletedTask;
+              - listitem [ref=e236]: "});"
+              - listitem [ref=e237]
+            - list [ref=e238]:
+              - listitem [ref=e239]: await next();
+            - list [ref=e240]:
+              - listitem [ref=e241]: "});"
+              - listitem [ref=e242]
+              - listitem [ref=e243]: app.UseHttpsRedirection(); // Ep HTTPS.
+              - listitem [ref=e244]: app.UseStaticFiles(); // Phuc vu css/js/image.
+              - listitem [ref=e245]: app.UseRouting(); // Route matching.
+              - listitem [ref=e246]
+        - listitem [ref=e247]:
+          - heading "Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext)" [level=3] [ref=e248]
+        - listitem [ref=e249]:
+          - heading "Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider)" [level=3] [ref=e250]
+        - listitem [ref=e251]:
+          - heading "Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)" [level=3] [ref=e252]
+    - listitem [ref=e253]:
+      - generic [ref=e254]:
+        - button "Show raw exception details" [ref=e255] [cursor=pointer]
+        - generic [ref=e257]: "System.Net.Http.HttpRequestException: No connection could be made because the target machine actively refused it. (localhost:7018) ---> System.Net.Sockets.SocketException (10061): No connection could be made because the target machine actively refused it. at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.ThrowException(SocketError error, CancellationToken cancellationToken) at System.Net.Sockets.Socket.AwaitableSocketAsyncEventArgs.System.Threading.Tasks.Sources.IValueTaskSource.GetResult(Int16 token) at System.Net.Sockets.Socket.<ConnectAsync>g__WaitForConnectWithCancellation|285_0(AwaitableSocketAsyncEventArgs saea, ValueTask connectTask, CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken) --- End of inner exception stack trace --- at System.Net.Http.HttpConnectionPool.ConnectToTcpHostAsync(String host, Int32 port, HttpRequestMessage initialRequest, Boolean async, CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.ConnectAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.CreateHttp11ConnectionAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.AddHttp11ConnectionAsync(QueueItem queueItem) at System.Threading.Tasks.TaskCompletionSourceWithCancellation`1.WaitWithCancellationAsync(CancellationToken cancellationToken) at System.Net.Http.HttpConnectionPool.SendWithVersionDetectionAndRetryAsync(HttpRequestMessage request, Boolean async, Boolean doRequestAuth, CancellationToken cancellationToken) at System.Net.Http.DiagnosticsHandler.SendAsyncCore(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken) at System.Net.Http.RedirectHandler.SendAsync(HttpRequestMessage request, Boolean async, CancellationToken cancellationToken) at Microsoft.Extensions.Http.Logging.LoggingHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken) at Microsoft.Extensions.Http.Logging.LoggingScopeHttpMessageHandler.<SendCoreAsync>g__Core|5_0(HttpRequestMessage request, Boolean useAsync, CancellationToken cancellationToken) at System.Net.Http.HttpClient.<SendAsync>g__Core|83_0(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationTokenSource cts, Boolean disposeCts, CancellationTokenSource pendingRequestsCts, CancellationToken originalCancellationToken) at FreshFarm.Web.Bff.Services.CartSessionService.GetItemsFromApiAsync(String token) in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Services\\CartSessionService.cs:line 259 at FreshFarm.Web.Bff.Services.CartSessionService.GetItemsAsync() in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Services\\CartSessionService.cs:line 47 at AspNetCoreGeneratedDocument.Views_Shared__HeaderLegacy.ExecuteAsync() in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Views\\Shared\\_HeaderLegacy.cshtml:line 8 at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageCoreAsync(IRazorPage page, ViewContext context) at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageAsync(IRazorPage page, ViewContext context, Boolean invokeViewStarts) at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderAsync(ViewContext context) at Microsoft.AspNetCore.Mvc.ViewFeatures.HtmlHelper.RenderPartialCoreAsync(String partialViewName, Object model, ViewDataDictionary viewData, TextWriter writer) at Microsoft.AspNetCore.Mvc.ViewFeatures.HtmlHelper.PartialAsync(String partialViewName, Object model, ViewDataDictionary viewData) at AspNetCoreGeneratedDocument.Views_Home_Index.<ExecuteAsync>b__19_1() at Microsoft.AspNetCore.Razor.Runtime.TagHelpers.TagHelperExecutionContext.SetOutputContentAsync() at AspNetCoreGeneratedDocument.Views_Home_Index.ExecuteAsync() in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Views\\Home\\Index.cshtml:line 2 at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageCoreAsync(IRazorPage page, ViewContext context) at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderPageAsync(IRazorPage page, ViewContext context, Boolean invokeViewStarts) at Microsoft.AspNetCore.Mvc.Razor.RazorView.RenderAsync(ViewContext context) at Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, String contentType, Nullable`1 statusCode) at Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ViewContext viewContext, String contentType, Nullable`1 statusCode) at Microsoft.AspNetCore.Mvc.ViewFeatures.ViewExecutor.ExecuteAsync(ActionContext actionContext, IView view, ViewDataDictionary viewData, ITempDataDictionary tempData, String contentType, Nullable`1 statusCode) at Microsoft.AspNetCore.Mvc.ViewFeatures.ViewResultExecutor.ExecuteAsync(ActionContext context, ViewResult result) at Microsoft.AspNetCore.Mvc.ViewResult.ExecuteResultAsync(ActionContext context) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResultFilterAsync>g__Awaited|30_0[TFilter,TFilterAsync](ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResultExecutedContextSealed context) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.ResultNext[TFilter,TFilterAsync](State& next, Scope& scope, Object& state, Boolean& isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeResultFilters>g__Awaited|28_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeNextResourceFilter>g__Awaited|25_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Rethrow(ResourceExecutedContextSealed context) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.Next(State& next, Scope& scope, Object& state, Boolean& isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeFilterPipelineAsync>g__Awaited|20_0(ResourceInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope) at Microsoft.AspNetCore.Mvc.Infrastructure.ResourceInvoker.<InvokeAsync>g__Awaited|17_0(ResourceInvoker invoker, Task task, IDisposable scope) at Program.<>c.<<<Main>$>b__0_15>d.MoveNext() in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Program.cs:line 555 --- End of stack trace from previous location --- at Microsoft.AspNetCore.Authorization.AuthorizationMiddleware.Invoke(HttpContext context) at Microsoft.AspNetCore.Authentication.AuthenticationMiddleware.Invoke(HttpContext context) at Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context) at Microsoft.AspNetCore.Session.SessionMiddleware.Invoke(HttpContext context) at Microsoft.AspNetCore.RateLimiting.RateLimitingMiddleware.InvokeInternal(HttpContext context, EnableRateLimitingAttribute enableRateLimitingAttribute) at Program.<>c__DisplayClass0_0.<<<Main>$>b__14>d.MoveNext() in D:\\NCKH\\DOAN\\NCKH-FRESH-FARM\\src\\Web\\FreshFarm.Web.Bff\\Program.cs:line 530 --- End of stack trace from previous location --- at Swashbuckle.AspNetCore.SwaggerUI.SwaggerUIMiddleware.Invoke(HttpContext httpContext) at Swashbuckle.AspNetCore.Swagger.SwaggerMiddleware.Invoke(HttpContext httpContext, ISwaggerProvider swaggerProvider) at Microsoft.AspNetCore.Diagnostics.DeveloperExceptionPageMiddlewareImpl.Invoke(HttpContext context)"
+  - paragraph [ref=e259]: No query string data.
+  - table [ref=e261]:
+    - rowgroup [ref=e262]:
+      - row "Variable Value" [ref=e263]:
+        - columnheader "Variable" [ref=e264]
+        - columnheader "Value" [ref=e265]
+    - rowgroup [ref=e266]:
+      - row ".AspNetCore.Antiforgery.P0eeTBOapqs CfDJ8JhZfa4YInFJoWMPQSjpVYvKx0reKQxkTgOXeKyjof_7Hjk8d6h7aUCiueJHJLXAZFS7qb-GZWcJUImeSgHw-GVQuQe4p7aVlwnj_WWITEbB8Q4ujT5W2CDYiC93Z68eZF3SZq5BWjyjdVbVXNerkQc" [ref=e267]:
+        - cell ".AspNetCore.Antiforgery.P0eeTBOapqs" [ref=e268]
+        - cell "CfDJ8JhZfa4YInFJoWMPQSjpVYvKx0reKQxkTgOXeKyjof_7Hjk8d6h7aUCiueJHJLXAZFS7qb-GZWcJUImeSgHw-GVQuQe4p7aVlwnj_WWITEbB8Q4ujT5W2CDYiC93Z68eZF3SZq5BWjyjdVbVXNerkQc" [ref=e269]
+      - row "FreshFarm.Bff.Auth CfDJ8JhZfa4YInFJoWMPQSjpVYv6Xd8QRC2wewEtPqyYr2fnP3vpgyu9xgcgm4y6Do8H1kQbxhAAEH-0EZYNS0b5fwyDLLXlAcLCGNljUfJsvyvoIhqBHbzDF_7dhoQIsSJW6JYJ6jVqE44df_d_Jl_nXbqMH8DC6B3OAxSziJ1AVIeTZR0doaoSofj7iiVNAIVYyZxzZp3Rq094mXNwHO4TNok0LtmxoEqzLEI2Yx6J7XSCoiWKoe_lebWoUkwkmuYQlj0HorerT-Ez_rn9qyxINQpFUGSCqI78WMWqQ1Dfy9dMrhCEdbwxI6ANsUB22Awy0GNc4QJsYU3DWTJD2XHeil2lJLl7BYQnsHYZP7wbvbMsDHBMwwC4i-kfICQnnFXyyvQhPxCPErjrSuMmqlZf28wc8Pzp9dr8JEn79lzEJ4iEkXM2GeKdXix8FthqrDLTC4vQBxjW8TP0km3CAYd7FcXZbVZqFwFbeQRHE9TndaXZwjVHmv0JSU5ID9_h59rnzKFn7Z_Sczc2TK1ayG2hyytLti5re-UjL2eVZ5cpMMEaBz6OUQ4J1KYe0Hg1dERuq6sLjey8QRbnzPUvdoAVOzauI3OE4ZZ6_-oEMTxiP1w_6j0fb8y_s3tdJwjISj88FBkvGDRXTI9Gm_NBjCS4KPlVoUhbcnD3qcRBkAo9mbA-ZLHBbtbqvAltyR7Qr51wCCmVklcE8mgzNRaiHBdHJplm0H-c4Iw92D7akq_3-Nj6JWC_r-3IHSmQ5UPg03Jdaw" [ref=e270]:
+        - cell "FreshFarm.Bff.Auth" [ref=e271]
+        - cell "CfDJ8JhZfa4YInFJoWMPQSjpVYv6Xd8QRC2wewEtPqyYr2fnP3vpgyu9xgcgm4y6Do8H1kQbxhAAEH-0EZYNS0b5fwyDLLXlAcLCGNljUfJsvyvoIhqBHbzDF_7dhoQIsSJW6JYJ6jVqE44df_d_Jl_nXbqMH8DC6B3OAxSziJ1AVIeTZR0doaoSofj7iiVNAIVYyZxzZp3Rq094mXNwHO4TNok0LtmxoEqzLEI2Yx6J7XSCoiWKoe_lebWoUkwkmuYQlj0HorerT-Ez_rn9qyxINQpFUGSCqI78WMWqQ1Dfy9dMrhCEdbwxI6ANsUB22Awy0GNc4QJsYU3DWTJD2XHeil2lJLl7BYQnsHYZP7wbvbMsDHBMwwC4i-kfICQnnFXyyvQhPxCPErjrSuMmqlZf28wc8Pzp9dr8JEn79lzEJ4iEkXM2GeKdXix8FthqrDLTC4vQBxjW8TP0km3CAYd7FcXZbVZqFwFbeQRHE9TndaXZwjVHmv0JSU5ID9_h59rnzKFn7Z_Sczc2TK1ayG2hyytLti5re-UjL2eVZ5cpMMEaBz6OUQ4J1KYe0Hg1dERuq6sLjey8QRbnzPUvdoAVOzauI3OE4ZZ6_-oEMTxiP1w_6j0fb8y_s3tdJwjISj88FBkvGDRXTI9Gm_NBjCS4KPlVoUhbcnD3qcRBkAo9mbA-ZLHBbtbqvAltyR7Qr51wCCmVklcE8mgzNRaiHBdHJplm0H-c4Iw92D7akq_3-Nj6JWC_r-3IHSmQ5UPg03Jdaw" [ref=e272]
+      - row "FreshFarm.Bff.Session CfDJ8JhZfa4YInFJoWMPQSjpVYt2zmSck+ZtiA1zIXQ0QHVgW/mOu77KLDu5CqHQORQDl5698wx9R9O+F4sgS4rhuPQaQ3MW3hGZ7/6VWlTR6ZGsqfPvaAFehFxcyXF/pxAhZggXaO6txBTNaOw/WpYGyCojWDrRK2WtZ/Yvgs7M8nEm" [ref=e273]:
+        - cell "FreshFarm.Bff.Session" [ref=e274]
+        - cell "CfDJ8JhZfa4YInFJoWMPQSjpVYt2zmSck+ZtiA1zIXQ0QHVgW/mOu77KLDu5CqHQORQDl5698wx9R9O+F4sgS4rhuPQaQ3MW3hGZ7/6VWlTR6ZGsqfPvaAFehFxcyXF/pxAhZggXaO6txBTNaOw/WpYGyCojWDrRK2WtZ/Yvgs7M8nEm" [ref=e275]
+  - table [ref=e277]:
+    - rowgroup [ref=e278]:
+      - row "Variable Value" [ref=e279]:
+        - columnheader "Variable" [ref=e280]
+        - columnheader "Value" [ref=e281]
+    - rowgroup [ref=e282]:
+      - row "Accept text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" [ref=e283]:
+        - cell "Accept" [ref=e284]
+        - cell "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" [ref=e285]
+      - row "Accept-Encoding gzip, deflate, br, zstd" [ref=e286]:
+        - cell "Accept-Encoding" [ref=e287]
+        - cell "gzip, deflate, br, zstd" [ref=e288]
+      - row "Accept-Language en-US,en;q=0.9" [ref=e289]:
+        - cell "Accept-Language" [ref=e290]
+        - cell "en-US,en;q=0.9" [ref=e291]
+      - row "Cache-Control max-age=0" [ref=e292]:
+        - cell "Cache-Control" [ref=e293]
+        - cell "max-age=0" [ref=e294]
+      - row [ref=e295]:
+        - cell "Cookie" [ref=e296]
+        - cell [ref=e297]
+      - row "Host localhost:7085" [ref=e298]:
+        - cell "Host" [ref=e299]
+        - cell "localhost:7085" [ref=e300]
+      - row "priority u=0, i" [ref=e301]:
+        - cell "priority" [ref=e302]
+        - cell "u=0, i" [ref=e303]
+      - row "Referer https://localhost:7085/account/signin" [ref=e304]:
+        - cell "Referer" [ref=e305]
+        - cell "https://localhost:7085/account/signin" [ref=e306]
+      - row "sec-ch-ua \"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"" [ref=e307]:
+        - cell "sec-ch-ua" [ref=e308]
+        - cell "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"" [ref=e309]
+      - row "sec-ch-ua-mobile ?0" [ref=e310]:
+        - cell "sec-ch-ua-mobile" [ref=e311]
+        - cell "?0" [ref=e312]
+      - row "sec-ch-ua-platform \"Windows\"" [ref=e313]:
+        - cell "sec-ch-ua-platform" [ref=e314]
+        - cell "\"Windows\"" [ref=e315]
+      - row "sec-fetch-dest document" [ref=e316]:
+        - cell "sec-fetch-dest" [ref=e317]
+        - cell "document" [ref=e318]
+      - row "sec-fetch-mode navigate" [ref=e319]:
+        - cell "sec-fetch-mode" [ref=e320]
+        - cell "navigate" [ref=e321]
+      - row "sec-fetch-site same-origin" [ref=e322]:
+        - cell "sec-fetch-site" [ref=e323]
+        - cell "same-origin" [ref=e324]
+      - row "sec-fetch-user ?1" [ref=e325]:
+        - cell "sec-fetch-user" [ref=e326]
+        - cell "?1" [ref=e327]
+      - row "Upgrade-Insecure-Requests 1" [ref=e328]:
+        - cell "Upgrade-Insecure-Requests" [ref=e329]
+        - cell "1" [ref=e330]
+      - row "User-Agent Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/146.0.0.0 Safari/537.36" [ref=e331]:
+        - cell "User-Agent" [ref=e332]
+        - cell "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/146.0.0.0 Safari/537.36" [ref=e333]
+  - generic [ref=e334]:
+    - heading "Endpoint" [level=2] [ref=e335]
+    - table [ref=e336]:
+      - rowgroup [ref=e337]:
+        - row "Name Value" [ref=e338]:
+          - columnheader "Name" [ref=e339]
+          - columnheader "Value" [ref=e340]
+      - rowgroup [ref=e341]:
+        - row "Display Name FreshFarm.Web.Bff.Controllers.HomeController.Index (FreshFarm.Web.Bff)" [ref=e342]:
+          - cell "Display Name" [ref=e343]
+          - cell "FreshFarm.Web.Bff.Controllers.HomeController.Index (FreshFarm.Web.Bff)" [ref=e344]
+        - 'row "Route Pattern {controller=Home}/{action=Index}/{id?}" [ref=e345]':
+          - cell "Route Pattern" [ref=e346]
+          - 'cell "{controller=Home}/{action=Index}/{id?}" [ref=e347]'
+        - row "Route Order 2" [ref=e348]:
+          - cell "Route Order" [ref=e349]
+          - cell "2" [ref=e350]
+    - heading "Route Values" [level=2] [ref=e351]
+    - table [ref=e352]:
+      - rowgroup [ref=e353]:
+        - row "Variable Value" [ref=e354]:
+          - columnheader "Variable" [ref=e355]
+          - columnheader "Value" [ref=e356]
+      - rowgroup [ref=e357]:
+        - row "action Index" [ref=e358]:
+          - cell "action" [ref=e359]
+          - cell "Index" [ref=e360]
+        - row "controller Home" [ref=e361]:
+          - cell "controller" [ref=e362]
+          - cell "Home" [ref=e363]

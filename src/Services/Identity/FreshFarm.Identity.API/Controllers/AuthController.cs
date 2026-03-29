@@ -73,7 +73,7 @@ namespace FreshFarm.Identity.Api.Controllers
             if (!TryValidateLoginRequest(request, out var validationProblem))
             {
                 _logger.LogWarning("Tu choi login do thieu du lieu bat buoc.");
-                return validationProblem;
+                return validationProblem!;
             }
 
             var id = request.Identifier.Trim();

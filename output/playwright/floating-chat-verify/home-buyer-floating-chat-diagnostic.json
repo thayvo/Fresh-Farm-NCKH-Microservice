@@ -1,0 +1,138 @@
+{
+  "logs": [
+    {
+      "type": "response",
+      "url": "https://localhost:7085/account/signin?returnUrl=%2F",
+      "status": 200
+    },
+    {
+      "type": "response",
+      "url": "https://localhost:7085/account/signin",
+      "status": 302
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 ()"
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw4BXoKZA.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw5BXoKZA.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw3BXo.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI286Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI287Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI281Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "error",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The action has been blocked."
+    },
+    {
+      "type": "response",
+      "url": "https://localhost:7085/bff/support-chat/summaries",
+      "status": 200
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 500 ()"
+    },
+    {
+      "type": "error",
+      "text": "Error: Không tải được sản phẩm.\n    at Object.createHttpError (https://localhost:7085/js/site.js?v=8lDVPow2spJDy5d3HKk6_JPIFN4_6QDAjbv5S7aSBOA:45:23)\n    at loadHomeProducts (https://localhost:7085/js/home-page.js?v=aWdufVnB_GrjSRlRaW2lf6L2Rvt0zy1453HXs-ewBYA:444:40)"
+    },
+    {
+      "type": "response",
+      "url": "https://localhost:7085/bff/support-chat/summaries",
+      "status": 200
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-24T16:42:19.153Z] Information: Normalizing '/hubs/support-chat' to 'https://localhost:7085/hubs/support-chat'."
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-24T16:42:19.168Z] Information: WebSocket connected to wss://localhost:7085/hubs/support-chat?id=1yLDa2u8mcEzSM4BqJHdtw."
+    }
+  ],
+  "afterLoginUrl": "https://localhost:7085/",
+  "afterLoginTitle": "Trang Chủ - FreshFarm",
+  "afterLoginBodySnippet": "Kênh Người Bán\n|\nTrở thành Người bán FreshFarm\n Thông báo\n Hỗ trợ\n|\nthu\nChat với shop\nHỗ trợ mua hàng",
+  "homeBeforeOpen": {
+    "authenticatedWidget": "true",
+    "buyerEligible": "true",
+    "launcherText": "Chat với shop\n                1 shop đã trò chuyện\n            \n            0",
+    "supportText": "Hỗ trợ"
+  },
+  "panelState": {
+    "listHtml": "\n                    <button type=\"button\" class=\"floating-chat-conversation-item is-active\" data-conversation-id=\"1\">\n                        <span class=\"floating-chat-conversation-avatar\">C</span>\n                        <span class=\"floating-chat-conversation-main\">\n                            <span class=\"floating-chat-conversation-head\">\n                                <span class=\"floating-chat-conversation-name\">Cửa hàng Hoàng Thanh Bình</span>\n                                <span class=\"floating-chat-conversation-time\">23 ngày trước</span>\n                            </span>\n                            <span class=\"floating-chat-conversation-preview\">welcome to my channel</span>\n                            <span class=\"floating-chat-conversation-meta\">\n                                <span class=\"floating-chat-conversation-address\">Chưa cập nhật địa chỉ hoạt động</span>\n                                <span><span class=\"floating-chat-pill closed\">Đã đóng</span></span>\n                            </span>\n                        </span>\n                    </button>\n                ",
+    "listText": "C\n                        \n                            \n                                Cửa hàng Hoàng Thanh Bình\n                                23 ngày trước\n                            \n                            welcome to my channel\n                            \n                                Chưa cập nhật địa chỉ hoạt động\n                                Đã đóng",
+    "guestVisible": false,
+    "emptyVisible": false,
+    "threadVisible": true,
+    "cookies": "",
+    "itemCount": 0
+  }
+}

@@ -61,7 +61,7 @@ public sealed class DeliveryController : LegacySellerControllerBase
                 return Json(new { success = false, message = "Không đọc được dữ liệu giao hàng từ service." });
             }
 
-            var items = (payload.RecentShippings ?? new List<ShippingRowApiDto>())
+            var items = DeduplicateRecentShippings(payload.RecentShippings)
                 .Select(MapDeliveryRow)
                 .ToList();
 
@@ -93,7 +93,7 @@ public sealed class DeliveryController : LegacySellerControllerBase
             }
 
             var payload = await response.Content.ReadFromJsonAsync<ShippingReportApiResponse>(JsonOptions);
-            var staffs = (payload?.DeliveryStaffs ?? new List<StaffOptionApiDto>())
+            var staffs = DeduplicateStaffs(payload?.DeliveryStaffs)
                 .Select(x =>
                 {
                     _ = int.TryParse(x.Value, out var staffId);
@@ -232,6 +232,55 @@ public sealed class DeliveryController : LegacySellerControllerBase
         var digits = new string(orderCode.Where(char.IsDigit).ToArray());
         return int.TryParse(digits, out var id) ? id : 0;
     }
+
+    private static List<ShippingRowApiDto> DeduplicateRecentShippings(IEnumerable<ShippingRowApiDto>? rows)
+    {
+        return rows?
+            .Where(row => ParseOrderId(row.OrderCode) > 0 || HasMeaningfulValue(row.OrderCode))
+            .GroupBy(row => ParseOrderId(row.OrderCode) > 0 ? ParseOrderId(row.OrderCode).ToString() : row.OrderCode!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateShippingRowScore)
+                .ThenByDescending(CalculateShippingRowSignalLength)
+                .First())
+            .ToList() ?? new List<ShippingRowApiDto>();
+    }
+
+    private static List<StaffOptionApiDto> DeduplicateStaffs(IEnumerable<StaffOptionApiDto>? staffs)
+    {
+        return staffs?
+            .Where(staff => HasMeaningfulValue(staff.Value))
+            .GroupBy(staff => staff.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(staff => HasMeaningfulValue(staff.Text))
+                .ThenByDescending(CalculateStaffSignalLength)
+                .First())
+            .ToList() ?? new List<StaffOptionApiDto>();
+    }
+
+    private static int CalculateShippingRowScore(ShippingRowApiDto row)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(row.OrderCode) ? 2 : 0;
+        score += HasMeaningfulValue(row.CustomerName) ? 1 : 0;
+        score += HasMeaningfulValue(row.CustomerPhone) ? 1 : 0;
+        score += HasMeaningfulValue(row.DeliveryAddress) ? 1 : 0;
+        score += HasMeaningfulValue(row.ShippingDateFormatted) ? 1 : 0;
+        score += HasMeaningfulValue(row.StatusText) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateShippingRowSignalLength(ShippingRowApiDto row)
+        => (row.OrderCode?.Length ?? 0)
+        + (row.CustomerName?.Length ?? 0)
+        + (row.CustomerPhone?.Length ?? 0)
+        + (row.DeliveryAddress?.Length ?? 0)
+        + (row.ShippingDateFormatted?.Length ?? 0)
+        + (row.StatusText?.Length ?? 0);
+
+    private static int CalculateStaffSignalLength(StaffOptionApiDto staff)
+        => (staff.Value?.Length ?? 0) + (staff.Text?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string NormalizeStatusFilter(string? status)
     {

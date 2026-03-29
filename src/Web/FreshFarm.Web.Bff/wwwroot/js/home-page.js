@@ -28,8 +28,13 @@
         }
 
         let swiperInstance = null;
+        const suggestionRecommendationPlacement = "home_today";
+        let suggestionRecommendationAlgorithm = "catalog_fallback";
+        let suggestionRecommendationRunId = "";
+        const suggestionImpressionIds = new Map();
 
         const endpointBase = "/bff/products";
+        const recommendationEndpoint = "/bff/recommendations/home?limit=12";
         const categoryImages = [
             "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
             "https://images.pexels.com/photos/1656666/pexels-photo-1656666.jpeg",
@@ -106,6 +111,35 @@
         const buildProductUrl = (product) => {
             const productId = toNumber(product.productId, 0);
             return productId > 0 ? `/products/${productId}` : "/search";
+        };
+
+        const buildSuggestionImpressionKey = (productId, rank) =>
+            `${toNumber(productId, 0)}:${Math.max(0, toNumber(rank, 0))}`;
+
+        const registerSuggestionImpressions = (suggestions) => {
+            if (!appHelpers?.trackRecommendationImpression || !Array.isArray(suggestions) || suggestions.length === 0) {
+                return;
+            }
+
+            suggestionRecommendationRunId = appHelpers.createRecommendationRunId?.(suggestionRecommendationPlacement) ?? "";
+            suggestionImpressionIds.clear();
+
+            suggestions.forEach((product, index) => {
+                const rank = index + 1;
+                const impressionKey = buildSuggestionImpressionKey(product.productId, rank);
+
+                void appHelpers.trackRecommendationImpression({
+                    placement: suggestionRecommendationPlacement,
+                    recommendationRunId: suggestionRecommendationRunId,
+                    productId: product.productId,
+                    rank,
+                    algorithm: suggestionRecommendationAlgorithm
+                }).then((eventId) => {
+                    if (eventId) {
+                        suggestionImpressionIds.set(impressionKey, eventId);
+                    }
+                });
+            });
         };
 
         const showCartToast = (message, tone = "success") => {
@@ -284,14 +318,21 @@
             });
         };
 
-        const renderSuggestions = (products) => {
-            const suggestions = products.slice(0, 12);
+        const renderSuggestions = (recommendationPayload, fallbackProducts) => {
+            const recommendationItems = Array.isArray(recommendationPayload?.items)
+                ? recommendationPayload.items.map(normalizeProduct)
+                : [];
+            const suggestions = recommendationItems.length > 0
+                ? recommendationItems
+                : (Array.isArray(fallbackProducts) ? fallbackProducts.slice(0, 12) : []);
+            suggestionRecommendationAlgorithm = (recommendationPayload?.algorithm ?? "").toString().trim() || "catalog_fallback";
             const swiperHost = document.querySelector(".mySwiper-suggest");
             const hasSwiperRuntime = typeof window.Swiper === "function";
 
             if (suggestions.length === 0) {
                 suggestionWrapper.innerHTML = "";
                 suggestionEmpty.classList.remove("d-none");
+                suggestionImpressionIds.clear();
                 if (swiperHost instanceof HTMLElement) {
                     swiperHost.classList.remove("suggestion-fallback-grid");
                 }
@@ -308,7 +349,7 @@
             }
 
             suggestionWrapper.innerHTML = suggestions
-                .map((p) => {
+                .map((p, index) => {
                     const cardMarkup = `
                         <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
                             <div class="product-image-wrapper">
@@ -319,7 +360,11 @@
                                 <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
                                     <span class="fw-bold fs-5">${toVnd(p.price)}</span>
                                 </div>
-                                <a href="${buildProductUrl(p)}" class="view-details mb-3">
+                                <a href="${buildProductUrl(p)}"
+                                   class="view-details mb-3"
+                                   data-action="suggestion-click"
+                                   data-product-id="${p.productId}"
+                                   data-rank="${index + 1}">
                                     <i class="bi bi-eye me-1"></i> Xem chi tiết
                                 </a>
                                 <div class="d-flex flex-wrap gap-2 justify-content-center">
@@ -334,7 +379,11 @@
                                             data-unit-symbol="${escapeHtml(p.unitName)}">
                                         <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
                                     </button>
-                                    <a href="${buildCheckoutUrl(p)}" class="btn btn-success btn-sm">
+                                    <a href="${buildCheckoutUrl(p)}"
+                                       class="btn btn-success btn-sm"
+                                       data-action="suggestion-click"
+                                       data-product-id="${p.productId}"
+                                       data-rank="${index + 1}">
                                         <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
                                     </a>
                                 </div>
@@ -359,6 +408,7 @@
 
             if (!hasSwiperRuntime) {
                 console.warn("Swiper runtime unavailable. Rendering suggestions in static grid mode.");
+                registerSuggestionImpressions(suggestions);
                 return;
             }
 
@@ -387,6 +437,8 @@
                 swiperEl.addEventListener("mouseenter", () => swiperInstance.autoplay.stop());
                 swiperEl.addEventListener("mouseleave", () => swiperInstance.autoplay.start());
             }
+
+            registerSuggestionImpressions(suggestions);
         };
 
         const renderFeatured = (products) => {
@@ -405,6 +457,20 @@
             const target = event.target;
             if (!(target instanceof HTMLElement)) {
                 return;
+            }
+
+            const suggestionLink = target.closest("a[data-action='suggestion-click']");
+            if (suggestionLink instanceof HTMLAnchorElement) {
+                const productId = toNumber(suggestionLink.getAttribute("data-product-id"), 0);
+                const rank = toNumber(suggestionLink.getAttribute("data-rank"), 0);
+                const impressionKey = buildSuggestionImpressionKey(productId, rank);
+
+                void appHelpers?.trackRecommendationClick?.({
+                    recommendationImpressionEventId: suggestionImpressionIds.get(impressionKey) ?? null,
+                    productId,
+                    placement: suggestionRecommendationPlacement,
+                    algorithm: suggestionRecommendationAlgorithm
+                });
             }
 
             const addCartButton = target.closest("button[data-action='add-cart']");
@@ -432,24 +498,38 @@
                     ? `${endpointBase}?name=${encodeURIComponent(keyword)}`
                     : endpointBase;
 
-                const response = await fetch(url, {
-                    method: "GET",
-                    headers: { Accept: "application/json" }
-                });
+                const [productResponse, recommendationResult] = await Promise.all([
+                    fetch(url, {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    }),
+                    fetch(recommendationEndpoint, {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    }).catch(() => null)
+                ]);
 
-                const { payload } = appHelpers
-                    ? await appHelpers.tryParsePayload(response)
-                    : { payload: await response.json() };
-                if (!response.ok) {
-                    throw (appHelpers?.createHttpError(response, payload, "Không tải được sản phẩm.")
-                        ?? new Error(`Không tải được sản phẩm: ${response.status}`));
+                const { payload: productPayload } = appHelpers
+                    ? await appHelpers.tryParsePayload(productResponse)
+                    : { payload: await productResponse.json() };
+                if (!productResponse.ok) {
+                    throw (appHelpers?.createHttpError(productResponse, productPayload, "Không tải được sản phẩm.")
+                        ?? new Error(`Không tải được sản phẩm: ${productResponse.status}`));
                 }
-                const products = Array.isArray(payload)
-                    ? payload.map(normalizeProduct)
+
+                const products = Array.isArray(productPayload)
+                    ? productPayload.map(normalizeProduct)
                     : [];
+                let recommendationData = null;
+                if (recommendationResult instanceof Response) {
+                    const { payload: recommendationPayload } = appHelpers
+                        ? await appHelpers.tryParsePayload(recommendationResult)
+                        : { payload: await recommendationResult.json() };
+                    recommendationData = recommendationResult.ok ? recommendationPayload : null;
+                }
 
                 renderCategories(products);
-                renderSuggestions(products);
+                renderSuggestions(recommendationData, products);
                 renderFeatured(products);
             } catch (error) {
                 categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";

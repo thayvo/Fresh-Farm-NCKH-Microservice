@@ -225,6 +225,25 @@ public class ShippingController : LegacySellerControllerBase
             });
         }
 
+        if (request.OrderId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Bạn cần chọn một đơn hàng có sẵn trước khi tạo vận đơn."
+            });
+        }
+
+        var orderInfo = await GetOrderInfoPayloadAsync(request.OrderId, cancellationToken);
+        if (orderInfo is null || !orderInfo.success)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Không tìm thấy đơn hàng hợp lệ để tạo vận đơn."
+            });
+        }
+
         var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
         {
             ToName = request.ToName ?? string.Empty,
@@ -233,7 +252,7 @@ public class ShippingController : LegacySellerControllerBase
             ToDistrictId = request.ToDistrictId,
             ToWardCode = request.ToWardCode ?? string.Empty,
             ServiceTypeId = request.ServiceTypeId,
-            ClientOrderCode = request.ClientOrderCode ?? string.Empty,
+            ClientOrderCode = BuildBoundClientOrderCode(request.OrderId),
             Content = request.Content ?? string.Empty,
             Note = request.Note ?? string.Empty,
             RequiredNote = request.RequiredNote ?? string.Empty,
@@ -259,72 +278,18 @@ public class ShippingController : LegacySellerControllerBase
                 .ToList() ?? new List<GhnSandboxOrderItemRequest>()
         }, cancellationToken);
 
-        return Json(new
+        if (result.Success)
         {
-            success = result.Success,
-            assumedShopId = result.ShopId,
-            clientOrderCode = result.ClientOrderCode,
-            orderCode = result.OrderCode,
-            sortCode = result.SortCode,
-            serviceId = result.ServiceId,
-            serviceName = result.ServiceName,
-            totalFee = result.TotalFee,
-            expectedDeliveryTimeUnix = result.ExpectedDeliveryTimeUnix,
-            expectedDeliveryTime = result.ExpectedDeliveryTime?.ToString("O"),
-            fromDistrictId = result.FromDistrictId,
-            fromWardCode = result.FromWardCode,
-            message = result.Message
-        });
-    }
-
-    [HttpGet]
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> CreateGhnSandboxOrderQuick([FromBody] CreateGhnSandboxOrderQuickRequest? request, CancellationToken cancellationToken)
-    {
-        if (request is null)
-        {
-            return Json(new
+            await PersistGhnMetadataAsync(request.OrderId, new GhnMetadataUpsertRequest
             {
-                success = false,
-                message = "Thiếu dữ liệu yêu cầu tạo đơn GHN."
-            });
+                OrderCode = result.OrderCode,
+                ClientOrderCode = result.ClientOrderCode,
+                TotalFee = result.TotalFee,
+                CreatedAt = DateTime.UtcNow,
+                ExpectedDeliveryTime = result.ExpectedDeliveryTime?.UtcDateTime,
+                LastSyncedAt = DateTime.UtcNow
+            }, cancellationToken);
         }
-
-        var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
-        {
-            ToName = request.ToName ?? string.Empty,
-            ToPhone = request.ToPhone ?? string.Empty,
-            ToAddress = request.ToAddress ?? string.Empty,
-            ToDistrictId = request.ToDistrictId,
-            ToWardCode = request.ToWardCode ?? string.Empty,
-            ServiceTypeId = request.ServiceTypeId,
-            ClientOrderCode = request.ClientOrderCode ?? string.Empty,
-            Content = request.Content ?? string.Empty,
-            Note = request.Note ?? string.Empty,
-            RequiredNote = request.RequiredNote ?? string.Empty,
-            PaymentTypeId = request.PaymentTypeId,
-            CodAmount = request.CodAmount,
-            InsuranceValue = request.InsuranceValue,
-            Height = request.Height,
-            Length = request.Length,
-            Width = request.Width,
-            Weight = request.Weight,
-            Items = new List<GhnSandboxOrderItemRequest>
-            {
-                new()
-                {
-                    Name = request.ItemName ?? "Nông sản FreshFarm",
-                    Code = request.ItemCode ?? string.Empty,
-                    Quantity = request.ItemQuantity,
-                    Price = request.ItemPrice,
-                    Height = request.Height,
-                    Length = request.Length,
-                    Width = request.Width,
-                    Weight = request.Weight
-                }
-            }
-        }, cancellationToken);
 
         return Json(new
         {
@@ -361,6 +326,22 @@ public class ShippingController : LegacySellerControllerBase
             OrderCode = request.OrderCode ?? string.Empty,
             ClientOrderCode = request.ClientOrderCode ?? string.Empty
         }, cancellationToken);
+
+        var selectedOrderId = ParseNullableInt(Request.Query["orderId"].ToString());
+        if (result.Success && selectedOrderId.HasValue)
+        {
+            await PersistGhnMetadataAsync(selectedOrderId.Value, new GhnMetadataUpsertRequest
+            {
+                OrderCode = result.OrderCode,
+                ClientOrderCode = result.ClientOrderCode,
+                Status = result.Status,
+                StatusLabel = result.StatusLabel,
+                TotalFee = result.TotalFee,
+                CreatedAt = result.CreatedDate?.UtcDateTime,
+                ExpectedDeliveryTime = result.LeadTime?.UtcDateTime,
+                LastSyncedAt = DateTime.UtcNow
+            }, cancellationToken);
+        }
 
         return Json(new
         {
@@ -772,6 +753,53 @@ public class ShippingController : LegacySellerControllerBase
         return client;
     }
 
+    private async Task<OrderInfoApiResponse?> GetOrderInfoPayloadAsync(int orderId, CancellationToken cancellationToken)
+    {
+        if (orderId <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Ordering");
+            var response = await client.GetAsync($"/api/orders/admin/shippings/order-info/{orderId}", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<OrderInfoApiResponse>(JsonOptions, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string BuildBoundClientOrderCode(int orderId)
+    {
+        return $"FF-ORD-{orderId:D6}";
+    }
+
+    private async Task PersistGhnMetadataAsync(int orderId, GhnMetadataUpsertRequest request, CancellationToken cancellationToken)
+    {
+        if (orderId <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Ordering");
+            await client.PostAsJsonAsync($"/api/orders/admin/shippings/{orderId}/ghn-metadata", request, cancellationToken);
+        }
+        catch
+        {
+            // Best-effort sync only. UI flow should not fail because metadata persistence is unavailable.
+        }
+    }
+
     private static Shipping MapShipping(ShippingItemDto item)
     {
         return new Shipping
@@ -785,6 +813,14 @@ public class ShippingController : LegacySellerControllerBase
             AddressDetail = item.addressDetail,
             ProvinceId = item.provinceId,
             CommuneId = item.communeId,
+            GhnOrderCode = item.ghnOrderCode,
+            GhnClientOrderCode = item.ghnClientOrderCode,
+            GhnStatus = item.ghnStatus,
+            GhnStatusLabel = item.ghnStatusLabel,
+            GhnTotalFee = item.ghnTotalFee,
+            GhnCreatedAt = item.ghnCreatedAt,
+            GhnExpectedDeliveryTime = item.ghnExpectedDeliveryTime,
+            GhnLastSyncedAt = item.ghnLastSyncedAt,
             IsStorePickup = item.isStorePickup,
             StoreAddress = item.storeAddress,
             Province = item.province is null
@@ -911,6 +947,22 @@ public class ShippingController : LegacySellerControllerBase
 
         public int? communeId { get; set; }
 
+        public string? ghnOrderCode { get; set; }
+
+        public string? ghnClientOrderCode { get; set; }
+
+        public string? ghnStatus { get; set; }
+
+        public string? ghnStatusLabel { get; set; }
+
+        public decimal? ghnTotalFee { get; set; }
+
+        public DateTime? ghnCreatedAt { get; set; }
+
+        public DateTime? ghnExpectedDeliveryTime { get; set; }
+
+        public DateTime? ghnLastSyncedAt { get; set; }
+
         public bool isStorePickup { get; set; }
 
         public string? storeAddress { get; set; }
@@ -992,6 +1044,38 @@ public class ShippingController : LegacySellerControllerBase
         public int? provinceId { get; set; }
 
         public int? communeId { get; set; }
+
+        public decimal? shippingFee { get; set; }
+
+        public decimal? itemsAmount { get; set; }
+
+        public decimal? totalAmount { get; set; }
+
+        public int? totalQuantity { get; set; }
+
+        public string? itemSummary { get; set; }
+
+        public string? ghnOrderCode { get; set; }
+
+        public string? ghnClientOrderCode { get; set; }
+
+        public string? ghnStatus { get; set; }
+
+        public string? ghnStatusLabel { get; set; }
+
+        public decimal? ghnTotalFee { get; set; }
+
+        public DateTime? ghnCreatedAt { get; set; }
+
+        public DateTime? ghnExpectedDeliveryTime { get; set; }
+
+        public DateTime? ghnLastSyncedAt { get; set; }
+
+        public string? paymentMethod { get; set; }
+
+        public bool isCod { get; set; }
+
+        public decimal? codAmount { get; set; }
     }
 
     private sealed class ShippingEditApiResponse
@@ -1057,6 +1141,8 @@ public class ShippingController : LegacySellerControllerBase
 
     public sealed class CreateGhnSandboxOrderRequest
     {
+        public int OrderId { get; set; }
+
         public string? ToName { get; set; }
 
         public string? ToPhone { get; set; }
@@ -1120,48 +1206,22 @@ public class ShippingController : LegacySellerControllerBase
         public string? ClientOrderCode { get; set; }
     }
 
-    public sealed class CreateGhnSandboxOrderQuickRequest
+    private sealed class GhnMetadataUpsertRequest
     {
-        public string? ToName { get; set; }
-
-        public string? ToPhone { get; set; }
-
-        public string? ToAddress { get; set; }
-
-        public int ToDistrictId { get; set; }
-
-        public string? ToWardCode { get; set; }
-
-        public int? ServiceTypeId { get; set; }
+        public string? OrderCode { get; set; }
 
         public string? ClientOrderCode { get; set; }
 
-        public string? Content { get; set; }
+        public string? Status { get; set; }
 
-        public string? Note { get; set; }
+        public string? StatusLabel { get; set; }
 
-        public string? RequiredNote { get; set; }
+        public decimal? TotalFee { get; set; }
 
-        public int PaymentTypeId { get; set; } = 2;
+        public DateTime? CreatedAt { get; set; }
 
-        public int CodAmount { get; set; }
+        public DateTime? ExpectedDeliveryTime { get; set; }
 
-        public int InsuranceValue { get; set; }
-
-        public int Height { get; set; } = 10;
-
-        public int Length { get; set; } = 20;
-
-        public int Width { get; set; } = 20;
-
-        public int Weight { get; set; } = 500;
-
-        public string? ItemName { get; set; }
-
-        public string? ItemCode { get; set; }
-
-        public int ItemQuantity { get; set; } = 1;
-
-        public int ItemPrice { get; set; }
+        public DateTime? LastSyncedAt { get; set; }
     }
 }

@@ -17,11 +17,13 @@
         hub: null,
         isRealtimeReady: false,
         pollTimer: null,
+        signalRLoader: null,
         lastMessageDate: null, // Track last message date for separator
 
         init: function () {
             this.hub = null;
             this.isRealtimeReady = false;
+            this.signalRLoader = null;
         }
     };
 
@@ -414,7 +416,7 @@
     // Controller Logic
     // ==========================================
     const ChatController = {
-        init: function () {
+        init: async function () {
             ChatState.init();
             ChatUI.init();
             if (SupportConfig.forcePolling) {
@@ -423,7 +425,7 @@
                 this.setPollingEnabled(true);
                 return;
             }
-            const realtimeConfigured = this.setupSignalR();
+            const realtimeConfigured = await this.setupSignalR();
             this.configureRealtimeUi(realtimeConfigured);
             this.loadConversations();
             this.setPollingEnabled(!realtimeConfigured);
@@ -439,7 +441,51 @@
             }
         },
 
-        setupSignalR: function () {
+        ensureSignalRClientScript: function () {
+            if (window.signalR && window.signalR.HubConnectionBuilder) {
+                return Promise.resolve(true);
+            }
+
+            if (ChatState.signalRLoader) {
+                return ChatState.signalRLoader;
+            }
+
+            ChatState.signalRLoader = new Promise(function (resolve) {
+                const existing = document.querySelector('script[data-support-chat-signalr-loader="true"]');
+                if (existing) {
+                    existing.addEventListener('load', function () {
+                        resolve(!!(window.signalR && window.signalR.HubConnectionBuilder));
+                    }, { once: true });
+                    existing.addEventListener('error', function () {
+                        resolve(false);
+                    }, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js';
+                script.async = true;
+                script.dataset.supportChatSignalrLoader = 'true';
+                script.onload = function () {
+                    resolve(!!(window.signalR && window.signalR.HubConnectionBuilder));
+                };
+                script.onerror = function () {
+                    resolve(false);
+                };
+                document.head.appendChild(script);
+            });
+
+            return ChatState.signalRLoader;
+        },
+
+        setupSignalR: async function () {
+            const signalRReady = await this.ensureSignalRClientScript();
+            if (!signalRReady) {
+                console.warn('[support-chat-admin] ASP.NET Core SignalR client not loaded. Fallback to polling mode.');
+                ChatState.isRealtimeReady = false;
+                return false;
+            }
+
             if (!window.signalR || !window.signalR.HubConnectionBuilder) {
                 console.warn('[support-chat-admin] ASP.NET Core SignalR client not loaded. Fallback to polling mode.');
                 ChatState.isRealtimeReady = false;
@@ -454,20 +500,44 @@
             ChatState.hub = connection;
 
             connection.on('newConversationOrMessage', function (payload) {
-                ChatController.loadConversations();
-                if (ChatState.currentConvId === (payload && payload.conversationId)) {
-                    ChatController.reloadCurrentConversationMessages();
-                $.post(SupportRoutes.markAsRead, {
-                    conversationId: ChatState.currentConvId,
-                    __RequestVerificationToken: getAntiForgeryToken()
+                const conversationId = payload && payload.conversationId;
+                const eventType = payload && payload.eventType ? payload.eventType : 'updated';
+                const message = payload && payload.message ? payload.message : null;
+                const isCurrentConversation = ChatState.currentConvId === conversationId;
+
+                ChatController.syncConversationSummary(conversationId, {
+                    message: message,
+                    eventType: eventType,
+                    hasUnread: eventType === 'message' && !isCurrentConversation
                 });
+
+                if (!message || eventType !== 'message') {
+                    ChatController.loadConversations();
+                }
+
+                if (isCurrentConversation) {
+                    ChatController.reloadCurrentConversationMessages();
+                    $.post(SupportRoutes.markAsRead, {
+                        conversationId: ChatState.currentConvId,
+                        __RequestVerificationToken: getAntiForgeryToken()
+                    });
                 }
             });
 
             connection.on('receiveMessage', function (payload) {
                 const conversationId = payload && payload.conversationId;
                 const message = payload && payload.message ? payload.message : payload;
-                if (!message || ChatState.currentConvId !== conversationId) {
+                if (!message) {
+                    return;
+                }
+
+                ChatController.syncConversationSummary(conversationId, {
+                    message: message,
+                    eventType: 'message',
+                    hasUnread: ChatState.currentConvId === conversationId ? false : undefined
+                });
+
+                if (ChatState.currentConvId !== conversationId) {
                     return;
                 }
 
@@ -508,6 +578,7 @@
                 console.warn('[support-chat-admin] SignalR start failed, fallback to polling mode.', err);
                 ChatState.isRealtimeReady = false;
                 ChatController.setPollingEnabled(true);
+                ChatUI.elements.input.attr('placeholder', 'Realtime chua san sang. Dang cap nhat o che do polling.');
             });
 
             return true;
@@ -582,6 +653,65 @@
                     ChatUI.applyFilterAndRender();
                 }
             });
+        },
+
+        syncConversationSummary: function (conversationId, options) {
+            if (!conversationId) {
+                return;
+            }
+
+            options = options || {};
+            const index = ChatState.allConversations.findIndex(function (c) {
+                return c.ConversationId === conversationId;
+            });
+
+            if (index < 0) {
+                return;
+            }
+
+            const current = ChatState.allConversations[index];
+            const message = options.message || null;
+            const normalizedTime = ChatController.getMessageCreatedAtIso(message);
+            const normalizedContent = ChatController.getMessagePreview(message);
+            const nextStatus = options.eventType === 'closed'
+                ? 'Closed'
+                : (options.status || current.Status || 'Open');
+            const nextHasUnread = typeof options.hasUnread === 'boolean'
+                ? options.hasUnread
+                : current.HasUnread;
+
+            const updated = Object.assign({}, current, {
+                LastTime: normalizedTime || current.LastTime,
+                LastContent: normalizedContent || current.LastContent,
+                Status: nextStatus,
+                HasUnread: nextHasUnread
+            });
+
+            ChatState.allConversations.splice(index, 1);
+            ChatState.allConversations.unshift(updated);
+            ChatUI.applyFilterAndRender();
+        },
+
+        getMessageCreatedAtIso: function (message) {
+            if (!message) {
+                return null;
+            }
+
+            return message.createdAt || message.CreatedAt || null;
+        },
+
+        getMessagePreview: function (message) {
+            if (!message) {
+                return null;
+            }
+
+            if (message.isDeleted || message.IsDeleted) {
+                return 'Tin nhan da bi thu hoi';
+            }
+
+            const content = message.content || message.Content || '';
+            const normalized = (content || '').trim();
+            return normalized || null;
         },
 
         selectConversation: function (convId) {
@@ -668,6 +798,16 @@
                     });
                 }
 
+                ChatController.syncConversationSummary(ChatState.currentConvId, {
+                    message: res.message || {
+                        content: msg,
+                        createdAt: new Date().toISOString()
+                    },
+                    eventType: 'message',
+                    hasUnread: false,
+                    status: 'Open'
+                });
+
                 ChatUI.clearReplyMode();
                 ChatUI.elements.input.val('').focus();
                 ChatController.loadConversations();
@@ -689,6 +829,10 @@
                 __RequestVerificationToken: getAntiForgeryToken()
             }, function (res) {
                 if (res && res.ok) {
+                    ChatController.syncConversationSummary(ChatState.currentConvId, {
+                        eventType: 'closed',
+                        status: 'Closed'
+                    });
                     ChatController.loadConversations();
                     ChatUI.elements.closeBtn.prop('disabled', true);
                 }
@@ -710,19 +854,39 @@
             return $('<div/>').text(value || '').html();
         },
 
+        parseServerDate: function (dateStr) {
+            if (!dateStr) return null;
+            if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+
+            if (typeof dateStr === 'string') {
+                const normalized = dateStr.trim();
+                if (!normalized) return null;
+
+                const hasTimezone = /(?:Z|[+\-]\d{2}:\d{2})$/i.test(normalized);
+                const candidate = hasTimezone ? normalized : normalized + 'Z';
+                const parsed = new Date(candidate);
+                return isNaN(parsed.getTime()) ? null : parsed;
+            }
+
+            const parsed = new Date(dateStr);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        },
+
         formatMoney: function (amount) {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
         },
 
         formatDate: function (dateStr) {
             if (!dateStr) return '';
-            const date = new Date(dateStr);
+            const date = this.parseServerDate(dateStr);
+            if (!date) return '';
             return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
         },
 
         formatRelativeTime: function (dateStr) {
             if (!dateStr) return '';
-            const date = new Date(dateStr);
+            const date = this.parseServerDate(dateStr);
+            if (!date) return '';
             const now = new Date();
             const diff = (now - date) / 1000; // seconds
 
@@ -735,7 +899,8 @@
         formatDateSeparator: function (dateStr) {
             if (!dateStr) return '';
             
-            var msgDate = new Date(dateStr);
+            var msgDate = this.parseServerDate(dateStr);
+            if (!msgDate) return '';
             var today = new Date();
             var yesterday = new Date(today);
             yesterday.setDate(today.getDate() - 1);
@@ -761,7 +926,8 @@
         
         getDateKey: function (dateStr) {
             if (!dateStr) return '';
-            var d = new Date(dateStr);
+            var d = this.parseServerDate(dateStr);
+            if (!d) return '';
             return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
         },
 
@@ -770,7 +936,7 @@
 
     // Initialize
     $(document).ready(function () {
-        ChatController.init();
+        void ChatController.init();
     });
 
 })(jQuery);

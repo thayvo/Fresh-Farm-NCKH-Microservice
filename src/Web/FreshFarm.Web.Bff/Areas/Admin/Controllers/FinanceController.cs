@@ -242,21 +242,21 @@ public sealed class FinanceController : LegacySellerControllerBase
             Refunds = payload.SectionCounts?.Refunds ?? 0,
             Returns = payload.SectionCounts?.Returns ?? 0
         };
-        model.SellerOptions = payload.Filters?.SellerOptions?
+        model.SellerOptions = DeduplicateOptions(payload.Filters?.SellerOptions)?
             .Select(x => new FinanceOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
             })
             .ToList() ?? new List<FinanceOptionViewModel>();
-        model.StatusOptions = payload.Filters?.StatusOptions?
+        model.StatusOptions = DeduplicateOptions(payload.Filters?.StatusOptions)?
             .Select(x => new FinanceOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
             })
             .ToList() ?? new List<FinanceOptionViewModel>();
-        model.Rows = payload.Rows?
+        model.Rows = DeduplicateRows(payload.Rows)?
             .Select(x => new FinanceConsoleRowViewModel
             {
                 RecordId = x.RecordId,
@@ -293,7 +293,7 @@ public sealed class FinanceController : LegacySellerControllerBase
                 LastActionSummary = x.LastActionSummary ?? string.Empty
             })
             .ToList() ?? new List<FinanceConsoleRowViewModel>();
-        model.OwnerSummary = payload.OwnerSummary?
+        model.OwnerSummary = DeduplicateOwnerSummary(payload.OwnerSummary)?
             .Select(x => new FinanceOwnerSummaryViewModel
             {
                 OwnerLabel = x.OwnerLabel ?? string.Empty,
@@ -304,6 +304,110 @@ public sealed class FinanceController : LegacySellerControllerBase
             })
             .ToList() ?? new List<FinanceOwnerSummaryViewModel>();
     }
+
+    private static IEnumerable<FinanceOptionApiDto>? DeduplicateOptions(IEnumerable<FinanceOptionApiDto>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First());
+    }
+
+    private static IEnumerable<FinanceConsoleRowApiDto>? DeduplicateRows(IEnumerable<FinanceConsoleRowApiDto>? rows)
+    {
+        return rows?
+            .Where(row => row.RecordId > 0)
+            .GroupBy(row => row.RecordId)
+            .Select(group => group
+                .OrderByDescending(CalculateRowScore)
+                .ThenByDescending(CalculateRowSignalLength)
+                .ThenByDescending(row => row.PaidAt ?? row.ProcessedAt ?? row.ScheduledAt ?? row.CreatedAt)
+                .First());
+    }
+
+    private static IEnumerable<FinanceOwnerSummaryApiDto>? DeduplicateOwnerSummary(IEnumerable<FinanceOwnerSummaryApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.OwnerLabel))
+            .GroupBy(item => item.OwnerLabel!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateOwnerSummaryScore)
+                .ThenByDescending(CalculateOwnerSummarySignalLength)
+                .First());
+    }
+
+    private static int CalculateOptionSignalLength(FinanceOptionApiDto option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateRowScore(FinanceConsoleRowApiDto row)
+    {
+        var score = 0;
+        score += row.OrderId.HasValue ? 1 : 0;
+        score += row.SellerId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.SellerLabel) ? 1 : 0;
+        score += row.OrderCount.HasValue ? 1 : 0;
+        score += row.AmountGross.HasValue ? 1 : 0;
+        score += row.FeeAmount.HasValue ? 1 : 0;
+        score += row.AmountNet.HasValue ? 1 : 0;
+        score += row.RefundAmount.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.Status) ? 1 : 0;
+        score += HasMeaningfulValue(row.Method) ? 1 : 0;
+        score += HasMeaningfulValue(row.Provider) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReferenceCode) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReasonCode) ? 1 : 0;
+        score += HasMeaningfulValue(row.Resolution) ? 1 : 0;
+        score += HasMeaningfulValue(row.ItemName) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReconciliationStatus) ? 1 : 0;
+        score += HasMeaningfulValue(row.NextStep) ? 1 : 0;
+        score += HasMeaningfulValue(row.AssignedOwner) ? 1 : 0;
+        score += row.FollowUpAt.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.FollowUpNote) ? 1 : 0;
+        score += row.ReminderSentAt.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.ReminderNote) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityKey) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityLabel) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityReason) ? 1 : 0;
+        score += HasMeaningfulValue(row.LastActionSummary) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRowSignalLength(FinanceConsoleRowApiDto row)
+        => (row.SellerLabel?.Length ?? 0)
+        + (row.Status?.Length ?? 0)
+        + (row.Method?.Length ?? 0)
+        + (row.Provider?.Length ?? 0)
+        + (row.ReferenceCode?.Length ?? 0)
+        + (row.ReasonCode?.Length ?? 0)
+        + (row.Resolution?.Length ?? 0)
+        + (row.ItemName?.Length ?? 0)
+        + (row.ReconciliationStatus?.Length ?? 0)
+        + (row.NextStep?.Length ?? 0)
+        + (row.AssignedOwner?.Length ?? 0)
+        + (row.FollowUpNote?.Length ?? 0)
+        + (row.ReminderNote?.Length ?? 0)
+        + (row.PriorityKey?.Length ?? 0)
+        + (row.PriorityLabel?.Length ?? 0)
+        + (row.PriorityReason?.Length ?? 0)
+        + (row.LastActionSummary?.Length ?? 0);
+
+    private static int CalculateOwnerSummaryScore(FinanceOwnerSummaryApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.OwnerLabel) ? 2 : 0;
+        score += item.ItemCount > 0 ? 1 : 0;
+        score += item.OverdueCount > 0 ? 1 : 0;
+        score += item.DueSoonCount > 0 ? 1 : 0;
+        score += item.NoFollowUpCount > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateOwnerSummarySignalLength(FinanceOwnerSummaryApiDto item)
+        => (item.OwnerLabel?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string BuildExportEndpoint(string? section, string? q, string? status, string? followUpBucket, int? sellerId)
     {

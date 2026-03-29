@@ -63,7 +63,7 @@ public sealed class RiskController : LegacySellerControllerBase
                         VoucherAbuseCases = overview.Stats?.VoucherAbuseCases ?? 0,
                         ReturnSpikeCases = overview.Stats?.ReturnSpikeCases ?? 0,
                         DecisionsLast7d = overview.Stats?.DecisionsLast7d ?? 0,
-                        Recent = overview.Recent?.Select(x => new RiskRecentCaseViewModel
+                        Recent = DeduplicateRecentCases(overview.Recent).Select(x => new RiskRecentCaseViewModel
                         {
                             RiskCaseId = x.RiskCaseId,
                             CaseType = x.CaseType ?? string.Empty,
@@ -96,10 +96,10 @@ public sealed class RiskController : LegacySellerControllerBase
                 model.Type = payload.Filters?.Type ?? model.Type;
                 model.Status = payload.Filters?.Status ?? model.Status;
                 model.Severity = payload.Filters?.Severity ?? model.Severity;
-                model.TypeOptions = payload.Filters?.TypeOptions?.Select(MapOption).ToList() ?? model.TypeOptions;
-                model.StatusOptions = payload.Filters?.StatusOptions?.Select(MapOption).ToList() ?? model.StatusOptions;
-                model.SeverityOptions = payload.Filters?.SeverityOptions?.Select(MapOption).ToList() ?? model.SeverityOptions;
-                model.Rows = payload.Rows?.Select(x => new RiskCaseRowViewModel
+                model.TypeOptions = DeduplicateOptions(payload.Filters?.TypeOptions).Select(MapOption).ToList();
+                model.StatusOptions = DeduplicateOptions(payload.Filters?.StatusOptions).Select(MapOption).ToList();
+                model.SeverityOptions = DeduplicateOptions(payload.Filters?.SeverityOptions).Select(MapOption).ToList();
+                model.Rows = DeduplicateRiskRows(payload.Rows).Select(x => new RiskCaseRowViewModel
                 {
                     RiskCaseId = x.RiskCaseId,
                     CaseType = x.CaseType ?? string.Empty,
@@ -117,7 +117,7 @@ public sealed class RiskController : LegacySellerControllerBase
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt,
                     LastSignalAt = x.LastSignalAt
-                }).ToList() ?? new List<RiskCaseRowViewModel>();
+                }).ToList();
             }
 
             if (!model.SelectedCaseId.HasValue && model.Rows.Count > 0)
@@ -222,7 +222,7 @@ public sealed class RiskController : LegacySellerControllerBase
             LastSignalAt = payload.LastSignalAt,
             ReviewedAt = payload.ReviewedAt,
             ReviewedBy = payload.ReviewedBy,
-            Signals = payload.Signals?.Select(x => new RiskSignalViewModel
+            Signals = DeduplicateSignals(payload.Signals).Select(x => new RiskSignalViewModel
             {
                 RiskSignalId = x.RiskSignalId,
                 SignalType = x.SignalType ?? string.Empty,
@@ -232,16 +232,16 @@ public sealed class RiskController : LegacySellerControllerBase
                 Score = x.Score,
                 MetadataJson = x.MetadataJson,
                 TriggeredAt = x.TriggeredAt
-            }).ToList() ?? new List<RiskSignalViewModel>(),
-            Decisions = payload.Decisions?.Select(x => new RiskDecisionHistoryViewModel
+            }).ToList(),
+            Decisions = DeduplicateDecisions(payload.Decisions).Select(x => new RiskDecisionHistoryViewModel
             {
                 RiskDecisionId = x.RiskDecisionId,
                 DecisionType = x.DecisionType ?? string.Empty,
                 Notes = x.Notes,
                 CreatedBy = x.CreatedBy,
                 CreatedAt = x.CreatedAt
-            }).ToList() ?? new List<RiskDecisionHistoryViewModel>(),
-            VoucherAbuseCases = payload.VoucherAbuseCases?.Select(x => new VoucherAbuseDetailViewModel
+            }).ToList(),
+            VoucherAbuseCases = DeduplicateVoucherAbuseCases(payload.VoucherAbuseCases).Select(x => new VoucherAbuseDetailViewModel
             {
                 VoucherAbuseCaseId = x.VoucherAbuseCaseId,
                 CouponId = x.CouponId,
@@ -254,8 +254,8 @@ public sealed class RiskController : LegacySellerControllerBase
                 Status = x.Status ?? string.Empty,
                 CreatedAt = x.CreatedAt,
                 ReviewedAt = x.ReviewedAt
-            }).ToList() ?? new List<VoucherAbuseDetailViewModel>(),
-            DecisionOptions = payload.DecisionOptions?.Select(MapOption).ToList() ?? new List<RiskOptionViewModel>()
+            }).ToList(),
+            DecisionOptions = DeduplicateOptions(payload.DecisionOptions).Select(MapOption).ToList()
         };
 
         model.DecisionEditor = new RiskDecisionInputModel
@@ -305,6 +305,182 @@ public sealed class RiskController : LegacySellerControllerBase
             Value = option.Value ?? string.Empty,
             Text = TranslateRiskOption(option.Value, option.Text)
         };
+
+    private static List<RiskRecentApiModel> DeduplicateRecentCases(IEnumerable<RiskRecentApiModel>? items)
+    {
+        return (items ?? [])
+            .Where(item => item.RiskCaseId > 0)
+            .GroupBy(item => item.RiskCaseId)
+            .Select(group => group
+                .OrderByDescending(CalculateRecentCaseScore)
+                .ThenByDescending(CalculateRecentCaseSignalLength)
+                .ThenByDescending(item => item.UpdatedAt ?? item.LastSignalAt ?? DateTime.MinValue)
+                .First())
+            .ToList();
+    }
+
+    private static List<RiskOptionApiModel> DeduplicateOptions(IEnumerable<RiskOptionApiModel>? options)
+    {
+        return (options ?? [])
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static List<RiskCaseRowApiModel> DeduplicateRiskRows(IEnumerable<RiskCaseRowApiModel>? rows)
+    {
+        return (rows ?? [])
+            .Where(row => row.RiskCaseId > 0)
+            .GroupBy(row => row.RiskCaseId)
+            .Select(group => group
+                .OrderByDescending(CalculateRiskRowScore)
+                .ThenByDescending(CalculateRiskRowSignalLength)
+                .ThenByDescending(row => row.UpdatedAt ?? row.LastSignalAt ?? row.CreatedAt)
+                .First())
+            .ToList();
+    }
+
+    private static List<RiskSignalApiModel> DeduplicateSignals(IEnumerable<RiskSignalApiModel>? signals)
+    {
+        return (signals ?? [])
+            .Where(signal => signal.RiskSignalId > 0)
+            .GroupBy(signal => signal.RiskSignalId)
+            .Select(group => group
+                .OrderByDescending(CalculateSignalScore)
+                .ThenByDescending(CalculateSignalSignalLength)
+                .ThenByDescending(signal => signal.TriggeredAt)
+                .First())
+            .ToList();
+    }
+
+    private static List<RiskDecisionApiModel> DeduplicateDecisions(IEnumerable<RiskDecisionApiModel>? decisions)
+    {
+        return (decisions ?? [])
+            .Where(decision => decision.RiskDecisionId > 0)
+            .GroupBy(decision => decision.RiskDecisionId)
+            .Select(group => group
+                .OrderByDescending(CalculateDecisionScore)
+                .ThenByDescending(CalculateDecisionSignalLength)
+                .ThenByDescending(decision => decision.CreatedAt)
+                .First())
+            .ToList();
+    }
+
+    private static List<VoucherAbuseApiModel> DeduplicateVoucherAbuseCases(IEnumerable<VoucherAbuseApiModel>? cases)
+    {
+        return (cases ?? [])
+            .Where(item => item.VoucherAbuseCaseId > 0)
+            .GroupBy(item => item.VoucherAbuseCaseId)
+            .Select(group => group
+                .OrderByDescending(CalculateVoucherAbuseScore)
+                .ThenByDescending(CalculateVoucherAbuseSignalLength)
+                .ThenByDescending(item => item.ReviewedAt ?? item.CreatedAt)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateRecentCaseScore(RiskRecentApiModel item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.CaseType) ? 1 : 0;
+        score += HasMeaningfulValue(item.Title) ? 2 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        score += HasMeaningfulValue(item.Severity) ? 1 : 0;
+        score += item.SignalCount > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRecentCaseSignalLength(RiskRecentApiModel item)
+    {
+        var values = new[] { item.CaseType, item.Title, item.Status, item.Severity };
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateOptionSignalLength(RiskOptionApiModel option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateRiskRowScore(RiskCaseRowApiModel row)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(row.CaseType) ? 1 : 0;
+        score += HasMeaningfulValue(row.Title) ? 2 : 0;
+        score += HasMeaningfulValue(row.Summary) ? 1 : 0;
+        score += HasMeaningfulValue(row.Status) ? 1 : 0;
+        score += HasMeaningfulValue(row.Severity) ? 1 : 0;
+        score += row.SellerId.HasValue && row.SellerId.Value > 0 ? 1 : 0;
+        score += row.BuyerId.HasValue && row.BuyerId.Value > 0 ? 1 : 0;
+        score += row.OrderId.HasValue && row.OrderId.Value > 0 ? 1 : 0;
+        score += row.CampaignId.HasValue && row.CampaignId.Value > 0 ? 1 : 0;
+        score += row.VoucherCouponId.HasValue && row.VoucherCouponId.Value > 0 ? 1 : 0;
+        score += row.SignalCount > 0 ? 1 : 0;
+        score += row.IsEscalated ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRiskRowSignalLength(RiskCaseRowApiModel row)
+    {
+        var values = new[] { row.CaseType, row.Title, row.Summary, row.Status, row.Severity };
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateSignalScore(RiskSignalApiModel signal)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(signal.SignalType) ? 1 : 0;
+        score += HasMeaningfulValue(signal.SignalCode) ? 2 : 0;
+        score += HasMeaningfulValue(signal.Severity) ? 1 : 0;
+        score += HasMeaningfulValue(signal.Source) ? 1 : 0;
+        score += signal.Score > 0 ? 1 : 0;
+        score += HasMeaningfulValue(signal.MetadataJson) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateSignalSignalLength(RiskSignalApiModel signal)
+    {
+        var values = new[] { signal.SignalType, signal.SignalCode, signal.Severity, signal.Source, signal.MetadataJson };
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateDecisionScore(RiskDecisionApiModel decision)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(decision.DecisionType) ? 2 : 0;
+        score += HasMeaningfulValue(decision.Notes) ? 1 : 0;
+        score += decision.CreatedBy.HasValue && decision.CreatedBy.Value > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateDecisionSignalLength(RiskDecisionApiModel decision)
+    {
+        var values = new[] { decision.DecisionType, decision.Notes };
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateVoucherAbuseScore(VoucherAbuseApiModel item)
+    {
+        var score = 0;
+        score += item.CouponId > 0 ? 1 : 0;
+        score += item.BuyerId.HasValue && item.BuyerId.Value > 0 ? 1 : 0;
+        score += item.SellerId.HasValue && item.SellerId.Value > 0 ? 1 : 0;
+        score += item.CampaignId.HasValue && item.CampaignId.Value > 0 ? 1 : 0;
+        score += item.OrderId.HasValue && item.OrderId.Value > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.AbuseType) ? 2 : 0;
+        score += item.SuspectedBenefitAmount.HasValue && item.SuspectedBenefitAmount.Value > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateVoucherAbuseSignalLength(VoucherAbuseApiModel item)
+    {
+        var values = new[] { item.AbuseType, item.Status };
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string TranslateRiskOption(string? value, string? text)
         => (value ?? string.Empty).ToLowerInvariant() switch

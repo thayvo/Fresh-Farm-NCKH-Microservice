@@ -1,0 +1,15 @@
+{
+  "afterLoginUrl": "https://localhost:7085/",
+  "home": {
+    "hasWidget": true,
+    "launcherText": "Chat với shop\n                Chưa có hội thoại nào\n            \n            0",
+    "supportLinkVisible": true,
+    "supportHref": "#buyerChatWidget",
+    "bodySnippet": "Kênh Người Bán\n|\nTrở thành Người bán FreshFarm\n Thông báo\n Hỗ trợ\n|\ntho\nChat với shop\nChưa có hội thoại nào\nFRESHFARM\nRau sạch\nTrái cây\nNông sản hữu cơ\nThực phẩm tươi\nGiao nhanh\nGiỏ hàng\nTrang Chủ\nDanh mục\nGợi Ý Hôm Nay\nSản phẩm nổi bật\nLịch sử đơn\nDanh mục\nKhông tải được danh mục.\nGợi Ý Hôm Nay\nChư"
+  },
+  "panel": {
+    "isOpen": true,
+    "subtitle": "Widget sẽ hiện các shop bạn từng nhắn trên FreshFarm.",
+    "listText": "Đang tải lịch sử chat..."
+  }
+}

@@ -1,0 +1,344 @@
+@model FreshFarm.Web.Bff.Dtos.BecomeSellerPageViewModel
+@{
+    Layout = null;
+    ViewBag.Title = "Đăng ký người bán";
+    var page = Model ?? new FreshFarm.Web.Bff.Dtos.BecomeSellerPageViewModel();
+    var current = page.Current ?? new FreshFarm.Web.Bff.Dtos.SellerApplicationSummaryDto();
+    var form = page.Form ?? new FreshFarm.Web.Bff.Dtos.BecomeSellerRequestDto();
+    ViewData["SellerApplicationSummary"] = current;
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
+    var googleRecaptchaEnabled = ViewData["SellerGoogleRecaptchaEnabled"] as bool? ?? false;
+    var googleRecaptchaSiteKey = ViewData["SellerGoogleRecaptchaSiteKey"] as string ?? string.Empty;
+    var googleRecaptchaAction = ViewData["SellerGoogleRecaptchaAction"] as string ?? "become_seller";
+    var returnUrl = page.ReturnUrl;
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        returnUrl = "/account/become-seller";
+    }
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng ký người bán - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        body { background: radial-gradient(circle at top right, #eefaf3 0, transparent 35%), #f4f7f5; }
+        .seller-shell { max-width: 1200px; }
+        .status-card { background: linear-gradient(135deg, #0f9f5b, #0b6b3d); color: #fff; }
+        .field-note { color: #6b7280; font-size: .875rem; }
+        .review-timeline-item {
+            position: relative;
+            padding-left: 1.25rem;
+        }
+        .review-timeline-item::before {
+            content: "";
+            position: absolute;
+            left: .1rem;
+            top: .45rem;
+            bottom: -.9rem;
+            width: 2px;
+            background: #dbe3dd;
+        }
+        .review-timeline-item:last-child::before {
+            display: none;
+        }
+        .review-timeline-dot {
+            width: .8rem;
+            height: .8rem;
+            border-radius: 999px;
+            position: absolute;
+            left: -.15rem;
+            top: .35rem;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 2px rgba(15, 23, 42, .06);
+        }
+    </style>
+</head>
+<body>
+    <main class="container seller-shell my-5">
+        <div class="mb-4">
+            <h1 class="fw-bold mb-2">Đăng ký trở thành người bán</h1>
+            <p class="text-muted mb-0">Điền hồ sơ gian hàng cơ bản để đội vận hành duyệt và mở quyền seller cho tài khoản của bạn.</p>
+        </div>
+
+        <div class="row g-4">
+            @await Html.PartialAsync("_AccountNav")
+
+            <section class="col-lg-9">
+                @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="alert alert-success">@successMessage</div>
+                }
+
+                @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
+                {
+                    <div class="alert alert-danger">@pageError</div>
+                }
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger">
+                        <div class="fw-semibold mb-1">Hồ sơ chưa hợp lệ</div>
+                        <div>Vui lòng kiểm tra lại các trường bắt buộc trước khi gửi.</div>
+                    </div>
+                }
+
+                <div class="card border-0 shadow-sm status-card mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3">
+                            <div>
+                                <div class="text-uppercase small opacity-75 mb-2">Trạng thái hiện tại</div>
+                                <h4 class="fw-bold mb-2">@current.StatusLabel</h4>
+                                <p class="mb-2">@current.Message</p>
+                                @if (current.SubmittedAtUtc.HasValue)
+                                {
+                                    <div class="small opacity-75">Gửi hồ sơ: @current.SubmittedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                                @if (current.UpdatedAtUtc.HasValue)
+                                {
+                                    <div class="small opacity-75">Cập nhật gần nhất: @current.UpdatedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                            <div class="small opacity-75">
+                                <div>Store: @(string.IsNullOrWhiteSpace(current.StoreName) ? "Chưa có" : current.StoreName)</div>
+                                <div>Liên hệ: @(string.IsNullOrWhiteSpace(current.StorePhone) ? "Chưa có" : current.StorePhone)</div>
+                                <div>Rà soát hồ sơ: @current.ReviewStatusLabel</div>
+                            </div>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(current.ReviewNote))
+                        {
+                            <div class="alert alert-warning border-0 mt-3 mb-0">
+                                <div class="fw-semibold mb-1">Lý do cần bổ sung hồ sơ</div>
+                                <div>@current.ReviewNote</div>
+                                @if (current.ReviewedAtUtc.HasValue)
+                                {
+                                    <div class="small mt-2 opacity-75">Admin cập nhật: @current.ReviewedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (current.ReviewHistory.Count > 0)
+                {
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-1">Lịch sử rà soát hồ sơ</h5>
+                                    <div class="text-muted small">Các lần đội vận hành đã cập nhật trạng thái hồ sơ seller của bạn.</div>
+                                </div>
+                                <span class="badge text-bg-light border">@current.ReviewHistory.Count sự kiện</span>
+                            </div>
+
+                            <div class="d-flex flex-column gap-3">
+                                @foreach (var item in current.ReviewHistory)
+                                {
+                                    <article class="review-timeline-item">
+                                        <span class="review-timeline-dot bg-@item.TimelineTone"></span>
+                                        <div class="border rounded-4 p-3 bg-light">
+                                            <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-1">
+                                                <div class="fw-semibold">@item.ActionLabel</div>
+                                                <div class="small text-muted">@item.ReviewedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                            </div>
+                                            <div class="small mb-2">
+                                                <span class="badge text-bg-@item.TimelineTone">@item.ReviewStatusLabel</span>
+                                                <span class="text-muted ms-2">Cập nhật bởi @item.ReviewerDisplayName</span>
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(item.Note))
+                                            {
+                                                <div>@item.Note</div>
+                                            }
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4 p-md-5">
+                        <form asp-controller="Account"
+                              asp-action="BecomeSeller"
+                              method="post"
+                              enctype="multipart/form-data"
+                              novalidate
+                              id="becomeSellerForm"
+                              data-recaptcha-site-key="@googleRecaptchaSiteKey"
+                              data-recaptcha-action="@googleRecaptchaAction">
+                            @Html.AntiForgeryToken()
+                            <input asp-for="ReturnUrl" type="hidden" />
+                            @if (googleRecaptchaEnabled && !string.IsNullOrWhiteSpace(googleRecaptchaSiteKey))
+                            {
+                                <input asp-for="Form.RecaptchaToken" type="hidden" />
+                            }
+
+                            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                            @if (googleRecaptchaEnabled && !string.IsNullOrWhiteSpace(googleRecaptchaSiteKey))
+                            {
+                                <span asp-validation-for="Form.RecaptchaToken" class="text-danger small d-block mb-3"></span>
+                            }
+
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Tên cửa hàng</label>
+                                    <input asp-for="Form.StoreName" class="form-control" maxlength="255" />
+                                    <span asp-validation-for="Form.StoreName" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Email liên hệ</label>
+                                    <input asp-for="Form.StoreEmail" class="form-control" type="email" maxlength="100" />
+                                    <span asp-validation-for="Form.StoreEmail" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Số điện thoại cửa hàng</label>
+                                    <input asp-for="Form.StorePhone" class="form-control" maxlength="12" />
+                                    <span asp-validation-for="Form.StorePhone" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Email nhận thông báo</label>
+                                    <input asp-for="Form.AdminNotificationEmail" class="form-control" type="email" maxlength="100" />
+                                    <div class="field-note mt-1">Có thể dùng cùng email liên hệ nếu bạn chưa tách riêng vận hành.</div>
+                                    <span asp-validation-for="Form.AdminNotificationEmail" class="text-danger small"></span>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Địa chỉ hoạt động</label>
+                                    <textarea asp-for="Form.StoreAddress" class="form-control" rows="3" maxlength="500"></textarea>
+                                    <span asp-validation-for="Form.StoreAddress" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Tên người lấy hàng</label>
+                                    <input asp-for="Form.PickupName" class="form-control" maxlength="150" />
+                                    <span asp-validation-for="Form.PickupName" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Số điện thoại lấy hàng</label>
+                                    <input asp-for="Form.PickupPhone" class="form-control" maxlength="12" />
+                                    <span asp-validation-for="Form.PickupPhone" class="text-danger small"></span>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Địa chỉ lấy hàng</label>
+                                    <textarea asp-for="Form.PickupAddress" class="form-control" rows="2" maxlength="500"></textarea>
+                                    <span asp-validation-for="Form.PickupAddress" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Thông tin tài khoản ngân hàng</label>
+                                    <textarea asp-for="Form.BankAccountInfo" class="form-control" rows="3" maxlength="500"></textarea>
+                                    <span asp-validation-for="Form.BankAccountInfo" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Hướng dẫn chuyển khoản</label>
+                                    <textarea asp-for="Form.BankTransferInstructions" class="form-control" rows="3" maxlength="1000"></textarea>
+                                    <span asp-validation-for="Form.BankTransferInstructions" class="text-danger small"></span>
+                                </div>
+
+                                <div class="col-12 mt-3">
+                                    <div class="border rounded-4 p-3 bg-light-subtle">
+                                        <div class="fw-semibold mb-1">Hồ sơ pháp lý người bán</div>
+                                        <div class="text-muted small">Tải CCCD và chứng từ liên quan để đội vận hành rà soát trước khi duyệt seller.</div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Họ tên trên CCCD</label>
+                                    <input asp-for="Form.LegalFullName" class="form-control" maxlength="150" />
+                                    <span asp-validation-for="Form.LegalFullName" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Số CCCD/CMND</label>
+                                    <input asp-for="Form.IdentityNumber" class="form-control" maxlength="50" />
+                                    <span asp-validation-for="Form.IdentityNumber" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Ngày cấp CCCD/CMND</label>
+                                    <input asp-for="Form.IdentityIssuedDate" class="form-control" type="date" />
+                                    <span asp-validation-for="Form.IdentityIssuedDate" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Nơi cấp CCCD/CMND</label>
+                                    <input asp-for="Form.IdentityIssuedPlace" class="form-control" maxlength="255" />
+                                    <span asp-validation-for="Form.IdentityIssuedPlace" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Mã số thuế</label>
+                                    <input asp-for="Form.TaxCode" class="form-control" maxlength="50" />
+                                    <span asp-validation-for="Form.TaxCode" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Số giấy phép kinh doanh</label>
+                                    <input asp-for="Form.BusinessLicenseNumber" class="form-control" maxlength="100" />
+                                    <span asp-validation-for="Form.BusinessLicenseNumber" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">CCCD mặt trước</label>
+                                    <input asp-for="CitizenIdFrontFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp" />
+                                    @if (!string.IsNullOrWhiteSpace(form.CitizenIdFrontUrl))
+                                    {
+                                        <div class="field-note mt-1"><a href="@form.CitizenIdFrontUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                    }
+                                    <span asp-validation-for="CitizenIdFrontFile" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">CCCD mặt sau</label>
+                                    <input asp-for="CitizenIdBackFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp" />
+                                    @if (!string.IsNullOrWhiteSpace(form.CitizenIdBackUrl))
+                                    {
+                                        <div class="field-note mt-1"><a href="@form.CitizenIdBackUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                    }
+                                    <span asp-validation-for="CitizenIdBackFile" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Giấy phép kinh doanh</label>
+                                    <input asp-for="BusinessLicenseFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" />
+                                    @if (!string.IsNullOrWhiteSpace(form.BusinessLicenseUrl))
+                                    {
+                                        <div class="field-note mt-1"><a href="@form.BusinessLicenseUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                    }
+                                    <span asp-validation-for="BusinessLicenseFile" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Chứng từ bổ sung</label>
+                                    <input asp-for="AdditionalDocumentFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" />
+                                    @if (!string.IsNullOrWhiteSpace(form.AdditionalDocumentUrl))
+                                    {
+                                        <div class="field-note mt-1"><a href="@form.AdditionalDocumentUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                    }
+                                    <span asp-validation-for="AdditionalDocumentFile" class="text-danger small"></span>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold">Ghi chú hồ sơ</label>
+                                    <textarea asp-for="Form.Notes" class="form-control" rows="3" maxlength="1000"></textarea>
+                                    <span asp-validation-for="Form.Notes" class="text-danger small"></span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap mt-4">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="bi bi-send-check me-2"></i>@(current.HasApplication ? "Cập nhật hồ sơ seller" : "Gửi hồ sơ đăng ký")
+                                </button>
+                                <a href="/account/profile" class="btn btn-outline-secondary">
+                                    <i class="bi bi-arrow-left me-2"></i>Quay lại tài khoản
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @await Html.PartialAsync("_IdleSessionMonitor")
+    <script nonce="@cspNonce" src="~/js/csp-phase2.js" asp-append-version="true"></script>
+    @if (googleRecaptchaEnabled && !string.IsNullOrWhiteSpace(googleRecaptchaSiteKey))
+    {
+        <script nonce="@cspNonce" src="~/js/become-seller-recaptcha.js" asp-append-version="true"></script>
+        <script nonce="@cspNonce" src="https://www.google.com/recaptcha/api.js?render=@googleRecaptchaSiteKey" async defer></script>
+    }
+    <partial name="_ValidationScriptsPartial" />
+</body>
+</html>

@@ -513,7 +513,8 @@ public sealed class ProductController : LegacySellerControllerBase
             return new List<Product>();
         }
 
-        var apiProducts = await response.Content.ReadFromJsonAsync<List<ApiProductDto>>(JsonOptions) ?? new List<ApiProductDto>();
+        var apiProducts = DeduplicateProducts(
+            await response.Content.ReadFromJsonAsync<List<ApiProductDto>>(JsonOptions) ?? new List<ApiProductDto>());
         return apiProducts.Select(MapProduct).ToList();
     }
 
@@ -541,7 +542,8 @@ public sealed class ProductController : LegacySellerControllerBase
             return new List<Category>();
         }
 
-        var apiCategories = await response.Content.ReadFromJsonAsync<List<ApiCategoryDto>>(JsonOptions) ?? new List<ApiCategoryDto>();
+        var apiCategories = DeduplicateCategories(
+            await response.Content.ReadFromJsonAsync<List<ApiCategoryDto>>(JsonOptions) ?? new List<ApiCategoryDto>());
         return apiCategories.Select(c => new Category
         {
             CategoryID = c.CategoryId,
@@ -565,7 +567,8 @@ public sealed class ProductController : LegacySellerControllerBase
             return new List<Unit>();
         }
 
-        var apiUnits = await response.Content.ReadFromJsonAsync<List<ApiUnitDto>>(JsonOptions) ?? new List<ApiUnitDto>();
+        var apiUnits = DeduplicateUnits(
+            await response.Content.ReadFromJsonAsync<List<ApiUnitDto>>(JsonOptions) ?? new List<ApiUnitDto>());
         return apiUnits.Select(u => new Unit
         {
             UnitID = u.UnitId,
@@ -614,6 +617,89 @@ public sealed class ProductController : LegacySellerControllerBase
             }).ToList() ?? new List<ProductInfo>()
         };
     }
+
+    private static List<ApiProductDto> DeduplicateProducts(IEnumerable<ApiProductDto> products)
+    {
+        return products
+            .Where(product => product.ProductId > 0)
+            .GroupBy(product => product.ProductId)
+            .Select(group => SelectPreferredProduct(group))
+            .ToList();
+    }
+
+    private static ApiProductDto SelectPreferredProduct(IEnumerable<ApiProductDto> products)
+    {
+        return products
+            .OrderByDescending(CalculateProductScore)
+            .ThenByDescending(CalculateProductSignalLength)
+            .ThenByDescending(product => product.UpdatedDate ?? product.CreatedDate)
+            .First();
+    }
+
+    private static int CalculateProductScore(ApiProductDto product)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(product.ProductName) ? 3 : 0;
+        score += HasMeaningfulValue(product.Sku) ? 2 : 0;
+        score += HasMeaningfulValue(product.CategoryName) ? 2 : 0;
+        score += HasMeaningfulValue(product.UnitName) ? 1 : 0;
+        score += HasMeaningfulValue(product.ShortDescription) ? 1 : 0;
+        score += HasMeaningfulValue(product.LongDescription) ? 1 : 0;
+        score += HasMeaningfulValue(product.ImageFileName) ? 1 : 0;
+        score += product.Price > 0 ? 1 : 0;
+        score += product.StockQuantity > 0 ? 1 : 0;
+        score += product.ProductInfos?.Count > 0 ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateProductSignalLength(ApiProductDto product)
+    {
+        var values = new[]
+        {
+            product.ProductName,
+            product.Sku,
+            product.CategoryName,
+            product.UnitName,
+            product.ShortDescription,
+            product.LongDescription,
+            product.ImageFileName
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static List<ApiCategoryDto> DeduplicateCategories(IEnumerable<ApiCategoryDto> categories)
+    {
+        return categories
+            .Where(category => category.CategoryId > 0)
+            .GroupBy(category => category.CategoryId)
+            .Select(group => group
+                .OrderByDescending(category => HasMeaningfulValue(category.CategoryName))
+                .ThenByDescending(category => HasMeaningfulValue(category.Description))
+                .ThenByDescending(category => category.IsActive)
+                .ThenByDescending(category => category.UpdatedDate ?? category.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static List<ApiUnitDto> DeduplicateUnits(IEnumerable<ApiUnitDto> units)
+    {
+        return units
+            .Where(unit => unit.UnitId > 0)
+            .GroupBy(unit => unit.UnitId)
+            .Select(group => group
+                .OrderByDescending(unit => HasMeaningfulValue(unit.UnitName))
+                .ThenByDescending(unit => HasMeaningfulValue(unit.Symbol))
+                .ThenByDescending(unit => HasMeaningfulValue(unit.Description))
+                .ThenByDescending(unit => unit.IsActive)
+                .ThenByDescending(unit => unit.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private void LoadDropdownData(IEnumerable<Category> categories, IEnumerable<Unit> units, int? selectedCategory, int? selectedUnit)
     {
@@ -700,6 +786,7 @@ public sealed class ProductController : LegacySellerControllerBase
         public int StockQuantity { get; set; }
         public string? ImageFileName { get; set; }
         public DateTime CreatedDate { get; set; }
+        public DateTime? UpdatedDate { get; set; }
         public string? ShortDescription { get; set; }
         public string? LongDescription { get; set; }
         public bool IsManuallyDisabled { get; set; }

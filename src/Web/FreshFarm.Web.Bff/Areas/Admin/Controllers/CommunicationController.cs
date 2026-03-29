@@ -65,17 +65,17 @@ public sealed class CommunicationController : LegacySellerControllerBase
                 OptedOutCount = payload.Stats?.OptedOutCount ?? 0,
                 UpdatedPreferences24h = payload.Stats?.UpdatedPreferences24h ?? 0
             };
-            model.ChannelOptions = payload.Filters?.ChannelOptions?.Select(MapOption).ToList() ?? model.ChannelOptions;
-            model.EventOptions = payload.Filters?.EventOptions?.Select(MapOption).ToList() ?? model.EventOptions;
-            model.AudienceOptions = payload.Filters?.AudienceOptions?.Select(MapOption).ToList() ?? model.AudienceOptions;
-            model.DeliveryModeOptions = payload.Filters?.DeliveryModeOptions?.Select(MapOption).ToList() ?? model.DeliveryModeOptions;
-            model.SourceOptions = payload.Filters?.SourceOptions?.Select(MapOption).ToList() ?? model.SourceOptions;
-            model.TemplateOptions = payload.Filters?.Templates?.Select(x => new CommunicationTemplateOptionViewModel
+            model.ChannelOptions = DeduplicateOptions(payload.Filters?.ChannelOptions).Select(MapOption).ToList();
+            model.EventOptions = DeduplicateOptions(payload.Filters?.EventOptions).Select(MapOption).ToList();
+            model.AudienceOptions = DeduplicateOptions(payload.Filters?.AudienceOptions).Select(MapOption).ToList();
+            model.DeliveryModeOptions = DeduplicateOptions(payload.Filters?.DeliveryModeOptions).Select(MapOption).ToList();
+            model.SourceOptions = DeduplicateOptions(payload.Filters?.SourceOptions).Select(MapOption).ToList();
+            model.TemplateOptions = DeduplicateTemplateOptions(payload.Filters?.Templates).Select(x => new CommunicationTemplateOptionViewModel
             {
                 CommunicationTemplateId = x.CommunicationTemplateId,
                 Text = x.Text ?? string.Empty
-            }).ToList() ?? new List<CommunicationTemplateOptionViewModel>();
-            model.Templates = payload.Templates?.Select(x => new CommunicationTemplateRowViewModel
+            }).ToList();
+            model.Templates = DeduplicateTemplates(payload.Templates).Select(x => new CommunicationTemplateRowViewModel
             {
                 CommunicationTemplateId = x.CommunicationTemplateId,
                 TemplateName = x.TemplateName ?? string.Empty,
@@ -89,8 +89,8 @@ public sealed class CommunicationController : LegacySellerControllerBase
                 LastEditedByUserId = x.LastEditedByUserId,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
-            }).ToList() ?? new List<CommunicationTemplateRowViewModel>();
-            model.Policies = payload.Policies?.Select(x => new CommunicationPolicyRowViewModel
+            }).ToList();
+            model.Policies = DeduplicatePolicies(payload.Policies).Select(x => new CommunicationPolicyRowViewModel
             {
                 NotificationPolicyRuleId = x.NotificationPolicyRuleId,
                 EventType = x.EventType ?? string.Empty,
@@ -105,8 +105,8 @@ public sealed class CommunicationController : LegacySellerControllerBase
                 Notes = x.Notes,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
-            }).ToList() ?? new List<CommunicationPolicyRowViewModel>();
-            model.Preferences = payload.Preferences?.Select(x => new CommunicationPreferenceRowViewModel
+            }).ToList();
+            model.Preferences = DeduplicatePreferences(payload.Preferences).Select(x => new CommunicationPreferenceRowViewModel
             {
                 NotificationPreferenceId = x.NotificationPreferenceId,
                 UserId = x.UserId,
@@ -116,7 +116,7 @@ public sealed class CommunicationController : LegacySellerControllerBase
                 Source = x.Source ?? string.Empty,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
-            }).ToList() ?? new List<CommunicationPreferenceRowViewModel>();
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -227,6 +227,140 @@ public sealed class CommunicationController : LegacySellerControllerBase
             Value = option.Value ?? string.Empty,
             Text = option.Text ?? string.Empty
         };
+
+    private static List<CommunicationOptionApiModel> DeduplicateOptions(IEnumerable<CommunicationOptionApiModel>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First())
+            .ToList() ?? new List<CommunicationOptionApiModel>();
+    }
+
+    private static List<CommunicationTemplateOptionApiModel> DeduplicateTemplateOptions(IEnumerable<CommunicationTemplateOptionApiModel>? options)
+    {
+        return options?
+            .Where(option => option.CommunicationTemplateId > 0)
+            .GroupBy(option => option.CommunicationTemplateId)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateTemplateOptionSignalLength)
+                .First())
+            .ToList() ?? new List<CommunicationTemplateOptionApiModel>();
+    }
+
+    private static List<CommunicationTemplateApiModel> DeduplicateTemplates(IEnumerable<CommunicationTemplateApiModel>? templates)
+    {
+        return templates?
+            .Where(template => template.CommunicationTemplateId > 0)
+            .GroupBy(template => template.CommunicationTemplateId)
+            .Select(group => group
+                .OrderByDescending(CalculateTemplateScore)
+                .ThenByDescending(CalculateTemplateSignalLength)
+                .ThenByDescending(template => template.UpdatedAt ?? template.CreatedAt)
+                .First())
+            .ToList() ?? new List<CommunicationTemplateApiModel>();
+    }
+
+    private static List<CommunicationPolicyApiModel> DeduplicatePolicies(IEnumerable<CommunicationPolicyApiModel>? policies)
+    {
+        return policies?
+            .Where(policy => policy.NotificationPolicyRuleId > 0)
+            .GroupBy(policy => policy.NotificationPolicyRuleId)
+            .Select(group => group
+                .OrderByDescending(CalculatePolicyScore)
+                .ThenByDescending(CalculatePolicySignalLength)
+                .ThenByDescending(policy => policy.UpdatedAt ?? policy.CreatedAt)
+                .First())
+            .ToList() ?? new List<CommunicationPolicyApiModel>();
+    }
+
+    private static List<CommunicationPreferenceApiModel> DeduplicatePreferences(IEnumerable<CommunicationPreferenceApiModel>? preferences)
+    {
+        return preferences?
+            .Where(preference => preference.NotificationPreferenceId > 0)
+            .GroupBy(preference => preference.NotificationPreferenceId)
+            .Select(group => group
+                .OrderByDescending(CalculatePreferenceScore)
+                .ThenByDescending(CalculatePreferenceSignalLength)
+                .ThenByDescending(preference => preference.UpdatedAt)
+                .First())
+            .ToList() ?? new List<CommunicationPreferenceApiModel>();
+    }
+
+    private static int CalculateOptionSignalLength(CommunicationOptionApiModel option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateTemplateOptionSignalLength(CommunicationTemplateOptionApiModel option)
+        => option.Text?.Length ?? 0;
+
+    private static int CalculateTemplateScore(CommunicationTemplateApiModel template)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(template.TemplateName) ? 2 : 0;
+        score += HasMeaningfulValue(template.EventType) ? 1 : 0;
+        score += HasMeaningfulValue(template.Channel) ? 1 : 0;
+        score += HasMeaningfulValue(template.Locale) ? 1 : 0;
+        score += HasMeaningfulValue(template.Subject) ? 1 : 0;
+        score += HasMeaningfulValue(template.Body) ? 2 : 0;
+        score += template.IsActive ? 1 : 0;
+        score += template.Version > 0 ? 1 : 0;
+        score += template.LastEditedByUserId.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateTemplateSignalLength(CommunicationTemplateApiModel template)
+        => (template.TemplateName?.Length ?? 0)
+        + (template.EventType?.Length ?? 0)
+        + (template.Channel?.Length ?? 0)
+        + (template.Locale?.Length ?? 0)
+        + (template.Subject?.Length ?? 0)
+        + (template.Body?.Length ?? 0);
+
+    private static int CalculatePolicyScore(CommunicationPolicyApiModel policy)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(policy.EventType) ? 1 : 0;
+        score += HasMeaningfulValue(policy.Channel) ? 1 : 0;
+        score += HasMeaningfulValue(policy.AudienceType) ? 1 : 0;
+        score += policy.CommunicationTemplateId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(policy.TemplateName) ? 1 : 0;
+        score += policy.IsEnabled ? 1 : 0;
+        score += policy.CooldownMinutes > 0 ? 1 : 0;
+        score += HasMeaningfulValue(policy.DeliveryMode) ? 1 : 0;
+        score += policy.Priority > 0 ? 1 : 0;
+        score += HasMeaningfulValue(policy.Notes) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculatePolicySignalLength(CommunicationPolicyApiModel policy)
+        => (policy.EventType?.Length ?? 0)
+        + (policy.Channel?.Length ?? 0)
+        + (policy.AudienceType?.Length ?? 0)
+        + (policy.TemplateName?.Length ?? 0)
+        + (policy.DeliveryMode?.Length ?? 0)
+        + (policy.Notes?.Length ?? 0);
+
+    private static int CalculatePreferenceScore(CommunicationPreferenceApiModel preference)
+    {
+        var score = 0;
+        score += preference.UserId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(preference.EventType) ? 1 : 0;
+        score += HasMeaningfulValue(preference.Channel) ? 1 : 0;
+        score += preference.IsOptedIn ? 1 : 0;
+        score += HasMeaningfulValue(preference.Source) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculatePreferenceSignalLength(CommunicationPreferenceApiModel preference)
+        => (preference.EventType?.Length ?? 0)
+        + (preference.Channel?.Length ?? 0)
+        + (preference.Source?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? "all" : value.Trim().ToLowerInvariant();

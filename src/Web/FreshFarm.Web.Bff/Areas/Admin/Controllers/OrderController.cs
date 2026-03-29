@@ -575,11 +575,55 @@ public class OrderController : LegacySellerControllerBase
         List<Dictionary<string, object?>> rows,
         HashSet<int> allowedOrderIds)
     {
-        return rows.Where(row =>
+        return rows
+            .Select(row => new
+            {
+                Row = row,
+                OrderId = TryGetOrderIdFromRow(row)
+            })
+            .Where(entry => entry.OrderId.HasValue && allowedOrderIds.Contains(entry.OrderId.Value))
+            .GroupBy(entry => entry.OrderId!.Value)
+            .Select(group => SelectPreferredOrderRow(group.Select(entry => entry.Row)))
+            .ToList();
+    }
+
+    private static Dictionary<string, object?> SelectPreferredOrderRow(IEnumerable<Dictionary<string, object?>> rows)
+    {
+        return rows
+            .OrderByDescending(CalculateOrderRowScore)
+            .ThenByDescending(CalculateOrderRowSignalLength)
+            .First();
+    }
+
+    private static int CalculateOrderRowScore(IReadOnlyDictionary<string, object?> row)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(GetRowValue(row, "OrderCode", "orderCode")) ? 3 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "CustomerName", "customerName", "buyerFullName")) ? 3 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "OrderDate", "orderDate")) ? 2 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "TotalAmount", "totalAmount", "total")) ? 2 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "Status", "status")) ? 2 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "StatusText", "statusText")) ? 1 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "StatusBadgeClass", "statusBadgeClass")) ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateOrderRowSignalLength(IReadOnlyDictionary<string, object?> row)
+    {
+        var values = new[]
         {
-            var orderId = TryGetOrderIdFromRow(row);
-            return orderId.HasValue && allowedOrderIds.Contains(orderId.Value);
-        }).ToList();
+            GetRowValue(row, "OrderCode", "orderCode"),
+            GetRowValue(row, "CustomerName", "customerName", "buyerFullName"),
+            GetRowValue(row, "OrderDate", "orderDate"),
+            GetRowValue(row, "TotalAmount", "totalAmount", "total"),
+            GetRowValue(row, "Status", "status"),
+            GetRowValue(row, "StatusText", "statusText"),
+            GetRowValue(row, "StatusBadgeClass", "statusBadgeClass")
+        };
+
+        return values.Sum(value => value?.ToString()?.Length ?? 0);
     }
 
     private static int? TryGetOrderIdFromRow(IReadOnlyDictionary<string, object?> row)
@@ -641,6 +685,17 @@ public class OrderController : LegacySellerControllerBase
         }
 
         return value;
+    }
+
+    private static bool HasMeaningfulValue(object? value)
+    {
+        return value switch
+        {
+            null => false,
+            string text => !string.IsNullOrWhiteSpace(text),
+            JsonElement element => element.ValueKind != JsonValueKind.Null && element.ValueKind != JsonValueKind.Undefined,
+            _ => true
+        };
     }
 
     private static string? BuildOrderCodeFromId(object? orderId)

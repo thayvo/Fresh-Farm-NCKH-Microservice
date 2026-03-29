@@ -57,16 +57,29 @@ builder.Services.Configure<PasswordResetOptions>(builder.Configuration.GetSectio
 builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSection(EmailVerificationOptions.SectionName));
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
 builder.Services.Configure<GeoIpOptions>(builder.Configuration.GetSection(GeoIpOptions.SectionName));
+builder.Services.Configure<OrderingServiceOptions>(builder.Configuration.GetSection(OrderingServiceOptions.SectionName));
 builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
 builder.Services.AddScoped<IEmailVerificationTokenService, EmailVerificationTokenService>();
 builder.Services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
 builder.Services.AddScoped<IAuthAuditService, AuthAuditService>();
+builder.Services.AddScoped<ISellerStoreSettingsResolver, SellerStoreSettingsResolver>();
 builder.Services.AddHttpClient<IGeoIpLookupService, GeoIpLookupService>((serviceProvider, client) =>
 {
     var geoIpOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<GeoIpOptions>>().Value;
     var baseUrl = string.IsNullOrWhiteSpace(geoIpOptions.BaseUrl) ? "https://ipwho.is/" : geoIpOptions.BaseUrl;
     client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
     client.Timeout = TimeSpan.FromSeconds(Math.Max(1, geoIpOptions.TimeoutSeconds));
+});
+builder.Services.AddHttpClient<ICustomerNotificationPublisher, OrderingCustomerNotificationPublisher>((serviceProvider, client) =>
+{
+    var orderingOptions = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OrderingServiceOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(orderingOptions.BaseUrl))
+    {
+        var baseUrl = orderingOptions.BaseUrl.EndsWith('/') ? orderingOptions.BaseUrl : orderingOptions.BaseUrl + "/";
+        client.BaseAddress = new Uri(baseUrl);
+    }
+
+    client.Timeout = TimeSpan.FromSeconds(5);
 });
 builder.Services.AddSingleton<ITotpService, TotpService>();
 builder.Services.AddSingleton<ITwoFactorLoginTicketService, TwoFactorLoginTicketService>();
@@ -112,6 +125,8 @@ builder.Services.AddAuthorization(options =>
 });
 
 var app = builder.Build();
+
+await SellerSchemaInitializer.EnsureCreatedAsync(app.Services);
 
 if (app.Environment.IsDevelopment())
 {

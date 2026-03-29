@@ -1448,6 +1448,14 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.FullName)
                 .IsRequired()
                 .HasMaxLength(100);
+            entity.Property(e => e.GhnClientOrderCode).HasMaxLength(50);
+            entity.Property(e => e.GhnCreatedAt).HasColumnType("datetime");
+            entity.Property(e => e.GhnExpectedDeliveryTime).HasColumnType("datetime");
+            entity.Property(e => e.GhnLastSyncedAt).HasColumnType("datetime");
+            entity.Property(e => e.GhnOrderCode).HasMaxLength(50);
+            entity.Property(e => e.GhnStatus).HasMaxLength(50);
+            entity.Property(e => e.GhnStatusLabel).HasMaxLength(100);
+            entity.Property(e => e.GhnTotalFee).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.OrderId).HasColumnName("OrderID");
             entity.Property(e => e.Phone)
                 .IsRequired()

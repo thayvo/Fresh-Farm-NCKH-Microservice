@@ -1728,8 +1728,53 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 GhnWardCode = x.GhnWardCode?.Trim(),
                 PickupAddressSummary = x.PickupAddressSummary?.Trim() ?? string.Empty
             })
+            .GroupBy(x => x.SellerId)
+            .Select(group => SelectPreferredSellerShippingOrigin(group))
             .ToList()
             ?? new List<SellerShippingOriginSnapshot>();
+    }
+
+    private static SellerShippingOriginSnapshot SelectPreferredSellerShippingOrigin(IEnumerable<SellerShippingOriginSnapshot> origins)
+    {
+        return origins
+            .OrderByDescending(CalculateSellerShippingOriginScore)
+            .ThenByDescending(origin => origin.HasShippingOrigin)
+            .ThenByDescending(origin => origin.GhnDistrictId.HasValue)
+            .ThenByDescending(origin => !string.IsNullOrWhiteSpace(origin.GhnWardCode))
+            .ThenByDescending(origin => !string.IsNullOrWhiteSpace(origin.PickupAddressSummary))
+            .ThenByDescending(origin => !string.IsNullOrWhiteSpace(origin.ShopName))
+            .First();
+    }
+
+    private static int CalculateSellerShippingOriginScore(SellerShippingOriginSnapshot origin)
+    {
+        var score = 0;
+        if (origin.HasShippingOrigin)
+        {
+            score += 5;
+        }
+
+        if (origin.GhnDistrictId.HasValue)
+        {
+            score += 3;
+        }
+
+        if (!string.IsNullOrWhiteSpace(origin.GhnWardCode))
+        {
+            score += 3;
+        }
+
+        if (!string.IsNullOrWhiteSpace(origin.PickupAddressSummary))
+        {
+            score += 2;
+        }
+
+        if (!string.IsNullOrWhiteSpace(origin.ShopName))
+        {
+            score += 1;
+        }
+
+        return score;
     }
 
     private static string ResolveSellerDisplayName(

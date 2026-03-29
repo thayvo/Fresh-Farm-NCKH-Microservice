@@ -1,0 +1,79 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Đăng ký trở thành người bán" [level=1] [ref=e4]
+    - paragraph [ref=e5]: Điền hồ sơ gian hàng cơ bản để đội vận hành duyệt và mở quyền seller cho tài khoản của bạn.
+  - generic [ref=e6]:
+    - generic [ref=e8]:
+      - generic [ref=e10]:
+        - link " Thông tin tài khoản" [ref=e11] [cursor=pointer]:
+          - /url: /account/profile
+          - generic [ref=e12]: 
+          - text: Thông tin tài khoản
+        - link " Lịch sử đơn hàng" [ref=e13] [cursor=pointer]:
+          - /url: /account/orders
+          - generic [ref=e14]: 
+          - text: Lịch sử đơn hàng
+        - link " Đăng ký người bán" [ref=e15] [cursor=pointer]:
+          - /url: /account/become-seller
+          - generic [ref=e16]: 
+          - text: Đăng ký người bán
+        - link " Trang chủ" [ref=e17] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e18]: 
+          - text: Trang chủ
+      - button " Đăng xuất" [ref=e21] [cursor=pointer]:
+        - generic [ref=e22]: 
+        - text: Đăng xuất
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: Hồ sơ chưa hợp lệ
+        - generic [ref=e26]: Vui lòng kiểm tra lại các trường bắt buộc trước khi gửi.
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]: Trạng thái hiện tại
+          - heading "Chưa đăng ký" [level=4] [ref=e32]
+          - paragraph [ref=e33]: Bạn có thể gửi hồ sơ để bắt đầu bán hàng trên FreshFarm.
+        - generic [ref=e34]:
+          - generic [ref=e35]: "Store: Playwright Customer"
+          - generic [ref=e36]: "Liên hệ: 0912345681"
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]: Tên cửa hàng
+            - textbox [ref=e43]
+          - generic [ref=e44]:
+            - generic [ref=e45]: Email liên hệ
+            - textbox [ref=e46]
+          - generic [ref=e47]:
+            - generic [ref=e48]: Số điện thoại cửa hàng
+            - textbox [ref=e49]
+          - generic [ref=e50]:
+            - generic [ref=e51]: Email nhận thông báo
+            - textbox [ref=e52]
+            - generic [ref=e53]: Có thể dùng cùng email liên hệ nếu bạn chưa tách riêng vận hành.
+          - generic [ref=e54]:
+            - generic [ref=e55]: Địa chỉ hoạt động
+            - textbox [ref=e56]
+          - generic [ref=e57]:
+            - generic [ref=e58]: Tên người lấy hàng
+            - textbox [ref=e59]
+          - generic [ref=e60]:
+            - generic [ref=e61]: Số điện thoại lấy hàng
+            - textbox [ref=e62]
+          - generic [ref=e63]:
+            - generic [ref=e64]: Địa chỉ lấy hàng
+            - textbox [ref=e65]
+          - generic [ref=e66]:
+            - generic [ref=e67]: Thông tin tài khoản ngân hàng
+            - textbox [ref=e68]
+          - generic [ref=e69]:
+            - generic [ref=e70]: Hướng dẫn chuyển khoản
+            - textbox [ref=e71]
+        - generic [ref=e72]:
+          - button " Gửi hồ sơ đăng ký" [ref=e73] [cursor=pointer]:
+            - generic [ref=e74]: 
+            - text: Gửi hồ sơ đăng ký
+          - link " Quay lại tài khoản" [ref=e75] [cursor=pointer]:
+            - /url: /account/profile
+            - generic [ref=e76]: 
+            - text: Quay lại tài khoản

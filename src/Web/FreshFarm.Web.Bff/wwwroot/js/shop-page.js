@@ -50,6 +50,7 @@
         const productsEndpoint = config.dataset.productsEndpoint || `/bff/products?sellerId=${sellerId}`;
         const productFallbackImage = config.dataset.productFallbackImage || "/images/no-image.png";
         const productUploadRoot = config.dataset.productUploadRoot || "/uploads/products/";
+        const supportChatHubUrl = config.dataset.supportChatHubUrl || "/hubs/support-chat";
         const antiForgeryToken = antiForgeryInput instanceof HTMLInputElement ? antiForgeryInput.value : "";
 
         const resolveImage = (value) => {
@@ -83,24 +84,40 @@
                     : { payload: await shopResp.json() };
                 const productsResult = appHelpers
                     ? await appHelpers.tryParsePayload(productsResp)
-                    : { payload: await productsResp.json() };
+                    : { payload: await productsResp.text().then((text) => {
+                        if (!text) {
+                            return null;
+                        }
+
+                        try {
+                            return JSON.parse(text);
+                        } catch {
+                            return text;
+                        }
+                    }) };
                 const shopPayload = shopResult.payload;
                 const productsPayload = productsResult.payload;
                 if (!shopResp.ok) {
                     throw (appHelpers?.createHttpError(shopResp, shopPayload, "Không tải được gian hàng.")
                         ?? new Error(shopPayload?.message || `HTTP ${shopResp.status}`));
                 }
-                if (!productsResp.ok) {
-                    throw (appHelpers?.createHttpError(productsResp, productsPayload, "Không tải được sản phẩm của shop.")
-                        ?? new Error(productsPayload?.message || `HTTP ${productsResp.status}`));
+
+                let products = [];
+                let productsWarning = "";
+                if (productsResp.ok) {
+                    products = Array.isArray(productsPayload) ? productsPayload : [];
+                } else {
+                    productsWarning = "Chưa tải được sản phẩm của shop. Bạn vẫn có thể xem thông tin shop và nhắn tin trực tiếp.";
+                    console.warn("[shop-page] Could not load products for shop.", productsResp.status, productsPayload);
                 }
 
                 return {
                     shop: shopPayload,
-                    products: Array.isArray(productsPayload) ? productsPayload : []
+                    products,
+                    productsWarning
                 };
             })
-            .then(({ shop, products }) => {
+            .then(({ shop, products, productsWarning }) => {
                 const avatar = resolveAvatar(shop.avatar ?? shop.Avatar);
                 const shopName = (shop.shopName ?? shop.ShopName ?? "Shop chưa đặt tên").toString();
                 const address = (shop.addressSummary ?? shop.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động").toString();
@@ -134,6 +151,7 @@
                             <h2>Sản phẩm đang bán</h2>
                             <div class="text-muted">${products.length.toLocaleString("vi-VN")} sản phẩm công khai</div>
                         </div>
+                        ${productsWarning ? `<div class="state-box mb-3">${escapeHtml(productsWarning)}</div>` : ""}
                         ${products.length === 0 ? `<div class="state-box">Shop này chưa có sản phẩm công khai.</div>` : `<div class="product-grid">
                             ${products.map((product) => `
                                 <article class="product-card">
@@ -163,6 +181,7 @@
                         isBuyerEligible,
                         signInUrl,
                         antiForgeryToken,
+                        hubUrl: supportChatHubUrl,
                         conversationUrl: `/bff/support-chat/sellers/${sellerId}/conversation`,
                         messagesUrlTemplate: "/bff/support-chat/conversations/__id__/messages",
                         sendUrlTemplate: "/bff/support-chat/conversations/__id__/messages",

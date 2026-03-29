@@ -4,6 +4,7 @@
 (function () {
     const toastId = "freshfarmGlobalToast";
     let toastTimer = 0;
+    const recommendationImpressionRequests = new Map();
 
     const getRetryAfterSeconds = (response) => {
         const raw = response?.headers?.get?.("Retry-After");
@@ -92,11 +93,163 @@
         }, 3200);
     };
 
+    const toPositiveIntOrNull = (value) => {
+        const numeric = Number(value);
+        return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+    };
+
+    const normalizeRequiredText = (value) => {
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value).trim();
+    };
+
+    const createRecommendationRunId = (placement = "recommendation") =>
+        `${normalizeRequiredText(placement) || "recommendation"}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    const postTrackingEvent = async (url, payload, options = {}) => {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                credentials: "same-origin",
+                keepalive: options.keepalive !== false,
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const { payload: responsePayload } = await tryParsePayload(response);
+            if (!response.ok) {
+                console.warn("Recommendation event tracking failed.", {
+                    url,
+                    status: response.status,
+                    payload: responsePayload
+                });
+                return null;
+            }
+
+            return responsePayload;
+        } catch (error) {
+            console.warn("Recommendation event tracking errored.", { url, error });
+            return null;
+        }
+    };
+
+    const trackProductView = async (request) => {
+        const productId = toPositiveIntOrNull(request?.productId);
+        const sourcePage = normalizeRequiredText(request?.sourcePage);
+        if (!productId || !sourcePage) {
+            return null;
+        }
+
+        const responsePayload = await postTrackingEvent("/bff/events/product-view", {
+            productId,
+            sellerId: toPositiveIntOrNull(request?.sellerId),
+            sourcePage,
+            sourceModule: normalizeRequiredText(request?.sourceModule) || "unknown"
+        });
+
+        return toPositiveIntOrNull(responsePayload?.eventId);
+    };
+
+    const trackSearch = async (request) => {
+        const keyword = normalizeRequiredText(request?.keyword);
+        if (!keyword) {
+            return null;
+        }
+
+        const responsePayload = await postTrackingEvent("/bff/events/search", {
+            keyword,
+            filters: request?.filters ?? null,
+            resultCount: Math.max(0, Number(request?.resultCount) || 0)
+        });
+
+        return toPositiveIntOrNull(responsePayload?.eventId);
+    };
+
+    const trackSearchClick = async (request) => {
+        const productId = toPositiveIntOrNull(request?.productId);
+        if (!productId) {
+            return null;
+        }
+
+        const responsePayload = await postTrackingEvent("/bff/events/search-click", {
+            searchEventId: toPositiveIntOrNull(request?.searchEventId),
+            productId,
+            sellerId: toPositiveIntOrNull(request?.sellerId),
+            rank: Math.max(0, Number(request?.rank) || 0)
+        });
+
+        return toPositiveIntOrNull(responsePayload?.eventId);
+    };
+
+    const buildRecommendationImpressionKey = (request) => {
+        const placement = normalizeRequiredText(request?.placement) || "unknown";
+        const runId = normalizeRequiredText(request?.recommendationRunId) || "single-run";
+        const productId = toPositiveIntOrNull(request?.productId) || 0;
+        const rank = Math.max(0, Number(request?.rank) || 0);
+        const algorithm = normalizeRequiredText(request?.algorithm) || "unknown";
+        return `${placement}|${runId}|${productId}|${rank}|${algorithm}`;
+    };
+
+    const trackRecommendationImpression = async (request) => {
+        const productId = toPositiveIntOrNull(request?.productId);
+        const placement = normalizeRequiredText(request?.placement);
+        const algorithm = normalizeRequiredText(request?.algorithm);
+        if (!productId || !placement || !algorithm) {
+            return null;
+        }
+
+        const dedupeKey = buildRecommendationImpressionKey(request);
+        if (recommendationImpressionRequests.has(dedupeKey)) {
+            return recommendationImpressionRequests.get(dedupeKey);
+        }
+
+        const requestPromise = postTrackingEvent("/bff/events/recommendation-impression", {
+            placement,
+            recommendationRunId: normalizeRequiredText(request?.recommendationRunId) || null,
+            productId,
+            rank: Math.max(0, Number(request?.rank) || 0),
+            algorithm
+        }).then((responsePayload) => toPositiveIntOrNull(responsePayload?.eventId));
+
+        recommendationImpressionRequests.set(dedupeKey, requestPromise);
+        return requestPromise;
+    };
+
+    const trackRecommendationClick = async (request) => {
+        const productId = toPositiveIntOrNull(request?.productId);
+        const placement = normalizeRequiredText(request?.placement);
+        const algorithm = normalizeRequiredText(request?.algorithm);
+        if (!productId || !placement || !algorithm) {
+            return null;
+        }
+
+        const responsePayload = await postTrackingEvent("/bff/events/recommendation-click", {
+            recommendationImpressionEventId: toPositiveIntOrNull(request?.recommendationImpressionEventId),
+            productId,
+            placement,
+            algorithm
+        });
+
+        return toPositiveIntOrNull(responsePayload?.eventId);
+    };
+
     window.FreshFarmApp = {
         createHttpError,
+        createRecommendationRunId,
         getFriendlyMessage,
         getRetryAfterSeconds,
         showToast,
+        trackProductView,
+        trackRecommendationClick,
+        trackRecommendationImpression,
+        trackSearch,
+        trackSearchClick,
         tryParsePayload
     };
 })();

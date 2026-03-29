@@ -67,10 +67,18 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
                 ProductsMissing = payload.Stats?.ProductsMissing ?? 0,
                 FacetAttributes = payload.Stats?.FacetAttributes ?? 0
             };
-            model.CategoryOptions = payload.Filters?.Categories?.Select(MapCategoryOption).ToList() ?? model.CategoryOptions;
-            model.StateOptions = payload.Filters?.StateOptions?.Select(MapStateOption).ToList() ?? model.StateOptions;
-            model.Attributes = payload.Attributes?.Select(MapAttributeRow).ToList() ?? new List<CatalogAttributeRowViewModel>();
-            model.ReadinessRows = payload.Readiness?.Select(MapReadinessRow).ToList() ?? new List<CatalogProductReadinessRowViewModel>();
+            model.CategoryOptions = DeduplicateCategoryOptions(payload.Filters?.Categories)
+                .Select(MapCategoryOption)
+                .ToList();
+            model.StateOptions = DeduplicateStateOptions(payload.Filters?.StateOptions)
+                .Select(MapStateOption)
+                .ToList();
+            model.Attributes = DeduplicateAttributes(payload.Attributes)
+                .Select(MapAttributeRow)
+                .ToList();
+            model.ReadinessRows = DeduplicateReadinessRows(payload.Readiness)
+                .Select(MapReadinessRow)
+                .ToList();
 
             if (model.NewAttribute.CategoryId <= 0 && model.CategoryId.HasValue)
             {
@@ -290,6 +298,115 @@ public sealed class CatalogReadinessController : LegacySellerControllerBase
             ReadinessScore = row.ReadinessScore,
             MissingAttributes = row.MissingAttributes ?? new List<string>()
         };
+
+    private static List<CatalogCategoryOptionApiModel> DeduplicateCategoryOptions(IEnumerable<CatalogCategoryOptionApiModel>? categories)
+    {
+        return (categories ?? [])
+            .Where(category => category.CategoryId > 0)
+            .GroupBy(category => category.CategoryId)
+            .Select(group => group
+                .OrderByDescending(category => HasMeaningfulValue(category.CategoryName))
+                .ThenByDescending(category => category.IsActive)
+                .First())
+            .ToList();
+    }
+
+    private static List<CatalogStateOptionApiModel> DeduplicateStateOptions(IEnumerable<CatalogStateOptionApiModel>? states)
+    {
+        return (states ?? [])
+            .Where(state => HasMeaningfulValue(state.Value))
+            .GroupBy(state => state.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(state => HasMeaningfulValue(state.Text))
+                .First())
+            .ToList();
+    }
+
+    private static List<CatalogAttributeApiModel> DeduplicateAttributes(IEnumerable<CatalogAttributeApiModel>? attributes)
+    {
+        return (attributes ?? [])
+            .Where(attribute => attribute.CategoryAttributeId > 0)
+            .GroupBy(attribute => attribute.CategoryAttributeId)
+            .Select(group => group
+                .OrderByDescending(CalculateAttributeScore)
+                .ThenByDescending(CalculateAttributeSignalLength)
+                .ThenByDescending(attribute => attribute.UpdatedAt ?? attribute.CreatedAt)
+                .First())
+            .ToList();
+    }
+
+    private static List<CatalogProductReadinessApiModel> DeduplicateReadinessRows(IEnumerable<CatalogProductReadinessApiModel>? rows)
+    {
+        return (rows ?? [])
+            .Where(row => row.ProductId > 0)
+            .GroupBy(row => row.ProductId)
+            .Select(group => group
+                .OrderByDescending(CalculateReadinessScore)
+                .ThenByDescending(CalculateReadinessSignalLength)
+                .ThenByDescending(row => row.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateAttributeScore(CatalogAttributeApiModel attribute)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(attribute.CategoryName) ? 1 : 0;
+        score += HasMeaningfulValue(attribute.AttributeKey) ? 2 : 0;
+        score += HasMeaningfulValue(attribute.DisplayName) ? 2 : 0;
+        score += HasMeaningfulValue(attribute.InputType) ? 1 : 0;
+        score += HasMeaningfulValue(attribute.Placeholder) ? 1 : 0;
+        score += attribute.IsRequired ? 1 : 0;
+        score += attribute.IsFacet ? 1 : 0;
+        score += attribute.IsActive ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateAttributeSignalLength(CatalogAttributeApiModel attribute)
+    {
+        var values = new[]
+        {
+            attribute.CategoryName,
+            attribute.AttributeKey,
+            attribute.DisplayName,
+            attribute.InputType,
+            attribute.Placeholder
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static int CalculateReadinessScore(CatalogProductReadinessApiModel row)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(row.ProductName) ? 3 : 0;
+        score += HasMeaningfulValue(row.Sku) ? 2 : 0;
+        score += HasMeaningfulValue(row.CategoryName) ? 2 : 0;
+        score += row.TotalRequired > 0 ? 1 : 0;
+        score += row.ReadyCount > 0 ? 1 : 0;
+        score += row.MissingCount > 0 ? 1 : 0;
+        score += row.ReadinessScore > 0 ? 1 : 0;
+        score += row.MissingAttributes?.Count > 0 ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateReadinessSignalLength(CatalogProductReadinessApiModel row)
+    {
+        var values = new[]
+        {
+            row.ProductName,
+            row.Sku,
+            row.CategoryName
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
     {

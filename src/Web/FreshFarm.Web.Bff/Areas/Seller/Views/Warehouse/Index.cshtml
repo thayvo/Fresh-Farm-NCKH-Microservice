@@ -471,7 +471,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <p class="mb-1 opacity-75">Tổng sản phẩm</p>
-                                <h2 class="fw-bold mb-0">@Model.TotalProducts</h2>
+                                <h2 class="fw-bold mb-0">@(Model?.TotalProducts ?? 0)</h2>
                                 <small class="opacity-80">
                                     <i class="bi bi-arrow-up"></i> Đang quản lý trong kho
                                 </small>
@@ -488,7 +488,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <p class="mb-1 opacity-80">Sắp hết hàng</p>
-                                <h2 class="fw-bold mb-0">@Model.LowStockCount</h2>
+                                <h2 class="fw-bold mb-0">@(Model?.LowStockCount ?? 0)</h2>
                                 <small class="opacity-85">
                                     <i class="bi bi-exclamation-triangle"></i> Cần nhập thêm
                                 </small>
@@ -505,7 +505,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <p class="mb-1 opacity-80">Hết hàng</p>
-                                <h2 class="fw-bold mb-0">@Model.OutOfStockCount</h2>
+                                <h2 class="fw-bold mb-0">@(Model?.OutOfStockCount ?? 0)</h2>
                                 <small class="opacity-85">
                                     <i class="bi bi-x-circle"></i> Cần xử lý ngay
                                 </small>
@@ -522,7 +522,7 @@
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <p class="mb-1 opacity-80">Giá trị kho</p>
-                                <h2 class="fw-bold mb-0">@string.Format("{0:N0}", Model.TotalWarehouseValue)</h2>
+                                <h2 class="fw-bold mb-0">@string.Format("{0:N0}", Model?.TotalWarehouseValue ?? 0m)</h2>
                                 <small class="opacity-85">
                                     <i class="bi bi-currency-dollar"></i> VNĐ
                                 </small>
@@ -607,9 +607,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @if (Model.Products != null && Model.Products.Any())
+                        @if (Model?.Products?.Any() == true)
                         {
-                            foreach (var item in Model.Products)
+                            foreach (var item in Model.Products ?? Enumerable.Empty<FreshFarm.Web.Bff.Areas.Seller.Models.WarehouseViewModel>())
                             {
                                 var stockClass = item.StockQuantity == 0
                                     ? "text-danger fw-bold"

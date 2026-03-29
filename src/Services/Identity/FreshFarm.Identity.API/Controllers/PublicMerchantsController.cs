@@ -50,6 +50,8 @@ public sealed class PublicMerchantsController : ControllerBase
             });
         }
 
+        var sellerStoreSettings = _db.SellerStoreSettings.AsNoTracking();
+
         var query = _db.Users
             .AsNoTracking()
             .Where(u => u.IsActive && u.UserRoles.Any(ur => ur.RoleId == sellerRoleId.Value));
@@ -63,7 +65,7 @@ public sealed class PublicMerchantsController : ControllerBase
         {
             var term = q.Trim().ToLowerInvariant();
             query = query.Where(u =>
-                (u.SellerStoreSetting != null && u.SellerStoreSetting.StoreName.ToLower().Contains(term)) ||
+                sellerStoreSettings.Any(s => s.UserId == u.UserId && s.StoreName != null && s.StoreName.ToLower().Contains(term)) ||
                 u.UserName.ToLower().Contains(term) ||
                 u.FullName.ToLower().Contains(term) ||
                 (u.AddressBook != null && u.AddressBook.IsActive &&
@@ -82,7 +84,12 @@ public sealed class PublicMerchantsController : ControllerBase
                 FullName = u.FullName,
                 Avatar = u.Avatar,
                 CreatedAt = u.CreatedAt,
-                StoreName = u.SellerStoreSetting != null ? u.SellerStoreSetting.StoreName : null,
+                StoreName = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.StoreName)
+                    .FirstOrDefault(),
                 AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
                 Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
                 District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
@@ -91,6 +98,8 @@ public sealed class PublicMerchantsController : ControllerBase
             .ToListAsync(cancellationToken);
 
         var mapped = merchants
+            .GroupBy(x => x.SellerId)
+            .Select(group => SelectPreferredProjection(group))
             .Select(MapMerchant)
             .OrderByDescending(x => x.JoinedAt)
             .ToList();
@@ -144,7 +153,9 @@ public sealed class PublicMerchantsController : ControllerBase
             return NotFound(new { message = "Không tìm thấy seller." });
         }
 
-        var merchant = await _db.Users
+        var sellerStoreSettings = _db.SellerStoreSettings.AsNoTracking();
+
+        var merchantRows = await _db.Users
             .AsNoTracking()
             .Where(u => u.UserId == sellerId && u.IsActive && u.UserRoles.Any(ur => ur.RoleId == sellerRoleId.Value))
             .Select(u => new PublicMerchantProjection
@@ -154,13 +165,23 @@ public sealed class PublicMerchantsController : ControllerBase
                 FullName = u.FullName,
                 Avatar = u.Avatar,
                 CreatedAt = u.CreatedAt,
-                StoreName = u.SellerStoreSetting != null ? u.SellerStoreSetting.StoreName : null,
+                StoreName = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.StoreName)
+                    .FirstOrDefault(),
                 AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
                 Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
                 District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
                 Ward = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Ward : null
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        var merchant = merchantRows
+            .GroupBy(x => x.SellerId)
+            .Select(group => SelectPreferredProjection(group))
+            .FirstOrDefault();
 
         if (merchant is null)
         {
@@ -196,27 +217,81 @@ public sealed class PublicMerchantsController : ControllerBase
             return Ok(new PublicMerchantShippingOriginListResponse());
         }
 
+        var sellerStoreSettings = _db.SellerStoreSettings.AsNoTracking();
+
         var rows = await _db.Users
             .AsNoTracking()
             .Where(u => normalizedIds.Contains(u.UserId) && u.IsActive && u.UserRoles.Any(ur => ur.RoleId == sellerRoleId.Value))
             .Select(u => new PublicMerchantShippingOriginDto
             {
                 SellerId = u.UserId,
-                ShopName = u.SellerStoreSetting != null && !string.IsNullOrWhiteSpace(u.SellerStoreSetting.StoreName)
-                    ? u.SellerStoreSetting.StoreName
+                ShopName = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.StoreName)
+                    .FirstOrDefault() != null
+                    && !string.IsNullOrWhiteSpace(sellerStoreSettings
+                        .Where(s => s.UserId == u.UserId)
+                        .OrderByDescending(s => s.UpdatedAt)
+                        .ThenByDescending(s => s.SellerStoreSettingId)
+                        .Select(s => s.StoreName)
+                        .FirstOrDefault())
+                    ? sellerStoreSettings
+                        .Where(s => s.UserId == u.UserId)
+                        .OrderByDescending(s => s.UpdatedAt)
+                        .ThenByDescending(s => s.SellerStoreSettingId)
+                        .Select(s => s.StoreName)
+                        .FirstOrDefault()!
                     : (string.IsNullOrWhiteSpace(u.FullName) ? (u.UserName ?? $"FreshFarm Seller {u.UserId}") : u.FullName),
-                HasShippingOrigin = u.SellerStoreSetting != null
-                    && u.SellerStoreSetting.GhnDistrictId.HasValue
-                    && u.SellerStoreSetting.GhnDistrictId.Value > 0
-                    && u.SellerStoreSetting.GhnWardCode != null
-                    && u.SellerStoreSetting.GhnWardCode != string.Empty,
-                GhnDistrictId = u.SellerStoreSetting != null ? u.SellerStoreSetting.GhnDistrictId : null,
-                GhnWardCode = u.SellerStoreSetting != null ? u.SellerStoreSetting.GhnWardCode : null,
-                GhnDistrictName = u.SellerStoreSetting != null ? u.SellerStoreSetting.GhnDistrictName : null,
-                GhnWardName = u.SellerStoreSetting != null ? u.SellerStoreSetting.GhnWardName : null,
-                PickupAddressSummary = u.SellerStoreSetting != null ? BuildPickupSummary(u.SellerStoreSetting) : string.Empty
+                HasShippingOrigin = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnDistrictId.HasValue && s.GhnDistrictId.Value > 0 && s.GhnWardCode != null && s.GhnWardCode != string.Empty)
+                    .FirstOrDefault(),
+                GhnDistrictId = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnDistrictId)
+                    .FirstOrDefault(),
+                GhnWardCode = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnWardCode)
+                    .FirstOrDefault(),
+                GhnDistrictName = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnDistrictName)
+                    .FirstOrDefault(),
+                GhnWardName = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnWardName)
+                    .FirstOrDefault(),
+                GhnPickupAddress = sellerStoreSettings
+                    .Where(s => s.UserId == u.UserId)
+                    .OrderByDescending(s => s.UpdatedAt)
+                    .ThenByDescending(s => s.SellerStoreSettingId)
+                    .Select(s => s.GhnPickupAddress)
+                    .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
+
+        rows = rows
+            .GroupBy(x => x.SellerId)
+            .Select(group => SelectPreferredShippingOrigin(group))
+            .Select(x =>
+            {
+                x.PickupAddressSummary = BuildPickupSummary(x);
+                return x;
+            })
+            .ToList();
 
         var items = normalizedIds
             .Select(id => rows.FirstOrDefault(x => x.SellerId == id) ?? new PublicMerchantShippingOriginDto
@@ -281,6 +356,39 @@ public sealed class PublicMerchantsController : ControllerBase
         return parts.Count == 0 ? "Chưa cấu hình địa chỉ lấy hàng" : string.Join(", ", parts);
     }
 
+    private static string BuildPickupSummary(PublicMerchantShippingOriginDto origin)
+    {
+        var parts = new[]
+        {
+            origin.GhnPickupAddress,
+            origin.GhnWardName,
+            origin.GhnDistrictName
+        }
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Select(x => x!.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+        return parts.Count == 0 ? "Chưa cấu hình địa chỉ lấy hàng" : string.Join(", ", parts);
+    }
+
+    private static PublicMerchantProjection SelectPreferredProjection(IEnumerable<PublicMerchantProjection> rows)
+    {
+        return rows
+            .OrderByDescending(x => !string.IsNullOrWhiteSpace(x.StoreName))
+            .ThenByDescending(x => x.CreatedAt)
+            .First();
+    }
+
+    private static PublicMerchantShippingOriginDto SelectPreferredShippingOrigin(IEnumerable<PublicMerchantShippingOriginDto> rows)
+    {
+        return rows
+            .OrderByDescending(x => x.HasShippingOrigin)
+            .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.GhnWardCode))
+            .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.PickupAddressSummary))
+            .First();
+    }
+
     private sealed class PublicMerchantProjection
     {
         public int SellerId { get; set; }
@@ -324,6 +432,7 @@ public sealed class PublicMerchantsController : ControllerBase
         public string? GhnWardCode { get; set; }
         public string? GhnDistrictName { get; set; }
         public string? GhnWardName { get; set; }
+        public string? GhnPickupAddress { get; set; }
         public string PickupAddressSummary { get; set; } = string.Empty;
     }
 

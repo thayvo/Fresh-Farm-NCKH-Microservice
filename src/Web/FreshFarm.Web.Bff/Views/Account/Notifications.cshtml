@@ -1,0 +1,552 @@
+@model FreshFarm.Web.Bff.Dtos.AccountNotificationsPageViewModel
+@{
+    Layout = null;
+    ViewBag.Title = "Thông báo tài khoản";
+
+    var vm = Model ?? new FreshFarm.Web.Bff.Dtos.AccountNotificationsPageViewModel();
+    var sellerApplication = vm.SellerApplication ?? new FreshFarm.Web.Bff.Dtos.SellerApplicationSummaryDto();
+    ViewData["SellerApplicationSummary"] = sellerApplication;
+    ViewData["AccountNotificationSummary"] = FreshFarm.Web.Bff.Dtos.AccountNotificationNavSummaryDto.FromPage(vm);
+    var cspNonce = ViewContext.HttpContext.Items["CspNonce"] as string ?? string.Empty;
+
+    var typeQuickFilters = new[]
+    {
+        new { Key = "", Label = "Tất cả" },
+        new { Key = "seller_review_update", Label = FreshFarm.Web.Bff.Dtos.AccountNotificationListItemDto.GetNotificationTypeLabel("seller_review_update") },
+        new { Key = "order_status", Label = FreshFarm.Web.Bff.Dtos.AccountNotificationListItemDto.GetNotificationTypeLabel("order_status") },
+        new { Key = "location_update", Label = FreshFarm.Web.Bff.Dtos.AccountNotificationListItemDto.GetNotificationTypeLabel("location_update") }
+    };
+    var sectionStateStorageKey = "freshfarm-account-notifications-section-state";
+    var sectionUnreadOnlyStorageKey = "freshfarm-account-notifications-section-unread-only";
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thông báo tài khoản - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        body { background: radial-gradient(circle at top left, #eafaf1 0, transparent 35%), #f4f7f5; }
+        .notification-shell { max-width: 1180px; }
+        .notification-hero {
+            background: linear-gradient(135deg, #0f9f5b, #0b6b3d);
+            color: #fff;
+            border-radius: 1.5rem;
+        }
+        .feed-item {
+            border-left: 4px solid #dbe3dd;
+            padding-left: 1rem;
+        }
+        .feed-item.success { border-left-color: #198754; }
+        .feed-item.warning { border-left-color: #f59f00; }
+        .feed-item.info { border-left-color: #0dcaf0; }
+        .feed-item.secondary { border-left-color: #6c757d; }
+        .notification-preview {
+            border-radius: 1rem;
+            background: rgba(15, 159, 91, 0.08);
+        }
+        .notification-stat-card {
+            border-radius: 1rem;
+            border: 1px solid rgba(15, 159, 91, 0.12);
+            background: #fff;
+        }
+        .notification-empty-state {
+            border: 1px dashed rgba(15, 159, 91, 0.25);
+            border-radius: 1.25rem;
+            background: linear-gradient(180deg, rgba(15, 159, 91, 0.06), rgba(15, 159, 91, 0.02));
+        }
+    </style>
+</head>
+<body>
+    <main class="container notification-shell my-5">
+        <section class="notification-hero shadow-sm p-4 p-md-5 mb-4">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+                <div>
+                    <div class="text-uppercase small opacity-75 mb-2">FreshFarm Account</div>
+                    <h1 class="fw-bold mb-2">Thông báo tài khoản</h1>
+                    <p class="mb-0 opacity-75">Đọc trực tiếp các cập nhật tài khoản từ notification center, theo dõi unread và xử lý nhanh ngay trên một trang.</p>
+                </div>
+                <div class="text-lg-end">
+                    <div class="small opacity-75">Chưa đọc</div>
+                    <div class="display-6 fw-bold mb-1">@vm.UnreadNotifications</div>
+                    <div class="small opacity-75">@vm.TotalNotifications thông báo</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="row g-4">
+            @await Html.PartialAsync("_AccountNav")
+
+            <section class="col-lg-9">
+                @if (ViewBag.Error is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="alert alert-success">@successMessage</div>
+                }
+
+                @if (TempData["ErrorMessage"] is string tempErrorMessage && !string.IsNullOrWhiteSpace(tempErrorMessage))
+                {
+                    <div class="alert alert-danger">@tempErrorMessage</div>
+                }
+
+                @if (sellerApplication.HasSellerReviewAlert)
+                {
+                    <div class="alert alert-@sellerApplication.SellerReviewAlertTone border-0 shadow-sm mb-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-start">
+                            <div>
+                                <div class="fw-semibold mb-1">@sellerApplication.SellerReviewAlertTitle</div>
+                                <div>@sellerApplication.SellerReviewAlertBody</div>
+                                @if (sellerApplication.ReviewedAtUtc.HasValue)
+                                {
+                                    <div class="small mt-2 text-muted">Cập nhật lúc @sellerApplication.ReviewedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                            <div class="text-md-end">
+                                <a href="/account/become-seller" class="btn btn-sm btn-outline-dark">
+                                    <i class="bi bi-shop-window me-2"></i>Xem hồ sơ seller
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-4">
+                            <div>
+                                <h5 class="fw-bold mb-1">Dòng cập nhật gần đây</h5>
+                                <div class="text-muted small">Lọc theo loại, trạng thái đọc và đánh dấu đã đọc ngay tại đây.</div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge text-bg-light border">@vm.TotalNotifications tổng</span>
+                                <span class="badge text-bg-danger">@vm.UnreadNotifications chưa đọc</span>
+                                <span class="badge text-bg-light border">@vm.Recent24hNotifications trong 24h</span>
+                            </div>
+                        </div>
+
+                        @await Html.PartialAsync("_NotificationStats", vm)
+                        @await Html.PartialAsync("_NotificationPriorityPanel", vm)
+
+                        <div class="border rounded-4 bg-light-subtle p-3 mb-4">
+                            <div class="d-flex flex-column gap-3">
+                                <div>
+                                    <div class="small text-uppercase text-muted fw-semibold mb-2">Truy cập nhanh</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="@vm.BuildNotificationsUrl(vm.Type, null, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead is null ? "btn-success" : "btn-outline-success")">
+                                            Tất cả
+                                            <span class="ms-1 badge @(vm.IsRead is null ? "text-bg-light" : "text-bg-success")">@vm.TotalNotifications</span>
+                                        </a>
+                                        <a href="@vm.BuildNotificationsUrl(vm.Type, false, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead == false ? "btn-danger" : "btn-outline-danger")">
+                                            Chưa đọc
+                                            <span class="ms-1 badge @(vm.IsRead == false ? "text-bg-light" : "text-bg-danger")">@vm.UnreadNotifications</span>
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <div class="small text-uppercase text-muted fw-semibold mb-2">Nhóm thông báo</div>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach (var quickFilter in typeQuickFilters)
+                                        {
+                                            var isActiveType = string.Equals(vm.Type, quickFilter.Key, StringComparison.OrdinalIgnoreCase)
+                                                || (string.IsNullOrWhiteSpace(vm.Type) && string.IsNullOrWhiteSpace(quickFilter.Key));
+                                            <a href="@vm.BuildNotificationsUrl(quickFilter.Key, vm.IsRead, vm.RecentOnly ? true : null, string.IsNullOrWhiteSpace(quickFilter.Key) ? null : quickFilter.Key)" class="btn btn-sm @(isActiveType ? "btn-dark" : "btn-outline-dark")">
+                                                @quickFilter.Label
+                                                @if (!string.IsNullOrWhiteSpace(quickFilter.Key))
+                                                {
+                                                    <span class="ms-1 badge @(isActiveType ? "text-bg-light" : "text-bg-secondary")">@vm.GetVisibleCount(quickFilter.Key)</span>
+                                                }
+                                            </a>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="get" action="/account/notifications" class="row g-3 mb-4">
+                            <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
+                            <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="focusType" value="@vm.FocusType" />
+                            <div class="col-md-5">
+                                <label class="form-label">Từ khóa</label>
+                                <input type="text" class="form-control" name="q" value="@vm.Query" placeholder="Tìm theo tiêu đề, nội dung..." />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Loại thông báo</label>
+                                <select class="form-select" name="type">
+                                    <option value="">Tất cả</option>
+                                    @foreach (var typeOption in vm.TypeOptions)
+                                    {
+                                        var typeLabel = FreshFarm.Web.Bff.Dtos.AccountNotificationListItemDto.GetNotificationTypeLabel(typeOption);
+                                        <option value="@typeOption" selected="@(string.Equals(vm.Type, typeOption, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@typeLabel</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Trạng thái đọc</label>
+                                <select class="form-select" name="isRead">
+                                    <option value="" selected="@(vm.IsRead is null ? "selected" : null)">Tất cả</option>
+                                    <option value="false" selected="@(vm.IsRead == false ? "selected" : null)">Chưa đọc</option>
+                                    <option value="true" selected="@(vm.IsRead == true ? "selected" : null)">Đã đọc</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end gap-2">
+                                <button type="submit" class="btn btn-success flex-fill">
+                                    <i class="bi bi-funnel me-2"></i>Lọc
+                                </button>
+                                <a href="/account/notifications" class="btn btn-outline-secondary">Reset</a>
+                            </div>
+                        </form>
+
+                        <div class="border rounded-4 p-3 p-md-4 bg-body-tertiary mb-4">
+                            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3">
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="small text-uppercase text-muted fw-semibold">Trạng thái hiện tại</div>
+                                    <div class="fw-semibold">Trang @vm.Page / @vm.TotalPages</div>
+                                    <div class="small text-muted">@vm.ResultsSummary.</div>
+                                    @if (vm.HasActiveFilters)
+                                    {
+                                        <div class="d-flex flex-wrap gap-2">
+                                            @foreach (var chip in vm.ActiveFilterChips)
+                                            {
+                                                <span class="badge text-bg-@chip.Tone">@chip.Label</span>
+                                            }
+                                            <a href="/account/notifications" class="btn btn-sm btn-link px-0 text-decoration-none">
+                                                <i class="bi bi-arrow-counterclockwise me-1"></i>Xóa toàn bộ bộ lọc
+                                            </a>
+                                        </div>
+                                    }
+                                </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @if (vm.HasNotifications)
+                                {
+                                    <a href="@vm.BuildNotificationsUrl(vm.Type, vm.IsRead, !vm.RecentOnly, vm.FocusType)"
+                                       class="btn btn-sm @(vm.RecentOnly ? "btn-warning" : "btn-outline-warning")">
+                                        <i class="bi @(vm.RecentOnly ? "bi-list-ul" : "bi-clock-history") me-2"></i>
+                                        @(vm.RecentOnly ? "Xem tất cả" : "Chỉ mới cập nhật")
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-section-toggle-all="expand">
+                                        <i class="bi bi-arrows-expand me-2"></i>Mở rộng tất cả
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-section-toggle-all="collapse">
+                                        <i class="bi bi-arrows-collapse me-2"></i>Thu gọn tất cả
+                                    </button>
+                                }
+                                <form method="post" action="/account/notifications/mark-all-read">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="q" value="@vm.Query" />
+                                    <input type="hidden" name="type" value="@vm.Type" />
+                                    @if (vm.IsRead.HasValue)
+                                    {
+                                        <input type="hidden" name="isRead" value="@vm.IsRead.Value.ToString().ToLowerInvariant()" />
+                                    }
+                                    <input type="hidden" name="page" value="@vm.Page" />
+                                    <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
+                                    <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
+                                    <input type="hidden" name="focusType" value="@vm.FocusType" />
+                                    <button type="submit" class="btn btn-outline-dark btn-sm" @(vm.UnreadNotifications == 0 ? "disabled" : null)>
+                                        <i class="bi bi-check2-all me-2"></i>Đánh dấu tất cả đã đọc
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        </div>
+
+                        @if (!vm.HasNotifications)
+                        {
+                            <div class="notification-empty-state text-center py-5 px-4">
+                                <div class="mb-3 text-success"><i class="bi bi-inbox fs-1"></i></div>
+                                <div class="fw-semibold fs-5 mb-2">@vm.EmptyStateTitle</div>
+                                <div class="text-muted mb-4 mx-auto" style="max-width: 560px;">@vm.EmptyStateDescription</div>
+                                <div class="d-flex flex-wrap justify-content-center gap-2">
+                                    <a href="@vm.EmptyStatePrimaryActionUrl" class="btn btn-success">
+                                        <i class="bi bi-arrow-up-right-circle me-2"></i>@vm.EmptyStatePrimaryActionLabel
+                                    </a>
+                                    @if (!vm.HasActiveFilters)
+                                    {
+                                        <a href="/account/orders" class="btn btn-outline-secondary">
+                                            <i class="bi bi-bag-check me-2"></i>Xem đơn hàng của tôi
+                                        </a>
+                                    }
+                                </div>
+                            </div>
+                        }
+        else
+        {
+            <div class="d-flex flex-column gap-4">
+                @foreach (var notificationSection in vm.NotificationSections)
+                {
+                    @await Html.PartialAsync("_NotificationSection", new FreshFarm.Web.Bff.Dtos.AccountNotificationSectionViewModel
+                    {
+                        Page = vm,
+                        Section = notificationSection
+                    })
+                }
+            </div>
+
+            @if (vm.TotalPages > 1)
+            {
+                                <nav class="mt-4" aria-label="Notification pagination">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @for (var pageNumber = 1; pageNumber <= vm.TotalPages; pageNumber++)
+                                        {
+                                            var href = vm.BuildNotificationsUrl(vm.Type, vm.IsRead, vm.RecentOnly, vm.FocusType, pageNumber);
+
+                                            <a class="btn btn-sm @(pageNumber == vm.Page ? "btn-success" : "btn-outline-secondary")" href="@href">@pageNumber</a>
+                                        }
+                                    </div>
+                                </nav>
+                            }
+                        }
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script nonce="@cspNonce" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @await Html.PartialAsync("_IdleSessionMonitor")
+    <script nonce="@cspNonce" src="~/js/csp-phase2.js" asp-append-version="true"></script>
+    <script nonce="@cspNonce">
+        (() => {
+            const storageKey = '@sectionStateStorageKey';
+            const unreadOnlyStorageKey = '@sectionUnreadOnlyStorageKey';
+            const searchParams = new URLSearchParams(window.location.search);
+            const focusType = searchParams.get('focusType');
+            const recentOnly = searchParams.get('recentOnly') === 'true';
+            const collapses = Array.from(document.querySelectorAll('[data-section-collapse]'));
+            if (!collapses.length) {
+                return;
+            }
+
+            const readState = () => {
+                try {
+                    const raw = window.localStorage.getItem(storageKey);
+                    return raw ? JSON.parse(raw) : {};
+                } catch {
+                    return {};
+                }
+            };
+
+            const writeState = (state) => {
+                try {
+                    window.localStorage.setItem(storageKey, JSON.stringify(state));
+                } catch {
+                }
+            };
+
+            const readUnreadOnlyState = () => {
+                try {
+                    const raw = window.localStorage.getItem(unreadOnlyStorageKey);
+                    return raw ? JSON.parse(raw) : {};
+                } catch {
+                    return {};
+                }
+            };
+
+            const writeUnreadOnlyState = (state) => {
+                try {
+                    window.localStorage.setItem(unreadOnlyStorageKey, JSON.stringify(state));
+                } catch {
+                }
+            };
+
+            const updateButton = (collapseElement, isExpanded) => {
+                const collapseId = collapseElement.getAttribute('id');
+                const toggleButton = document.querySelector(`[data-section-toggle-button][data-section-target="${collapseId}"]`);
+                if (!toggleButton) {
+                    return;
+                }
+
+                toggleButton.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                toggleButton.innerHTML = isExpanded
+                    ? '<i class="bi bi-chevron-up me-2"></i>Thu gọn'
+                    : '<i class="bi bi-chevron-down me-2"></i>Mở rộng';
+            };
+
+            const updateUnreadOnlyButton = (sectionKey, unreadOnly) => {
+                const button = document.querySelector(`[data-section-unread-toggle][data-section-key="${sectionKey}"]`);
+                if (!button) {
+                    return;
+                }
+
+                button.innerHTML = unreadOnly
+                    ? '<i class="bi bi-list-ul me-2"></i>Xem tất cả'
+                    : '<i class="bi bi-funnel me-2"></i>Chỉ chưa đọc';
+                button.classList.toggle('btn-outline-danger', !unreadOnly);
+                button.classList.toggle('btn-danger', unreadOnly);
+            };
+
+            const applySectionFilters = (sectionKey, unreadOnly, recentOnly) => {
+                const collapseElement = document.querySelector(`[data-section-collapse][data-section-key="${sectionKey}"]`);
+                const sectionElement = document.querySelector(`[data-notification-section][data-section-key="${sectionKey}"]`);
+                if (!collapseElement || !sectionElement) {
+                    return;
+                }
+
+                let visibleCount = 0;
+                collapseElement.querySelectorAll('[data-notification-item]').forEach((item) => {
+                    const isRead = item.getAttribute('data-is-read') === 'true';
+                    const isRecent = item.getAttribute('data-is-recent') === 'true';
+                    const shouldHide = (unreadOnly && isRead) || (recentOnly && !isRecent);
+                    item.classList.toggle('d-none', shouldHide);
+                    if (!shouldHide) {
+                        visibleCount += 1;
+                    }
+                });
+
+                updateUnreadOnlyButton(sectionKey, unreadOnly);
+                sectionElement.classList.toggle('d-none', visibleCount === 0);
+            };
+
+            const applyFiltersAcrossSections = () => {
+                collapses.forEach((collapseElement) => {
+                    const sectionKey = collapseElement.getAttribute('data-section-key');
+                    if (!sectionKey) {
+                        return;
+                    }
+
+                    applySectionFilters(sectionKey, !!unreadOnlyState[sectionKey], recentOnly);
+                });
+            };
+
+            const state = readState();
+            const unreadOnlyState = readUnreadOnlyState();
+            collapses.forEach((collapseElement) => {
+                const sectionKey = collapseElement.getAttribute('data-section-key');
+                if (!sectionKey) {
+                    return;
+                }
+
+                const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                const shouldExpand = Object.prototype.hasOwnProperty.call(state, sectionKey)
+                    ? !!state[sectionKey]
+                    : collapseElement.classList.contains('show');
+
+                if (shouldExpand) {
+                    collapseElement.classList.add('show');
+                } else {
+                    collapseElement.classList.remove('show');
+                }
+
+                updateButton(collapseElement, shouldExpand);
+                applySectionFilters(sectionKey, !!unreadOnlyState[sectionKey], recentOnly);
+
+                collapseElement.addEventListener('shown.bs.collapse', () => {
+                    state[sectionKey] = true;
+                    writeState(state);
+                    updateButton(collapseElement, true);
+                });
+
+                collapseElement.addEventListener('hidden.bs.collapse', () => {
+                    state[sectionKey] = false;
+                    writeState(state);
+                    updateButton(collapseElement, false);
+                });
+            });
+
+            document.querySelectorAll('[data-section-toggle-all]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const mode = button.getAttribute('data-section-toggle-all');
+                    collapses.forEach((collapseElement) => {
+                        const sectionKey = collapseElement.getAttribute('data-section-key');
+                        const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                        const shouldExpand = mode === 'expand';
+                        if (sectionKey) {
+                            state[sectionKey] = shouldExpand;
+                        }
+
+                        if (shouldExpand) {
+                            collapseInstance.show();
+                        } else {
+                            collapseInstance.hide();
+                        }
+                    });
+
+                    writeState(state);
+                });
+            });
+
+            document.querySelectorAll('[data-section-unread-toggle]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const sectionKey = button.getAttribute('data-section-key');
+                    if (!sectionKey) {
+                        return;
+                    }
+
+                    const nextValue = !unreadOnlyState[sectionKey];
+                    unreadOnlyState[sectionKey] = nextValue;
+                    writeUnreadOnlyState(unreadOnlyState);
+                    applySectionFilters(sectionKey, nextValue, recentOnly);
+                });
+            });
+
+            document.querySelectorAll('[data-open-notification-section]').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+
+                    const sectionKey = button.getAttribute('data-section-key');
+                    const targetId = button.getAttribute('data-section-target');
+                    const forceUnreadOnly = button.getAttribute('data-force-unread-only') === 'true';
+                    if (!sectionKey || !targetId) {
+                        return;
+                    }
+
+                    if (forceUnreadOnly) {
+                        unreadOnlyState[sectionKey] = true;
+                        writeUnreadOnlyState(unreadOnlyState);
+                    }
+
+                    applyFiltersAcrossSections();
+
+                    const collapseElement = document.getElementById(targetId);
+                    if (!collapseElement) {
+                        return;
+                    }
+
+                    state[sectionKey] = true;
+                    writeState(state);
+                    const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                    collapseInstance.show();
+                    collapseElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            });
+
+            if (focusType) {
+                const targetSection = document.querySelector(`[data-notification-section][data-notification-type="${focusType}"]`);
+                if (targetSection) {
+                    const sectionKey = targetSection.getAttribute('data-section-key');
+                    const collapseElement = targetSection.querySelector('[data-section-collapse]');
+                    if (sectionKey && collapseElement instanceof HTMLElement) {
+                        state[sectionKey] = true;
+                        writeState(state);
+                        const collapseInstance = bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                        collapseInstance.show();
+
+                        if (searchParams.get('isRead') === 'false') {
+                            unreadOnlyState[sectionKey] = true;
+                            writeUnreadOnlyState(unreadOnlyState);
+                            applySectionFilters(sectionKey, true, recentOnly);
+                        }
+
+                        setTimeout(() => {
+                            collapseElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 50);
+                    }
+                }
+            }
+        })();
+    </script>
+</body>
+</html>

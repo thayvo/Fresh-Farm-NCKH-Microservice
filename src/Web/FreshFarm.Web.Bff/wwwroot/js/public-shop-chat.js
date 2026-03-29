@@ -13,13 +13,37 @@
             .replaceAll("'", "&#39;");
     }
 
+    function parseServerDate(value) {
+        if (!value) {
+            return null;
+        }
+
+        if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value;
+        }
+
+        if (typeof value === "string") {
+            const normalized = value.trim();
+            if (!normalized) {
+                return null;
+            }
+
+            const hasTimezone = /(?:Z|[+\-]\d{2}:\d{2})$/i.test(normalized);
+            const parsed = new Date(hasTimezone ? normalized : `${normalized}Z`);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
     function formatTime(value) {
         if (!value) {
             return "";
         }
 
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) {
+        const date = parseServerDate(value);
+        if (!date) {
             return "";
         }
 
@@ -135,8 +159,13 @@
 
             const state = {
                 conversationId: 0,
+                conversationStatus: "Open",
                 pollTimer: null,
-                isSending: false
+                hub: null,
+                isRealtimeReady: false,
+                joinedConversationId: 0,
+                isSending: false,
+                typingTimeout: null
             };
 
             const setStatus = (value) => {
@@ -176,6 +205,131 @@
                 }
             };
 
+            const setPollingEnabled = (enabled) => {
+                if (enabled) {
+                    if (state.pollTimer) {
+                        return;
+                    }
+
+                    state.pollTimer = window.setInterval(() => {
+                        if (document.hidden || state.conversationId <= 0) {
+                            return;
+                        }
+
+                        void loadMessages();
+                    }, 8000);
+                    return;
+                }
+
+                if (state.pollTimer) {
+                    window.clearInterval(state.pollTimer);
+                    state.pollTimer = null;
+                }
+            };
+
+            const joinConversationGroup = async (conversationId) => {
+                if (!state.hub || !state.isRealtimeReady || conversationId <= 0) {
+                    return;
+                }
+
+                try {
+                    if (state.joinedConversationId > 0 && state.joinedConversationId !== conversationId) {
+                        await state.hub.invoke("LeaveConversation", state.joinedConversationId);
+                    }
+
+                    if (state.joinedConversationId !== conversationId) {
+                        await state.hub.invoke("JoinConversation", conversationId);
+                        state.joinedConversationId = conversationId;
+                    }
+                } catch (error) {
+                    console.warn("[public-shop-chat] Join conversation group failed.", error);
+                }
+            };
+
+            const setupSignalR = () => {
+                if (!window.signalR || !window.signalR.HubConnectionBuilder) {
+                    console.warn("[public-shop-chat] ASP.NET Core SignalR client not loaded. Fallback to polling mode.");
+                    state.isRealtimeReady = false;
+                    return false;
+                }
+
+                const connection = new window.signalR.HubConnectionBuilder()
+                    .withUrl(config.hubUrl || "/hubs/support-chat")
+                    .withAutomaticReconnect()
+                    .build();
+
+                state.hub = connection;
+
+                connection.on("receiveMessage", (payload) => {
+                    const conversationId = Number(payload?.conversationId || payload?.message?.conversationId || 0);
+                    if (conversationId <= 0 || conversationId !== state.conversationId) {
+                        return;
+                    }
+
+                    void loadConversation(false)
+                        .then(() => loadMessages())
+                        .catch(() => { });
+                });
+
+                connection.on("newConversationOrMessage", (payload) => {
+                    const conversationId = Number(payload?.conversationId || 0);
+                    if (conversationId <= 0 || conversationId !== state.conversationId) {
+                        return;
+                    }
+
+                    void loadConversation(false)
+                        .then(() => loadMessages())
+                        .catch(() => { });
+                });
+
+                connection.on("userTyping", (payload) => {
+                    const conversationId = Number(payload?.conversationId || 0);
+                    if (conversationId <= 0 || conversationId !== state.conversationId) {
+                        return;
+                    }
+
+                    setStatus("Shop đang nhập tin nhắn...");
+                    window.clearTimeout(state.typingTimeout);
+                    state.typingTimeout = window.setTimeout(() => {
+                        void loadConversation(false).catch(() => { });
+                    }, 2500);
+                });
+
+                connection.onclose(() => {
+                    state.isRealtimeReady = false;
+                    state.joinedConversationId = 0;
+                    setPollingEnabled(true);
+                });
+
+                connection.onreconnected(async () => {
+                    state.isRealtimeReady = true;
+                    setPollingEnabled(false);
+                    await joinConversationGroup(state.conversationId);
+                });
+
+                connection.start()
+                    .then(async () => {
+                        state.isRealtimeReady = true;
+                        setPollingEnabled(false);
+                        await joinConversationGroup(state.conversationId);
+                    })
+                    .catch((error) => {
+                        console.warn("[public-shop-chat] SignalR start failed. Fallback to polling mode.", error);
+                        state.isRealtimeReady = false;
+                        setPollingEnabled(true);
+                    });
+
+                return true;
+            };
+
+            const notifyTyping = () => {
+                if (!state.hub || !state.isRealtimeReady || state.conversationId <= 0) {
+                    return;
+                }
+
+                state.hub.invoke("NotifyTyping", state.conversationId).catch(() => { });
+            };
+
             const loadConversation = async (createIfMissing) => {
                 const response = await fetch(`${config.conversationUrl}?createIfMissing=${createIfMissing ? "true" : "false"}`, {
                     headers: { Accept: "application/json" }
@@ -190,8 +344,10 @@
                 state.conversationId = Number(payload?.conversation?.conversationId || 0);
                 const conversation = payload?.conversation || null;
                 const status = (conversation?.status || "Open").toString();
+                state.conversationStatus = status;
 
                 if (state.conversationId <= 0) {
+                    state.conversationStatus = "Open";
                     setStatus("Chưa có hội thoại nào. Hãy gửi câu hỏi đầu tiên cho shop.");
                     setBadge("");
                     renderMessages(messagesNode, []);
@@ -199,10 +355,14 @@
                     return null;
                 }
 
+                await joinConversationGroup(state.conversationId);
+
                 const lastTime = formatTime(conversation?.lastTime);
                 const hasUnread = Boolean(conversation?.hasUnread);
                 if (status === "Closed") {
-                    setStatus(lastTime ? `Hội thoại đã kết thúc. Trao đổi cuối: ${lastTime}.` : "Hội thoại đã kết thúc.");
+                    setStatus(lastTime
+                        ? `Hội thoại trước đã kết thúc lúc ${lastTime}. Gửi tin mới để mở cuộc trò chuyện mới với shop.`
+                        : "Hội thoại trước đã kết thúc. Gửi tin mới để mở cuộc trò chuyện mới với shop.");
                 } else if (hasUnread) {
                     setStatus(lastTime ? `Shop vừa phản hồi lúc ${lastTime}.` : "Shop có tin nhắn mới.");
                 } else if (lastTime) {
@@ -212,7 +372,7 @@
                 }
 
                 setBadge(hasUnread ? "Tin mới" : "");
-                setComposerEnabled(status !== "Closed");
+                setComposerEnabled(true);
                 notifyConversationChanged(conversation);
                 return conversation;
             };
@@ -248,7 +408,7 @@
             };
 
             const ensureConversation = async () => {
-                if (state.conversationId > 0) {
+                if (state.conversationId > 0 && state.conversationStatus !== "Closed") {
                     return state.conversationId;
                 }
 
@@ -283,7 +443,7 @@
                             "RequestVerificationToken": config.antiForgeryToken,
                             "Accept": "application/json"
                         },
-                        body: JSON.stringify({ content: content })
+                        body: JSON.stringify({ content: content, sellerId: Number(config.sellerId || 0) })
                     });
 
                     const payload = await readJson(response);
@@ -316,26 +476,17 @@
                         void sendMessage();
                     }
                 });
+                inputNode.addEventListener("input", () => {
+                    notifyTyping();
+                });
             }
 
-            const startPolling = () => {
-                if (state.pollTimer) {
-                    return;
-                }
-
-                state.pollTimer = window.setInterval(() => {
-                    if (document.hidden || state.conversationId <= 0) {
-                        return;
-                    }
-
-                    void loadMessages();
-                }, 8000);
-            };
+            setPollingEnabled(true);
+            setupSignalR();
 
             Promise.resolve()
                 .then(() => loadConversation(false))
                 .then(() => loadMessages())
-                .then(() => startPolling())
                 .catch((error) => {
                     setStatus(error?.message || "Không thể tải chat.");
                     renderMessages(messagesNode, []);

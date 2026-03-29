@@ -1,0 +1,240 @@
+- main [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: FreshFarm Account
+      - heading "Thông báo tài khoản" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Đọc trực tiếp các cập nhật tài khoản từ notification center, theo dõi unread và xử lý nhanh ngay trên một trang.
+    - generic [ref=e9]:
+      - generic [ref=e10]: Chưa đọc
+      - generic [ref=e11]: "6"
+      - generic [ref=e12]: 10 thông báo
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - link " Thông tin tài khoản" [ref=e18] [cursor=pointer]:
+          - /url: /account/profile
+          - generic [ref=e19]: 
+          - text: Thông tin tài khoản
+        - link " Lịch sử đơn hàng" [ref=e20] [cursor=pointer]:
+          - /url: /account/orders
+          - generic [ref=e21]: 
+          - text: Lịch sử đơn hàng
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - link " Thông báo tài khoản 6" [ref=e24] [cursor=pointer]:
+              - /url: /account/notifications
+              - generic [ref=e25]: 
+              - text: Thông báo tài khoản
+              - generic [ref=e26]: "6"
+            - link "10 mới" [ref=e27] [cursor=pointer]:
+              - /url: /account/notifications?recentOnly=true
+          - generic [ref=e28]:
+            - link "Cập nhật hồ sơ seller" [ref=e30] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&focusType=seller_review_update
+            - generic [ref=e31]: 3 chưa đọc, 3 cập nhật còn mới trong 24h.
+            - 'link "Cập nhật hồ sơ seller: 3 chưa đọc" [ref=e33] [cursor=pointer]':
+              - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update
+        - link " Đăng ký người bán" [ref=e34] [cursor=pointer]:
+          - /url: /account/become-seller
+          - generic [ref=e35]: 
+          - text: Đăng ký người bán
+        - link " Trang chủ" [ref=e36] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e37]: 
+          - text: Trang chủ
+      - button " Đăng xuất" [ref=e40] [cursor=pointer]:
+        - generic [ref=e41]: 
+        - text: Đăng xuất
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - heading "Dòng cập nhật gần đây" [level=5] [ref=e47]
+          - generic [ref=e48]: Lọc theo loại, trạng thái đọc và đánh dấu đã đọc ngay tại đây.
+        - generic [ref=e49]:
+          - generic [ref=e50]: 10 tổng
+          - generic [ref=e51]: 6 chưa đọc
+          - generic [ref=e52]: 10 trong 24h
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e56]: Ưu tiên lúc này
+            - generic [ref=e57]: Cập nhật hồ sơ seller đang cần bạn xử lý trước
+            - generic [ref=e58]: 3 chưa đọc, 3 cập nhật còn mới trong 24h.
+            - generic [ref=e59]:
+              - generic [ref=e60]: Cập nhật hồ sơ seller
+              - generic [ref=e61]: 3 chưa đọc
+              - generic [ref=e62]: 3 mới trong 24h
+              - generic [ref=e63]: Có cập nhật trong 24h
+          - link " Mở nhóm ưu tiên" [ref=e65] [cursor=pointer]:
+            - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - generic [ref=e66]: 
+            - text: Mở nhóm ưu tiên
+        - generic [ref=e67]:
+          - generic [ref=e68]: Tổng quan theo nhóm
+          - generic [ref=e70]:
+            - link "Cập nhật hồ sơ seller 3 chưa đọc" [ref=e71] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật hồ sơ seller
+              - generic [ref=e72]: 3 chưa đọc
+            - link " Chỉ unread" [ref=e73] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - generic [ref=e74]: 
+              - text: Chỉ unread
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - generic [ref=e78]: Truy cập nhanh
+          - generic [ref=e79]:
+            - link "Tất cả 10" [ref=e80] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Tất cả
+              - generic [ref=e81]: "10"
+            - link "Chưa đọc 6" [ref=e82] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Chưa đọc
+              - generic [ref=e83]: "6"
+        - generic [ref=e84]:
+          - generic [ref=e85]: Nhóm thông báo
+          - generic [ref=e86]:
+            - link "Tất cả" [ref=e87] [cursor=pointer]:
+              - /url: /account/notifications?isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - link "Cập nhật hồ sơ seller 3" [ref=e88] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&isRead=false&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật hồ sơ seller
+              - generic [ref=e89]: "3"
+            - link "Cập nhật đơn hàng 0" [ref=e90] [cursor=pointer]:
+              - /url: /account/notifications?type=order_status&isRead=false&focusType=order_status&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật đơn hàng
+              - generic [ref=e91]: "0"
+            - link "Cập nhật vị trí giao hàng 0" [ref=e92] [cursor=pointer]:
+              - /url: /account/notifications?type=location_update&isRead=false&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật vị trí giao hàng
+              - generic [ref=e93]: "0"
+      - generic [ref=e94]:
+        - generic [ref=e95]:
+          - generic [ref=e96]: Từ khóa
+          - textbox "Tìm theo tiêu đề, nội dung..." [ref=e97]
+        - generic [ref=e98]:
+          - generic [ref=e99]: Loại thông báo
+          - combobox [ref=e100]:
+            - option "Tất cả"
+            - option "Cập nhật vị trí giao hàng"
+            - option "Cập nhật đơn hàng"
+            - option "Cập nhật hồ sơ seller" [selected]
+        - generic [ref=e101]:
+          - generic [ref=e102]: Trạng thái đọc
+          - combobox [ref=e103]:
+            - option "Tất cả"
+            - option "Chưa đọc" [selected]
+            - option "Đã đọc"
+        - generic [ref=e104]:
+          - button " Lọc" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]: 
+            - text: Lọc
+          - link "Reset" [ref=e107] [cursor=pointer]:
+            - /url: /account/notifications
+      - generic [ref=e108]:
+        - generic [ref=e109]:
+          - generic [ref=e110]: Trang 1 / 1
+          - generic [ref=e111]:
+            - text: Đang áp dụng bộ lọc
+            - generic [ref=e112]: Cập nhật hồ sơ seller
+            - generic [ref=e113]: Chưa đọc
+        - generic [ref=e114]:
+          - link " Chỉ mới cập nhật" [ref=e115] [cursor=pointer]:
+            - /url: /account/notifications?type=seller_review_update&isRead=false&recentOnly=true&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - generic [ref=e116]: 
+            - text: Chỉ mới cập nhật
+          - button " Mở rộng tất cả" [ref=e117] [cursor=pointer]:
+            - generic [ref=e118]: 
+            - text: Mở rộng tất cả
+          - button " Thu gọn tất cả" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]: 
+            - text: Thu gọn tất cả
+          - button " Đánh dấu tất cả đã đọc" [ref=e122] [cursor=pointer]:
+            - generic [ref=e123]: 
+            - text: Đánh dấu tất cả đã đọc
+      - generic [ref=e125]:
+        - generic [ref=e126]:
+          - generic [ref=e127]:
+            - generic [ref=e128]: Cập nhật hồ sơ seller
+            - generic [ref=e129]: 3 chưa đọc, 3 cập nhật trong nhóm này
+          - generic [ref=e130]:
+            - generic [ref=e131]: Có cập nhật trong 24h
+            - generic [ref=e132]: 3 tổng
+            - generic [ref=e133]: 3 chưa đọc
+            - button " Thu gọn" [expanded] [ref=e134] [cursor=pointer]:
+              - generic [ref=e135]: 
+              - text: Thu gọn
+        - generic [ref=e137]:
+          - article [ref=e138]:
+            - generic [ref=e139]:
+              - generic [ref=e140]:
+                - generic [ref=e141]:
+                  - generic [ref=e142]: Hồ sơ seller đã được duyệt
+                  - generic [ref=e143]: Mới
+                - generic [ref=e144]: 23/03/2026 14:17
+              - generic [ref=e145]:
+                - generic [ref=e146]: Cập nhật hồ sơ seller
+                - generic [ref=e147]: Hồ sơ seller
+                - generic [ref=e148]: Mới trong 24h
+              - generic [ref=e149]:
+                - generic [ref=e150]: Trạng thái hồ sơ
+                - generic [ref=e151]: Đã được duyệt
+                - generic [ref=e152]: Mở hồ sơ seller để hoàn tất thiết lập và bắt đầu vận hành gian hàng.
+              - generic [ref=e153]: Hồ sơ đăng ký người bán của bạn đã được FreshFarm phê duyệt.
+              - generic [ref=e154]:
+                - link " Xem hồ sơ seller" [ref=e155] [cursor=pointer]:
+                  - /url: /account/notifications/43/open?target=%2Faccount%2Fbecome-seller
+                  - generic [ref=e156]: 
+                  - text: Xem hồ sơ seller
+                - button " Đánh dấu đã đọc" [ref=e158] [cursor=pointer]:
+                  - generic [ref=e159]: 
+                  - text: Đánh dấu đã đọc
+          - article [ref=e160]:
+            - generic [ref=e161]:
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - generic [ref=e164]: Hồ sơ seller cần bổ sung
+                  - generic [ref=e165]: Mới
+                - generic [ref=e166]: 23/03/2026 14:17
+              - generic [ref=e167]:
+                - generic [ref=e168]: Cập nhật hồ sơ seller
+                - generic [ref=e169]: Hồ sơ seller
+                - generic [ref=e170]: Mới trong 24h
+              - generic [ref=e171]:
+                - generic [ref=e172]: Cần bổ sung
+                - generic [ref=e173]: Thiếu ảnh CCCD mặt sau rõ nét
+                - generic [ref=e174]: Mở hồ sơ seller để cập nhật giấy tờ và gửi lại hồ sơ.
+              - generic [ref=e175]: "Đội vận hành đã yêu cầu bổ sung hồ sơ seller: Thiếu ảnh CCCD mặt sau rõ nét."
+              - generic [ref=e176]:
+                - link " Xem hồ sơ seller" [ref=e177] [cursor=pointer]:
+                  - /url: /account/notifications/42/open?target=%2Faccount%2Fbecome-seller
+                  - generic [ref=e178]: 
+                  - text: Xem hồ sơ seller
+                - button " Đánh dấu đã đọc" [ref=e180] [cursor=pointer]:
+                  - generic [ref=e181]: 
+                  - text: Đánh dấu đã đọc
+          - article [ref=e182]:
+            - generic [ref=e183]:
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - generic [ref=e186]: Hồ sơ seller cần bổ sung lần nữa
+                  - generic [ref=e187]: Mới
+                - generic [ref=e188]: 23/03/2026 12:53
+              - generic [ref=e189]:
+                - generic [ref=e190]: Cập nhật hồ sơ seller
+                - generic [ref=e191]: Hồ sơ seller
+                - generic [ref=e192]: Mới trong 24h
+              - generic [ref=e193]:
+                - generic [ref=e194]: Cần bổ sung
+                - generic [ref=e195]: FreshFarm vừa thêm một cập nhật mới để bạn kiểm tra unread badge
+                - generic [ref=e196]: Mở hồ sơ seller để cập nhật giấy tờ và gửi lại hồ sơ.
+              - generic [ref=e197]: FreshFarm vừa thêm một cập nhật mới để bạn kiểm tra unread badge.
+              - generic [ref=e198]:
+                - link " Xem hồ sơ seller" [ref=e199] [cursor=pointer]:
+                  - /url: /account/notifications/39/open?target=%2Faccount%2Fbecome-seller
+                  - generic [ref=e200]: 
+                  - text: Xem hồ sơ seller
+                - button " Đánh dấu đã đọc" [ref=e202] [cursor=pointer]:
+                  - generic [ref=e203]: 
+                  - text: Đánh dấu đã đọc

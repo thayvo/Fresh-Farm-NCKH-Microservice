@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
@@ -16,6 +17,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class SettingController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private static readonly Regex VietnamPhoneRegex = new(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", RegexOptions.Compiled);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGhnSandboxService _ghnSandboxService;
@@ -67,11 +69,6 @@ public class SettingController : LegacySellerControllerBase
         ViewData["GhnSandboxConfigured"] = _ghnSandboxService.IsConfigured;
         ViewData["GhnSandboxShopId"] = _ghnSandboxService.ShopId?.ToString() ?? "Chưa có";
 
-        if (!ModelState.IsValid)
-        {
-            return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
-        }
-
         try
         {
             model.StoreName = model.StoreName.Trim();
@@ -88,6 +85,29 @@ public class SettingController : LegacySellerControllerBase
             model.GhnDistrictName = model.GhnDistrictName?.Trim();
             model.GhnWardCode = model.GhnWardCode?.Trim();
             model.GhnWardName = model.GhnWardName?.Trim();
+
+            if (!IsVietnamPhone(model.StorePhone))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Số điện thoại cửa hàng phải đúng định dạng di động Việt Nam, ví dụ 0328898307 hoặc +84328898307."
+                });
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.GhnPickupPhone) && !IsVietnamPhone(model.GhnPickupPhone))
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = "Số điện thoại lấy hàng GHN phải đúng định dạng di động Việt Nam, ví dụ 0328898307 hoặc +84328898307."
+                });
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return Json(new { success = false, message = "Dữ liệu không hợp lệ." });
+            }
 
             var client = CreateAuthorizedClient("Identity");
             var response = await client.PutAsJsonAsync("/auth/admin/settings/store", model);
@@ -200,6 +220,11 @@ public class SettingController : LegacySellerControllerBase
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+    }
+
+    private static bool IsVietnamPhone(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && VietnamPhoneRegex.IsMatch(value.Trim());
     }
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)

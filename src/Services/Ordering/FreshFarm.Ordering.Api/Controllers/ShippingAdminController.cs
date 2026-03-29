@@ -1,9 +1,14 @@
 using FreshFarm.Ordering.Api.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using FreshFarm.Ordering.Api.Options;
+using FreshFarm.Ordering.Api.Services;
 
 namespace FreshFarm.Ordering.Api.Controllers;
 
@@ -13,6 +18,16 @@ namespace FreshFarm.Ordering.Api.Controllers;
 public sealed class ShippingAdminController : ControllerBase
 {
     private static readonly string[] PaidStatuses = { "Da thanh toan", "Đã thanh toán", "Hoan tat", "Hoàn tất" };
+    private static readonly HashSet<string> TerminalGhnStatuses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "delivered",
+        "returned",
+        "cancel",
+        "delivery_fail",
+        "lost",
+        "damage"
+    };
+    private static readonly DateTime SqlDateTimeFloor = new(1900, 1, 1);
 
     private static readonly List<ProvinceOption> Provinces = new()
     {
@@ -41,10 +56,20 @@ public sealed class ShippingAdminController : ControllerBase
     };
 
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly CustomerNotificationService _customerNotificationService;
+    private readonly InternalServiceAuthOptions _internalServiceAuthOptions;
+    private readonly ILogger<ShippingAdminController> _logger;
 
-    public ShippingAdminController(FreshFarmOrderingDBContext db)
+    public ShippingAdminController(
+        FreshFarmOrderingDBContext db,
+        CustomerNotificationService customerNotificationService,
+        IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
+        ILogger<ShippingAdminController> logger)
     {
         _db = db;
+        _customerNotificationService = customerNotificationService;
+        _internalServiceAuthOptions = internalServiceAuthOptions.Value;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -163,6 +188,14 @@ public sealed class ShippingAdminController : ControllerBase
                 addressDetail = s.AddressDetail,
                 provinceId = s.ProvinceId,
                 communeId = s.CommuneId,
+                ghnOrderCode = s.GhnOrderCode,
+                ghnClientOrderCode = s.GhnClientOrderCode,
+                ghnStatus = s.GhnStatus,
+                ghnStatusLabel = s.GhnStatusLabel,
+                ghnTotalFee = s.GhnTotalFee,
+                ghnCreatedAt = s.GhnCreatedAt,
+                ghnExpectedDeliveryTime = s.GhnExpectedDeliveryTime,
+                ghnLastSyncedAt = s.GhnLastSyncedAt,
                 isStorePickup = s.ShippingType == "StorePickup",
                 storeAddress = s.ShippingType == "StorePickup" ? s.AddressDetail : null,
                 order = new
@@ -257,6 +290,14 @@ public sealed class ShippingAdminController : ControllerBase
                 s.addressDetail,
                 s.provinceId,
                 s.communeId,
+                s.ghnOrderCode,
+                s.ghnClientOrderCode,
+                s.ghnStatus,
+                s.ghnStatusLabel,
+                s.ghnTotalFee,
+                s.ghnCreatedAt,
+                s.ghnExpectedDeliveryTime,
+                s.ghnLastSyncedAt,
                 s.isStorePickup,
                 s.storeAddress,
                 province = province is null
@@ -357,6 +398,14 @@ public sealed class ShippingAdminController : ControllerBase
             addressDetail = shipping.AddressDetail,
             provinceId = shipping.ProvinceId,
             communeId = shipping.CommuneId,
+            ghnOrderCode = shipping.GhnOrderCode,
+            ghnClientOrderCode = shipping.GhnClientOrderCode,
+            ghnStatus = shipping.GhnStatus,
+            ghnStatusLabel = shipping.GhnStatusLabel,
+            ghnTotalFee = shipping.GhnTotalFee,
+            ghnCreatedAt = shipping.GhnCreatedAt,
+            ghnExpectedDeliveryTime = shipping.GhnExpectedDeliveryTime,
+            ghnLastSyncedAt = shipping.GhnLastSyncedAt,
             isStorePickup = shipping.ShippingType == "StorePickup",
             storeAddress = shipping.ShippingType == "StorePickup" ? shipping.AddressDetail : null,
             deliveryStaffId = (int?)null
@@ -419,6 +468,14 @@ public sealed class ShippingAdminController : ControllerBase
             totalAmount = itemsAmount + shippingFee,
             totalQuantity,
             itemSummary,
+            ghnOrderCode = shipping?.GhnOrderCode,
+            ghnClientOrderCode = shipping?.GhnClientOrderCode,
+            ghnStatus = shipping?.GhnStatus,
+            ghnStatusLabel = shipping?.GhnStatusLabel,
+            ghnTotalFee = shipping?.GhnTotalFee,
+            ghnCreatedAt = shipping?.GhnCreatedAt,
+            ghnExpectedDeliveryTime = shipping?.GhnExpectedDeliveryTime,
+            ghnLastSyncedAt = shipping?.GhnLastSyncedAt,
             paymentMethod = payment?.PaymentMethod,
             isCod = string.Equals(payment?.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase),
             codAmount = string.Equals(payment?.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase)
@@ -436,6 +493,189 @@ public sealed class ShippingAdminController : ControllerBase
         }
 
         return Ok(communes.Select(c => new { value = c.Id, text = c.Name }));
+    }
+
+    [HttpPost("{orderId:int}/ghn-metadata")]
+    public async Task<IActionResult> UpsertGhnMetadata([FromRoute] int orderId, [FromBody] GhnMetadataUpsertRequest request, CancellationToken cancellationToken)
+    {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller." });
+        }
+
+        return await UpsertGhnMetadataCore(orderId, request, sellerId, isAdmin, bypassOwnershipCheck: false, cancellationToken);
+    }
+
+    [AllowAnonymous]
+    [HttpGet("internal/ghn-sync-candidates")]
+    public async Task<IActionResult> GetInternalGhnSyncCandidates(
+        [FromQuery] int limit = 10,
+        [FromQuery] int staleMinutes = 20,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsValidInternalServiceRequest())
+        {
+            _logger.LogWarning("Ghn internal sync candidates bi tu choi do internal service key khong hop le.");
+            return Unauthorized(new { success = false, message = "Yeu cau noi bo khong hop le." });
+        }
+
+        limit = Math.Clamp(limit, 1, 50);
+        staleMinutes = Math.Clamp(staleMinutes, 1, 24 * 60);
+        var cutoffUtc = DateTime.UtcNow.AddMinutes(-staleMinutes);
+
+        var items = await _db.Shippings
+            .AsNoTracking()
+            .Include(s => s.Order)
+            .Where(s => s.OrderId > 0 && !string.IsNullOrWhiteSpace(s.GhnOrderCode))
+            .Where(s => s.GhnLastSyncedAt == null || s.GhnLastSyncedAt <= cutoffUtc)
+            .Where(s => s.Order != null && s.Order.Status != "Canceled")
+            .Where(s => string.IsNullOrWhiteSpace(s.GhnStatus) || !TerminalGhnStatuses.Contains(s.GhnStatus))
+            .OrderBy(s => s.GhnLastSyncedAt ?? SqlDateTimeFloor)
+            .ThenBy(s => s.OrderId)
+            .Take(limit)
+            .Select(s => new InternalGhnSyncCandidate
+            {
+                OrderId = s.OrderId,
+                OrderCode = s.GhnOrderCode ?? string.Empty,
+                ClientOrderCode = s.GhnClientOrderCode,
+                GhnStatus = s.GhnStatus,
+                LastSyncedAt = s.GhnLastSyncedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            count = items.Count,
+            staleMinutes,
+            items
+        });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("internal/{orderId:int}/ghn-metadata")]
+    public async Task<IActionResult> UpsertGhnMetadataInternal(
+        [FromRoute] int orderId,
+        [FromBody] GhnMetadataUpsertRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidInternalServiceRequest())
+        {
+            _logger.LogWarning("Ghn internal metadata upsert bi tu choi do internal service key khong hop le. OrderId={OrderId}", orderId);
+            return Unauthorized(new { success = false, message = "Yeu cau noi bo khong hop le." });
+        }
+
+        return await UpsertGhnMetadataCore(orderId, request, sellerId: null, isAdmin: true, bypassOwnershipCheck: true, cancellationToken);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("internal/ghn-metadata/by-code")]
+    public async Task<IActionResult> UpsertGhnMetadataInternalByCode(
+        [FromBody] GhnMetadataByCodeUpsertRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsValidInternalServiceRequest())
+        {
+            _logger.LogWarning(
+                "Ghn internal metadata by-code upsert bi tu choi do internal service key khong hop le. OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}",
+                request.OrderCode,
+                request.ClientOrderCode);
+            return Unauthorized(new { success = false, message = "Yeu cau noi bo khong hop le." });
+        }
+
+        var normalizedOrderCode = NormalizeNullableText(request.OrderCode, 50);
+        var normalizedClientOrderCode = NormalizeNullableText(request.ClientOrderCode, 50);
+        if (string.IsNullOrWhiteSpace(normalizedOrderCode) && string.IsNullOrWhiteSpace(normalizedClientOrderCode))
+        {
+            return BadRequest(new { success = false, message = "Thieu order code hoac client order code de luu metadata GHN." });
+        }
+
+        var shipping = await _db.Shippings
+            .Include(s => s.Order)
+            .ThenInclude(o => o.SellerOrders)
+            .FirstOrDefaultAsync(
+                s => (!string.IsNullOrWhiteSpace(normalizedOrderCode) && s.GhnOrderCode == normalizedOrderCode) ||
+                     (!string.IsNullOrWhiteSpace(normalizedClientOrderCode) && s.GhnClientOrderCode == normalizedClientOrderCode),
+                cancellationToken);
+
+        if (shipping is null)
+        {
+            return NotFound(new { success = false, message = "Khong tim thay shipping de luu metadata GHN theo order code." });
+        }
+
+        var previousGhnStatus = shipping.GhnStatus;
+        var previousGhnStatusLabel = shipping.GhnStatusLabel;
+        ApplyGhnMetadata(shipping, new GhnMetadataUpsertRequest
+        {
+            OrderCode = normalizedOrderCode,
+            ClientOrderCode = normalizedClientOrderCode,
+            Status = request.Status,
+            StatusLabel = request.StatusLabel,
+            TotalFee = request.TotalFee,
+            CreatedAt = request.CreatedAt,
+            ExpectedDeliveryTime = request.ExpectedDeliveryTime,
+            LastSyncedAt = request.LastSyncedAt
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await _customerNotificationService.PublishShippingStatusUpdateAsync(
+            shipping.Order,
+            shipping,
+            previousGhnStatus,
+            previousGhnStatusLabel,
+            cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Da luu metadata GHN theo order code.",
+            orderId = shipping.OrderId,
+            shippingId = shipping.ShippingId
+        });
+    }
+
+    private async Task<IActionResult> UpsertGhnMetadataCore(
+        int orderId,
+        GhnMetadataUpsertRequest request,
+        int? sellerId,
+        bool isAdmin,
+        bool bypassOwnershipCheck,
+        CancellationToken cancellationToken)
+    {
+        if (orderId <= 0)
+        {
+            return BadRequest(new { success = false, message = "Thieu OrderId hop le de luu metadata GHN." });
+        }
+
+        var shipping = await _db.Shippings
+            .Include(s => s.Order)
+            .ThenInclude(o => o.SellerOrders)
+            .FirstOrDefaultAsync(s => s.OrderId == orderId, cancellationToken);
+        if (shipping is null || (!bypassOwnershipCheck && !CanAccessShippingBySeller(shipping, sellerId, isAdmin)))
+        {
+            return NotFound(new { success = false, message = "Khong tim thay shipping de luu metadata GHN." });
+        }
+
+        var previousGhnStatus = shipping.GhnStatus;
+        var previousGhnStatusLabel = shipping.GhnStatusLabel;
+        ApplyGhnMetadata(shipping, request);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _customerNotificationService.PublishShippingStatusUpdateAsync(
+            shipping.Order,
+            shipping,
+            previousGhnStatus,
+            previousGhnStatusLabel,
+            cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Da luu metadata GHN cho shipping.",
+            orderId,
+            shippingId = shipping.ShippingId
+        });
     }
 
     [HttpPost]
@@ -695,6 +935,21 @@ public sealed class ShippingAdminController : ControllerBase
         return shipping.Order is not null && CanAccessOrderBySeller(shipping.Order, sellerId, isAdmin);
     }
 
+    private bool IsValidInternalServiceRequest()
+    {
+        var configuredKey = _internalServiceAuthOptions.InternalServiceKey?.Trim();
+        var incomingKey = Request.Headers["X-Internal-Service-Key"].ToString().Trim();
+
+        if (string.IsNullOrWhiteSpace(configuredKey) || string.IsNullOrWhiteSpace(incomingKey))
+        {
+            return false;
+        }
+
+        var configuredBytes = Encoding.UTF8.GetBytes(configuredKey);
+        var incomingBytes = Encoding.UTF8.GetBytes(incomingKey);
+        return CryptographicOperations.FixedTimeEquals(configuredBytes, incomingBytes);
+    }
+
     private static string BuildItemSummary(IReadOnlyCollection<string?> names)
     {
         var cleaned = names
@@ -736,6 +991,31 @@ public sealed class ShippingAdminController : ControllerBase
         return (addressDetail, request.ProvinceId, request.CommuneId, shippingType);
     }
 
+    private static void ApplyGhnMetadata(Shipping shipping, GhnMetadataUpsertRequest request)
+    {
+        shipping.GhnOrderCode = NormalizeNullableText(request.OrderCode, 50);
+        shipping.GhnClientOrderCode = NormalizeNullableText(request.ClientOrderCode, 50);
+        shipping.GhnStatus = NormalizeNullableText(request.Status, 50);
+        shipping.GhnStatusLabel = NormalizeNullableText(request.StatusLabel, 100);
+        shipping.GhnTotalFee = request.TotalFee;
+        shipping.GhnCreatedAt = request.CreatedAt;
+        shipping.GhnExpectedDeliveryTime = request.ExpectedDeliveryTime;
+        shipping.GhnLastSyncedAt = request.LastSyncedAt ?? DateTime.UtcNow;
+    }
+
+    private static string? NormalizeNullableText(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim();
+        return trimmed.Length <= maxLength
+            ? trimmed
+            : trimmed[..maxLength];
+    }
+
     public sealed class ShippingUpsertRequest
     {
         public int OrderID { get; set; }
@@ -766,6 +1046,25 @@ public sealed class ShippingAdminController : ControllerBase
         public int OrderId { get; set; }
     }
 
+    public sealed class GhnMetadataUpsertRequest
+    {
+        public string? OrderCode { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? Status { get; set; }
+
+        public string? StatusLabel { get; set; }
+
+        public decimal? TotalFee { get; set; }
+
+        public DateTime? CreatedAt { get; set; }
+
+        public DateTime? ExpectedDeliveryTime { get; set; }
+
+        public DateTime? LastSyncedAt { get; set; }
+    }
+
     private sealed record ShippingScopeRow(int OrderId, decimal ShippingFee, decimal ItemsAmount);
 
     private sealed record ShippingItemScopeRow(int OrderId, int Quantity, string? SnapshotName);
@@ -773,4 +1072,36 @@ public sealed class ShippingAdminController : ControllerBase
     private sealed record ProvinceOption(int Id, string Name);
 
     private sealed record CommuneOption(int Id, string Name);
+
+    public sealed class InternalGhnSyncCandidate
+    {
+        public int OrderId { get; set; }
+
+        public string OrderCode { get; set; } = string.Empty;
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? GhnStatus { get; set; }
+
+        public DateTime? LastSyncedAt { get; set; }
+    }
+
+    public sealed class GhnMetadataByCodeUpsertRequest
+    {
+        public string? OrderCode { get; set; }
+
+        public string? ClientOrderCode { get; set; }
+
+        public string? Status { get; set; }
+
+        public string? StatusLabel { get; set; }
+
+        public decimal? TotalFee { get; set; }
+
+        public DateTime? CreatedAt { get; set; }
+
+        public DateTime? ExpectedDeliveryTime { get; set; }
+
+        public DateTime? LastSyncedAt { get; set; }
+    }
 }

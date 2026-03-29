@@ -1,0 +1,42 @@
+[
+  {
+    "label": "home",
+    "url": "https://localhost:7085/",
+    "hasFloatingWidget": true,
+    "launcherVisible": true,
+    "supportLinkVisible": true,
+    "listText": "C\n                        \n                            \n                                Cửa hàng Hoàng Thanh Bình\n                                23 ngày trước\n                            \n                            welcome to my channel\n                            \n                                Chưa cập nhật địa chỉ hoạt động\n                                Đã đóng",
+    "threadName": "Cửa hàng Hoàng Thanh Bình",
+    "hasPublicShopChat": false
+  },
+  {
+    "label": "shops",
+    "url": "https://localhost:7085/shop",
+    "hasFloatingWidget": true,
+    "launcherVisible": true,
+    "supportLinkVisible": true,
+    "listText": "C\n                        \n                            \n                                Cửa hàng Hoàng Thanh Bình\n                                23 ngày trước\n                            \n                            welcome to my channel\n                            \n                                Chưa cập nhật địa chỉ hoạt động\n                                Đã đóng",
+    "threadName": "FreshFarm Seller",
+    "hasPublicShopChat": false
+  },
+  {
+    "label": "search",
+    "url": "https://localhost:7085/search?q=rau",
+    "hasFloatingWidget": true,
+    "launcherVisible": true,
+    "supportLinkVisible": true,
+    "listText": "C\n                        \n                            \n                                Cửa hàng Hoàng Thanh Bình\n                                23 ngày trước\n                            \n                            welcome to my channel\n                            \n                                Chưa cập nhật địa chỉ hoạt động\n                                Đã đóng",
+    "threadName": "FreshFarm Seller",
+    "hasPublicShopChat": false
+  },
+  {
+    "label": "shop-2",
+    "url": "https://localhost:7085/shop/2",
+    "hasFloatingWidget": true,
+    "launcherVisible": true,
+    "supportLinkVisible": true,
+    "listText": "C\n                        \n                            \n                                Cửa hàng Hoàng Thanh Bình\n                                23 ngày trước\n                            \n                            welcome to my channel\n                            \n                                Chưa cập nhật địa chỉ hoạt động\n                                Đã đóng",
+    "threadName": "FreshFarm Seller",
+    "hasPublicShopChat": false
+  }
+]

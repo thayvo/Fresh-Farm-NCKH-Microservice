@@ -313,6 +313,9 @@ public sealed class ReportsAdminController : ControllerBase
             .Where(d => orderIds.Contains(d.OrderId))
             .ToListAsync(cancellationToken);
         details = FilterReportableDetails(details);
+        var productNamesById = await BuildProductSnapshotLookupAsync(
+            details.Select(d => d.ProductId).ToList(),
+            cancellationToken);
 
         var totalRevenue = orders.Sum(o => o.TotalAmount);
         var totalOrders = orders.Count;
@@ -347,7 +350,7 @@ public sealed class ReportsAdminController : ControllerBase
             .Take(5)
             .Select(x => new
             {
-                ProductName = $"San pham #{x.ProductId}",
+                ProductName = ResolveProductName(x.ProductId, productNamesById),
                 TotalRevenue = x.Revenue
             })
             .ToList();
@@ -469,6 +472,9 @@ public sealed class ReportsAdminController : ControllerBase
             .Where(d => orderIds.Contains(d.OrderId))
             .ToListAsync(cancellationToken);
         details = FilterReportableDetails(details);
+        var productNamesById = await BuildProductSnapshotLookupAsync(
+            details.Select(d => d.ProductId).ToList(),
+            cancellationToken);
 
         var productAgg = details
             .GroupBy(d => d.ProductId)
@@ -481,7 +487,7 @@ public sealed class ReportsAdminController : ControllerBase
                 return new
                 {
                     ProductId = g.Key,
-                    ProductName = $"San pham #{g.Key}",
+                    ProductName = ResolveProductName(g.Key, productNamesById),
                     CategoryName = categoryName,
                     QuantitySold = quantity,
                     TotalRevenue = revenue,
@@ -586,6 +592,9 @@ public sealed class ReportsAdminController : ControllerBase
             .Where(d => orderIds.Contains(d.OrderId))
             .ToListAsync(cancellationToken);
         details = FilterReportableDetails(details);
+        var productNamesById = await BuildProductSnapshotLookupAsync(
+            details.Select(d => d.ProductId).ToList(),
+            cancellationToken);
 
         var productAgg = details
             .GroupBy(d => d.ProductId)
@@ -596,7 +605,7 @@ public sealed class ReportsAdminController : ControllerBase
                 return new
                 {
                     ProductId = g.Key,
-                    ProductName = $"San pham #{g.Key}",
+                    ProductName = ResolveProductName(g.Key, productNamesById),
                     Sku = $"SKU-{g.Key:D5}",
                     CategoryName = categoryName,
                     QuantitySold = g.Sum(x => (long)x.Quantity),
@@ -1009,6 +1018,9 @@ public sealed class ReportsAdminController : ControllerBase
             .GroupBy(o => o.UserId)
             .Select(g => g.OrderByDescending(x => x.OrderDate).First())
             .ToDictionaryAsync(x => x.UserId, cancellationToken);
+        var productNamesById = await BuildProductSnapshotLookupAsync(
+            reviews.Select(r => r.ProductId).ToList(),
+            cancellationToken);
 
         var normalizedStar = string.IsNullOrWhiteSpace(starRating) ? "all" : starRating.Trim().ToLowerInvariant();
         if (!normalizedStar.Equals("all", StringComparison.OrdinalIgnoreCase) && int.TryParse(normalizedStar, out var targetStar))
@@ -1034,7 +1046,7 @@ public sealed class ReportsAdminController : ControllerBase
                 CustomerName = latestOrdersByUser.TryGetValue(r.UserId, out var userOrder) && !string.IsNullOrWhiteSpace(userOrder.BuyerFullName)
                     ? userOrder.BuyerFullName
                     : $"Khach {r.UserId}",
-                ProductName = $"San pham #{r.ProductId}",
+                ProductName = ResolveProductName(r.ProductId, productNamesById),
                 ProductImageFileName = string.Empty,
                 Rating = r.Rating,
                 StarDisplay = BuildStarDisplay(r.Rating),
@@ -1123,6 +1135,9 @@ public sealed class ReportsAdminController : ControllerBase
             .GroupBy(o => o.UserId)
             .Select(g => g.OrderByDescending(x => x.OrderDate).First())
             .ToDictionaryAsync(x => x.UserId, cancellationToken);
+        var productNamesById = await BuildProductSnapshotLookupAsync(
+            reviews.Select(r => r.ProductId).ToList(),
+            cancellationToken);
 
         var normalizedStar = string.IsNullOrWhiteSpace(starRating) ? "all" : starRating.Trim().ToLowerInvariant();
         if (!normalizedStar.Equals("all", StringComparison.OrdinalIgnoreCase) && int.TryParse(normalizedStar, out var targetStar))
@@ -1139,7 +1154,7 @@ public sealed class ReportsAdminController : ControllerBase
                 latestOrdersByUser.TryGetValue(r.UserId, out var userOrder) && !string.IsNullOrWhiteSpace(userOrder.BuyerFullName)
                     ? userOrder.BuyerFullName
                     : $"Khach {r.UserId}",
-                $"San pham #{r.ProductId}",
+                ResolveProductName(r.ProductId, productNamesById),
                 r.Rating.ToString(CultureInfo.InvariantCulture),
                 r.Comment ?? string.Empty,
                 r.CreatedAt.ToString("dd/MM/yyyy HH:mm")
@@ -1372,6 +1387,63 @@ public sealed class ReportsAdminController : ControllerBase
                && detail.Quantity > 0
                && detail.Quantity <= 10_000
                && detail.UnitPrice > 0m;
+    }
+
+    private async Task<Dictionary<int, string>> BuildProductSnapshotLookupAsync(
+        IReadOnlyCollection<int> productIds,
+        CancellationToken cancellationToken)
+    {
+        var normalizedIds = productIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+        if (normalizedIds.Count == 0)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        var query = _db.SellerOrderItems
+            .AsNoTracking()
+            .Where(x => normalizedIds.Contains(x.ProductId))
+            .Where(x => !string.IsNullOrWhiteSpace(x.SnapshotName))
+            .AsQueryable();
+
+        if (!isAdmin)
+        {
+            query = query.Where(x => x.SellerOrder.SellerId == sellerId!.Value);
+        }
+
+        var rows = await query
+            .OrderByDescending(x => x.SellerOrderItemId)
+            .Select(x => new
+            {
+                x.ProductId,
+                x.SnapshotName
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.SnapshotName?.Trim())
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+                    ?? $"San pham #{g.Key}");
+    }
+
+    private static string ResolveProductName(int productId, IReadOnlyDictionary<int, string> productNamesById)
+    {
+        return productNamesById.TryGetValue(productId, out var name) &&
+               !string.IsNullOrWhiteSpace(name)
+            ? name
+            : $"San pham #{productId}";
     }
 
     private static int ToSafeNonNegativeInt(long value)

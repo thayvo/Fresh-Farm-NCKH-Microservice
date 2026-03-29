@@ -7,6 +7,7 @@
             const signInUrl = configNode?.dataset.signInUrl || "/account/signin";
             const endpoint = configNode?.dataset.endpoint || `/bff/products/${productId}`;
             const offersEndpoint = configNode?.dataset.offersEndpoint || `/bff/products/${productId}/offers`;
+            const similarEndpoint = configNode?.dataset.similarEndpoint || `/bff/recommendations/products/${productId}/similar?limit=8`;
             const reviewsEndpoint = configNode?.dataset.reviewsEndpoint || `/bff/reviews/products/${productId}`;
             const fallbackImage = configNode?.dataset.fallbackImage || "/uploads/products/no-image.png";
             const uploadRoot = configNode?.dataset.uploadRoot || "/uploads/products/";
@@ -17,6 +18,14 @@
             const rootNode = document.getElementById("productDetailRoot");
             const headerSearchInput = document.getElementById("headerSearchInput");
             let chatSummaryTimer = 0;
+            const offerRecommendationPlacement = "product_offers";
+            const offerRecommendationAlgorithm = "catalog_offer_list";
+            let currentOfferRecommendationRunId = "";
+            const offerImpressionIds = new Map();
+            const similarRecommendationPlacement = "product_similar";
+            let similarRecommendationAlgorithm = "content_based_similar_v1";
+            let currentSimilarRecommendationRunId = "";
+            const similarImpressionIds = new Map();
 
             const escapeHtml = (value) => (value ?? "")
                 .toString()
@@ -67,10 +76,17 @@
                     unitSymbol: (raw.unitSymbol ?? raw.UnitSymbol ?? "").toString(),
                     shortDescription: (raw.shortDescription ?? raw.ShortDescription ?? "").toString().trim(),
                     longDescription: (raw.longDescription ?? raw.LongDescription ?? "").toString().trim(),
-                    weight: (firstInfo.weight ?? firstInfo.Weight ?? "").toString().trim(),
-                    origin: (firstInfo.origin ?? firstInfo.Origin ?? "").toString().trim(),
-                    standard: (firstInfo.standard ?? firstInfo.Standard ?? "").toString().trim(),
-                    preservation: (firstInfo.preservation ?? firstInfo.Preservation ?? "").toString().trim()
+                    weight: (firstInfo.weight ?? firstInfo.Weight ?? raw.weight ?? raw.Weight ?? "").toString().trim(),
+                    origin: (firstInfo.origin ?? firstInfo.Origin ?? raw.origin ?? raw.Origin ?? "").toString().trim(),
+                    standard: (firstInfo.standard ?? firstInfo.Standard ?? raw.standard ?? raw.Standard ?? "").toString().trim(),
+                    preservation: (firstInfo.preservation ?? firstInfo.Preservation ?? raw.preservation ?? raw.Preservation ?? "").toString().trim(),
+                    averageRating: toNumber(raw.averageRating ?? raw.AverageRating, 0),
+                    soldCount: toNumber(raw.soldCount ?? raw.SoldCount, 0),
+                    reviewCount: toNumber(raw.reviewCount ?? raw.ReviewCount, 0),
+                    recommendationReason: (raw.recommendationReason ?? raw.RecommendationReason ?? "").toString().trim(),
+                    recommendationTags: Array.isArray(raw.recommendationTags ?? raw.RecommendationTags)
+                        ? (raw.recommendationTags ?? raw.RecommendationTags)
+                        : []
                 };
             };
 
@@ -193,6 +209,65 @@
             const buildShopChatUrl = (sellerId) => {
                 const shopUrl = buildShopUrl(sellerId);
                 return shopUrl ? `${shopUrl}#shop-chat` : "";
+            };
+
+            const buildOfferImpressionKey = (sellerId, rank) =>
+                `${toNumber(sellerId, 0)}:${Math.max(0, toNumber(rank, 0))}`;
+
+            const buildSimilarImpressionKey = (productIdValue, rank) =>
+                `${toNumber(productIdValue, 0)}:${Math.max(0, toNumber(rank, 0))}`;
+
+            const registerOfferImpressions = (product, offers) => {
+                if (!appHelpers?.trackRecommendationImpression || !Array.isArray(offers) || offers.length === 0) {
+                    return;
+                }
+
+                currentOfferRecommendationRunId = appHelpers.createRecommendationRunId?.(offerRecommendationPlacement) ?? "";
+                offerImpressionIds.clear();
+
+                offers.forEach((offer, index) => {
+                    const rank = index + 1;
+                    const sellerId = toNumber(offer?.sellerId ?? offer?.SellerId, 0);
+                    const impressionKey = buildOfferImpressionKey(sellerId, rank);
+
+                    void appHelpers.trackRecommendationImpression({
+                        placement: offerRecommendationPlacement,
+                        recommendationRunId: currentOfferRecommendationRunId,
+                        productId: product.productId,
+                        rank,
+                        algorithm: offerRecommendationAlgorithm
+                    }).then((eventId) => {
+                        if (eventId) {
+                            offerImpressionIds.set(impressionKey, eventId);
+                        }
+                    });
+                });
+            };
+
+            const registerSimilarImpressions = (items) => {
+                if (!appHelpers?.trackRecommendationImpression || !Array.isArray(items) || items.length === 0) {
+                    return;
+                }
+
+                currentSimilarRecommendationRunId = appHelpers.createRecommendationRunId?.(similarRecommendationPlacement) ?? "";
+                similarImpressionIds.clear();
+
+                items.forEach((item, index) => {
+                    const rank = index + 1;
+                    const impressionKey = buildSimilarImpressionKey(item.productId, rank);
+
+                    void appHelpers.trackRecommendationImpression({
+                        placement: similarRecommendationPlacement,
+                        recommendationRunId: currentSimilarRecommendationRunId,
+                        productId: item.productId,
+                        rank,
+                        algorithm: similarRecommendationAlgorithm
+                    }).then((eventId) => {
+                        if (eventId) {
+                            similarImpressionIds.set(impressionKey, eventId);
+                        }
+                    });
+                });
             };
 
             const loadChatSummary = async (sellerId) => {
@@ -687,12 +762,13 @@
                 `;
 
                 if (!Array.isArray(offers) || offers.length === 0) {
+                    offerImpressionIds.clear();
                     offersNode.innerHTML = `${guideHtml}<div class='offer-state'>Chưa có thêm shop công khai nào khác cho sản phẩm này.</div>`;
                     return;
                 }
 
                 offersNode.innerHTML = guideHtml + offers
-                    .map((offer) => {
+                    .map((offer, index) => {
                         const avatarUrl = resolveAvatar(offer.avatar ?? offer.Avatar);
                         const shopName = (offer.shopName ?? offer.ShopName ?? `Seller #${offer.sellerId ?? offer.SellerId}`).toString();
                         const address = (offer.addressSummary ?? offer.AddressSummary ?? "Chưa cập nhật địa chỉ hoạt động").toString();
@@ -721,15 +797,37 @@
                                 <div>
                                     <div class="offer-price">${vnd(product.price)}</div>
                                     ${canPurchase
-                                        ? `<a href="${buildCheckoutUrl(product, 1, sellerIdValue, shopName)}" class="offer-action mb-2">${isPrimarySeller ? "Mua từ shop chính" : "Chọn mua"}</a>`
-                                        : `<a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Hỏi shop chính" : "Hỏi shop này"}</a>`}
-                                    <a href="${buildShopChatUrl(sellerIdValue)}" class="offer-action mb-2">${isPrimarySeller ? "Nhắn shop chính" : "Nhắn shop"}</a>
-                                    <a href="${buildShopUrl(sellerIdValue)}" class="offer-action">Vào shop</a>
+                                        ? `<a href="${buildCheckoutUrl(product, 1, sellerIdValue, shopName)}"
+                                              class="offer-action mb-2"
+                                              data-action="offer-recommendation-click"
+                                              data-product-id="${product.productId}"
+                                              data-seller-id="${sellerIdValue}"
+                                              data-rank="${index + 1}">${isPrimarySeller ? "Mua từ shop chính" : "Chọn mua"}</a>`
+                                        : `<a href="${buildShopChatUrl(sellerIdValue)}"
+                                              class="offer-action mb-2"
+                                              data-action="offer-recommendation-click"
+                                              data-product-id="${product.productId}"
+                                              data-seller-id="${sellerIdValue}"
+                                              data-rank="${index + 1}">${isPrimarySeller ? "Hỏi shop chính" : "Hỏi shop này"}</a>`}
+                                    <a href="${buildShopChatUrl(sellerIdValue)}"
+                                       class="offer-action mb-2"
+                                       data-action="offer-recommendation-click"
+                                       data-product-id="${product.productId}"
+                                       data-seller-id="${sellerIdValue}"
+                                       data-rank="${index + 1}">${isPrimarySeller ? "Nhắn shop chính" : "Nhắn shop"}</a>
+                                    <a href="${buildShopUrl(sellerIdValue)}"
+                                       class="offer-action"
+                                       data-action="offer-recommendation-click"
+                                       data-product-id="${product.productId}"
+                                       data-seller-id="${sellerIdValue}"
+                                       data-rank="${index + 1}">Vào shop</a>
                                 </div>
                             </article>
                         `;
                     })
                     .join("");
+
+                registerOfferImpressions(product, offers);
             };
 
             const loadOffers = async (product) => {
@@ -747,6 +845,79 @@
                     renderOffers(product, payload);
                 } catch {
                     renderOffers(product, []);
+                }
+            };
+
+            const renderSimilarProducts = (items) => {
+                const similarNode = document.getElementById("similarProductList");
+                if (!(similarNode instanceof HTMLElement)) {
+                    return;
+                }
+
+                if (!Array.isArray(items) || items.length === 0) {
+                    similarImpressionIds.clear();
+                    similarNode.innerHTML = "<div class='offer-state'>Chưa có sản phẩm tương tự đủ mạnh để gợi ý lúc này.</div>";
+                    return;
+                }
+
+                similarNode.innerHTML = `
+                    <div class="row g-3">
+                        ${items.map((item, index) => `
+                            <div class="col-12 col-md-6 col-xl-3">
+                                <article class="h-100 border rounded-4 bg-white shadow-sm overflow-hidden">
+                                    <img src="${item.image}" alt="${escapeHtml(item.productName)}" class="w-100" style="aspect-ratio:1/1;object-fit:cover;" />
+                                    <div class="p-3 d-grid gap-2 h-100">
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge text-bg-light border">${escapeHtml(item.categoryName || "Cùng nhóm")}</span>
+                                            ${(item.recommendationTags || []).slice(0, 2).map((tag) => `
+                                                <span class="badge rounded-pill text-bg-success-subtle border border-success-subtle text-success-emphasis">${escapeHtml(tag)}</span>
+                                            `).join("")}
+                                        </div>
+                                        <div class="fw-bold fs-6">${escapeHtml(item.productName)}</div>
+                                        <div class="text-muted small">${escapeHtml(item.recommendationReason || "Phù hợp để xem thêm từ cùng nhóm.")}</div>
+                                        <div class="small text-secondary">Đánh giá ${item.averageRating.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · Đã bán ${item.soldCount.toLocaleString("vi-VN")}</div>
+                                        <div class="fw-bold text-danger fs-5">${vnd(item.price)}</div>
+                                        <div class="mt-auto d-grid gap-2">
+                                            <a href="/products/${item.productId}"
+                                               class="btn btn-outline-success"
+                                               data-action="similar-recommendation-click"
+                                               data-product-id="${item.productId}"
+                                               data-rank="${index + 1}">Xem chi tiết</a>
+                                            <a href="${buildCheckoutUrl(item)}"
+                                               class="btn btn-success"
+                                               data-action="similar-recommendation-click"
+                                               data-product-id="${item.productId}"
+                                               data-rank="${index + 1}">Mua nhanh</a>
+                                        </div>
+                                    </div>
+                                </article>
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+
+                registerSimilarImpressions(items);
+            };
+
+            const loadSimilarProducts = async () => {
+                try {
+                    const response = await fetch(similarEndpoint, { headers: { "Accept": "application/json" } });
+                    const { payload } = appHelpers
+                        ? await appHelpers.tryParsePayload(response)
+                        : { payload: null };
+
+                    if (!response.ok) {
+                        throw (appHelpers?.createHttpError(response, payload, "Chưa thể tải gợi ý sản phẩm tương tự.")
+                            ?? new Error(payload?.message || `HTTP ${response.status}`));
+                    }
+
+                    similarRecommendationAlgorithm = (payload?.algorithm ?? "").toString().trim() || "content_based_similar_v1";
+                    const items = Array.isArray(payload?.items)
+                        ? payload.items.map(normalizeProduct)
+                        : [];
+                    renderSimilarProducts(items);
+                } catch {
+                    renderSimilarProducts([]);
                 }
             };
 
@@ -866,6 +1037,13 @@
                             <div class="offer-state">Đang tải danh sách shop...</div>
                         </div>
                     </section>
+                    <section class="section-card">
+                        <h2>Gợi ý sản phẩm tương tự</h2>
+                        <div class="offer-state mb-3">FreshFarm đang xếp hạng các lựa chọn gần nhất theo danh mục, xuất xứ, chuẩn và tín hiệu chất lượng.</div>
+                        <div id="similarProductList">
+                            <div class="offer-state">Đang tải gợi ý tương tự...</div>
+                        </div>
+                    </section>
                     <section class="section-card" id="product-reviews">
                         <h2>Đánh giá sản phẩm</h2>
                         <div id="productReviewPanel" class="offer-state">Đang tải đánh giá sản phẩm...</div>
@@ -948,6 +1126,7 @@
                 }
 
                 void loadOffers(product);
+                void loadSimilarProducts();
                 void loadReviews();
 
                 if (isBuyerEligible && product.primarySellerId > 0) {
@@ -957,6 +1136,44 @@
                     startPrimaryChatPolling(product.primarySellerId);
                 }
             };
+
+            document.addEventListener("click", (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+
+                const offerLink = target.closest("a[data-action='offer-recommendation-click']");
+                if (offerLink instanceof HTMLAnchorElement) {
+                    const sellerId = toNumber(offerLink.getAttribute("data-seller-id"), 0);
+                    const rank = toNumber(offerLink.getAttribute("data-rank"), 0);
+                    const impressionKey = buildOfferImpressionKey(sellerId, rank);
+
+                    void appHelpers?.trackRecommendationClick?.({
+                        recommendationImpressionEventId: offerImpressionIds.get(impressionKey) ?? null,
+                        productId: toNumber(offerLink.getAttribute("data-product-id"), 0),
+                        placement: offerRecommendationPlacement,
+                        algorithm: offerRecommendationAlgorithm
+                    });
+                    return;
+                }
+
+                const similarLink = target.closest("a[data-action='similar-recommendation-click']");
+                if (!(similarLink instanceof HTMLAnchorElement)) {
+                    return;
+                }
+
+                const productIdValue = toNumber(similarLink.getAttribute("data-product-id"), 0);
+                const rank = toNumber(similarLink.getAttribute("data-rank"), 0);
+                const impressionKey = buildSimilarImpressionKey(productIdValue, rank);
+
+                void appHelpers?.trackRecommendationClick?.({
+                    recommendationImpressionEventId: similarImpressionIds.get(impressionKey) ?? null,
+                    productId: productIdValue,
+                    placement: similarRecommendationPlacement,
+                    algorithm: similarRecommendationAlgorithm
+                });
+            });
 
             if (!Number.isInteger(productId) || productId <= 0) {
                 showError("ID sản phẩm không hợp lệ.");
@@ -992,6 +1209,15 @@
 
                     return payload;
                 })
-                .then((payload) => renderProduct(normalizeProduct(payload)))
+                .then((payload) => {
+                    const product = normalizeProduct(payload);
+                    renderProduct(product);
+                    void appHelpers?.trackProductView?.({
+                        productId: product.productId,
+                        sellerId: product.primarySellerId,
+                        sourcePage: "product",
+                        sourceModule: searchKeyword ? "product_detail_search" : "product_detail"
+                    });
+                })
                 .catch((error) => showError(error?.message || "Không thể tải dữ liệu sản phẩm."));
         })();

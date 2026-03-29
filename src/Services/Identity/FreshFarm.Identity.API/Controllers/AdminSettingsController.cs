@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using FreshFarm.Identity.Api.Models;
+using FreshFarm.Identity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +16,14 @@ namespace FreshFarm.Identity.Api.Controllers;
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly FreshFarmIdentityDBContext _db;
+    private readonly ISellerStoreSettingsResolver _sellerStoreSettingsResolver;
 
-    public AdminSettingsController(FreshFarmIdentityDBContext db)
+    public AdminSettingsController(
+        FreshFarmIdentityDBContext db,
+        ISellerStoreSettingsResolver sellerStoreSettingsResolver)
     {
         _db = db;
+        _sellerStoreSettingsResolver = sellerStoreSettingsResolver;
     }
 
     [HttpGet]
@@ -31,9 +36,8 @@ public sealed class AdminSettingsController : ControllerBase
                 return Unauthorized("Token không chứa user id hợp lệ.");
             }
 
-            var sellerEntity = await _db.SellerStoreSettings
-                .AsNoTracking()
-                .SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            var sellerEntity = await _sellerStoreSettingsResolver
+                .GetLatestForUserAsync(userId, asNoTracking: true, cancellationToken);
 
             if (sellerEntity is null)
             {
@@ -89,8 +93,8 @@ public sealed class AdminSettingsController : ControllerBase
             }
 
             var now = DateTime.UtcNow;
-            var entity = await _db.SellerStoreSettings
-                .SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            var entity = await _sellerStoreSettingsResolver
+                .GetLatestForUserAsync(userId, asNoTracking: false, cancellationToken);
 
             if (entity is null)
             {

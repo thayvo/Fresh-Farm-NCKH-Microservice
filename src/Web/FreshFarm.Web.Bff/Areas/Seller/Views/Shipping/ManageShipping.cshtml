@@ -26,7 +26,7 @@
 
     var paidStatuses = new[] { "Đã thanh toán", "Da thanh toan", "Hoàn tất", "Hoan tat" };
 
-    Func<FreshFarm.Web.Bff.Areas.Seller.Models.Order, IHtmlContent> RenderStatus = (o) =>
+    Func<FreshFarm.Web.Bff.Areas.Seller.Models.Order?, IHtmlContent> RenderStatus = (o) =>
     {
         if (o == null) return SoftBadge("N/A", "bg-light text-secondary border-secondary-subtle");
         switch (o.Status)
@@ -568,6 +568,14 @@
             </div>
         }
 
+        <div class="alert alert-info border-0 shadow-sm d-flex align-items-start gap-3 mb-4" style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); border-radius: 1.25rem;">
+            <i class="bi bi-info-circle-fill text-primary" style="font-size: 1.5rem;"></i>
+            <div>
+                <div class="fw-bold text-primary-blue mb-1">Bản ghi vận chuyển đã được tạo tự động theo đơn hàng.</div>
+                <div class="text-muted">Trang này dùng để theo dõi, chỉnh sửa dữ liệu đang có và tạo vận đơn GHN theo `OrderId` thật. Không còn luồng thêm vận chuyển thủ công ngoài checkout.</div>
+            </div>
+        </div>
+
         <div class="ghn-panel p-4 mb-4">
             <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4">
                 <div class="d-flex align-items-center gap-3">
@@ -616,16 +624,16 @@
                                 <div class="row g-3">
                                     <div class="col-12 col-md-6">
                                         <label class="form-label fw-semibold text-primary-blue">Người nhận</label>
-                                        <input type="text" class="form-control" id="ghnToName" placeholder="Nguyễn Văn A" />
+                                        <input type="text" class="form-control" id="ghnToName" placeholder="Tự lấy từ đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label fw-semibold text-primary-blue">Số điện thoại</label>
-                                        <input type="text" class="form-control" id="ghnToPhone" placeholder="0912345678" />
+                                        <input type="text" class="form-control" id="ghnToPhone" placeholder="Tự lấy từ đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết</label>
-                                        <input type="text" class="form-control" id="ghnToAddress" placeholder="Ví dụ: 45 Nguyễn Văn Cừ" />
-                                        <div class="ghn-field-note">Seller chỉ cần rà soát địa chỉ chi tiết. Hệ thống sẽ tự nhận diện tỉnh/quận/phường phù hợp để tạo vận đơn GHN.</div>
+                                        <input type="text" class="form-control" id="ghnToAddress" placeholder="Tự lấy từ đơn đã chọn" readonly />
+                                        <div class="ghn-field-note">Thông tin người nhận được khóa theo đơn hàng thật. Hệ thống sẽ tự nhận diện tỉnh/quận/phường phù hợp để tạo vận đơn GHN.</div>
                                         <div class="shipping-readonly-note mt-2" id="ghnRecipientLocationStatus">
                                             <i class="bi bi-magic"></i>
                                             Hệ thống sẽ tự nhận diện địa bàn giao từ địa chỉ người nhận.
@@ -670,37 +678,38 @@
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <label class="form-label fw-semibold text-primary-blue">Thu hộ COD</label>
-                                        <input type="number" class="form-control" id="ghnCodAmount" min="0" placeholder="Nhập số tiền thu hộ" />
+                                        <input type="number" class="form-control" id="ghnCodAmount" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-6 col-md-4">
                                         <label class="form-label fw-semibold text-primary-blue">Giá trị bảo hiểm</label>
-                                        <input type="number" class="form-control" id="ghnInsuranceValue" min="0" placeholder="Nếu có" />
+                                        <input type="number" class="form-control" id="ghnInsuranceValue" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label fw-semibold text-primary-blue">Mã theo dõi nội bộ</label>
-                                        <input type="text" class="form-control" id="ghnClientOrderCode" placeholder="Tự tạo nếu để trống" />
+                                        <input type="text" class="form-control" id="ghnClientOrderCode" placeholder="Sinh tự động theo đơn đã chọn" readonly />
+                                        <div class="ghn-field-note">Hệ thống khóa mã này theo `OrderId` để tránh tạo vận đơn rời.</div>
                                     </div>
                                     <div class="col-12 col-md-8">
                                         <label class="form-label fw-semibold text-primary-blue">Nội dung vận đơn</label>
-                                        <input type="text" class="form-control" id="ghnContent" placeholder="Ví dụ: Đơn giao cho khách" />
+                                        <input type="text" class="form-control" id="ghnContent" placeholder="Tự sinh theo đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-12 col-md-4">
                                         <label class="form-label fw-semibold text-primary-blue">Tên mặt hàng</label>
-                                        <input type="text" class="form-control" id="ghnItemName" placeholder="Ví dụ: Rau củ tổng hợp" />
+                                        <input type="text" class="form-control" id="ghnItemName" placeholder="Tự tổng hợp từ đơn đã chọn" readonly />
                                         <div class="ghn-field-note">Tự tổng hợp từ các sản phẩm thuộc shop của bạn trong đơn đã chọn.</div>
                                     </div>
                                     <div class="col-12 col-md-3">
                                         <label class="form-label fw-semibold text-primary-blue">Mã hàng</label>
-                                        <input type="text" class="form-control" id="ghnItemCode" placeholder="RAU-001" />
+                                        <input type="text" class="form-control" id="ghnItemCode" placeholder="Khóa theo đơn đã chọn" readonly />
                                     </div>
                                     <div class="col-6 col-md-2">
                                         <label class="form-label fw-semibold text-primary-blue">Số lượng</label>
-                                        <input type="number" class="form-control" id="ghnItemQuantity" min="1" placeholder="1" />
+                                        <input type="number" class="form-control" id="ghnItemQuantity" min="1" placeholder="Tự lấy từ đơn đã chọn" readonly />
                                         <div class="ghn-field-note">Là tổng số lượng các sản phẩm của shop này trong đơn.</div>
                                     </div>
                                     <div class="col-6 col-md-3">
                                         <label class="form-label fw-semibold text-primary-blue">Giá món hàng</label>
-                                        <input type="number" class="form-control" id="ghnItemPrice" min="0" placeholder="Nhập giá món hàng" />
+                                        <input type="number" class="form-control" id="ghnItemPrice" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
                                     </div>
                                 </div>
                             </div>
@@ -761,13 +770,21 @@
                                     <div class="col-12 col-md-7">
                                         <input type="text" class="form-control" id="ghnTrackingOrderCode" placeholder="Nhập mã vận đơn" />
                                     </div>
-                                    <div class="col-12 col-md-5 d-grid">
-                                        <button type="button" class="btn btn-outline-primary btn-pill" id="btnGhnTrackOrder">
+                                    <div class="col-12 col-md-5 d-grid gap-2 d-md-flex">
+                                        <button type="button" class="btn btn-outline-primary btn-pill flex-fill" id="btnGhnTrackOrder">
                                             <i class="bi bi-search me-2"></i>Tra cứu
+                                        </button>
+                                        <button type="button" class="btn btn-primary btn-pill flex-fill" id="btnGhnSyncMetadata">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ vào bảng
                                         </button>
                                     </div>
                                 </div>
                                 <div class="ghn-result-box p-3 mt-3">
+                                    <div class="d-flex justify-content-end mb-2">
+                                        <button type="button" class="btn btn-outline-secondary btn-pill btn-sm" id="btnGhnSyncVisibleRows">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ các đơn GHN trên trang
+                                        </button>
+                                    </div>
                                     <pre id="ghnTrackingResult">Chưa có thông tin vận đơn.</pre>
                                 </div>
                             </div>
@@ -896,7 +913,13 @@
                                         data-ghn-total-amount="@((item.Order?.TotalAmount ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                         data-ghn-total-quantity="@((item.Order?.TotalQuantity ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                         data-ghn-item-summary="@item.Order?.ItemSummary"
-                                        data-ghn-is-cod="@((item.Order?.Payments?.Any(p => p.PaymentMethod == "COD") ?? false).ToString().ToLower())">
+                                        data-ghn-is-cod="@((item.Order?.Payments?.Any(p => p.PaymentMethod == "COD") ?? false).ToString().ToLower())"
+                                        data-ghn-order-code="@item.GhnOrderCode"
+                                        data-ghn-client-order-code="@item.GhnClientOrderCode"
+                                        data-ghn-status="@item.GhnStatus"
+                                        data-ghn-status-label="@item.GhnStatusLabel"
+                                        data-ghn-total-fee="@((item.GhnTotalFee ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-last-synced-at="@(item.GhnLastSyncedAt?.ToString("O") ?? string.Empty)">
                                         <td class="px-4"><span class="badge bg-primary-blue text-white border">@(startIndex + i)</span></td>
                                         <td class="px-4">
                                             <div class="d-flex align-items-center gap-2">
@@ -914,7 +937,7 @@
                                                 var staffName = activeAssign != null
                                                     ? (!string.IsNullOrWhiteSpace(activeAssign.UserAdmin?.FullName)
                                                         ? activeAssign.UserAdmin.FullName
-                                                        : ("NV #" + activeAssign.AssignedToAdminID.Value.ToString("D4")))
+                                                        : (activeAssign.AssignedToAdminID is int assignedAdminId ? $"NV #{assignedAdminId:D4}" : "Chưa phân công"))
                                                     : "Chưa phân công";
                                             }
                                             <div class="d-flex align-items-center gap-2">
@@ -948,7 +971,24 @@
                                                 </div>
                                             }
                                         </td>
-                                        <td class="px-4">@RenderStatus(item.Order)</td>
+                                        <td class="px-4">
+                                            <div class="d-flex flex-column gap-2">
+                                                @RenderStatus(item.Order)
+                                                @if (!string.IsNullOrWhiteSpace(item.GhnOrderCode))
+                                                {
+                                                    <div class="small text-muted">
+                                                        <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle mb-1">
+                                                            GHN: @(item.GhnStatusLabel ?? item.GhnStatus ?? "Đã tạo vận đơn")
+                                                        </span>
+                                                        <div class="font-monospace">@(item.GhnOrderCode)</div>
+                                                        @if (item.GhnTotalFee is decimal ghnTotalFee)
+                                                        {
+                                                            <div>Phí hãng: @ghnTotalFee.ToString("N0") đ</div>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        </td>
                                         <td class="text-center px-4">
                                             <div class="btn-group" role="group">
                                                 <button type="button" class="btn btn-sm btn-outline-info btn-action btn-use-ghn-row" title="Dùng đơn này để tạo vận đơn"><i class="bi bi-truck-front"></i></button>
@@ -1017,80 +1057,6 @@
 </div>
 
 @section modal {
-    <div class="modal fade" id="addShippingModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2"><i class="bi bi-plus-circle"></i>Thêm thông tin vận chuyển</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <form id="addShippingForm" class="row g-4">
-                        @Html.AntiForgeryToken()
-                        <div class="col-12">
-                            <div class="alert alert-info border-0 d-flex align-items-start gap-3" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
-                                <i class="bi bi-info-circle-fill text-primary" style="font-size: 1.5rem;"></i>
-                                <div><strong>Lưu ý:</strong> Vui lòng điền đầy đủ thông tin bắt buộc có dấu <span class="text-danger">*</span></div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-cart-check me-2"></i> Đơn hàng <span class="text-danger">*</span></label>
-                            @Html.DropDownList("OrderID", (SelectList)ViewBag.Orders, "-- Chọn đơn hàng --", new { @class = "form-select", id = "OrderID", required = "required" })
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                            @Html.DropDownList("DeliveryStaffId", (SelectList)ViewBag.DeliveryStaffs, "-- Chọn nhân viên --", new { @class = "form-select", id = "DeliveryStaffId" })
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-3 border" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="IsStorePickup" name="IsStorePickup" value="true" style="width: 3rem; height: 1.5rem;">
-                                    <label class="form-check-label fw-semibold ms-2" for="IsStorePickup"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person me-2"></i> Người nhận <span class="text-danger">*</span></label>
-                            <input type="text" name="FullName" id="FullName" class="form-control" placeholder="Nhập họ tên người nhận" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-telephone me-2"></i> Số điện thoại <span class="text-danger">*</span></label>
-                            <input type="tel" name="Phone" id="Phone" class="form-control" placeholder="Nhập số điện thoại" required />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-envelope me-2"></i> Email</label>
-                            <input type="email" name="Email" id="Email" class="form-control" placeholder="Nhập địa chỉ email (tùy chọn)" />
-                        </div>
-                        <div id="deliveryInfo" class="row g-3">
-                            <div class="col-12"><div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-geo-alt-fill text-danger"></i>Thông tin giao hàng</h6></div></div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-primary-blue">Tỉnh/Thành phố <span class="text-danger">*</span></label>
-                                @Html.DropDownList("ProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "ProvinceId" })
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-primary-blue">Xã/Phường <span class="text-danger">*</span></label>
-                                <select id="CommuneId" name="CommuneId" class="form-select"><option value="">-- Chọn Xã/Phường --</option></select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết <span class="text-danger">*</span></label>
-                                <input type="text" id="AddressDetail" name="AddressDetail" class="form-control" placeholder="Số nhà, tên đường..." />
-                            </div>
-                        </div>
-                        <div id="storePickupInfo" style="display:none" class="col-12">
-                            <div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-shop text-info"></i>Thông tin cửa hàng</h6></div>
-                            <label class="form-label fw-semibold text-primary-blue">Địa chỉ cửa hàng <span class="text-danger">*</span></label>
-                            <input type="text" id="StoreAddress" name="StoreAddress" class="form-control" placeholder="Nhập địa chỉ cửa hàng" />
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer p-4 border-top">
-                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Đóng</button>
-                    <button type="button" class="btn btn-primary btn-pill px-4 hover-scale" id="btnSaveAdd"><i class="bi bi-check-circle me-2"></i>Lưu lại</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="modal fade" id="editShippingModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -1275,6 +1241,49 @@
         function getTextValue(id) {
             return document.getElementById(id)?.value?.trim() || '';
         }
+        function collectVisibleGhnRowsForSync() {
+            return Array.from(document.querySelectorAll('tr[data-ghn-order-id]'))
+                .map(function (row) {
+                    return {
+                        orderId: (row.dataset.ghnOrderId || '').trim(),
+                        orderCode: (row.dataset.ghnOrderCode || '').trim(),
+                        orderLabel: (row.dataset.ghnOrderLabel || '').trim(),
+                        lastSyncedAt: (row.dataset.ghnLastSyncedAt || '').trim()
+                    };
+                })
+                .filter(function (item) {
+                    return item.orderId && item.orderCode;
+                });
+        }
+        function collectAutoSyncCandidates(maxAgeMinutes = 20, maxItems = 3) {
+            const now = Date.now();
+            const maxAgeMs = maxAgeMinutes * 60 * 1000;
+            return collectVisibleGhnRowsForSync()
+                .filter(function (item) {
+                    if (!item.lastSyncedAt) {
+                        return true;
+                    }
+                    const parsed = Date.parse(item.lastSyncedAt);
+                    if (!Number.isFinite(parsed)) {
+                        return true;
+                    }
+                    return (now - parsed) >= maxAgeMs;
+                })
+                .slice(0, maxItems);
+        }
+        function buildBoundClientOrderCode(orderId) {
+            const numeric = Number(orderId);
+            if (!Number.isFinite(numeric) || numeric <= 0) {
+                return '';
+            }
+
+            return `FF-ORD-${String(Math.trunc(numeric)).padStart(6, '0')}`;
+        }
+        function setBoundClientOrderCode(orderId) {
+            const input = document.getElementById('ghnClientOrderCode');
+            if (!input) return;
+            input.value = buildBoundClientOrderCode(orderId);
+        }
         function updateCreateButtonState() {
             const button = document.getElementById('btnGhnCreateOrder');
             if (!button) return;
@@ -1398,7 +1407,7 @@
                 return null;
             }
             if (!toName || !toPhone || !toAddress) {
-                showNotification('Cần điền đủ người nhận, số điện thoại và địa chỉ chi tiết.', 'warning');
+                showNotification('Đơn đã chọn chưa có đủ thông tin người nhận để tạo vận đơn.', 'warning');
                 return null;
             }
 
@@ -1430,12 +1439,12 @@
             }
 
             if (!itemName) {
-                showNotification('Bạn cần nhập tên mặt hàng trước khi tiếp tục.', 'warning');
+                showNotification('Không đọc được tên mặt hàng từ đơn đã chọn.', 'warning');
                 return null;
             }
 
             if (itemQuantity <= 0) {
-                showNotification('Số lượng mặt hàng phải lớn hơn 0.', 'warning');
+                showNotification('Không đọc được số lượng mặt hàng hợp lệ từ đơn đã chọn.', 'warning');
                 return null;
             }
 
@@ -1525,7 +1534,7 @@
             document.getElementById('ghnProvinceId').value = '';
             document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện</option>';
             document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã</option>';
-            document.getElementById('ghnClientOrderCode').value = `FF-ORD-${row.dataset.ghnOrderId}-${Date.now()}`;
+            setBoundClientOrderCode(row.dataset.ghnOrderId || '');
             document.getElementById('ghnContent').value = `Đơn giao vận cho ${orderLabel}`;
             document.getElementById('ghnItemName').value = itemSummary;
             document.getElementById('ghnItemCode').value = `ORDER-${row.dataset.ghnOrderId}`;
@@ -1533,6 +1542,7 @@
             document.getElementById('ghnItemPrice').value = itemsAmount > 0 ? String(Math.round(itemsAmount)) : '';
             document.getElementById('ghnCodAmount').value = isCod && totalAmount > 0 ? String(Math.round(totalAmount)) : '0';
             document.getElementById('ghnInsuranceValue').value = totalAmount > 0 ? String(Math.round(totalAmount)) : '0';
+            document.getElementById('ghnTrackingOrderCode').value = row.dataset.ghnOrderCode || '';
             const financeNote = document.getElementById('ghnOrderFinanceNote');
             if (financeNote) {
                 financeNote.innerHTML = `<i class="bi bi-cash-stack"></i> Buyer đã chốt phí ship ${formatCurrency(shippingFee)} cho ${orderLabel}. Gói hàng đang lấy ${totalQuantity > 0 ? totalQuantity : 1} sản phẩm của shop này với tên tổng hợp "${itemSummary}".`;
@@ -1649,38 +1659,174 @@
                 setButtonBusy(button, false);
             }
         }
-        async function trackGhnOrder() {
-            const button = document.getElementById('btnGhnTrackOrder');
+        async function trackGhnOrder(options) {
+            const shouldPersist = options?.persist ?? false;
+            const shouldReload = options?.reloadOnSuccess ?? false;
+            const button = document.getElementById(shouldPersist ? 'btnGhnSyncMetadata' : 'btnGhnTrackOrder');
             const orderCode = getTextValue('ghnTrackingOrderCode');
             if (!orderCode) {
-                showNotification('Cần nhập mã vận đơn để tra cứu.', 'warning');
+                showNotification(`Cần nhập mã vận đơn để ${shouldPersist ? 'đồng bộ' : 'tra cứu'}.`, 'warning');
+                return;
+            }
+            const orderId = getTextValue('ghnSelectedOrderId');
+            if (shouldPersist && !orderId) {
+                showNotification('Cần chọn đơn hàng trong bảng trước khi đồng bộ GHN.', 'warning');
                 return;
             }
             try {
-                setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tra...');
+                setButtonBusy(button, true, shouldPersist
+                    ? '<span class="spinner-border spinner-border-sm me-2"></span>Đang đồng bộ...'
+                    : '<span class="spinner-border spinner-border-sm me-2"></span>Đang tra...');
                 const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Seller" })', {
-                    orderCode
+                    orderCode,
+                    orderId
                 }));
                 setResult('ghnTrackingResult', payload);
-                showNotification(payload?.message || 'Đã tra cứu vận đơn.', payload?.success ? 'success' : 'warning');
+                showNotification(
+                    payload?.message || (shouldPersist ? 'Đã đồng bộ metadata GHN.' : 'Đã tra cứu vận đơn.'),
+                    payload?.success ? 'success' : 'warning');
+                if (payload?.success && shouldReload) {
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 700);
+                }
             } catch {
-                showNotification('Không tra cứu được vận đơn.', 'danger');
+                showNotification(shouldPersist ? 'Không đồng bộ được metadata GHN.' : 'Không tra cứu được vận đơn.', 'danger');
             } finally {
                 setButtonBusy(button, false);
             }
         }
+        async function syncVisibleGhnRows() {
+            const button = document.getElementById('btnGhnSyncVisibleRows');
+            const candidates = collectVisibleGhnRowsForSync();
+            if (!candidates.length) {
+                showNotification('Trang này chưa có đơn nào có mã GHN để đồng bộ.', 'warning');
+                return;
+            }
 
-        function toggleAddFormValidation(isStorePickup) {
-            const delivery = document.getElementById('deliveryInfo');
-            const store = document.getElementById('storePickupInfo');
-            const province = document.getElementById('ProvinceId');
-            const commune = document.getElementById('CommuneId');
-            const address = document.getElementById('AddressDetail');
-            const storeAddr = document.getElementById('StoreAddress');
-            if (!delivery || !store) return;
-            if (isStorePickup) { delivery.style.display = 'none'; store.style.display = 'block'; province?.removeAttribute('required'); commune?.removeAttribute('required'); address?.removeAttribute('required'); storeAddr?.setAttribute('required', 'required'); }
-            else { delivery.style.display = 'block'; store.style.display = 'none'; province?.setAttribute('required', 'required'); commune?.setAttribute('required', 'required'); address?.setAttribute('required', 'required'); storeAddr?.removeAttribute('required'); }
+            const summary = {
+                total: candidates.length,
+                synced: 0,
+                failed: 0,
+                items: []
+            };
+
+            try {
+                setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang đồng bộ trang...');
+                for (let index = 0; index < candidates.length; index += 1) {
+                    const candidate = candidates[index];
+                    setResult('ghnTrackingResult', {
+                        message: `Đang đồng bộ ${index + 1}/${candidates.length}`,
+                        current: candidate.orderLabel || `Đơn #${candidate.orderId}`,
+                        orderCode: candidate.orderCode,
+                        progress: `${index + 1}/${candidates.length}`
+                    });
+
+                    try {
+                        const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Seller" })', {
+                            orderCode: candidate.orderCode,
+                            orderId: candidate.orderId
+                        }));
+
+                        if (payload?.success) {
+                            summary.synced += 1;
+                        } else {
+                            summary.failed += 1;
+                        }
+
+                        summary.items.push({
+                            orderId: candidate.orderId,
+                            orderLabel: candidate.orderLabel,
+                            orderCode: candidate.orderCode,
+                            success: !!payload?.success,
+                            statusLabel: payload?.statusLabel || payload?.status || '',
+                            message: payload?.message || ''
+                        });
+                    } catch (error) {
+                        summary.failed += 1;
+                        summary.items.push({
+                            orderId: candidate.orderId,
+                            orderLabel: candidate.orderLabel,
+                            orderCode: candidate.orderCode,
+                            success: false,
+                            message: error?.message || 'Không đồng bộ được đơn GHN này.'
+                        });
+                    }
+                }
+
+                setResult('ghnTrackingResult', {
+                    message: `Đã đồng bộ ${summary.synced}/${summary.total} đơn GHN trên trang.`,
+                    total: summary.total,
+                    synced: summary.synced,
+                    failed: summary.failed,
+                    items: summary.items
+                });
+
+                showNotification(
+                    summary.failed
+                        ? `Đã đồng bộ ${summary.synced}/${summary.total} đơn GHN. Có ${summary.failed} đơn cần kiểm tra lại.`
+                        : `Đã đồng bộ ${summary.synced} đơn GHN trên trang.`,
+                    summary.failed ? 'warning' : 'success');
+
+                if (summary.synced > 0) {
+                    window.setTimeout(function () {
+                        window.location.reload();
+                    }, 900);
+                }
+            } finally {
+                setButtonBusy(button, false);
+            }
         }
+        async function autoSyncStaleGhnRows() {
+            const candidates = collectAutoSyncCandidates();
+            if (!candidates.length) {
+                return;
+            }
+
+            const summary = {
+                total: candidates.length,
+                synced: 0,
+                failed: 0
+            };
+
+            setResult('ghnTrackingResult', {
+                message: `Đang tự đồng bộ ${candidates.length} đơn GHN cũ trên trang...`,
+                auto: true,
+                total: candidates.length
+            });
+
+            for (let index = 0; index < candidates.length; index += 1) {
+                const candidate = candidates[index];
+                try {
+                    const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Seller" })', {
+                        orderCode: candidate.orderCode,
+                        orderId: candidate.orderId
+                    }));
+                    if (payload?.success) {
+                        summary.synced += 1;
+                    } else {
+                        summary.failed += 1;
+                    }
+                } catch {
+                    summary.failed += 1;
+                }
+            }
+
+            if (summary.synced > 0) {
+                setResult('ghnTrackingResult', {
+                    message: `Đã tự đồng bộ ${summary.synced}/${summary.total} đơn GHN cũ trên trang.`,
+                    auto: true,
+                    total: summary.total,
+                    synced: summary.synced,
+                    failed: summary.failed
+                });
+                showNotification(`Đã tự đồng bộ ${summary.synced}/${summary.total} đơn GHN cũ trên trang.`, summary.failed ? 'warning' : 'info');
+                window.setTimeout(function () {
+                    window.location.reload();
+                }, 900);
+            }
+        }
+
         function toggleEditFormValidation(isStorePickup) {
             const delivery = document.getElementById('editDeliveryInfo');
             const store = document.getElementById('editStorePickupInfo');
@@ -1728,19 +1874,6 @@
                 });
         }
 
-        const addProvinceSelect = document.getElementById('ProvinceId');
-        if (addProvinceSelect) {
-            addProvinceSelect.addEventListener('change', function () {
-                loadCommunes('ProvinceId', 'CommuneId');
-            });
-
-            // Nếu đã có sẵn tỉnh (ví dụ lấy từ địa chỉ nhận hàng)
-            // thì tự động load danh sách Xã/Phường lúc mở trang.
-            if (addProvinceSelect.value) {
-                loadCommunes('ProvinceId', 'CommuneId');
-            }
-        }
-
         const editProvinceSelect = document.getElementById('EditProvinceId');
         if (editProvinceSelect) {
             editProvinceSelect.addEventListener('change', function () {
@@ -1786,6 +1919,15 @@
         document.getElementById('btnGhnTrackOrder')?.addEventListener('click', function () {
             trackGhnOrder();
         });
+        document.getElementById('btnGhnSyncMetadata')?.addEventListener('click', function () {
+            trackGhnOrder({ persist: true, reloadOnSuccess: true });
+        });
+        document.getElementById('btnGhnSyncVisibleRows')?.addEventListener('click', function () {
+            syncVisibleGhnRows();
+        });
+        window.setTimeout(function () {
+            void autoSyncStaleGhnRows();
+        }, 1200);
 
         document.getElementById('btnUseCreatedOrderForTracking')?.addEventListener('click', function () {
             const text = document.getElementById('ghnCreateResult')?.textContent || '';
@@ -1817,84 +1959,7 @@
           }
         });
 
-        document.getElementById('IsStorePickup')?.addEventListener('change', function(){ toggleAddFormValidation(this.checked); });
         document.getElementById('EditIsStorePickup')?.addEventListener('change', function(){ toggleEditFormValidation(this.checked); });
-
-        document.getElementById('OrderID')?.addEventListener('change', function(){
-          const id=this.value; if(!id) return;
-          fetch('@Url.Action("GetOrderInfo","Shipping", new { area = "Seller" })?orderId='+id, { credentials:'same-origin' })
-            .then(r=>r.json())
-            .then(d=>{
-              if(!d || !d.success) return;
-              document.getElementById('FullName').value = d.fullName || '';
-              document.getElementById('Phone').value    = d.phone    || '';
-              document.getElementById('Email').value    = d.email    || '';
-              document.getElementById('AddressDetail').value = d.address || '';
-              if(d.provinceId){
-                const pv = document.getElementById('ProvinceId');
-                pv.value = d.provinceId;
-                loadCommunes('ProvinceId', 'CommuneId', function() {
-                    if(d.communeId) document.getElementById('CommuneId').value = d.communeId;
-                });
-              }
-              document.getElementById('ghnSelectedOrderId').value = id;
-              document.getElementById('ghnSourceLabel').value = `#DH${String(id).padStart(5, '0')}`;
-              document.getElementById('ghnToName').value = d.fullName || '';
-              document.getElementById('ghnToPhone').value = d.phone || '';
-              document.getElementById('ghnToAddress').value = d.address || '';
-              document.getElementById('ghnProvinceId').value = '';
-              document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện</option>';
-              document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã</option>';
-              document.getElementById('ghnClientOrderCode').value = `FF-ORD-${id}-${Date.now()}`;
-              document.getElementById('ghnContent').value = `Đơn giao vận cho #DH${String(id).padStart(5, '0')}`;
-              document.getElementById('ghnItemName').value = d.itemSummary || 'Gói hàng tổng hợp';
-              document.getElementById('ghnItemCode').value = `ORDER-${id}`;
-              document.getElementById('ghnItemQuantity').value = d.totalQuantity && d.totalQuantity > 0 ? String(d.totalQuantity) : '1';
-              document.getElementById('ghnItemPrice').value = d.itemsAmount && d.itemsAmount > 0 ? String(Math.round(d.itemsAmount)) : '';
-              document.getElementById('ghnInsuranceValue').value = d.totalAmount && d.totalAmount > 0 ? String(Math.round(d.totalAmount)) : '0';
-              document.getElementById('ghnCodAmount').value = d.isCod && d.codAmount && d.codAmount > 0 ? String(Math.round(d.codAmount)) : '0';
-              const financeNote = document.getElementById('ghnOrderFinanceNote');
-              if (financeNote) {
-                const shippingFee = Number(d.shippingFee || 0);
-                const totalQuantity = Number(d.totalQuantity || 0);
-                financeNote.innerHTML = `<i class="bi bi-cash-stack"></i> Buyer đã chốt phí ship ${formatCurrency(shippingFee)} cho #DH${String(id).padStart(5, '0')}. Gói hàng đang lấy ${totalQuantity > 0 ? totalQuantity : 1} sản phẩm của shop này với tên tổng hợp "${d.itemSummary || 'Gói hàng tổng hợp'}".`;
-              }
-              void autoResolveGhnRecipientLocation(d.address || '');
-            });
-        });
-
-        document.getElementById('btnAddNew')?.addEventListener('click', function(){
-          const f = document.getElementById('addShippingForm');
-          if (f) f.reset();
-          toggleAddFormValidation(false);
-          const c = document.getElementById('CommuneId');
-          if (c) c.innerHTML = '<option value="">-- Chọn Xã/Phường --</option>';
-        });
-
-        document.getElementById('btnSaveAdd')?.addEventListener('click', function(){
-          const form=document.getElementById('addShippingForm');
-          if(!form.checkValidity()){ form.reportValidity(); return; }
-          const fd=new FormData(form);
-          fd.set('ProvinceId', document.getElementById('ProvinceId')?.value || '');
-          const btn=this, old=btn.innerHTML;
-          btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
-
-          fetch('@Url.Action("Create","Shipping", new { area = "Seller" })', {
-              method:'POST',
-              credentials:'same-origin',
-              body:fd
-          })
-          .then(r=>r.json())
-          .then(d=>{
-              showNotification(d.message, d.success?'success':'danger');
-              if(d.success){
-                bootstrap.Modal.getInstance(document.getElementById('addShippingModal')).hide();
-                setTimeout(()=>location.reload(),800);
-              }
-          })
-          .catch(()=>showNotification('Có lỗi xảy ra!','danger'))
-          .finally(()=>{ btn.disabled=false; btn.innerHTML=old; });
-        });
 
         document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click', function(){
           const id=this.getAttribute('data-id');

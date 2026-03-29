@@ -335,7 +335,8 @@ public sealed class UnitController : LegacySellerControllerBase
             return new List<UnitViewModel>();
         }
 
-        var apiUnits = await response.Content.ReadFromJsonAsync<List<ApiUnitDto>>(JsonOptions) ?? new List<ApiUnitDto>();
+        var apiUnits = DeduplicateUnits(
+            await response.Content.ReadFromJsonAsync<List<ApiUnitDto>>(JsonOptions) ?? new List<ApiUnitDto>());
 
         return apiUnits
             .OrderByDescending(u => u.CreatedDate)
@@ -478,6 +479,45 @@ public sealed class UnitController : LegacySellerControllerBase
 
         return "Khác";
     }
+
+    private static List<ApiUnitDto> DeduplicateUnits(IEnumerable<ApiUnitDto> units)
+    {
+        return units
+            .Where(unit => unit.UnitId > 0)
+            .GroupBy(unit => unit.UnitId)
+            .Select(group => group
+                .OrderByDescending(CalculateUnitScore)
+                .ThenByDescending(CalculateUnitSignalLength)
+                .ThenByDescending(unit => unit.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateUnitScore(ApiUnitDto unit)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(unit.UnitName) ? 3 : 0;
+        score += HasMeaningfulValue(unit.Symbol) ? 2 : 0;
+        score += HasMeaningfulValue(unit.Description) ? 1 : 0;
+        score += unit.IsActive ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateUnitSignalLength(ApiUnitDto unit)
+    {
+        var values = new[]
+        {
+            unit.UnitName,
+            unit.Symbol,
+            unit.Description
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private sealed class ApiUnitDto
     {

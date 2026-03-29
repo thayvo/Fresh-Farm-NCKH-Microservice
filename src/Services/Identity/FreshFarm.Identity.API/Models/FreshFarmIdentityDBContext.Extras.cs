@@ -5,9 +5,13 @@ namespace FreshFarm.Identity.Api.Models;
 public partial class FreshFarmIdentityDBContext
 {
     public virtual DbSet<AuthAuditLog> AuthAuditLogs => Set<AuthAuditLog>();
+    public virtual DbSet<SellerKycReviewEvent> SellerKycReviewEvents => Set<SellerKycReviewEvent>();
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
+        ConfigureSellerKyc(modelBuilder);
+        ConfigureSellerKycReviewEvents(modelBuilder);
+
         modelBuilder.Entity<AuthAuditLog>(entity =>
         {
             entity.HasKey(e => e.AuthAuditLogId);

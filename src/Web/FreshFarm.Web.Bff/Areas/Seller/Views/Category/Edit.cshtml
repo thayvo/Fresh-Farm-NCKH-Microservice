@@ -14,7 +14,7 @@
 <main class="container-fluid p-4">
     <div class="mb-4">
         <h2 class="fw-bold">Chỉnh sửa danh mục</h2>
-        @Html.Partial("_Breadcrumb")
+        <partial name="_Breadcrumb" />
     </div>
 
     @if (TempData["ErrorMessage"] != null)
@@ -69,7 +69,7 @@
                                 <!-- Xem trước ảnh mới -->
                                 <label class="form-label fw-semibold">Xem trước ảnh mới</label>
                                 <div class="mb-3 text-center">
-                                    <img id="imgPreview" src="@catImg(Model.ImageCategoriesName)"
+                                    <img id="imgPreview" src="@catImg(Model.ImageCategoriesName ?? string.Empty)"
                                          class="rounded border"
                                          style="width:160px;height:160px;object-fit:cover;" />
                                 </div>

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using FreshFarm.Web.Bff.Areas.Admin.Models;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
@@ -28,13 +29,22 @@ public sealed class MerchantController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Index(string? q = null, string? status = null, string? queue = null, int page = 1, int? selectedSellerId = null)
+    public async Task<IActionResult> Index(
+        string? q = null,
+        string? status = null,
+        string? queue = null,
+        string? reviewStatus = null,
+        string? reviewWindow = null,
+        int page = 1,
+        int? selectedSellerId = null)
     {
         var model = new MerchantManagementPageViewModel
         {
             Query = q?.Trim() ?? string.Empty,
             Status = string.IsNullOrWhiteSpace(status) ? "all" : status.Trim().ToLowerInvariant(),
             Queue = string.IsNullOrWhiteSpace(queue) ? "all" : queue.Trim().ToLowerInvariant(),
+            ReviewStatus = string.IsNullOrWhiteSpace(reviewStatus) ? "all" : reviewStatus.Trim().ToLowerInvariant(),
+            ReviewWindow = string.IsNullOrWhiteSpace(reviewWindow) ? "all" : reviewWindow.Trim().ToLowerInvariant(),
             Page = page < 1 ? 1 : page,
             SelectedSellerId = selectedSellerId > 0 ? selectedSellerId : null
         };
@@ -82,7 +92,24 @@ public sealed class MerchantController : LegacySellerControllerBase
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
             }).ToList() ?? new List<MerchantOptionViewModel>();
-            model.Merchants = payload.Merchants?.Select(MapListItem).ToList() ?? new List<MerchantListItemViewModel>();
+            model.ReviewStatus = payload.Filters?.ReviewStatus ?? model.ReviewStatus;
+            model.ReviewStatusOptions = payload.Filters?.ReviewStatusOptions?.Select(x => new MerchantOptionViewModel
+            {
+                Value = x.Value ?? string.Empty,
+                Text = x.Text ?? string.Empty
+            }).ToList() ?? new List<MerchantOptionViewModel>();
+            model.ReviewWindow = payload.Filters?.ReviewWindow ?? model.ReviewWindow;
+            model.ReviewWindowOptions = payload.Filters?.ReviewWindowOptions?.Select(x => new MerchantOptionViewModel
+            {
+                Value = x.Value ?? string.Empty,
+                Text = x.Text ?? string.Empty
+            }).ToList() ?? new List<MerchantOptionViewModel>();
+            model.RejectReasonTemplates = payload.Filters?.RejectReasonTemplates?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+            model.Merchants = BuildMerchantList(payload.Merchants);
 
             if (!model.SelectedSellerId.HasValue && model.Merchants.Count > 0)
             {
@@ -104,12 +131,21 @@ public sealed class MerchantController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(int sellerId, bool isActive, string? q, string? status, string? queue, int page = 1, int? selectedSellerId = null)
+    public async Task<IActionResult> UpdateStatus(
+        int sellerId,
+        bool isActive,
+        string? q,
+        string? status,
+        string? queue,
+        string? reviewStatus,
+        string? reviewWindow,
+        int page = 1,
+        int? selectedSellerId = null)
     {
         if (sellerId <= 0)
         {
             TempData["ErrorMessage"] = "Nhà bán hàng không hợp lệ.";
-            return RedirectToAction(nameof(Index), new { q, status, queue, page, selectedSellerId });
+            return RedirectToAction(nameof(Index), new { q, status, queue, reviewStatus, reviewWindow, page, selectedSellerId });
         }
 
         try
@@ -131,6 +167,107 @@ public sealed class MerchantController : LegacySellerControllerBase
             q,
             status,
             queue,
+            reviewStatus,
+            reviewWindow,
+            page,
+            selectedSellerId = selectedSellerId > 0 ? selectedSellerId : sellerId
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Approve(
+        int sellerId,
+        string? q,
+        string? status,
+        string? queue,
+        string? reviewStatus,
+        string? reviewWindow,
+        int page = 1,
+        int? selectedSellerId = null)
+    {
+        if (sellerId <= 0)
+        {
+            TempData["ErrorMessage"] = "Nhà bán hàng không hợp lệ.";
+            return RedirectToAction(nameof(Index), new { q, status, queue, reviewStatus, reviewWindow, page, selectedSellerId });
+        }
+
+        try
+        {
+            var client = CreateIdentityClient();
+            var response = await client.PostAsync($"/auth/admin/merchants/{sellerId}/approve", content: null);
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                response.IsSuccessStatusCode
+                    ? await ReadApiSuccessAsync(response, "Đã duyệt hồ sơ và cấp quyền người bán.")
+                    : await ReadApiErrorAsync(response, "Không thể duyệt hồ sơ người bán.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi duyệt hồ sơ người bán: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new
+        {
+            q,
+            status,
+            queue,
+            reviewStatus,
+            reviewWindow,
+            page,
+            selectedSellerId = selectedSellerId > 0 ? selectedSellerId : sellerId
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Reject(
+        int sellerId,
+        string reason,
+        string? q,
+        string? status,
+        string? queue,
+        string? reviewStatus,
+        string? reviewWindow,
+        int page = 1,
+        int? selectedSellerId = null)
+    {
+        if (sellerId <= 0)
+        {
+            TempData["ErrorMessage"] = "Nhà bán hàng không hợp lệ.";
+            return RedirectToAction(nameof(Index), new { q, status, queue, reviewStatus, reviewWindow, page, selectedSellerId });
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["ErrorMessage"] = "Cần nhập lý do từ chối để nhà bán hàng biết phải bổ sung gì.";
+            return RedirectToAction(nameof(Index), new { q, status, queue, reviewStatus, reviewWindow, page, selectedSellerId = selectedSellerId > 0 ? selectedSellerId : sellerId });
+        }
+
+        try
+        {
+            var client = CreateIdentityClient();
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { reason = reason.Trim() }),
+                Encoding.UTF8,
+                "application/json");
+            var response = await client.PostAsync($"/auth/admin/merchants/{sellerId}/reject", content);
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                response.IsSuccessStatusCode
+                    ? await ReadApiSuccessAsync(response, "Đã từ chối hồ sơ người bán và yêu cầu bổ sung.")
+                    : await ReadApiErrorAsync(response, "Không thể từ chối hồ sơ người bán.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi từ chối hồ sơ người bán: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new
+        {
+            q,
+            status,
+            queue,
+            reviewStatus,
+            reviewWindow,
             page,
             selectedSellerId = selectedSellerId > 0 ? selectedSellerId : sellerId
         });
@@ -155,16 +292,38 @@ public sealed class MerchantController : LegacySellerControllerBase
         model.Details = new MerchantDetailViewModel
         {
             SellerId = payload.SellerId,
+            IsSellerApproved = payload.IsSellerApproved,
+            ReviewStatus = payload.ReviewStatus ?? "not_applied",
+            ReviewStatusLabel = payload.ReviewStatusLabel ?? "Chưa có hồ sơ",
+            ReviewNote = payload.ReviewNote,
+            ReviewedAt = payload.ReviewedAt,
             ShopName = payload.ShopName ?? string.Empty,
             UserName = payload.UserName ?? string.Empty,
             FullName = payload.FullName ?? string.Empty,
             Email = payload.Email ?? string.Empty,
             Phone = payload.Phone,
+            StoreName = payload.StoreName,
+            StoreAddress = payload.StoreAddress,
+            StoreEmail = payload.StoreEmail,
+            StorePhone = payload.StorePhone,
             Avatar = payload.Avatar,
             IsActive = payload.IsActive,
             CreatedAt = payload.CreatedAt,
             UpdatedAt = payload.UpdatedAt,
             LastLogin = payload.LastLogin,
+            ApplicationSubmittedAt = payload.ApplicationSubmittedAt,
+            ApplicationUpdatedAt = payload.ApplicationUpdatedAt,
+            LegalFullName = payload.LegalFullName,
+            IdentityNumberMasked = payload.IdentityNumberMasked,
+            IdentityIssuedDate = payload.IdentityIssuedDate,
+            IdentityIssuedPlace = payload.IdentityIssuedPlace,
+            TaxCode = payload.TaxCode,
+            BusinessLicenseNumber = payload.BusinessLicenseNumber,
+            CitizenIdFrontUrl = payload.CitizenIdFrontUrl,
+            CitizenIdBackUrl = payload.CitizenIdBackUrl,
+            BusinessLicenseUrl = payload.BusinessLicenseUrl,
+            AdditionalDocumentUrl = payload.AdditionalDocumentUrl,
+            KycNotes = payload.KycNotes,
             AddressSummary = payload.AddressSummary ?? string.Empty,
             AddressDetail = payload.AddressDetail,
             Province = payload.Province,
@@ -178,7 +337,19 @@ public sealed class MerchantController : LegacySellerControllerBase
             RecommendedAction = payload.RecommendedAction ?? string.Empty,
             IssueCount = payload.IssueCount,
             ComplianceSummary = payload.ComplianceSummary ?? string.Empty,
-            NextSteps = payload.NextSteps?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()).ToList() ?? new List<string>()
+            NextSteps = payload.NextSteps?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()).ToList() ?? new List<string>(),
+            RejectReasonDraft = payload.ReviewNote ?? string.Empty,
+            ReviewHistory = payload.ReviewHistory?.Select(x => new MerchantReviewHistoryViewModel
+            {
+                Action = x.Action ?? string.Empty,
+                ReviewStatus = x.ReviewStatus ?? string.Empty,
+                ReviewStatusLabel = x.ReviewStatusLabel ?? string.Empty,
+                Note = x.Note,
+                ReviewedAt = x.ReviewedAt,
+                ReviewedByUserId = x.ReviewedByUserId,
+                ReviewerUserName = x.ReviewerUserName,
+                ReviewerFullName = x.ReviewerFullName
+            }).ToList() ?? new List<MerchantReviewHistoryViewModel>()
         };
     }
 
@@ -201,16 +372,27 @@ public sealed class MerchantController : LegacySellerControllerBase
         return new MerchantListItemViewModel
         {
             SellerId = item.SellerId,
+            IsSellerApproved = item.IsSellerApproved,
+            ReviewStatus = item.ReviewStatus ?? "not_applied",
+            ReviewStatusLabel = item.ReviewStatusLabel ?? "Chưa có hồ sơ",
+            ReviewNote = item.ReviewNote,
+            ReviewedAt = item.ReviewedAt,
             ShopName = item.ShopName ?? string.Empty,
             UserName = item.UserName ?? string.Empty,
             FullName = item.FullName ?? string.Empty,
             Email = item.Email ?? string.Empty,
             Phone = item.Phone,
+            StoreName = item.StoreName,
+            StoreAddress = item.StoreAddress,
+            StoreEmail = item.StoreEmail,
+            StorePhone = item.StorePhone,
             Avatar = item.Avatar,
             IsActive = item.IsActive,
             CreatedAt = item.CreatedAt,
             UpdatedAt = item.UpdatedAt,
             LastLogin = item.LastLogin,
+            ApplicationSubmittedAt = item.ApplicationSubmittedAt,
+            ApplicationUpdatedAt = item.ApplicationUpdatedAt,
             AddressSummary = item.AddressSummary ?? string.Empty,
             ProfileScore = item.ProfileScore,
             ComplianceStatus = item.ComplianceStatus ?? string.Empty,
@@ -221,6 +403,79 @@ public sealed class MerchantController : LegacySellerControllerBase
             IssueCount = item.IssueCount
         };
     }
+
+    private static List<MerchantListItemViewModel> BuildMerchantList(IEnumerable<MerchantListItemApiDto>? merchants)
+    {
+        if (merchants is null)
+        {
+            return new List<MerchantListItemViewModel>();
+        }
+
+        return merchants
+            .Where(item => item.SellerId > 0)
+            .GroupBy(item => item.SellerId)
+            .Select(group => MapListItem(SelectPreferredMerchant(group)))
+            .ToList();
+    }
+
+    private static MerchantListItemApiDto SelectPreferredMerchant(IEnumerable<MerchantListItemApiDto> merchants)
+    {
+        return merchants
+            .OrderByDescending(CalculateMerchantScore)
+            .ThenByDescending(CalculateMerchantSignalLength)
+            .ThenByDescending(item => item.UpdatedAt ?? item.ApplicationUpdatedAt ?? item.CreatedAt)
+            .First();
+    }
+
+    private static int CalculateMerchantScore(MerchantListItemApiDto merchant)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(merchant.ShopName) ? 3 : 0;
+        score += HasMeaningfulValue(merchant.UserName) ? 3 : 0;
+        score += HasMeaningfulValue(merchant.FullName) ? 3 : 0;
+        score += HasMeaningfulValue(merchant.Email) ? 3 : 0;
+        score += HasMeaningfulValue(merchant.Phone) ? 2 : 0;
+        score += HasMeaningfulValue(merchant.StoreName) ? 2 : 0;
+        score += HasMeaningfulValue(merchant.StoreAddress) ? 2 : 0;
+        score += HasMeaningfulValue(merchant.StorePhone) ? 2 : 0;
+        score += HasMeaningfulValue(merchant.AddressSummary) ? 2 : 0;
+        score += HasMeaningfulValue(merchant.ReviewStatus) ? 1 : 0;
+        score += HasMeaningfulValue(merchant.ReviewStatusLabel) ? 1 : 0;
+        score += HasMeaningfulValue(merchant.ComplianceStatus) ? 1 : 0;
+        score += HasMeaningfulValue(merchant.QueueBucket) ? 1 : 0;
+        score += HasMeaningfulValue(merchant.RecommendedAction) ? 1 : 0;
+        score += merchant.ProfileScore > 0 ? 1 : 0;
+        score += merchant.IssueCount > 0 ? 1 : 0;
+        score += merchant.Flags?.Count > 0 ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateMerchantSignalLength(MerchantListItemApiDto merchant)
+    {
+        var values = new[]
+        {
+            merchant.ShopName,
+            merchant.UserName,
+            merchant.FullName,
+            merchant.Email,
+            merchant.Phone,
+            merchant.StoreName,
+            merchant.StoreAddress,
+            merchant.StorePhone,
+            merchant.AddressSummary,
+            merchant.ReviewStatus,
+            merchant.ReviewStatusLabel,
+            merchant.ComplianceStatus,
+            merchant.QueueBucket,
+            merchant.RecommendedAction
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static MerchantFlagViewModel MapFlag(MerchantFlagApiDto item)
     {
@@ -253,6 +508,16 @@ public sealed class MerchantController : LegacySellerControllerBase
         if (!string.IsNullOrWhiteSpace(model.Queue))
         {
             query.Add($"queue={Uri.EscapeDataString(model.Queue)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.ReviewStatus))
+        {
+            query.Add($"reviewStatus={Uri.EscapeDataString(model.ReviewStatus)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.ReviewWindow))
+        {
+            query.Add($"reviewWindow={Uri.EscapeDataString(model.ReviewWindow)}");
         }
 
         return "/auth/admin/merchants?" + string.Join("&", query);
@@ -347,8 +612,13 @@ public sealed class MerchantController : LegacySellerControllerBase
         public string? Search { get; set; }
         public string? Status { get; set; }
         public string? Queue { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewWindow { get; set; }
         public List<MerchantOptionApiDto>? StatusOptions { get; set; }
         public List<MerchantOptionApiDto>? QueueOptions { get; set; }
+        public List<MerchantOptionApiDto>? ReviewStatusOptions { get; set; }
+        public List<MerchantOptionApiDto>? ReviewWindowOptions { get; set; }
+        public List<string>? RejectReasonTemplates { get; set; }
     }
 
     private sealed class MerchantOptionApiDto
@@ -360,16 +630,27 @@ public sealed class MerchantController : LegacySellerControllerBase
     private class MerchantListItemApiDto
     {
         public int SellerId { get; set; }
+        public bool IsSellerApproved { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewStatusLabel { get; set; }
+        public string? ReviewNote { get; set; }
+        public DateTime? ReviewedAt { get; set; }
         public string? ShopName { get; set; }
         public string? UserName { get; set; }
         public string? FullName { get; set; }
         public string? Email { get; set; }
         public string? Phone { get; set; }
+        public string? StoreName { get; set; }
+        public string? StoreAddress { get; set; }
+        public string? StoreEmail { get; set; }
+        public string? StorePhone { get; set; }
         public string? Avatar { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLogin { get; set; }
+        public DateTime? ApplicationSubmittedAt { get; set; }
+        public DateTime? ApplicationUpdatedAt { get; set; }
         public string? AddressSummary { get; set; }
         public int ProfileScore { get; set; }
         public string? ComplianceStatus { get; set; }
@@ -386,8 +667,20 @@ public sealed class MerchantController : LegacySellerControllerBase
         public string? Province { get; set; }
         public string? District { get; set; }
         public string? Ward { get; set; }
+        public string? LegalFullName { get; set; }
+        public string? IdentityNumberMasked { get; set; }
+        public DateTime? IdentityIssuedDate { get; set; }
+        public string? IdentityIssuedPlace { get; set; }
+        public string? TaxCode { get; set; }
+        public string? BusinessLicenseNumber { get; set; }
+        public string? CitizenIdFrontUrl { get; set; }
+        public string? CitizenIdBackUrl { get; set; }
+        public string? BusinessLicenseUrl { get; set; }
+        public string? AdditionalDocumentUrl { get; set; }
+        public string? KycNotes { get; set; }
         public string? ComplianceSummary { get; set; }
         public List<string>? NextSteps { get; set; }
+        public List<MerchantReviewHistoryApiDto>? ReviewHistory { get; set; }
     }
 
     private sealed class MerchantFlagApiDto
@@ -395,6 +688,18 @@ public sealed class MerchantController : LegacySellerControllerBase
         public string? Code { get; set; }
         public string? Label { get; set; }
         public string? Tone { get; set; }
+    }
+
+    private sealed class MerchantReviewHistoryApiDto
+    {
+        public string? Action { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewStatusLabel { get; set; }
+        public string? Note { get; set; }
+        public DateTime ReviewedAt { get; set; }
+        public int? ReviewedByUserId { get; set; }
+        public string? ReviewerUserName { get; set; }
+        public string? ReviewerFullName { get; set; }
     }
 }
 

@@ -26,7 +26,35 @@ public sealed class InventoryReconciliationService
     {
         await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
         await ReconcileOrderReservationStatesAsync(cancellationToken);
-        await ReconcileCatalogReservedStockAsync(cancellationToken);
+        await ReconcileCatalogReservedStockSafelyAsync(cancellationToken);
+    }
+
+    private async Task ReconcileCatalogReservedStockSafelyAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ReconcileCatalogReservedStockAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(
+                "Bo qua doi soat reserved stock voi Catalog trong chu ky nay vi Catalog chua san sang: {Message}",
+                ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(
+                "Bo qua doi soat reserved stock voi Catalog trong chu ky nay vi Catalog tra ve loi: {Message}",
+                ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Bo qua doi soat reserved stock voi Catalog trong chu ky nay.");
+        }
     }
 
     private async Task ReconcileOrderReservationStatesAsync(CancellationToken cancellationToken)

@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Đăng nhập Nhà bán - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --seller-primary: #0f766e;
+            --seller-primary-dark: #115e59;
+        }
+
+        body {
+            font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(15, 118, 110, 0.14), transparent 30%),
+                linear-gradient(180deg, #f4fbfb 0%, #edf7f5 100%);
+        }
+
+        .seller-login-card {
+            border: 0;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
+        }
+
+        .seller-login-hero {
+            background: linear-gradient(135deg, var(--seller-primary) 0%, #14b8a6 100%);
+            color: #fff;
+        }
+
+        .btn-seller {
+            background: var(--seller-primary);
+            border-color: var(--seller-primary);
+            color: #fff;
+        }
+
+        .btn-seller:hover {
+            background: var(--seller-primary-dark);
+            border-color: var(--seller-primary-dark);
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-light d-flex align-items-center" style="min-height:100vh">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-sm-11 col-md-8 col-lg-5">
+                <div class="card seller-login-card">
+                    <div class="seller-login-hero p-4 p-md-5">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+                                <i class="bi bi-shop fs-4"></i>
+                            </span>
+                            <div>
+                                <div class="text-uppercase small fw-semibold opacity-75">FreshFarm Seller Center</div>
+                                <h1 class="h4 mb-0 fw-bold">Đăng nhập Nhà bán</h1>
+                            </div>
+                        </div>
+                        <p class="mb-0 opacity-75">
+                            Quản lý gian hàng, đơn bán, vận hành giao hàng và theo dõi hiệu suất kinh doanh tại một nơi duy nhất.
+                        </p>
+                    </div>
+
+                    <div class="card-body p-4 p-md-5">
+                        <div class="mb-4">
+                            <h2 class="h5 fw-bold mb-2">Cổng Nhà bán FreshFarm</h2>
+                            <p class="text-muted mb-0">Chỉ tài khoản có quyền Nhà bán mới đăng nhập được tại màn hình này.</p>
+                        </div>
+
+<form action="/Seller/SellerAccount/Login?returnUrl=%2FSeller%2FShipping%2FManageShipping" class="needs-validation" method="post" novalidate="novalidate">                            <div class="mb-3">
+                                <label class="form-label" for="UserName">T&#xEA;n &#x111;&#x103;ng nh&#x1EAD;p ho&#x1EB7;c email</label>
+                                <input class="form-control" data-val="true" data-val-required="Vui l&#xF2;ng nh&#x1EAD;p t&#xEA;n &#x111;&#x103;ng nh&#x1EAD;p ho&#x1EB7;c email." id="UserName" name="UserName" placeholder="T&#xEA;n &#x111;&#x103;ng nh&#x1EAD;p ho&#x1EB7;c email nh&#xE0; b&#xE1;n" type="text" value="" />
+                                <span class="text-danger field-validation-valid" data-valmsg-for="UserName" data-valmsg-replace="true"></span>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="Password">M&#x1EAD;t kh&#x1EA9;u</label>
+                                <input class="form-control" data-val="true" data-val-required="Vui l&#xF2;ng nh&#x1EAD;p m&#x1EAD;t kh&#x1EA9;u." id="Password" name="Password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" type="password" />
+                                <span class="text-danger field-validation-valid" data-valmsg-for="Password" data-valmsg-replace="true"></span>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" data-val="true" data-val-required="The Ghi nh&#x1EDB; t&#xF4;i field is required." id="remember" name="RememberMe" type="checkbox" value="true" />
+                                <label class="form-check-label" for="remember">Ghi nhớ tôi</label>
+                            </div>
+                            <button type="submit" class="btn btn-seller w-100">Đăng nhập Nhà bán</button>
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8JhZfa4YInFJoWMPQSjpVYskmQpGUFCKX2l-GCALKlarQO7hcNPmUwFENJ9eVqQ8RAHKPwf_rond8wX5iIuXGu3j6Q9knCREDapkT50ODzAQBZDxKZE4Kq7ylQpYdLvhKsKRyZNvN91Z2VEPlgQP0QE" /><input name="RememberMe" type="hidden" value="false" /></form>                    </div>
+                </div>
+                <p class="text-center text-muted mt-3 mb-0">&copy; FreshFarm Seller Center</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

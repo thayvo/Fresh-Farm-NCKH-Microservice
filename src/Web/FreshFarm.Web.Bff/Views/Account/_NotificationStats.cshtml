@@ -1,0 +1,32 @@
+@model FreshFarm.Web.Bff.Dtos.AccountNotificationsPageViewModel
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="notification-stat-card h-100 p-3">
+            <div class="small text-uppercase text-muted fw-semibold mb-2">Toàn bộ</div>
+            <div class="fs-4 fw-bold">@Model.TotalNotifications</div>
+            <div class="small text-muted">Tổng số cập nhật đã ghi nhận cho tài khoản.</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="notification-stat-card h-100 p-3">
+            <div class="small text-uppercase text-muted fw-semibold mb-2">Chưa đọc</div>
+            <div class="fs-4 fw-bold text-danger">@Model.UnreadNotifications</div>
+            <div class="small text-muted">Mục đang chờ bạn mở và xử lý ngay.</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="notification-stat-card h-100 p-3">
+            <div class="small text-uppercase text-muted fw-semibold mb-2">Mới trong 24h</div>
+            <div class="fs-4 fw-bold text-warning-emphasis">@Model.Recent24hNotifications</div>
+            <div class="small text-muted">@Model.Recent24hSummary</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="notification-stat-card h-100 p-3">
+            <div class="small text-uppercase text-muted fw-semibold mb-2">Đang hiển thị</div>
+            <div class="fs-4 fw-bold text-success">@Model.Notifications.Count</div>
+            <div class="small text-muted">@Model.DisplayedCountSummary</div>
+        </div>
+    </div>
+</div>

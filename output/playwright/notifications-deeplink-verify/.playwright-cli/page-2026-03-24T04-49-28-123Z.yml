@@ -1,0 +1,180 @@
+- main [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: FreshFarm Account
+      - heading "Thông báo tài khoản" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Đọc trực tiếp các cập nhật tài khoản từ notification center, theo dõi unread và xử lý nhanh ngay trên một trang.
+    - generic [ref=e9]:
+      - generic [ref=e10]: Chưa đọc
+      - generic [ref=e11]: "6"
+      - generic [ref=e12]: 10 thông báo
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - generic [ref=e17]:
+        - link " Thông tin tài khoản" [ref=e18] [cursor=pointer]:
+          - /url: /account/profile
+          - generic [ref=e19]: 
+          - text: Thông tin tài khoản
+        - link " Lịch sử đơn hàng" [ref=e20] [cursor=pointer]:
+          - /url: /account/orders
+          - generic [ref=e21]: 
+          - text: Lịch sử đơn hàng
+        - generic [ref=e22]:
+          - generic [ref=e23]:
+            - link " Thông báo tài khoản 6" [ref=e24] [cursor=pointer]:
+              - /url: /account/notifications
+              - generic [ref=e25]: 
+              - text: Thông báo tài khoản
+              - generic [ref=e26]: "6"
+            - link "10 mới" [ref=e27] [cursor=pointer]:
+              - /url: /account/notifications?recentOnly=true
+          - generic [ref=e28]:
+            - link "Cập nhật vị trí giao hàng" [ref=e30] [cursor=pointer]:
+              - /url: /account/notifications?type=location_update&focusType=location_update
+            - generic [ref=e31]: 1 cập nhật mới trong 24h đang chờ bạn xem lại.
+            - 'link "Cập nhật vị trí giao hàng: 1 mới trong 24h" [ref=e33] [cursor=pointer]':
+              - /url: /account/notifications?type=location_update&recentOnly=true&focusType=location_update
+        - link " Đăng ký người bán" [ref=e34] [cursor=pointer]:
+          - /url: /account/become-seller
+          - generic [ref=e35]: 
+          - text: Đăng ký người bán
+        - link " Trang chủ" [ref=e36] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e37]: 
+          - text: Trang chủ
+      - button " Đăng xuất" [ref=e40] [cursor=pointer]:
+        - generic [ref=e41]: 
+        - text: Đăng xuất
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - heading "Dòng cập nhật gần đây" [level=5] [ref=e47]
+          - generic [ref=e48]: Lọc theo loại, trạng thái đọc và đánh dấu đã đọc ngay tại đây.
+        - generic [ref=e49]:
+          - generic [ref=e50]: 10 tổng
+          - generic [ref=e51]: 6 chưa đọc
+          - generic [ref=e52]: 10 trong 24h
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - generic [ref=e56]: Ưu tiên lúc này
+            - generic [ref=e57]: Cập nhật vị trí giao hàng vừa có cập nhật mới
+            - generic [ref=e58]: 1 cập nhật mới trong 24h đang chờ bạn xem lại.
+            - generic [ref=e59]:
+              - generic [ref=e60]: Cập nhật vị trí giao hàng
+              - generic [ref=e61]: 1 mới trong 24h
+              - generic [ref=e62]: Có cập nhật trong 24h
+          - link " Mở nhóm ưu tiên" [ref=e64] [cursor=pointer]:
+            - /url: /account/notifications?type=location_update&recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - generic [ref=e65]: 
+            - text: Mở nhóm ưu tiên
+        - generic [ref=e66]:
+          - generic [ref=e67]: Tổng quan theo nhóm
+          - link "Cập nhật vị trí giao hàng 1 mới trong 24h" [ref=e70] [cursor=pointer]:
+            - /url: /account/notifications?type=location_update&recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - text: Cập nhật vị trí giao hàng
+            - generic [ref=e71]: 1 mới trong 24h
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - generic [ref=e75]: Truy cập nhanh
+          - generic [ref=e76]:
+            - link "Tất cả 10" [ref=e77] [cursor=pointer]:
+              - /url: /account/notifications?type=location_update&recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Tất cả
+              - generic [ref=e78]: "10"
+            - link "Chưa đọc 6" [ref=e79] [cursor=pointer]:
+              - /url: /account/notifications?type=location_update&isRead=false&recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Chưa đọc
+              - generic [ref=e80]: "6"
+        - generic [ref=e81]:
+          - generic [ref=e82]: Nhóm thông báo
+          - generic [ref=e83]:
+            - link "Tất cả" [ref=e84] [cursor=pointer]:
+              - /url: /account/notifications?recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - link "Cập nhật hồ sơ seller 0" [ref=e85] [cursor=pointer]:
+              - /url: /account/notifications?type=seller_review_update&recentOnly=true&focusType=seller_review_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật hồ sơ seller
+              - generic [ref=e86]: "0"
+            - link "Cập nhật đơn hàng 0" [ref=e87] [cursor=pointer]:
+              - /url: /account/notifications?type=order_status&recentOnly=true&focusType=order_status&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật đơn hàng
+              - generic [ref=e88]: "0"
+            - link "Cập nhật vị trí giao hàng 1" [ref=e89] [cursor=pointer]:
+              - /url: /account/notifications?type=location_update&recentOnly=true&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+              - text: Cập nhật vị trí giao hàng
+              - generic [ref=e90]: "1"
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]: Từ khóa
+          - textbox "Tìm theo tiêu đề, nội dung..." [ref=e94]
+        - generic [ref=e95]:
+          - generic [ref=e96]: Loại thông báo
+          - combobox [ref=e97]:
+            - option "Tất cả"
+            - option "Cập nhật vị trí giao hàng" [selected]
+            - option "Cập nhật đơn hàng"
+            - option "Cập nhật hồ sơ seller"
+        - generic [ref=e98]:
+          - generic [ref=e99]: Trạng thái đọc
+          - combobox [ref=e100]:
+            - option "Tất cả" [selected]
+            - option "Chưa đọc"
+            - option "Đã đọc"
+        - generic [ref=e101]:
+          - button " Lọc" [ref=e102] [cursor=pointer]:
+            - generic [ref=e103]: 
+            - text: Lọc
+          - link "Reset" [ref=e104] [cursor=pointer]:
+            - /url: /account/notifications
+      - generic [ref=e105]:
+        - generic [ref=e106]:
+          - generic [ref=e107]: Trang 1 / 1
+          - generic [ref=e108]:
+            - text: Đang áp dụng bộ lọc
+            - generic [ref=e109]: Cập nhật vị trí giao hàng
+            - generic [ref=e110]: Mới trong 24h
+        - generic [ref=e111]:
+          - link " Xem tất cả" [ref=e112] [cursor=pointer]:
+            - /url: /account/notifications?type=location_update&focusType=location_update&page=1&returnUrl=%2Faccount%2Fnotifications
+            - generic [ref=e113]: 
+            - text: Xem tất cả
+          - button " Mở rộng tất cả" [ref=e114] [cursor=pointer]:
+            - generic [ref=e115]: 
+            - text: Mở rộng tất cả
+          - button " Thu gọn tất cả" [ref=e116] [cursor=pointer]:
+            - generic [ref=e117]: 
+            - text: Thu gọn tất cả
+          - button " Đánh dấu tất cả đã đọc" [ref=e119] [cursor=pointer]:
+            - generic [ref=e120]: 
+            - text: Đánh dấu tất cả đã đọc
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]: Cập nhật vị trí giao hàng
+            - generic [ref=e126]: 1 cập nhật trong nhóm này
+          - generic [ref=e127]:
+            - generic [ref=e128]: Có cập nhật trong 24h
+            - generic [ref=e129]: 1 tổng
+            - button " Thu gọn" [expanded] [ref=e130] [cursor=pointer]:
+              - generic [ref=e131]: 
+              - text: Thu gọn
+        - article [ref=e134]:
+          - generic [ref=e135]:
+            - generic [ref=e136]:
+              - generic [ref=e138]: "Van chuyen don #000166 da duoc cap nhat"
+              - generic [ref=e139]: 23/03/2026 13:12
+            - generic [ref=e140]:
+              - generic [ref=e141]: Cập nhật vị trí giao hàng
+              - generic [ref=e142]: "Đơn #000166"
+              - generic [ref=e143]: Mới trong 24h
+              - generic [ref=e144]: Đã đọc 23/03/2026 13:20
+            - generic [ref=e145]:
+              - generic [ref=e146]: Vận chuyển mới nhất
+              - generic [ref=e147]: San sang lay hang
+              - generic [ref=e148]: Mở đơn để xem lịch sử giao hàng và trạng thái GHN.
+            - generic [ref=e149]: "Trang thai giao hang moi nhat: San sang lay hang."
+            - generic [ref=e150]: "Đơn liên quan: #166"
+            - link " Xem đơn hàng" [ref=e152] [cursor=pointer]:
+              - /url: /account/notifications/41/open?target=%2Faccount%2Forders%2F166
+              - generic [ref=e153]: 
+              - text: Xem đơn hàng

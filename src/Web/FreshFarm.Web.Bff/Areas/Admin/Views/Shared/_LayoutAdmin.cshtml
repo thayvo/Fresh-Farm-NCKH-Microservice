@@ -15,9 +15,9 @@
     @Html.AntiForgeryToken()
 
     <div class="wrapper">
-        @Html.Partial("_SideBar")
+        <partial name="_SideBar" />
         <div id="content">
-            @Html.Partial("_NavBar")
+            <partial name="_NavBar" />
             @RenderBody()
         </div>
     </div>

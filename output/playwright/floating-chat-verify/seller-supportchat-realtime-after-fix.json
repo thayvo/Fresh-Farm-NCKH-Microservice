@@ -1,0 +1,216 @@
+{
+  "state": {
+    "url": "https://localhost:7085/Seller/SupportChat/Index",
+    "signalRType": "object",
+    "hasHubBuilder": true,
+    "inputPlaceholder": "Nhập câu trả lời...",
+    "typingTextVisible": false,
+    "bodyText": " Kênh người bán\n Bảng điều khiển\n Quản lý đơn hàng\n Quản lý sản phẩm\n Quản lý khách hàng\n Quản lý mã giảm giá\n Quản lý đánh giá\n Quản lý vận chuyển\n Đối soát thanh toán\n Báo cáo & Thống kê\nQuản lý kho\n Tài khoản của tôi\n Hỗ trợ khách hàng\n Phản hồi người dùng\n Cài đặt\n tho \nHỗ trợ khách hàng trực tuyến\nTheo seller\nTất cả\nChưa đọc\nChưa giải quyết\nKhach #28\n7 giờ trước\nem có thể ở lại đay không\nOpen\nMới\nabc\n100 ngày trước\nXin chao shop, toi can ho tro don #00...\nOpen\nChọn một cuộc trò chuyện\n Kết "
+  },
+  "logs": [
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw4BXoKZA.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw5BXoKZA.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVPSTAyLFyeg_IDWvOJmVES_Hw3BXo.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HTEJm81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HToIW81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG86Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG87Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSMIG81Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI286Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI287Rb0bcw.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Loading the font 'https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HSQI281Rb0.woff2' violates the following Content Security Policy directive: \"font-src 'self' data: https://cdn.jsdelivr.net\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/negotiate?clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FLogin%3FreturnUrl%3D%252FSeller%252FSupportChat%252FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=112a-fb4a&_=1774410615958' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'ws://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/connect?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FLogin%3FreturnUrl%3D%252FSeller%252FSupportChat%252FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=112a-fb4a&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAADfQKSyGCSu29tJLbt%2FIU6CHqh%2FBbvE767KP%2FYnreuZiAAAAAAOgAAAAAIAACAAAADvNxxADfjwAOakmkZgoEJr82ca9njZkEQxfiP%2F5yxp2DAAAACygsJVdGY2sMukmLBFpEVgW8dUrtS%2Fw70kVMPkMh1N9SnN26C6wxnXmz%2BLOgKv0chAAAAAiJYMI7suNVPR1CyFbS00n2ed3sQ66Jw0SK%2BDjFWHXH4c%2Fcgte5rKICbMaCPxQqM8NKTHI8KIZVsEfNWGZtFluQ%3D%3D&tid=1' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/start?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FLogin%3FreturnUrl%3D%252FSeller%252FSupportChat%252FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=112a-fb4a&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAADfQKSyGCSu29tJLbt%2FIU6CHqh%2FBbvE767KP%2FYnreuZiAAAAAAOgAAAAAIAACAAAADvNxxADfjwAOakmkZgoEJr82ca9njZkEQxfiP%2F5yxp2DAAAACygsJVdGY2sMukmLBFpEVgW8dUrtS%2Fw70kVMPkMh1N9SnN26C6wxnXmz%2BLOgKv0chAAAAAiJYMI7suNVPR1CyFbS00n2ed3sQ66Jw0SK%2BDjFWHXH4c%2Fcgte5rKICbMaCPxQqM8NKTHI8KIZVsEfNWGZtFluQ%3D%3D&_=1774410615959' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FLogin%3FreturnUrl%3D%252FSeller%252FSupportChat%252FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=112a-fb4a&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAADfQKSyGCSu29tJLbt%2FIU6CHqh%2FBbvE767KP%2FYnreuZiAAAAAAOgAAAAAIAACAAAADvNxxADfjwAOakmkZgoEJr82ca9njZkEQxfiP%2F5yxp2DAAAACygsJVdGY2sMukmLBFpEVgW8dUrtS%2Fw70kVMPkMh1N9SnN26C6wxnXmz%2BLOgKv0chAAAAAiJYMI7suNVPR1CyFbS00n2ed3sQ66Jw0SK%2BDjFWHXH4c%2Fcgte5rKICbMaCPxQqM8NKTHI8KIZVsEfNWGZtFluQ%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FLogin%3FreturnUrl%3D%252FSeller%252FSupportChat%252FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=112a-fb4a&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAADfQKSyGCSu29tJLbt%2FIU6CHqh%2FBbvE767KP%2FYnreuZiAAAAAAOgAAAAAIAACAAAADvNxxADfjwAOakmkZgoEJr82ca9njZkEQxfiP%2F5yxp2DAAAACygsJVdGY2sMukmLBFpEVgW8dUrtS%2Fw70kVMPkMh1N9SnN26C6wxnXmz%2BLOgKv0chAAAAAiJYMI7suNVPR1CyFbS00n2ed3sQ66Jw0SK%2BDjFWHXH4c%2Fcgte5rKICbMaCPxQqM8NKTHI8KIZVsEfNWGZtFluQ%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/negotiate?clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FTwoFactor&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=01a8-2305&_=1774410617672' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'ws://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/connect?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FTwoFactor&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=01a8-2305&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACzHT08ZPbHXmD4YCo6ngBDSmaI1m2eep5chZk7N9miMgAAAAAOgAAAAAIAACAAAACeap7o%2BOK3Uf%2BPbR1bzIF9wbQjASJfcW3mTJggk%2B4ypTAAAACP4P5woccHT9ZZPc2bfcFd6wONMnvLM4MH0cCwYkH%2Fpv9AMRZdRrumG%2BSe1fQJLXtAAAAAFEOlE5HRtE%2BvomlkuUUIYxqzhW6IsvNn6YhMNSIWELxn8jyV6gDPC2bR44C4fNJwuxc41nb7hwa898xxt805eQ%3D%3D&tid=7' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/start?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FTwoFactor&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=01a8-2305&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACzHT08ZPbHXmD4YCo6ngBDSmaI1m2eep5chZk7N9miMgAAAAAOgAAAAAIAACAAAACeap7o%2BOK3Uf%2BPbR1bzIF9wbQjASJfcW3mTJggk%2B4ypTAAAACP4P5woccHT9ZZPc2bfcFd6wONMnvLM4MH0cCwYkH%2Fpv9AMRZdRrumG%2BSe1fQJLXtAAAAAFEOlE5HRtE%2BvomlkuUUIYxqzhW6IsvNn6YhMNSIWELxn8jyV6gDPC2bR44C4fNJwuxc41nb7hwa898xxt805eQ%3D%3D&_=1774410617673' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FTwoFactor&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=01a8-2305&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACzHT08ZPbHXmD4YCo6ngBDSmaI1m2eep5chZk7N9miMgAAAAAOgAAAAAIAACAAAACeap7o%2BOK3Uf%2BPbR1bzIF9wbQjASJfcW3mTJggk%2B4ypTAAAACP4P5woccHT9ZZPc2bfcFd6wONMnvLM4MH0cCwYkH%2Fpv9AMRZdRrumG%2BSe1fQJLXtAAAAAFEOlE5HRtE%2BvomlkuUUIYxqzhW6IsvNn6YhMNSIWELxn8jyV6gDPC2bR44C4fNJwuxc41nb7hwa898xxt805eQ%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSellerAccount%2FTwoFactor&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=01a8-2305&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACzHT08ZPbHXmD4YCo6ngBDSmaI1m2eep5chZk7N9miMgAAAAAOgAAAAAIAACAAAACeap7o%2BOK3Uf%2BPbR1bzIF9wbQjASJfcW3mTJggk%2B4ypTAAAACP4P5woccHT9ZZPc2bfcFd6wONMnvLM4MH0cCwYkH%2Fpv9AMRZdRrumG%2BSe1fQJLXtAAAAAFEOlE5HRtE%2BvomlkuUUIYxqzhW6IsvNn6YhMNSIWELxn8jyV6gDPC2bR44C4fNJwuxc41nb7hwa898xxt805eQ%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'unsafe-inline' 'nonce-Uj99eS5cQCDSpHUWoSsNsQ==' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com'. Note that 'unsafe-inline' is ignored if either a hash or nonce value is present in the source list. The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/negotiate?clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=ad58-308f&_=1774410619977' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'ws://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/connect?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=ad58-308f&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAAAVOIOyM35n50B5TfOmw05rU5%2BYKYYQqe2eVOV%2FfnTjFQAAAAAOgAAAAAIAACAAAABWcUJ%2BTW%2B9Z6ga7HpcWq5KHLMkCFwyxoRCxXn6ho0ZXTAAAABAWytii450rPaAvp98mURNE7Zicplt1UlOWBDUlP4H%2BDOPL4%2FHDpbO1%2FC4zwRSH0ZAAAAASnoQZyTOlPvc3ftI6ReBsAdJPZb%2FHu2zDaAXoBVa4xBba0TSmo50H%2BvCXqJ3IIRo6SjuwMyrRCo49IsiSME7dg%3D%3D&tid=9' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/start?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=ad58-308f&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAAAVOIOyM35n50B5TfOmw05rU5%2BYKYYQqe2eVOV%2FfnTjFQAAAAAOgAAAAAIAACAAAABWcUJ%2BTW%2B9Z6ga7HpcWq5KHLMkCFwyxoRCxXn6ho0ZXTAAAABAWytii450rPaAvp98mURNE7Zicplt1UlOWBDUlP4H%2BDOPL4%2FHDpbO1%2FC4zwRSH0ZAAAAASnoQZyTOlPvc3ftI6ReBsAdJPZb%2FHu2zDaAXoBVa4xBba0TSmo50H%2BvCXqJ3IIRo6SjuwMyrRCo49IsiSME7dg%3D%3D&_=1774410619978' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-25T03:50:20.047Z] Information: Normalizing '/hubs/support-chat' to 'https://localhost:7085/hubs/support-chat'."
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-25T03:50:20.101Z] Information: WebSocket connected to wss://localhost:7085/hubs/support-chat?id=e6wFskqW2PGcYm3rE4zpxA."
+    },
+    {
+      "type": "log",
+      "text": "[support-chat-admin] ASP.NET Core SignalR connected"
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=ad58-308f&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAAAVOIOyM35n50B5TfOmw05rU5%2BYKYYQqe2eVOV%2FfnTjFQAAAAAOgAAAAAIAACAAAABWcUJ%2BTW%2B9Z6ga7HpcWq5KHLMkCFwyxoRCxXn6ho0ZXTAAAABAWytii450rPaAvp98mURNE7Zicplt1UlOWBDUlP4H%2BDOPL4%2FHDpbO1%2FC4zwRSH0ZAAAAASnoQZyTOlPvc3ftI6ReBsAdJPZb%2FHu2zDaAXoBVa4xBba0TSmo50H%2BvCXqJ3IIRo6SjuwMyrRCo49IsiSME7dg%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/abort?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=ad58-308f&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAAAVOIOyM35n50B5TfOmw05rU5%2BYKYYQqe2eVOV%2FfnTjFQAAAAAOgAAAAAIAACAAAABWcUJ%2BTW%2B9Z6ga7HpcWq5KHLMkCFwyxoRCxXn6ho0ZXTAAAABAWytii450rPaAvp98mURNE7Zicplt1UlOWBDUlP4H%2BDOPL4%2FHDpbO1%2FC4zwRSH0ZAAAAASnoQZyTOlPvc3ftI6ReBsAdJPZb%2FHu2zDaAXoBVa4xBba0TSmo50H%2BvCXqJ3IIRo6SjuwMyrRCo49IsiSME7dg%3D%3D' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'unsafe-inline' 'nonce-MgtX/6tLzcrZmB8qMB128g==' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com'. Note that 'unsafe-inline' is ignored if either a hash or nonce value is present in the source list. The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/negotiate?clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=d037-3187&_=1774410621254' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-25T03:50:21.265Z] Information: Normalizing '/hubs/support-chat' to 'https://localhost:7085/hubs/support-chat'."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'ws://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/connect?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=d037-3187&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACqVxC4uT7jcUSf8gJ3azcbBG56B%2FClZ5Hvj%2BoTHUJnuwAAAAAOgAAAAAIAACAAAAD9SxkseOwFiCOzAQPfHSyCfewa3VYxXy0NS1%2Fs60KvATAAAAC%2BpnShKnOGVGKdnfKYBITKZfZXEwJXDKqIGq3%2BGJVv4mIL5RZy8CK%2BNFnUAPNNsrNAAAAAenSVrFkGHihH7omvdvJBz1b4jmoQqtita7ZAWCteK88Ysjy7WnsmLkkhsil3H4H2iVEqe1KSkkURC5yS1cwJuA%3D%3D&tid=10' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "Connecting to 'http://localhost:54642/930b57a9f785493bbec32c8d999ed3a4/browserLinkSignalR/start?transport=webSockets&clientProtocol=2.1&requestUrl=https%3A%2F%2Flocalhost%3A7085%2FSeller%2FSupportChat%2FIndex&browserName=&userAgent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F145.0.7632.6%20Safari%2F537.36&browserIdKey=window.browserLink.initializationData.browserId&browserId=d037-3187&connectionToken=AQAAANCMnd8BFdERjHoAwE%2FCl%2BsBAAAAZQ7v3PuqS02ufNz7sMqwjAAAAAACAAAAAAAQZgAAAAEAACAAAACqVxC4uT7jcUSf8gJ3azcbBG56B%2FClZ5Hvj%2BoTHUJnuwAAAAAOgAAAAAIAACAAAAD9SxkseOwFiCOzAQPfHSyCfewa3VYxXy0NS1%2Fs60KvATAAAAC%2BpnShKnOGVGKdnfKYBITKZfZXEwJXDKqIGq3%2BGJVv4mIL5RZy8CK%2BNFnUAPNNsrNAAAAAenSVrFkGHihH7omvdvJBz1b4jmoQqtita7ZAWCteK88Ysjy7WnsmLkkhsil3H4H2iVEqe1KSkkURC5yS1cwJuA%3D%3D&_=1774410621255' violates the following Content Security Policy directive: \"connect-src 'self' https: wss:\". The policy is report-only, so the violation has been logged but no further action has been taken."
+    },
+    {
+      "type": "info",
+      "text": "[2026-03-25T03:50:21.284Z] Information: WebSocket connected to wss://localhost:7085/hubs/support-chat?id=f1gnBOqtvfle8lhCF0Ue-g."
+    },
+    {
+      "type": "log",
+      "text": "[support-chat-admin] ASP.NET Core SignalR connected"
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css because it was inaccessible or had more than 7000 rules."
+    },
+    {
+      "type": "debug",
+      "text": "CSS Hot Reload ignoring https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css because it was inaccessible or had more than 7000 rules."
+    }
+  ]
+}

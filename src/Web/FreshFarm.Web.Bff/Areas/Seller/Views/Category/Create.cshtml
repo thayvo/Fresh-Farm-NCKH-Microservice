@@ -14,7 +14,7 @@
 <main class="container-fluid p-4">
     <div class="mb-4">
         <h2 class="fw-bold">Thêm danh mục mới</h2>
-        @Html.Partial("_Breadcrumb")
+        <partial name="_Breadcrumb" />
     </div>
 
     @if (TempData["ErrorMessage"] != null)

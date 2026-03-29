@@ -1,0 +1,10 @@
+using System;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+var claims = new[] { new Claim(JwtRegisteredClaimNames.Sub, "52"), new Claim("username", "notifverify0323125000"), new Claim(JwtRegisteredClaimNames.Email, "buikhacvinh10+notifverify0323125000@gmail.com"), new Claim(ClaimTypes.Role, "Customer") };
+var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("THIEN_LI_OI_EM_CO_THE_O_LAI_DAY_KHONG_123456"));
+var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+var token = new JwtSecurityToken("FreshFarm.Identity", "FreshFarm", claims, expires: DateTime.UtcNow.AddHours(2), signingCredentials: creds);
+Console.Write(new JwtSecurityTokenHandler().WriteToken(token));

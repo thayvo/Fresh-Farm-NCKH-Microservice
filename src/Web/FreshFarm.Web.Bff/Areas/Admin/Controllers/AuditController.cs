@@ -75,9 +75,9 @@ public sealed class AuditController : LegacySellerControllerBase
                 SettlementCount = payload.Stats?.SettlementCount ?? 0,
                 SettlementAmount7d = payload.Stats?.SettlementAmount7d ?? 0m
             };
-            model.AreaOptions = payload.Filters?.AreaOptions?.Select(MapOption).ToList() ?? model.AreaOptions;
-            model.TypeOptions = payload.Filters?.TypeOptions?.Select(MapOption).ToList() ?? model.TypeOptions;
-            model.ActionLogs = payload.Actions?.Select(x => new AdminActionLogRowViewModel
+            model.AreaOptions = DeduplicateOptions(payload.Filters?.AreaOptions).Select(MapOption).ToList();
+            model.TypeOptions = DeduplicateOptions(payload.Filters?.TypeOptions).Select(MapOption).ToList();
+            model.ActionLogs = DeduplicateActionLogs(payload.Actions).Select(x => new AdminActionLogRowViewModel
             {
                 AdminActionLogId = x.AdminActionLogId,
                 Area = x.Area ?? string.Empty,
@@ -88,8 +88,8 @@ public sealed class AuditController : LegacySellerControllerBase
                 ActorUserId = x.ActorUserId,
                 MetadataJson = x.MetadataJson,
                 CreatedAt = x.CreatedAt
-            }).ToList() ?? new List<AdminActionLogRowViewModel>();
-            model.ModerationAudits = payload.ModerationAudits?.Select(x => new ModerationAuditRowViewModel
+            }).ToList();
+            model.ModerationAudits = DeduplicateModerationAudits(payload.ModerationAudits).Select(x => new ModerationAuditRowViewModel
             {
                 ModerationAuditId = x.ModerationAuditId,
                 AdminActionLogId = x.AdminActionLogId,
@@ -99,8 +99,8 @@ public sealed class AuditController : LegacySellerControllerBase
                 Notes = x.Notes,
                 ActorUserId = x.ActorUserId,
                 CreatedAt = x.CreatedAt
-            }).ToList() ?? new List<ModerationAuditRowViewModel>();
-            model.SettlementAudits = payload.SettlementAudits?.Select(x => new SettlementAuditRowViewModel
+            }).ToList();
+            model.SettlementAudits = DeduplicateSettlementAudits(payload.SettlementAudits).Select(x => new SettlementAuditRowViewModel
             {
                 SettlementAuditId = x.SettlementAuditId,
                 AdminActionLogId = x.AdminActionLogId,
@@ -113,7 +113,7 @@ public sealed class AuditController : LegacySellerControllerBase
                 Notes = x.Notes,
                 ActorUserId = x.ActorUserId,
                 CreatedAt = x.CreatedAt
-            }).ToList() ?? new List<SettlementAuditRowViewModel>();
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -154,9 +154,9 @@ public sealed class AuditController : LegacySellerControllerBase
                 Customer24h = payload.Stats?.Customer24h ?? 0,
                 Unknown24h = payload.Stats?.Unknown24h ?? 0
             };
-            model.AuthRoleOptions = payload.Filters?.RoleOptions?.Select(MapOption).ToList() ?? model.AuthRoleOptions;
-            model.AuthOutcomeOptions = payload.Filters?.OutcomeOptions?.Select(MapOption).ToList() ?? model.AuthOutcomeOptions;
-            model.AuthAudits = payload.Items?.Select(x => new AuthAuditRowViewModel
+            model.AuthRoleOptions = DeduplicateOptions(payload.Filters?.RoleOptions).Select(MapOption).ToList();
+            model.AuthOutcomeOptions = DeduplicateOptions(payload.Filters?.OutcomeOptions).Select(MapOption).ToList();
+            model.AuthAudits = DeduplicateAuthAudits(payload.Items).Select(x => new AuthAuditRowViewModel
             {
                 AuthAuditLogId = x.AuthAuditLogId,
                 UserId = x.UserId,
@@ -182,7 +182,7 @@ public sealed class AuditController : LegacySellerControllerBase
                 IsSuspicious = x.IsSuspicious,
                 SuspicionReasons = x.SuspicionReasons,
                 OccurredAt = x.OccurredAt
-            }).ToList() ?? new List<AuthAuditRowViewModel>();
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -299,6 +299,179 @@ public sealed class AuditController : LegacySellerControllerBase
             Value = option.Value ?? string.Empty,
             Text = TranslateAuditOption(option.Value, option.Text)
         };
+
+    private static List<AuditOptionApiModel> DeduplicateOptions(IEnumerable<AuditOptionApiModel>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First())
+            .ToList() ?? new List<AuditOptionApiModel>();
+    }
+
+    private static List<AdminActionLogApiModel> DeduplicateActionLogs(IEnumerable<AdminActionLogApiModel>? items)
+    {
+        return items?
+            .Where(item => item.AdminActionLogId > 0)
+            .GroupBy(item => item.AdminActionLogId)
+            .Select(group => group
+                .OrderByDescending(CalculateActionLogScore)
+                .ThenByDescending(CalculateActionLogSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList() ?? new List<AdminActionLogApiModel>();
+    }
+
+    private static List<ModerationAuditApiModel> DeduplicateModerationAudits(IEnumerable<ModerationAuditApiModel>? items)
+    {
+        return items?
+            .Where(item => item.ModerationAuditId > 0)
+            .GroupBy(item => item.ModerationAuditId)
+            .Select(group => group
+                .OrderByDescending(CalculateModerationAuditScore)
+                .ThenByDescending(CalculateModerationAuditSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList() ?? new List<ModerationAuditApiModel>();
+    }
+
+    private static List<SettlementAuditApiModel> DeduplicateSettlementAudits(IEnumerable<SettlementAuditApiModel>? items)
+    {
+        return items?
+            .Where(item => item.SettlementAuditId > 0)
+            .GroupBy(item => item.SettlementAuditId)
+            .Select(group => group
+                .OrderByDescending(CalculateSettlementAuditScore)
+                .ThenByDescending(CalculateSettlementAuditSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList() ?? new List<SettlementAuditApiModel>();
+    }
+
+    private static List<AuthAuditApiModel> DeduplicateAuthAudits(IEnumerable<AuthAuditApiModel>? items)
+    {
+        return items?
+            .Where(item => item.AuthAuditLogId > 0)
+            .GroupBy(item => item.AuthAuditLogId)
+            .Select(group => group
+                .OrderByDescending(CalculateAuthAuditScore)
+                .ThenByDescending(CalculateAuthAuditSignalLength)
+                .ThenByDescending(item => item.OccurredAt)
+                .First())
+            .ToList() ?? new List<AuthAuditApiModel>();
+    }
+
+    private static int CalculateOptionSignalLength(AuditOptionApiModel option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateActionLogScore(AdminActionLogApiModel item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.Area) ? 1 : 0;
+        score += HasMeaningfulValue(item.ActionName) ? 1 : 0;
+        score += HasMeaningfulValue(item.TargetType) ? 1 : 0;
+        score += item.TargetId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.Summary) ? 2 : 0;
+        score += item.ActorUserId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.MetadataJson) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateActionLogSignalLength(AdminActionLogApiModel item)
+        => (item.Area?.Length ?? 0)
+        + (item.ActionName?.Length ?? 0)
+        + (item.TargetType?.Length ?? 0)
+        + (item.Summary?.Length ?? 0)
+        + (item.MetadataJson?.Length ?? 0);
+
+    private static int CalculateModerationAuditScore(ModerationAuditApiModel item)
+    {
+        var score = 0;
+        score += item.AdminActionLogId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.SubjectType) ? 1 : 0;
+        score += item.SubjectId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.Decision) ? 2 : 0;
+        score += HasMeaningfulValue(item.Notes) ? 1 : 0;
+        score += item.ActorUserId.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateModerationAuditSignalLength(ModerationAuditApiModel item)
+        => (item.SubjectType?.Length ?? 0) + (item.Decision?.Length ?? 0) + (item.Notes?.Length ?? 0);
+
+    private static int CalculateSettlementAuditScore(SettlementAuditApiModel item)
+    {
+        var score = 0;
+        score += item.AdminActionLogId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.AuditType) ? 1 : 0;
+        score += HasMeaningfulValue(item.ReferenceType) ? 1 : 0;
+        score += item.ReferenceId.HasValue ? 1 : 0;
+        score += item.SellerId.HasValue ? 1 : 0;
+        score += item.Amount.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.Currency) ? 1 : 0;
+        score += HasMeaningfulValue(item.Notes) ? 1 : 0;
+        score += item.ActorUserId.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateSettlementAuditSignalLength(SettlementAuditApiModel item)
+        => (item.AuditType?.Length ?? 0)
+        + (item.ReferenceType?.Length ?? 0)
+        + (item.Currency?.Length ?? 0)
+        + (item.Notes?.Length ?? 0);
+
+    private static int CalculateAuthAuditScore(AuthAuditApiModel item)
+    {
+        var score = 0;
+        score += item.UserId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.ClientLane) ? 1 : 0;
+        score += HasMeaningfulValue(item.RoleName) ? 1 : 0;
+        score += HasMeaningfulValue(item.Identifier) ? 1 : 0;
+        score += HasMeaningfulValue(item.UserName) ? 1 : 0;
+        score += HasMeaningfulValue(item.Email) ? 1 : 0;
+        score += HasMeaningfulValue(item.EventType) ? 1 : 0;
+        score += item.Success ? 1 : 0;
+        score += HasMeaningfulValue(item.FailureReason) ? 1 : 0;
+        score += item.FailedAttemptCount.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.IpAddress) ? 1 : 0;
+        score += HasMeaningfulValue(item.ForwardedFor) ? 1 : 0;
+        score += HasMeaningfulValue(item.CountryCode) ? 1 : 0;
+        score += HasMeaningfulValue(item.CountryName) ? 1 : 0;
+        score += HasMeaningfulValue(item.RegionName) ? 1 : 0;
+        score += HasMeaningfulValue(item.CityName) ? 1 : 0;
+        score += HasMeaningfulValue(item.UserAgent) ? 1 : 0;
+        score += HasMeaningfulValue(item.DeviceType) ? 1 : 0;
+        score += HasMeaningfulValue(item.BrowserFamily) ? 1 : 0;
+        score += HasMeaningfulValue(item.OperatingSystem) ? 1 : 0;
+        score += item.IsSuspicious ? 1 : 0;
+        score += HasMeaningfulValue(item.SuspicionReasons) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateAuthAuditSignalLength(AuthAuditApiModel item)
+        => (item.ClientLane?.Length ?? 0)
+        + (item.RoleName?.Length ?? 0)
+        + (item.Identifier?.Length ?? 0)
+        + (item.UserName?.Length ?? 0)
+        + (item.Email?.Length ?? 0)
+        + (item.EventType?.Length ?? 0)
+        + (item.FailureReason?.Length ?? 0)
+        + (item.IpAddress?.Length ?? 0)
+        + (item.ForwardedFor?.Length ?? 0)
+        + (item.CountryCode?.Length ?? 0)
+        + (item.CountryName?.Length ?? 0)
+        + (item.RegionName?.Length ?? 0)
+        + (item.CityName?.Length ?? 0)
+        + (item.UserAgent?.Length ?? 0)
+        + (item.DeviceType?.Length ?? 0)
+        + (item.BrowserFamily?.Length ?? 0)
+        + (item.OperatingSystem?.Length ?? 0)
+        + (item.SuspicionReasons?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string TranslateAuditOption(string? value, string? text)
         => (value ?? string.Empty).ToLowerInvariant() switch

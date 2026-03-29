@@ -35,6 +35,7 @@ public sealed class OrdersController : ControllerBase
     private readonly FreshFarmOrderingDBContext _db;
     private readonly CatalogInventoryClient _catalogInventoryClient;
     private readonly OrderReservationService _orderReservationService;
+    private readonly CustomerNotificationService _customerNotificationService;
     private readonly InternalServiceAuthOptions _internalServiceAuthOptions;
     private readonly ILogger<OrdersController> _logger;
 
@@ -42,12 +43,14 @@ public sealed class OrdersController : ControllerBase
         FreshFarmOrderingDBContext db,
         CatalogInventoryClient catalogInventoryClient,
         OrderReservationService orderReservationService,
+        CustomerNotificationService customerNotificationService,
         IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
         ILogger<OrdersController> logger)
     {
         _db = db;
         _catalogInventoryClient = catalogInventoryClient;
         _orderReservationService = orderReservationService;
+        _customerNotificationService = customerNotificationService;
         _internalServiceAuthOptions = internalServiceAuthOptions.Value;
         _logger = logger;
     }
@@ -1188,6 +1191,7 @@ public sealed class OrdersController : ControllerBase
         if (newStatus == "Canceled")
         {
             await _orderReservationService.ReleaseReservationsAsync(order, "Canceled", order.PaymentStatus ?? "Canceled", HttpContext.RequestAborted);
+            await _customerNotificationService.PublishOrderStatusUpdateAsync(order, oldStatus, order.Status, HttpContext.RequestAborted);
             return Ok(new
             {
                 success = true,
@@ -1216,6 +1220,7 @@ public sealed class OrdersController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        await _customerNotificationService.PublishOrderStatusUpdateAsync(order, oldStatus, order.Status, HttpContext.RequestAborted);
 
         return Ok(new
         {

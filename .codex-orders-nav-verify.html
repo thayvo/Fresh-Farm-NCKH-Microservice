@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lịch sử đơn hàng - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <style>
+        body {
+            background: radial-gradient(circle at 0 0, #e8fff1 0, transparent 35%), #f4f7f5;
+        }
+
+        .account-nav .list-group-item.active {
+            background: var(--primary-green, #008a4f);
+            border-color: var(--primary-green, #008a4f);
+        }
+
+        .accordion-button:not(.collapsed) {
+            color: #000;
+            background: #f8f9fa;
+            box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .125);
+        }
+
+        .accordion-button:focus {
+            box-shadow: 0 0 0 .25rem rgba(0, 138, 79, .25);
+        }
+
+        .order-meta {
+            font-size: .9rem;
+            color: #6b7280;
+        }
+
+        .order-total {
+            color: var(--primary-green, #008a4f);
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <main class="container my-5">
+        <div class="mb-4">
+            <h1 class="fw-bold">Tài khoản của tôi</h1>
+            <nav style="--bs-breadcrumb-divider: '>'" aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb ">
+        <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+            <li class="breadcrumb-item">
+                <a href="/account/orders">T&#xE0;i kho&#x1EA3;n</a>
+            </li>
+        <li class="breadcrumb-item active" aria-current="page">L&#x1ECB;ch s&#x1EED; &#x111;&#x1A1;n h&#xE0;ng</li>
+    </ol>
+</nav>
+
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-3">
+    <div class="card border-0 shadow-sm account-nav">
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                <a href="/account/profile"
+                   class="list-group-item list-group-item-action ">
+                    <i class="bi bi-person-circle me-2"></i>Thông tin tài khoản
+                </a>
+                <a href="/account/orders"
+                   class="list-group-item list-group-item-action active">
+                    <i class="bi bi-receipt me-2"></i>Lịch sử đơn hàng
+                </a>
+                <a href="/account/notifications"
+                   class="list-group-item list-group-item-action ">
+                    <div class="d-flex align-items-start justify-content-between gap-2">
+                        <span>
+                            <i class="bi bi-bell me-2"></i>Thông báo tài khoản
+                                <span class="badge text-bg-danger ms-2">6</span>
+                        </span>
+                            <span class="badge text-bg-light text-dark border">10 mới</span>
+                    </div>
+                        <div class="small text-muted mt-2">
+                                <div class="fw-semibold text-dark">C&#x1EAD;p nh&#x1EAD;t h&#x1ED3; s&#x1A1; seller</div>
+                                <div>3 ch&#x1B0;a &#x111;&#x1ECD;c, 5 c&#x1EAD;p nh&#x1EAD;t c&#xF2;n m&#x1EDB;i trong 24h.</div>
+                            <div class="d-flex flex-wrap gap-1 mt-2">
+                                    <span class="badge text-bg-danger">
+                                        C&#x1EAD;p nh&#x1EAD;t h&#x1ED3; s&#x1A1; seller: 3 ch&#x1B0;a &#x111;&#x1ECD;c
+                                    </span>
+                                    <span class="badge text-bg-danger">
+                                        C&#x1EAD;p nh&#x1EAD;t &#x111;&#x1A1;n h&#xE0;ng: 3 ch&#x1B0;a &#x111;&#x1ECD;c
+                                    </span>
+                                    <span class="badge text-bg-light text-dark border">
+                                        C&#x1EAD;p nh&#x1EAD;t v&#x1ECB; tr&#xED; giao h&#xE0;ng: 1 m&#x1EDB;i trong 24h
+                                    </span>
+                            </div>
+                        </div>
+                </a>
+                <a href="/account/become-seller"
+                   class="list-group-item list-group-item-action ">
+                    <i class="bi bi-shop-window me-2"></i>Đăng ký người bán
+                </a>
+                <a href="/"
+                   class="list-group-item list-group-item-action">
+                    <i class="bi bi-house-door me-2"></i>Trang chủ
+                </a>
+            </div>
+        </div>
+        <div class="card-footer bg-white border-0 pt-0">
+            <form method="post" action="/account/logout">
+                
+                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-box-arrow-right me-2"></i>Đăng xuất
+                </button>
+            <input name="__RequestVerificationToken" type="hidden" value="CfDJ8JhZfa4YInFJoWMPQSjpVYuqzJAjyn51Fd30vnhQ8xL_He0-N4hJYithPIRAMSdEYs9sMgHVAmGZiNzqMkTySumOpVXPhpNPV9tT5Ho08jNZA7_vtDGocFCNpoYQhq3dJgevwUq2YfC8tmL118crhlqTh1XyAaLKf8Z19KleHpEkRY3ZAAAcPBGezApmkbD_fQ" /></form>
+        </div>
+    </div>
+</div>
+
+
+            <section class="col-lg-9">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                            <h4 class="card-title fw-bold mb-0">Lịch sử đơn hàng</h4>
+                            <span class="badge text-bg-light border">Tổng đơn: 1</span>
+                        </div>
+
+
+                            <div class="accordion" id="orderHistoryAccordion">
+                                    <div class="accordion-item mb-3 border rounded-3 overflow-hidden">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button "
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#order_166"
+                                                    aria-expanded="true"
+                                                    aria-controls="order_166">
+                                                <div class="d-flex w-100 justify-content-between align-items-center flex-wrap gap-2 pe-3">
+                                                    <div class="fw-semibold">Mã đơn: #166</div>
+                                                    <div class="order-meta">Ngày đặt: 23/03/2026 13:08</div>
+                                                    <div class="order-total">115.000 &#x20AB;</div>
+                                                    <span class="badge bg-warning text-dark">&#x110;ang x&#x1EED; l&#xFD;</span>
+                                                </div>
+                                            </button>
+                                        </h2>
+
+                                        <div id="order_166"
+                                             class="accordion-collapse collapse show"
+                                             data-bs-parent="#orderHistoryAccordion">
+                                            <div class="accordion-body">
+                                                <div class="mb-3 text-muted small">
+                                                    Thanh toán: <strong>Ch&#x1EDD; thanh to&#xE1;n</strong>
+                                                </div>
+
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    <a href="/account/orders/166" class="btn btn-success btn-sm">
+                                                        <i class="bi bi-eye me-1"></i>Xem chi tiết đơn
+                                                    </a>
+                                                    <a href="/" class="btn btn-outline-success btn-sm">
+                                                        <i class="bi bi-cart-plus me-1"></i>Mua thêm
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                            </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+<style>
+    .idle-session-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 1.25rem;
+    }
+
+    .idle-session-overlay.is-visible {
+        display: flex;
+    }
+
+    .idle-session-modal {
+        width: min(100%, 440px);
+        border-radius: 18px;
+        background: #fff;
+        color: #0f172a;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+        overflow: hidden;
+    }
+
+    .idle-session-modal-header {
+        padding: 1rem 1.25rem .5rem;
+    }
+
+    .idle-session-modal-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .idle-session-modal-body {
+        padding: 0 1.25rem 1rem;
+    }
+
+    .idle-session-modal-footer {
+        padding: 0 1.25rem 1.25rem;
+        display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .idle-session-countdown {
+        font-weight: 700;
+        color: #b42318;
+    }
+</style>
+
+<form id="idleSessionAntiForgeryForm" class="d-none" method="post">
+    
+<input name="__RequestVerificationToken" type="hidden" value="CfDJ8JhZfa4YInFJoWMPQSjpVYuqzJAjyn51Fd30vnhQ8xL_He0-N4hJYithPIRAMSdEYs9sMgHVAmGZiNzqMkTySumOpVXPhpNPV9tT5Ho08jNZA7_vtDGocFCNpoYQhq3dJgevwUq2YfC8tmL118crhlqTh1XyAaLKf8Z19KleHpEkRY3ZAAAcPBGezApmkbD_fQ" /></form>
+
+<div id="idleSessionConfig"
+     data-warning-after-ms="60000"
+     data-auto-logout-after-ms="60000"
+     data-refresh-url="/api/auth/refresh-session"
+     data-logout-url="/api/auth/logout"
+     data-login-url="/account/signin"></div>
+
+<div id="idleSessionOverlay" class="idle-session-overlay" aria-hidden="true">
+    <div class="idle-session-modal" role="dialog" aria-modal="true" aria-labelledby="idleSessionTitle">
+        <div class="idle-session-modal-header">
+            <h2 id="idleSessionTitle" class="idle-session-modal-title">Phiên đăng nhập sắp hết hạn</h2>
+        </div>
+        <div class="idle-session-modal-body">
+            <p class="mb-2">Phiên đăng nhập của bạn sắp hết hạn. Bạn có muốn tiếp tục duy trì đăng nhập không?</p>
+            <p class="mb-0 text-muted">Hệ thống sẽ tự động đăng xuất sau <span id="idleSessionCountdown" class="idle-session-countdown">02:00</span> nếu bạn không tiếp tục.</p>
+        </div>
+        <div class="idle-session-modal-footer">
+            <button type="button" id="idleSessionLogoutNowButton" class="btn btn-outline-secondary">Đăng xuất</button>
+            <button type="button" id="idleSessionContinueButton" class="btn btn-success">Tiếp tục</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="q&#x2B;88BRP0lwFDilTYsA7Skw==" src="/js/idle-session-monitor.js?v=tc5U6rPTo5yyGnZ3YJBztmlIUEXB5RBfe7l6nb_R5CQ"></script>
+
+</body>
+</html>
+

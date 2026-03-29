@@ -32,6 +32,12 @@ builder.Services.Configure<SessionStoreOptions>(
     builder.Configuration.GetSection(SessionStoreOptions.SectionName));
 builder.Services.Configure<IdleSessionOptions>(
     builder.Configuration.GetSection(IdleSessionOptions.SectionName));
+builder.Services.Configure<OrderingServiceOptions>(
+    builder.Configuration.GetSection(OrderingServiceOptions.SectionName));
+builder.Services.Configure<GhnBackgroundSyncOptions>(
+    builder.Configuration.GetSection(GhnBackgroundSyncOptions.SectionName));
+builder.Services.Configure<GhnOrderStatusWebhookOptions>(
+    builder.Configuration.GetSection(GhnOrderStatusWebhookOptions.SectionName));
 builder.Services.AddSingleton<IRateLimitTelemetryService, RateLimitTelemetryService>();
 
 var sessionStoreOptions = builder.Configuration
@@ -42,6 +48,7 @@ var idleSessionOptions = builder.Configuration
     .Get<IdleSessionOptions>() ?? new IdleSessionOptions();
 
 builder.Services.AddControllersWithViews(); // Bat MVC + Razor views.
+builder.Services.AddMemoryCache();
 builder.Services.AddEndpointsApiExplorer(); // Metadata endpoint cho swagger.
 builder.Services.Configure<FormOptions>(options =>
 {
@@ -347,6 +354,8 @@ builder.Services // Dang ky cookie authentication cho user web.
 
 builder.Services.Configure<GoogleAuthenticationOptions>(
     builder.Configuration.GetSection(GoogleAuthenticationOptions.SectionName));
+builder.Services.Configure<GoogleRecaptchaOptions>(
+    builder.Configuration.GetSection(GoogleRecaptchaOptions.SectionName));
 builder.Services.Configure<VnPayOptions>(
     builder.Configuration.GetSection(VnPayOptions.SectionName));
 
@@ -425,6 +434,7 @@ builder.Services.AddHttpClient("Ordering", client => // HttpClient cho Ordering 
     var baseUrl = builder.Configuration["Services:Ordering:BaseUrl"]; // Doc base url tu config.
     client.BaseAddress = new Uri(baseUrl!); // Gan base address.
 });
+builder.Services.AddHttpClient<IGoogleRecaptchaService, GoogleRecaptchaService>();
 
 builder.Services.Configure<GhnSandboxOptions>(builder.Configuration.GetSection(GhnSandboxOptions.SectionName));
 builder.Services.AddHttpClient("GhnSandbox", client =>
@@ -433,6 +443,7 @@ builder.Services.AddHttpClient("GhnSandbox", client =>
     client.BaseAddress = new Uri(baseUrl!);
 });
 builder.Services.AddScoped<IGhnSandboxService, GhnSandboxService>();
+builder.Services.AddHostedService<GhnMetadataSyncBackgroundService>();
 
 builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 {
@@ -442,6 +453,7 @@ builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionService cần HttpContext.
 builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
 builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
+builder.Services.AddScoped<ISellerKycStorageService, SellerKycStorageService>(); // Lưu/xóa giấy tờ KYC seller trong wwwroot/uploads/seller-kyc.
 builder.Services.AddSingleton<IVnPayService, VnPayService>(); // Ký URL + verify callback VNPay sandbox.
 builder.Services.AddSingleton<ISignUpCaptchaService, SignUpCaptchaService>();
 
@@ -482,16 +494,16 @@ app.Use(async (context, next) =>
             .Append("connect-src 'self' https: wss:; ");
 
         var strictScriptDirective = new StringBuilder()
-            .Append("script-src 'self' https://cdn.jsdelivr.net https://cdn.ckeditor.com; ")
+            .Append("script-src 'self' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com; ")
             .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
-            .Append("frame-src 'self' https:;");
+            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https:;");
 
         var legacyScriptDirective = new StringBuilder()
             .Append("script-src 'self' 'unsafe-inline' 'nonce-")
             .Append(cspNonce)
-            .Append("' https://cdn.jsdelivr.net https://cdn.ckeditor.com; ")
+            .Append("' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com; ")
             .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
-            .Append("frame-src 'self' https:;");
+            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https:;");
 
         var requestPath = context.Request.Path;
         var useReportOnly =

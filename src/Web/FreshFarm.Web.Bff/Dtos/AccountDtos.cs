@@ -47,9 +47,9 @@ namespace FreshFarm.Web.Bff.Dtos
         [Range(typeof(bool), "true", "true", ErrorMessage = "Bạn cần đồng ý với điều khoản sử dụng và chính sách quyền riêng tư.")]
         public bool AcceptTerms { get; set; }
 
-        [Required(ErrorMessage = "Vui lòng nhập mã xác nhận.")]
-        [StringLength(10, MinimumLength = 4, ErrorMessage = "Mã xác nhận không hợp lệ.")]
         public string CaptchaCode { get; set; } = string.Empty;
+
+        public string RecaptchaToken { get; set; } = string.Empty;
     }
 
     public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.
@@ -107,6 +107,22 @@ namespace FreshFarm.Web.Bff.Dtos
         public bool RequiresSetup { get; set; }
         public string? ManualEntryKey { get; set; }
         public string? OtpAuthUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
+    }
+
+    public sealed class AccountTwoFactorViewModel
+    {
+        [Required(ErrorMessage = "Vui lòng nhập mã xác thực 6 số.")]
+        [Display(Name = "Mã xác thực 6 số")]
+        public string Code { get; set; } = string.Empty;
+
+        public bool RequiresSetup { get; set; }
+        public bool RememberMe { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? QrCodeImageDataUri { get; set; }
         public string? AuthenticatorIssuer { get; set; }
         public string? AuthenticatorAccountName { get; set; }
         public string? ChallengeMessage { get; set; }

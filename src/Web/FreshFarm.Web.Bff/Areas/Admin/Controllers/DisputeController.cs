@@ -213,40 +213,40 @@ public sealed class DisputeController : LegacySellerControllerBase
                 Source = payload.Sla.Source ?? string.Empty,
                 IsBreached = payload.Sla.IsBreached
             },
-            Timeline = payload.Timeline?.Select(x => new DisputeTimelineItemViewModel
+            Timeline = DeduplicateTimeline(payload.Timeline).Select(x => new DisputeTimelineItemViewModel
             {
                 Label = x.Label ?? string.Empty,
                 Value = x.Value,
                 Tone = x.Tone ?? string.Empty
-            }).ToList() ?? new List<DisputeTimelineItemViewModel>(),
-            ActivityItems = payload.ActivityItems?.Select(x => new DisputeActivityItemViewModel
+            }).ToList(),
+            ActivityItems = DeduplicateActivities(payload.ActivityItems).Select(x => new DisputeActivityItemViewModel
             {
                 Label = x.Label ?? string.Empty,
                 Summary = x.Summary ?? string.Empty,
                 CreatedAt = x.CreatedAt,
                 ActorUserId = x.ActorUserId
-            }).ToList() ?? new List<DisputeActivityItemViewModel>(),
-            EvidenceItems = payload.EvidenceItems?.Select(x => new DisputeEvidenceItemViewModel
+            }).ToList(),
+            EvidenceItems = DeduplicateEvidence(payload.EvidenceItems).Select(x => new DisputeEvidenceItemViewModel
             {
                 Note = x.Note ?? string.Empty,
                 CreatedAt = x.CreatedAt,
                 ActorUserId = x.ActorUserId
-            }).ToList() ?? new List<DisputeEvidenceItemViewModel>(),
-            Messages = payload.Messages?.Select(x => new DisputeMessageViewModel
+            }).ToList(),
+            Messages = DeduplicateMessages(payload.Messages).Select(x => new DisputeMessageViewModel
             {
                 Sender = x.Sender ?? string.Empty,
                 Content = x.Content ?? string.Empty,
                 CreatedAt = x.CreatedAt,
                 IsRead = x.IsRead
-            }).ToList() ?? new List<DisputeMessageViewModel>(),
-            RelatedOrders = payload.RelatedOrders?.Select(x => new DisputeOrderViewModel
+            }).ToList(),
+            RelatedOrders = DeduplicateRelatedOrders(payload.RelatedOrders).Select(x => new DisputeOrderViewModel
             {
                 OrderId = x.OrderId,
                 TotalAmount = x.TotalAmount,
                 Status = x.Status ?? string.Empty,
                 OrderDate = x.OrderDate
-            }).ToList() ?? new List<DisputeOrderViewModel>(),
-            RelatedCases = payload.RelatedCases?.Select(x => new DisputeRelatedCaseViewModel
+            }).ToList(),
+            RelatedCases = DeduplicateRelatedCases(payload.RelatedCases).Select(x => new DisputeRelatedCaseViewModel
             {
                 CaseType = x.CaseType ?? string.Empty,
                 CaseId = x.CaseId,
@@ -254,7 +254,7 @@ public sealed class DisputeController : LegacySellerControllerBase
                 Status = x.Status ?? string.Empty,
                 Amount = x.Amount,
                 CreatedAt = x.CreatedAt
-            }).ToList() ?? new List<DisputeRelatedCaseViewModel>()
+            }).ToList()
         };
     }
 
@@ -279,10 +279,10 @@ public sealed class DisputeController : LegacySellerControllerBase
         model.Section = payload.Filters?.Section ?? model.Section;
         model.Status = payload.Filters?.Status ?? model.Status;
         model.SellerId = payload.Filters?.SellerId;
-        model.SectionOptions = payload.Filters?.SectionOptions?.Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList() ?? new List<DisputeOptionViewModel>();
-        model.StatusOptions = payload.Filters?.StatusOptions?.Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList() ?? new List<DisputeOptionViewModel>();
-        model.SellerOptions = payload.Filters?.SellerOptions?.Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList() ?? new List<DisputeOptionViewModel>();
-        model.Rows = payload.Rows?.Select(x => new DisputeQueueRowViewModel
+        model.SectionOptions = DeduplicateOptions(payload.Filters?.SectionOptions).Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList();
+        model.StatusOptions = DeduplicateOptions(payload.Filters?.StatusOptions).Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList();
+        model.SellerOptions = DeduplicateOptions(payload.Filters?.SellerOptions).Select(x => new DisputeOptionViewModel { Value = x.Value ?? string.Empty, Text = x.Text ?? string.Empty }).ToList();
+        model.Rows = DeduplicateQueueRows(payload.Rows).Select(x => new DisputeQueueRowViewModel
         {
             CaseType = x.CaseType ?? string.Empty,
             CaseId = x.CaseId,
@@ -304,8 +304,210 @@ public sealed class DisputeController : LegacySellerControllerBase
             IsSlaBreached = x.IsSlaBreached,
             CreatedAt = x.CreatedAt,
             UpdatedAt = x.UpdatedAt
-        }).ToList() ?? new List<DisputeQueueRowViewModel>();
+        }).ToList();
     }
+
+    private static List<DisputeOptionApiDto> DeduplicateOptions(IEnumerable<DisputeOptionApiDto>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First())
+            .ToList() ?? new List<DisputeOptionApiDto>();
+    }
+
+    private static List<DisputeQueueRowApiDto> DeduplicateQueueRows(IEnumerable<DisputeQueueRowApiDto>? rows)
+    {
+        return rows?
+            .Where(row => row.CaseId > 0)
+            .GroupBy(row => row.CaseId)
+            .Select(group => group
+                .OrderByDescending(CalculateQueueRowScore)
+                .ThenByDescending(CalculateQueueRowSignalLength)
+                .ThenByDescending(row => row.UpdatedAt ?? row.CreatedAt)
+                .First())
+            .ToList() ?? new List<DisputeQueueRowApiDto>();
+    }
+
+    private static List<DisputeTimelineApiDto> DeduplicateTimeline(IEnumerable<DisputeTimelineApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.Label) || item.Value.HasValue)
+            .GroupBy(item => $"{item.Label}|{item.Value:O}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(item => HasMeaningfulValue(item.Tone))
+                .ThenByDescending(CalculateTimelineSignalLength)
+                .First())
+            .ToList() ?? new List<DisputeTimelineApiDto>();
+    }
+
+    private static List<DisputeActivityApiDto> DeduplicateActivities(IEnumerable<DisputeActivityApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.Label) || HasMeaningfulValue(item.Summary) || item.CreatedAt.HasValue)
+            .GroupBy(item => $"{item.Label}|{item.CreatedAt:O}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateActivityScore)
+                .ThenByDescending(CalculateActivitySignalLength)
+                .First())
+            .ToList() ?? new List<DisputeActivityApiDto>();
+    }
+
+    private static List<DisputeEvidenceApiDto> DeduplicateEvidence(IEnumerable<DisputeEvidenceApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.Note) || item.CreatedAt.HasValue)
+            .GroupBy(item => item.CreatedAt.HasValue ? item.CreatedAt.Value.ToString("O") : item.Note ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateEvidenceScore)
+                .ThenByDescending(CalculateEvidenceSignalLength)
+                .First())
+            .ToList() ?? new List<DisputeEvidenceApiDto>();
+    }
+
+    private static List<DisputeMessageApiDto> DeduplicateMessages(IEnumerable<DisputeMessageApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.Sender) || HasMeaningfulValue(item.Content) || item.CreatedAt.HasValue)
+            .GroupBy(item => $"{item.Sender}|{item.CreatedAt:O}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateMessageScore)
+                .ThenByDescending(CalculateMessageSignalLength)
+                .First())
+            .ToList() ?? new List<DisputeMessageApiDto>();
+    }
+
+    private static List<DisputeOrderApiDto> DeduplicateRelatedOrders(IEnumerable<DisputeOrderApiDto>? items)
+    {
+        return items?
+            .Where(item => item.OrderId > 0)
+            .GroupBy(item => item.OrderId)
+            .Select(group => group
+                .OrderByDescending(CalculateRelatedOrderScore)
+                .ThenByDescending(CalculateRelatedOrderSignalLength)
+                .ThenByDescending(item => item.OrderDate)
+                .First())
+            .ToList() ?? new List<DisputeOrderApiDto>();
+    }
+
+    private static List<DisputeRelatedCaseApiDto> DeduplicateRelatedCases(IEnumerable<DisputeRelatedCaseApiDto>? items)
+    {
+        return items?
+            .Where(item => item.CaseId > 0)
+            .GroupBy(item => item.CaseId)
+            .Select(group => group
+                .OrderByDescending(CalculateRelatedCaseScore)
+                .ThenByDescending(CalculateRelatedCaseSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList() ?? new List<DisputeRelatedCaseApiDto>();
+    }
+
+    private static int CalculateOptionSignalLength(DisputeOptionApiDto option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateQueueRowScore(DisputeQueueRowApiDto row)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(row.CaseType) ? 1 : 0;
+        score += HasMeaningfulValue(row.Title) ? 2 : 0;
+        score += HasMeaningfulValue(row.Summary) ? 1 : 0;
+        score += HasMeaningfulValue(row.DisplayStatus) ? 1 : 0;
+        score += HasMeaningfulValue(row.QueueStatus) ? 1 : 0;
+        score += row.SellerId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.SellerLabel) ? 1 : 0;
+        score += row.BuyerId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(row.BuyerName) ? 1 : 0;
+        score += HasMeaningfulValue(row.BuyerPhone) ? 1 : 0;
+        score += row.OrderId.HasValue ? 1 : 0;
+        score += row.Amount.HasValue ? 1 : 0;
+        score += row.UnreadCount > 0 ? 1 : 0;
+        score += HasMeaningfulValue(row.AssignedOwner) ? 1 : 0;
+        score += row.TargetResolutionAt.HasValue ? 1 : 0;
+        score += row.EvidenceCount > 0 ? 1 : 0;
+        score += row.IsSlaBreached ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateQueueRowSignalLength(DisputeQueueRowApiDto row)
+        => (row.CaseType?.Length ?? 0)
+        + (row.Title?.Length ?? 0)
+        + (row.Summary?.Length ?? 0)
+        + (row.DisplayStatus?.Length ?? 0)
+        + (row.QueueStatus?.Length ?? 0)
+        + (row.SellerLabel?.Length ?? 0)
+        + (row.BuyerName?.Length ?? 0)
+        + (row.BuyerPhone?.Length ?? 0)
+        + (row.AssignedOwner?.Length ?? 0);
+
+    private static int CalculateTimelineSignalLength(DisputeTimelineApiDto item)
+        => (item.Label?.Length ?? 0) + (item.Tone?.Length ?? 0);
+
+    private static int CalculateActivityScore(DisputeActivityApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.Label) ? 1 : 0;
+        score += HasMeaningfulValue(item.Summary) ? 2 : 0;
+        score += item.ActorUserId.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateActivitySignalLength(DisputeActivityApiDto item)
+        => (item.Label?.Length ?? 0) + (item.Summary?.Length ?? 0);
+
+    private static int CalculateEvidenceScore(DisputeEvidenceApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.Note) ? 2 : 0;
+        score += item.ActorUserId.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateEvidenceSignalLength(DisputeEvidenceApiDto item)
+        => (item.Note?.Length ?? 0);
+
+    private static int CalculateMessageScore(DisputeMessageApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.Sender) ? 1 : 0;
+        score += HasMeaningfulValue(item.Content) ? 2 : 0;
+        score += item.IsRead ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateMessageSignalLength(DisputeMessageApiDto item)
+        => (item.Sender?.Length ?? 0) + (item.Content?.Length ?? 0);
+
+    private static int CalculateRelatedOrderScore(DisputeOrderApiDto item)
+    {
+        var score = 0;
+        score += item.TotalAmount != 0m ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        score += item.OrderDate.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRelatedOrderSignalLength(DisputeOrderApiDto item)
+        => (item.Status?.Length ?? 0);
+
+    private static int CalculateRelatedCaseScore(DisputeRelatedCaseApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.CaseType) ? 1 : 0;
+        score += HasMeaningfulValue(item.Title) ? 2 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        score += item.Amount.HasValue ? 1 : 0;
+        score += item.CreatedAt.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRelatedCaseSignalLength(DisputeRelatedCaseApiDto item)
+        => (item.CaseType?.Length ?? 0) + (item.Title?.Length ?? 0) + (item.Status?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private HttpClient CreateOrderingClient()
     {

@@ -211,8 +211,9 @@ public sealed class UserController : LegacySellerControllerBase
             return new List<AdminUserViewModel>();
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<List<AdminUserApiDto>>(JsonOptions)
-            ?? new List<AdminUserApiDto>();
+        var payload = DeduplicateUsers(
+            await response.Content.ReadFromJsonAsync<List<AdminUserApiDto>>(JsonOptions)
+            ?? new List<AdminUserApiDto>());
 
         return payload.Select(MapUser).ToList();
     }
@@ -237,8 +238,9 @@ public sealed class UserController : LegacySellerControllerBase
             return new List<AdminRoleViewModel>();
         }
 
-        var payload = await response.Content.ReadFromJsonAsync<List<AdminRoleApiDto>>(JsonOptions)
-            ?? new List<AdminRoleApiDto>();
+        var payload = DeduplicateRoles(
+            await response.Content.ReadFromJsonAsync<List<AdminRoleApiDto>>(JsonOptions)
+            ?? new List<AdminRoleApiDto>());
 
         var roles = payload
             .OrderBy(x => x.roleName)
@@ -298,6 +300,74 @@ public sealed class UserController : LegacySellerControllerBase
             UpdatedDate = dto.updated
         };
     }
+
+    private static List<AdminUserApiDto> DeduplicateUsers(IEnumerable<AdminUserApiDto> users)
+    {
+        return users
+            .Where(user => user.userId > 0)
+            .GroupBy(user => user.userId)
+            .Select(group => SelectPreferredUser(group))
+            .ToList();
+    }
+
+    private static AdminUserApiDto SelectPreferredUser(IEnumerable<AdminUserApiDto> users)
+    {
+        return users
+            .OrderByDescending(CalculateUserScore)
+            .ThenByDescending(CalculateUserSignalLength)
+            .ThenByDescending(user => user.updated ?? user.created)
+            .First();
+    }
+
+    private static int CalculateUserScore(AdminUserApiDto user)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(user.userName) ? 3 : 0;
+        score += HasMeaningfulValue(user.fullName) ? 3 : 0;
+        score += HasMeaningfulValue(user.email) ? 3 : 0;
+        score += HasMeaningfulValue(user.phone) ? 2 : 0;
+        score += HasMeaningfulValue(user.avatar) ? 1 : 0;
+        score += user.roleId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(user.role?.roleName) ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateUserSignalLength(AdminUserApiDto user)
+    {
+        var values = new[]
+        {
+            user.userName,
+            user.fullName,
+            user.email,
+            user.phone,
+            user.avatar,
+            user.role?.roleName
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static List<AdminRoleApiDto> DeduplicateRoles(IEnumerable<AdminRoleApiDto> roles)
+    {
+        return roles
+            .Where(role => role.roleId > 0)
+            .GroupBy(role => role.roleId)
+            .Select(group => SelectPreferredRole(group))
+            .ToList();
+    }
+
+    private static AdminRoleApiDto SelectPreferredRole(IEnumerable<AdminRoleApiDto> roles)
+    {
+        return roles
+            .OrderByDescending(role => HasMeaningfulValue(role.roleName))
+            .ThenByDescending(role => role.roleName?.Length ?? 0)
+            .ThenByDescending(role => role.isActive)
+            .First();
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
     {

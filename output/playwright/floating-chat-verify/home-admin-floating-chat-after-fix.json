@@ -1,0 +1,14 @@
+{
+  "guest": {
+    "hasWidget": true,
+    "launcherText": "Chat với shop\n                Đăng nhập để xem tin nhắn\n            \n            0",
+    "authText": true
+  },
+  "afterLoginUrl": "https://localhost:7085/account/signin/2fa",
+  "authenticated": {
+    "hasWidget": false,
+    "launcherText": "",
+    "supportLinkVisible": false,
+    "userTextSnippet": "FRESHFARM ACCOUNT\nXác thực 2 bước\n\nThiết lập ứng dụng xác thực cho tài khoản của bạn trước khi tiếp tục.\n\nVui lòng thêm mã bảo mật vào ứng dụng xác thực rồi nhập mã 6 số để hoàn tất đăng nhập.\nKhóa thiết lập thủ công\nPX2O AUVR MMLJ PPH7 IMJU IZSJ W6I7 V2DL\nTài khoản: buikhacvinh18@gmail.com\nNhà phát"
+  }
+}

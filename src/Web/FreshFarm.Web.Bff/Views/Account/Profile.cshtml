@@ -27,6 +27,8 @@
         : displayName.Trim().Substring(0, 1).ToUpperInvariant();
     var addressCount = profile.Addresses?.Count ?? 0;
     var ghnConfigured = ViewBag.GhnSandboxConfigured as bool? ?? false;
+    var sellerApplication = profile.SellerApplication ?? new FreshFarm.Web.Bff.Dtos.SellerApplicationSummaryDto();
+    ViewData["SellerApplicationSummary"] = sellerApplication;
 }
 
 <!DOCTYPE html>
@@ -106,6 +108,27 @@
                     <div class="alert alert-danger">@ViewBag.Error</div>
                 }
 
+                @if (sellerApplication.HasSellerReviewAlert)
+                {
+                    <div class="alert alert-@sellerApplication.SellerReviewAlertTone border-0 shadow-sm">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-start">
+                            <div>
+                                <div class="fw-semibold mb-1">@sellerApplication.SellerReviewAlertTitle</div>
+                                <div>@sellerApplication.SellerReviewAlertBody</div>
+                                @if (sellerApplication.ReviewedAtUtc.HasValue)
+                                {
+                                    <div class="small mt-2 text-muted">Cập nhật lúc @sellerApplication.ReviewedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                            <div class="text-md-end">
+                                <a href="/account/become-seller" class="btn btn-sm btn-outline-dark">
+                                    <i class="bi bi-shop-window me-2"></i>Xem hồ sơ seller
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body p-4 p-md-5">
                         <div class="d-flex align-items-center gap-3 flex-wrap mb-4">
@@ -168,6 +191,30 @@
                                 </a>
                             </div>
                         </form>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-start">
+                            <div>
+                                <div class="text-uppercase small text-success fw-semibold mb-2">Người bán</div>
+                                <h5 class="fw-bold mb-2">Mở gian hàng trên FreshFarm</h5>
+                                <p class="text-muted mb-2">Gửi hồ sơ cửa hàng để đội vận hành rà soát và cấp quyền seller.</p>
+                                <div class="small">
+                                    <span class="badge text-bg-light border">Trạng thái: @sellerApplication.StatusLabel</span>
+                                    @if (sellerApplication.SubmittedAtUtc.HasValue)
+                                    {
+                                        <span class="text-muted ms-2">Gửi lúc @sellerApplication.SubmittedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="text-md-end">
+                                <a href="/account/become-seller" class="btn btn-outline-success">
+                                    <i class="bi bi-shop-window me-2"></i>@(sellerApplication.IsSellerApproved ? "Xem hồ sơ gian hàng" : sellerApplication.HasApplication ? "Cập nhật hồ sơ" : "Đăng ký ngay")
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

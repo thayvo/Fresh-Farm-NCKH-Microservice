@@ -78,6 +78,7 @@ public sealed class LoyaltyController : LegacySellerControllerBase
                     Reason = x.reason ?? string.Empty
                 })
                 .ToList();
+            NormalizeDashboard(model);
         }
         catch (Exception ex)
         {
@@ -139,6 +140,7 @@ public sealed class LoyaltyController : LegacySellerControllerBase
                     RankName = x.rankName ?? string.Empty
                 })
                 .ToList();
+            NormalizeUsers(model);
         }
         catch (Exception ex)
         {
@@ -214,6 +216,7 @@ public sealed class LoyaltyController : LegacySellerControllerBase
                     Reason = x.reason ?? string.Empty
                 })
                 .ToList();
+            NormalizeHistory(model);
         }
         catch (Exception ex)
         {
@@ -474,6 +477,93 @@ public sealed class LoyaltyController : LegacySellerControllerBase
 
         return endpoint.ToString();
     }
+
+    private static void NormalizeDashboard(LoyaltyDashboardVM model)
+    {
+        model.TopQuarterUsers = model.TopQuarterUsers
+            .Where(item => item.UserID > 0)
+            .GroupBy(item => item.UserID)
+            .Select(group => group
+                .OrderByDescending(CalculateTopUserScore)
+                .ThenByDescending(CalculateTopUserSignalLength)
+                .First())
+            .ToList();
+
+        model.RecentActivities = model.RecentActivities
+            .Where(item => item.UserID > 0)
+            .GroupBy(BuildHistoryKey)
+            .Select(group => group
+                .OrderByDescending(CalculateHistoryRowScore)
+                .ThenByDescending(CalculateHistoryRowSignalLength)
+                .First())
+            .OrderByDescending(item => item.CreatedAt)
+            .ToList();
+    }
+
+    private static void NormalizeUsers(LoyaltyUsersVM model)
+    {
+        model.Rows = model.Rows
+            .Where(item => item.UserID > 0)
+            .GroupBy(item => item.UserID)
+            .Select(group => group
+                .OrderByDescending(CalculateUserRowScore)
+                .ThenByDescending(CalculateUserRowSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeHistory(LoyaltyHistoryVM model)
+    {
+        model.Rows = model.Rows
+            .Where(item => item.UserID > 0)
+            .GroupBy(BuildHistoryKey)
+            .Select(group => group
+                .OrderByDescending(CalculateHistoryRowScore)
+                .ThenByDescending(CalculateHistoryRowSignalLength)
+                .First())
+            .OrderByDescending(item => item.CreatedAt)
+            .ToList();
+    }
+
+    private static string BuildHistoryKey(LoyaltyHistoryRowVM item)
+        => FormattableString.Invariant(
+            $"{item.CreatedAt.Ticks}|{item.UserID}|{item.Points}|{NormalizeDirectionKey(item.Direction)}");
+
+    private static string NormalizeDirectionKey(string? direction)
+        => direction?.Trim().ToLowerInvariant() ?? string.Empty;
+
+    private static int CalculateTopUserScore(LoyaltyTopUserVM item)
+        => (HasMeaningfulValue(item.FullName) ? 2 : 0)
+        + (item.TotalPoints > 0 ? 1 : 0)
+        + (item.QuarterPoints > 0 ? 1 : 0)
+        + (HasMeaningfulValue(item.RankName) ? 1 : 0);
+
+    private static int CalculateTopUserSignalLength(LoyaltyTopUserVM item)
+        => (item.FullName?.Length ?? 0) + (item.RankName?.Length ?? 0);
+
+    private static int CalculateUserRowScore(LoyaltyUserRowVM item)
+        => (HasMeaningfulValue(item.FullName) ? 2 : 0)
+        + (item.TotalPoints > 0 ? 1 : 0)
+        + (item.CurrentQuarterPoints > 0 ? 1 : 0)
+        + (HasMeaningfulValue(item.RankName) ? 1 : 0);
+
+    private static int CalculateUserRowSignalLength(LoyaltyUserRowVM item)
+        => (item.FullName?.Length ?? 0) + (item.RankName?.Length ?? 0);
+
+    private static int CalculateHistoryRowScore(LoyaltyHistoryRowVM item)
+        => (HasMeaningfulValue(item.UserName) ? 2 : 0)
+        + (item.OrderID.HasValue && item.OrderID.Value > 0 ? 1 : 0)
+        + (item.Points != 0 ? 1 : 0)
+        + (HasMeaningfulValue(item.Direction) ? 1 : 0)
+        + (HasMeaningfulValue(item.Reason) ? 1 : 0);
+
+    private static int CalculateHistoryRowSignalLength(LoyaltyHistoryRowVM item)
+        => (item.UserName?.Length ?? 0)
+        + (item.Direction?.Length ?? 0)
+        + (item.Reason?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value)
+        => !string.IsNullOrWhiteSpace(value);
 
     private sealed class LoyaltyDashboardApiResponse
     {

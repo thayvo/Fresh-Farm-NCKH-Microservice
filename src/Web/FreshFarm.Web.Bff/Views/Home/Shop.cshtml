@@ -97,8 +97,10 @@
          data-shop-endpoint="/bff/shops/@sellerId"
          data-products-endpoint="/bff/products?sellerId=@sellerId"
          data-product-fallback-image="@ProductImagePaths.FallbackImageRequestPath"
-         data-product-upload-root="@ProductImagePaths.UploadFolderRequestPath"></div>
+         data-product-upload-root="@ProductImagePaths.UploadFolderRequestPath"
+         data-support-chat-hub-url="/hubs/support-chat"></div>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="https://cdn.jsdelivr.net/npm/%40microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
     <script src="~/js/public-shop-chat.js" asp-append-version="true"></script>
     <script src="~/js/shop-page.js" asp-append-version="true"></script>
 </body>

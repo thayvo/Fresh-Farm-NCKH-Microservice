@@ -1,0 +1,38 @@
+{
+  "BaseUrl": "https://localhost:7085",
+  "BuyerUserName": "thu",
+  "SellerUserName": "binh",
+  "StartedAtUtc": "2026-03-24T13:42:33.4607294Z",
+  "CompletedAtUtc": "2026-03-24T13:42:34.1715135Z",
+  "BuyerLoginOk": true,
+  "SellerLoginOk": true,
+  "BuyerHubConnected": true,
+  "SellerHubConnected": true,
+  "ConversationId": 8,
+  "BuyerNegotiateProbe": {
+    "StatusCode": 200,
+    "Location": null,
+    "BodySnippet": "{\u0022negotiateVersion\u0022:1,\u0022connectionId\u0022:\u0022Hd0xcOTsGyr_ukLbRWxydw\u0022,\u0022connectionToken\u0022:\u00221eEkEyNSobl94G-V8bhW_w\u0022,\u0022availableTransports\u0022:[{\u0022transport\u0022:\u0022WebSockets\u0022,\u0022transferFormats\u0022:[\u0022Text\u0022,\u0022Binary\u0022]},{\u0022transport\u0022:\u0022ServerSentEvents\u0022,\u0022transferFormats\u0022:[\u0022Text\u0022]},{\u0022transport\u0022:\u0022LongPolling\u0022,\u0022transferFormats\u0022:[\u0022Te"
+  },
+  "SellerNegotiateProbe": {
+    "StatusCode": 200,
+    "Location": null,
+    "BodySnippet": "{\u0022negotiateVersion\u0022:1,\u0022connectionId\u0022:\u0022AUwJxbF7EkB4cTfL80svyg\u0022,\u0022connectionToken\u0022:\u0022LDh6qa0Bjdk7oxhoqkxlVA\u0022,\u0022availableTransports\u0022:[{\u0022transport\u0022:\u0022WebSockets\u0022,\u0022transferFormats\u0022:[\u0022Text\u0022,\u0022Binary\u0022]},{\u0022transport\u0022:\u0022ServerSentEvents\u0022,\u0022transferFormats\u0022:[\u0022Text\u0022]},{\u0022transport\u0022:\u0022LongPolling\u0022,\u0022transferFormats\u0022:[\u0022Te"
+  },
+  "BuyerToSeller": {
+    "SentContent": "Codex realtime verify buyer -\u003E seller 2026-03-24T13:42:34.1074044Z",
+    "EventName": "newConversationOrMessage",
+    "ConversationId": 8,
+    "ReceivedContent": null,
+    "ElapsedMilliseconds": 49
+  },
+  "SellerToBuyer": {
+    "SentContent": "Codex realtime verify seller -\u003E buyer 2026-03-24T13:42:34.1577485Z",
+    "EventName": "receiveMessage",
+    "ConversationId": 8,
+    "ReceivedContent": "Codex realtime verify seller -\u003E buyer 2026-03-24T13:42:34.1577485Z",
+    "ElapsedMilliseconds": 13
+  },
+  "Success": true,
+  "Error": null
+}

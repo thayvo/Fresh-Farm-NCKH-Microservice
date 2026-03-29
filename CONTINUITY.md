@@ -1,42 +1,1573 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Xac minh trong repo FreshFarm hien da co hay chua co 3 hang muc bao mat: CSP enforce, mTLS giua microservices, va Penetration Testing dinh ky.
+  - Productionize lane da nguoi ban, uu tien khoa shipping/GHN seller theo don that truoc khi mo rong them tinh nang marketplace.
+  - Hoan thien UX trang `/account/notifications` de de doc hon, co empty state ro rang, bo loc de theo doi, va CTA phu hop theo tung trang thai.
+  - Kiem tra backlog can lam de mo rong phan `Goi Y Hom Nay` tu heuristic hien tai sang recommendation theo `Collaborative Filtering`, `Content-Based Filtering`, va `Hybrid`.
   - Success criteria:
-    - Ket luan ro tung muc: da co, co mot phan, hay chua co.
-    - Dua tren code/cau hinh/tai lieu hien co trong repo, khong suy doan.
+    - Seller chi tao GHN tu `OrderId` hop le va khong tao trung van don cho cung mot order.
+    - Du lieu receiver/item/COD/insurance trong payload GHN duoc suy ra tu order scope o server-side, khong phu thuoc browser input.
+    - Seller settings chan som store/origin phone khong hop le thay vi de GHN fail muon o runtime.
+    - Identity khong con phu thuoc SQL delta apply tay de co `SellerStoreSettings`/seller KYC schema runtime can thiet.
+    - Runtime local va test gate cua BFF/Identity giu xanh sau cac thay doi.
+    - `/account/notifications` hien ro trang thai dang xem, active filters, summary KPI, va empty state theo ngu canh thay vi thong diep generic.
+    - Xac dinh ro du lieu san co, du lieu con thieu, boundary service/API, va thu tu thuc hien de dua recommendation len muc ML that thay vi danh sach lay tu catalog chung.
 - **Constraints/Assumptions**:
-  - Khong dung lenh git/destructive.
-  - Worktree dang co nhieu thay doi san; khong duoc revert hay ghi de cac thay doi khong phuc vu task nay.
-  - Can dua tren code hien tai cua repo, khong suy doan theo kien truc ly thuyet.
-  - `rg` bi loi quyen truy cap trong moi truong nay; tam dung `Get-ChildItem` + `Select-String`.
+  - Phai cap nhat `CONTINUITY.md` de giu continuity cho workspace.
+  - Khong dung lenh destructive/git reset/revert.
+  - BFF/Identity local co the dang chay va giu lock file khi build; neu can verify code phai tame-stop process roi bat lai.
+  - User muon uu tien huong "co the van hanh that" truoc khi mo them breadth tinh nang.
+  - Runtime verify email reject/Gmail that da xong; lane hien tai tap trung vao productionize multi-seller.
 - **Key decisions**:
-  - Danh gia truc tiep cac `Program.cs`, controller internal, va workflow/docs thay vi chi dua tren bao cao tong hop.
-  - Xem `CSP` theo lane/public vs admin/seller/swagger.
-  - Xem `mTLS` theo bang chung cert/client cert thay vi chi co HTTPS/JWT/header secret.
+  - Checkout da tu tao `Shipping` row trong `OrdersController`; seller add-shipping modal hien tai la legacy/manual path, khong phai core production flow.
+  - Seller GHN create phai bind theo order scope:
+    - chan tao moi neu order da co `ghnOrderCode` hoac `ghnClientOrderCode`
+    - bo qua receiver/item/COD/insurance/content gui len tu client
+    - chi giu client-side cho `ToDistrictId`, `ToWardCode`, va package dimensions
+  - Persist metadata GHN sau khi tao order phai uu tien internal Ordering endpoint (`/api/orders/admin/shippings/internal/{orderId}/ghn-metadata` + `X-Internal-Service-Key`) de duplicate guard co du lieu ngay lap tuc.
+  - So dien thoai store/GHN pickup phai theo regex di dong Viet Nam thuc te (`03/05/07/08/09`); `0123456789` khong duoc coi la hop le cho GHN.
+  - Identity startup se tu ensure schema seller runtime theo huong non-destructive:
+    - tu tao `SellerStoreSettings` neu DB moi chua co bang.
+    - bo sung cac cot GHN seller con thieu va backfill field co the suy dien.
+    - chi tao unique index/FK khi du lieu hien tai khong vi pham, khong sua xoa destructive de ep schema.
+  - Buyer support chat khi `createIfMissing=true` chi duoc reuse thread dang `Open`; neu thread moi nhat voi seller da `Closed` thi phai tao thread moi thay vi khoa buyer o conversation cu.
+  - Lot migration baseline nen lam theo thu tu:
+    - dat design-time/tooling chay on dinh truoc
+    - scaffold migration baseline dau tien cho `Identity`
+    - sau do moi giam dan bootstrap schema ad-hoc o runtime.
+  - Vi 3 baseline migration hien tai la full create-schema migration, DB hien huu khong nen chay `database update` truc tiep; voi DB da co schema can verify roi stamp `__EFMigrationsHistory` truoc.
+  - Local dev da chot theo huong stamp baseline cho `Identity/Catalog/Ordering`; tu diem nay migration tiep theo co the di theo flow EF Core binh thuong tren 3 DB nay.
+  - Homepage recommendation se di theo huong `hybrid_home_v1`:
+    - Ordering expose `GET /api/orders/product-insights/home-profile`
+    - BFF blend `content quality + home preference seeds`
+    - direct-match voi san pham user vua xem/click/mua duoc boost manh hon affinity match de ket qua phan anh dung quan tam gan day
 - **State**:
   - *Done*:
-    - Da doc lai `CONTINUITY.md`.
-    - Da doi chieu `src/Web/FreshFarm.Web.Bff/Program.cs` va xac nhan BFF co security headers + CSP.
-    - Da xac nhan BFF tra `Content-Security-Policy` enforce cho buyer/public, nhung `Content-Security-Policy-Report-Only` cho `/Admin`, `/Seller`, `/swagger`.
-    - Da doi chieu `Program.cs` cua `Identity`, `Catalog`, `Ordering`; cac service dang dung JWT Bearer cho API auth thong thuong.
-    - Da doi chieu giao tiep noi bo `Ordering -> Catalog`; hien dang dung header chia se `X-Service-Key`, khong thay client certificate hay mTLS.
-    - Da quet `.github`, `docs`, `scripts`, `tools`; chua thay workflow/script OWASP ZAP hay Burp Suite dinh ky trong repo.
+    - Da surfacing metadata nguon recommendation/materialized len `Ordering` va `BFF`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - them response header `X-Recommendation-Signal-Source`
+        - cac endpoint sau gio tra ro `materialized` hoac `ad_hoc`:
+          - `GET /api/orders/product-insights/home-profile`
+          - `GET /api/orders/product-insights/home-collaborative`
+          - `GET /api/orders/product-insights/similar`
+          - `GET /api/orders/product-insights/search-ranking`
+        - da harden null-safe cho test context khi `HttpContext` chua duoc setup
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - BFF gio doc header `X-Recommendation-Signal-Source` tu Ordering
+        - `GET /bff/product-search` them `rankingSignalSource`
+          - `contentSignalSource`
+        - `GET /bff/recommendations/home` them:
+          - `contentSignalSource`
+          - `signalSource`
+          - `preferenceSignalSource`
+          - `collaborativeSignalSource`
+        - `GET /bff/recommendations/products/{id}/similar` them:
+          - `contentSignalSource`
+          - `signalSource`
+          - `collaborativeSignalSource`
+        - response home co the surfacing hop nhat nhieu nguon nhu `materialized+ad_hoc` neu can
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `34/34` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `101/101` PASS
+        - runtime:
+          - `GET /bff/product-search?name=rau&page=1&pageSize=5` -> `rankingAlgorithm = hybrid_search_v1`, `rankingSignalSource = materialized`
+          - `GET /bff/recommendations/home?limit=4` -> `signalSource = ad_hoc` (guest session khong co seed materialized o request nay)
+          - `GET /bff/recommendations/products/104/similar?limit=4` -> `signalSource = null` khi khong co collaborative signal, van fallback `content_based_similar_v1`
+      - verify bo sung:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `101/101` PASS
+        - runtime BFF voi guest session moi + event `search/search-click/product-view` tren `ProductId = 1`:
+          - rebuild affinity -> `materializedHomeCollaborativeRowCount = 16`
+          - `GET /bff/recommendations/home?limit=4` -> 
+            - `algorithm = hybrid_home_v1`
+            - `contentSignalSource = catalog_content_v1`
+            - `signalSource = materialized`
+            - `preferenceSignalSource = materialized`
+            - `collaborativeSignalSource = materialized`
+        - runtime BFF cho similar:
+          - `GET /bff/recommendations/products/104/similar?limit=4` ->
+            - `algorithm = content_based_similar_v1`
+            - `contentSignalSource = catalog_content_v1`
+            - `signalSource = null`
+            - `collaborativeSignalSource = null`
+          - `GET /bff/recommendations/products/1/similar?limit=4` ->
+            - `algorithm = hybrid_similar_v1`
+            - `contentSignalSource = catalog_content_v1`
+            - `signalSource = materialized`
+            - `collaborativeSignalSource = materialized`
+        - runtime BFF cho search:
+          - `GET /bff/product-search?name=rau&page=1&pageSize=3` ->
+            - `rankingAlgorithm = hybrid_search_v1`
+            - `rankingSignalSource = materialized`
+            - `contentSignalSource = catalog_keyword_v1`
+    - Da giam tiep phan query ad-hoc cua `hybrid_home_v1` bang materialized `home-profile`:
+      - them `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationHomePreferenceSeed.cs`
+        - bang materialized gom:
+          - `ScopeType` (`session` / `user`)
+          - `ScopeKey`
+          - `UserId`
+          - `ProductId`
+          - `ViewCount`
+          - `SearchClickCount`
+          - `RecommendationClickCount`
+          - `PurchaseCount`
+          - `PreferenceScore`
+          - `LastInteractedAtUtc`
+          - `ComputedAt`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+        - them `DbSet<RecommendationHomePreferenceSeed>`
+        - map:
+          - `UQ_RecommendationHomePreferenceSeed_Scope_Product`
+          - `IX_RecommendationHomePreferenceSeed_Scope_PreferenceScore`
+          - `IX_RecommendationHomePreferenceSeed_User_PreferenceScore`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/RecommendationAffinityService.cs`
+        - `RebuildAsync(...)` gio materialize ca `RecommendationHomePreferenceSeed`
+        - aggregate tu:
+          - `ProductViewEvent`
+          - `SearchClickEvent`
+          - `RecommendationClickEvent`
+          - successful-order purchase
+        - score giu cung cong thuc voi `home-profile` request-time:
+          - `ViewCount * 10`
+          - `SearchClickCount * 28`
+          - `RecommendationClickCount * 22`
+          - `PurchaseCount * 35`
+        - result refresh gio co them:
+          - `MaterializedHomePreferenceRowCount`
+          - `DistinctHomePreferenceScopeCount`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - `BuildHomePreferenceSeedsAsync(...)` gio uu tien doc `RecommendationHomePreferenceSeed` truoc (`materialized-first`), neu rong moi fallback ve aggregate ad-hoc cu
+      - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+        - them regression `GetHomeProfile_PrefersMaterializedSeeds_WhenAvailable`
+      - migration:
+        - them `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329153359_RecommendationHomePreferenceSeed20260329.cs`
+        - `dotnet-ef database update` da apply migration nay vao `FreshFarmOrderingDB`
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `34/34` PASS
+        - `POST https://localhost:7018/api/orders/product-insights/affinity/rebuild` -> `200`, body co them:
+          - `materializedHomePreferenceRowCount = 10`
+          - `distinctHomePreferenceScopeCount = 10`
+        - SQL verify tren `LAPTOP-D3S57BE5\\DEVSQL / FreshFarmOrderingDB`:
+          - `RecommendationHomePreferenceSeed` co `10` rows, `10` scopes
+          - top row hien tai: `ScopeType = session`, `ScopeKey = 0655bcf9-29a8-8511-da40-b0da821d3c28`, `ProductId = 104`, `PreferenceScore = 38`
+        - runtime:
+          - `GET /api/orders/product-insights/home-profile?sessionId=0655bcf9-29a8-8511-da40-b0da821d3c28&limit=5` -> tra row materialized that cho `ProductId = 104`, `PreferenceScore = 38`
+    - Da day `home-collaborative` sang `materialized-first` o Ordering:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationHomeCollaborativeCandidate.cs`
+        - them bang materialized theo `scope + product` gom:
+          - `ScopeType`
+          - `ScopeKey`
+          - `UserId`
+          - `ProductId`
+          - `CoPurchaseOrderCount`
+          - `CoViewSessionCount`
+          - `CoClickSessionCount`
+          - `CollaborativeScore`
+          - `ComputedAt`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+        - them `DbSet<RecommendationHomeCollaborativeCandidate>`
+        - map:
+          - `UQ_RecommendationHomeCollaborativeCandidate_Scope_Product`
+          - `IX_RecommendationHomeCollaborativeCandidate_Scope_CollaborativeScore`
+          - `IX_RecommendationHomeCollaborativeCandidate_User_CollaborativeScore`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/RecommendationAffinityService.cs`
+        - `RebuildAsync(...)` gio materialize them `RecommendationHomeCollaborativeCandidate`
+        - dung `RecommendationHomePreferenceSeed` + `RecommendationProductAffinity` de tao candidate collaborative theo scope
+        - refresh result gio co them:
+          - `MaterializedHomeCollaborativeRowCount`
+          - `DistinctHomeCollaborativeScopeCount`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - `GET /api/orders/product-insights/home-collaborative` gio uu tien doc `RecommendationHomeCollaborativeCandidate` truoc, chi fallback ve ad-hoc khi scope do chua co row materialized
+      - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+        - cap nhat regression `GetHomeCollaborative_PrefersMaterializedAffinity_WhenAvailable` theo bang candidate moi
+      - migration:
+        - them `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329155139_RecommendationHomeCollaborativeCandidate20260329.cs`
+        - `dotnet-ef database update` da apply migration nay vao `FreshFarmOrderingDB`
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `34/34` PASS
+        - `POST https://localhost:7018/api/orders/product-insights/affinity/rebuild` -> `200`, body co them:
+          - `materializedHomeCollaborativeRowCount = 8`
+          - `distinctHomeCollaborativeScopeCount = 1`
+        - SQL verify tren `LAPTOP-D3S57BE5\\DEVSQL / FreshFarmOrderingDB`:
+          - `RecommendationHomeCollaborativeCandidate` co `8` rows, `1` scope
+          - top row hien tai: `ScopeType = session`, `ScopeKey = dc676c06-afa2-ae3c-29fc-03c752dd0a7e`, `ProductId = 1`, `CollaborativeScore = 113.6`
+        - runtime:
+          - `GET /api/orders/product-insights/home-collaborative?sessionId=dc676c06-afa2-ae3c-29fc-03c752dd0a7e&limit=5` -> `200`, response header `X-Recommendation-Signal-Source = materialized`
+    - Da mo them lat cat `Collaborative Filtering` materialized cho `hybrid_search_v1`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationSearchKeywordAffinity.cs`
+        - them bang materialized keyword-product affinity gom:
+          - `Keyword`
+          - `ProductId`
+          - `SearchClickCount`
+          - `SearchClickSessionCount`
+          - `SearchViewSessionCount`
+          - `SearchRecommendationClickCount`
+          - `HybridSearchScore`
+          - `ComputedAt`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+        - them `DbSet<RecommendationSearchKeywordAffinity>`
+        - map:
+          - `UQ_RecommendationSearchKeywordAffinity_Keyword_Product`
+          - index `(Keyword, HybridSearchScore)` va `(ProductId, HybridSearchScore)`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/RecommendationAffinityService.cs`
+        - `RebuildAsync(...)` gio materialize ca `RecommendationSearchKeywordAffinity`
+        - keyword affinity duoc tinh tu:
+          - `SearchEvent`
+          - `SearchClickEvent`
+          - `RecommendationClickEvent`
+          - `ProductViewEvent`
+        - score hien tai:
+          - `SearchClickCount * 20`
+          - `SearchRecommendationClickCount * 14`
+          - `SearchViewSessionCount * 6`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - `GET /api/orders/product-insights/search-ranking` gio uu tien doc `RecommendationSearchKeywordAffinity` truoc (`materialized-first`), neu rong moi fallback sang ad-hoc query cu
+      - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+        - them regression `GetSearchRanking_PrefersMaterializedKeywordAffinity_WhenAvailable`
+      - migration:
+        - them `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329152045_RecommendationSearchKeywordAffinity20260329.cs`
+        - `dotnet-ef migrations list` gio co them:
+          - `20260329152045_RecommendationSearchKeywordAffinity20260329 (Pending)` truoc khi apply
+        - `dotnet-ef database update` da apply migration nay vao `FreshFarmOrderingDB`
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `33/33` PASS
+        - `POST https://localhost:7018/api/orders/product-insights/affinity/rebuild` voi `X-Internal-Service-Key: freshfarm-dev-internal-key` -> `200`, body:
+          - `materializedRowCount = 70`
+          - `distinctSeedProductCount = 18`
+          - `materializedKeywordRowCount = 1`
+          - `distinctKeywordCount = 1`
+        - SQL verify tren `LAPTOP-D3S57BE5\\DEVSQL / FreshFarmOrderingDB`:
+          - `RecommendationSearchKeywordAffinity` co `1` row, `1` keyword
+          - row hien tai: `Keyword = rau`, `ProductId = 104`, `HybridSearchScore = 52`
+        - runtime:
+          - `GET /api/orders/product-insights/search-ranking?keyword=rau&productIds=104&productIds=6&productIds=8&limit=10` -> tra row materialized that cho `ProductId = 104`, `HybridSearchScore = 52`
+          - `GET /bff/product-search?name=rau&page=1&pageSize=5` -> response `rankingAlgorithm = hybrid_search_v1`
+    - Da mo lat cat `Collaborative Filtering` materialized dau tien cho recommendation:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationProductAffinity.cs`
+        - them bang affinity materialized gom:
+          - `SeedProductId`
+          - `CandidateProductId`
+          - `CoPurchaseOrderCount`
+          - `CoViewSessionCount`
+          - `CoClickSessionCount`
+          - `AffinityScore`
+          - `ComputedAt`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+        - them `DbSet<RecommendationProductAffinity>`
+        - map index:
+          - `UQ_RecommendationProductAffinity_Seed_Candidate`
+          - `IX_RecommendationProductAffinity_SeedProduct_AffinityScore`
+          - `IX_RecommendationProductAffinity_CandidateProduct_AffinityScore`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/RecommendationAffinityService.cs`
+        - them service `RebuildAsync(...)` de materialize affinity tu:
+          - successful-order co-purchase
+          - `ProductViewEvent` session co-view
+          - `SearchClickEvent` + `RecommendationClickEvent` session co-click
+        - luc dau co bug EF translation o nhanh `Concat + GroupBy`; da sua bang cach materialize click pairs truoc roi group in-memory
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/RecommendationAffinityRefreshBackgroundService.cs`
+        - them hosted service refresh affinity moi 20 phut
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - `GET /api/orders/product-insights/similar` gio doc `RecommendationProductAffinity` truoc (`materialized-first`), neu khong co row thi fallback ve ad-hoc collaborative query cu
+        - `GET /api/orders/product-insights/home-collaborative` gio doc affinity materialized theo `seedSignals` truoc, neu rong thi fallback ve ad-hoc collaborative query cu
+        - them `POST /api/orders/product-insights/affinity/rebuild` duoc bao ve bang `X-Internal-Service-Key` de trigger rebuild chu dong khi verify/ops
+        - da tung gap loi DI do 2 constructor hop le; da fix bang `[ActivatorUtilitiesConstructor]` cho constructor inject service/options
+      - migration:
+        - them `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329150509_RecommendationProductAffinity20260329.cs`
+        - `dotnet-ef migrations list` gio co:
+          - `20260324140006_OrderingSchemaBaseline20260324`
+          - `20260329092025_RecommendationEventTracking20260329`
+          - `20260329150509_RecommendationProductAffinity20260329`
+        - `dotnet-ef database update` da apply migration nay vao `FreshFarmOrderingDB`
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-build` -> `30/30` PASS
+        - `POST https://localhost:7018/api/orders/product-insights/affinity/rebuild` voi `X-Internal-Service-Key: freshfarm-dev-internal-key` -> `200`, body:
+          - `materializedRowCount = 70`
+          - `distinctSeedProductCount = 18`
+        - SQL verify tren `LAPTOP-D3S57BE5\\DEVSQL / FreshFarmOrderingDB`:
+          - `RecommendationProductAffinity` co `70` rows
+          - top rows gom `SeedProductId = 1 -> CandidateProductId = 6`, `AffinityScore = 96`
+        - runtime verify:
+          - `GET /api/orders/product-insights/similar?productId=1&candidateProductIds=6&limit=5` -> tra row materialized that cho `ProductId = 6`, `CollaborativeScore = 96`
+          - chen tam `ProductViewEvent` voi `SessionId = tmp-home-materialized-verify`, `ProductId = 1`, goi `GET /api/orders/product-insights/home-collaborative?sessionId=tmp-home-materialized-verify&limit=5` -> tra candidate materialized that, item dau `ProductId = 6`, `CollaborativeScore = 104`
+          - da cleanup lai temp row `ProductViewEvent` cua session verify sau khi xong
+    - Da day them lat cat `Collaborative Filtering` thuc dung cho homepage recommendation:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - refactor `BuildHomePreferenceSeedsAsync(...)` de `GetHomeProfile(...)` va collaborative candidate generator dung chung
+        - them `GET /api/orders/product-insights/home-collaborative`
+        - endpoint moi sinh `HomeCollaborativeCandidateDto` tu global co-occurrence quanh cac seed product cua session/user:
+          - co-purchase tu order thanh cong
+          - co-view session tu `ProductViewEvent`
+          - co-click session tu `SearchClickEvent` va `RecommendationClickEvent`
+        - score candidate duoc weight theo do manh cua seed preference (`PreferenceScore`)
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/recommendations/home` gio goi them Ordering `home-collaborative`
+        - `BuildHomeRecommendations(...)` blend them `CollaborativeScore` vao home ranking
+        - `BuildHomeRecommendationReason(...)` biet surfacing tags collaborative nhu:
+          - `Hay được mua cùng mối quan tâm của bạn`
+          - `Hay được quan tâm cùng gần đây`
+          - `Hay được xem cùng gần đây`
+        - response `algorithm` van giu `hybrid_home_v1`, nhung hybrid home gio da co them nguon collaborative candidate thay vi chi seed boost
+      - test:
+        - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+          - them `GetHomeCollaborative_ReturnsCandidates_FromSeedInteractions`
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+          - them `GetHomeRecommendations_BlendsCollaborativeHomeCandidates_WhenOrderingProvidesThem`
+          - cap nhat home recommendation tests cu de mock them `home-collaborative`
+      - verify:
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `30/30` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `101/101` PASS
+        - runtime:
+          - browser session guest moi (`ffhome3`) da ghi event that:
+            - `SearchEventId = 10`
+            - `SearchClickEventId = 9`
+            - `ProductViewEventId = 14`
+            - cung `SessionId = 0655bcf9-29a8-8511-da40-b0da821d3c28`
+          - `GET /bff/recommendations/home?limit=4` van tra `algorithm = hybrid_home_v1` o runtime sau patch
+          - da chen tam signal co-occurrence toi thieu (`tmp-home-collab-*`) de probe endpoint collaborative, sau do da xoa lai sach:
+            - `TempProductViews = 0`
+            - `TempSearchClicks = 0`
+        - artifact:
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.json`
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.txt`
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.png`
+    - Da fix bug recommendation guest-session bi doi `SessionId` moi request o BFF:
+      - nguyen nhan:
+        - cac endpoint anonymous recommendation/event chi doc `HttpContext.Session.Id` ma khong "establish" session
+        - ASP.NET Core khong persist session cookie neu session khong co du lieu duoc set, nen moi request guest tao `SessionId` moi
+        - he qua:
+          - `SearchEvent`, `SearchClickEvent`, `ProductViewEvent` cua cung 1 browser session bi luu duoi cac `SessionId` khac nhau
+          - `GET /bff/recommendations/home` luon nhan `home-profile = []`, nen runtime that chi tra `content_based_home_v1`
+      - patch:
+        - `src/Web/FreshFarm.Web.Bff/Controllers/BffRecommendationEventsController.cs`
+          - them `RecommendationSessionMarkerKey = "__recommendation_session_initialized"`
+          - moi endpoint track (`product-view`, `search`, `search-click`, `recommendation-impression`, `recommendation-click`) gio goi `EnsureStableSessionIdAsync()`
+          - helper nay `LoadAsync()` + `SetString(...)` marker de session cookie duoc persist on dinh truoc khi forward event sang Ordering
+        - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+          - `GET /bff/recommendations/home` gio goi `EnsureStableRecommendationSessionIdAsync()` truoc khi doc `home-profile`
+          - dam bao recommendation-home dung cung 1 stable session voi event tracking guest
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffRecommendationEventsControllerTests.cs`
+          - them regression `TrackSearch_EstablishesStableRecommendationSessionMarker`
+      - verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `100/100` PASS
+        - browser verify bang Playwright CLI session `ffhome2`:
+          - `POST /bff/events/search` -> `eventId = 9`
+          - `POST /bff/events/search-click` -> `eventId = 8`
+          - `POST /bff/events/product-view` -> `eventId = 13`
+          - `GET /bff/recommendations/home?limit=4` -> `algorithm = hybrid_home_v1`
+        - DB verify qua `sqlcmd`:
+          - `SearchEventId = 9`, `SearchClickEventId = 8`, `ProductViewEventId = 13` deu co chung `SessionId = 549636c2-b859-1dde-a165-12d0b0708535`
+        - artifact:
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.json`
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.txt`
+          - `output/playwright/recommendation-content-based/home-hybrid-runtime-fixed.png`
+    - Da mo lat cat `Hybrid` dau tien cho homepage recommendation:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - them `GET /api/orders/product-insights/home-profile`
+        - aggregate home preference seeds theo `sessionId` va/hoac `userId` trong 90 ngay:
+          - `ProductViewEvent`
+          - `SearchClickEvent`
+          - `RecommendationClickEvent`
+          - purchase tu order thanh cong
+        - tra ve `ViewCount`, `SearchClickCount`, `RecommendationClickCount`, `PurchaseCount`, `PreferenceScore`, `LastInteractedAtUtc`
+        - `TryGetUserIdFromToken()` da duoc harden null-safe cho guest/test context
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/recommendations/home` gio goi them Ordering `home-profile`
+        - neu co preference seeds thi response doi sang `algorithm = hybrid_home_v1`, nguoc lai giu `content_based_home_v1`
+        - ranking home blend `CalculateHomeRecommendationScore(...)` voi `CalculateHomePersonalizationMatch(...)`
+        - direct-match boost da duoc tang ro rang hon de san pham user vua tuong tac thang dung cac candidate chi "rat giong"
+        - reason text home co them tag ca nhan hoa nhu `Ban da mua truoc do`, `Ban tung bam tu tim kiem`, `Ban da xem gan day`
+      - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+        - them regression `GetHomeProfile_ReturnsPreferenceSeeds_FromSessionAndPurchases`
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+        - cap nhat regression content-based home de cho phep BFF goi `home-profile` va nhan `[]`
+        - them regression `GetHomeRecommendations_PrefersHybridHomeSignal_WhenOrderingProvidesPreferenceSeeds`
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `29/29` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `99/99` PASS
+    - Da harden runtime recommendation/content-based khi local Catalog DB chua co bang `ProductAttributeValue`:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/ProductsController.cs`
+        - public `GET /api/products` va `GET /api/products/{id}` gio thu expose `ProductAttributes` neu schema co san
+        - neu SQL Server tra `Invalid object name 'ProductAttributeValue'` (`SqlException 208`) thi controller tu fallback ve payload cu voi `ProductAttributes = []`, thay vi danh sap endpoint `500`
+        - sua regression compile nho: `ProductPublicListDto` khong con `sealed` de `ProductPublicDetailDto` co the inherit hop le
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - scoring content-based da san sang dung `ProductAttributes` cho:
+          - `GetAttributeCoverageScore(...)`
+          - `CalculateAttributeSimilarityBonus(...)`
+          - `BuildSimilarRecommendationReason(...)`
+        - `BuildSimilarRecommendationReason(...)` gio uu tien dua matched attribute labels len dau tags de neu co data that thi reason text se surfacing duoc `Cung {DisplayName}`
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+        - regression `GetSimilarProducts_RanksClosestContentMatch_First` da duoc build/test lai xanh sau patch
+      - verify:
+        - `powershell -ExecutionPolicy Bypass -File scripts/stop-local-core.ps1` -> stop `Identity/Catalog/Ordering/BFF`
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build` -> `96/96` PASS
+        - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1` -> `Identity/Catalog/Ordering/BFF` healthy lai
+        - runtime:
+          - `GET https://localhost:7245/api/products?categoryIds=3` -> `200`, payload that voi `productAttributes: []` (xac nhan fallback dang hoat dong tren DB local chua co bang attribute)
+          - `GET https://localhost:7085/bff/recommendations/products/104/similar?limit=4` -> `200`, recommendation van tra du lieu that thay vi vo `500`
+    - Da ship `Content-Based MVP` recommendation tren BFF:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - them `GET /bff/recommendations/home`
+        - them `GET /bff/recommendations/products/{id}/similar`
+        - recommendation scoring hien tai blend:
+          - same category/origin/standard/preservation
+          - weight similarity
+          - price proximity
+          - quality signals `AverageRating`, `SoldCount`, `ReviewCount`
+          - freshness/content completeness/in-stock bias
+        - them response metadata: `placement`, `algorithm`, `generatedAtUtc`, `seedProductId`, `recommendationReason`, `recommendationTags`
+        - GetProducts/GetProductById duoc refactor nhe sang helper load/enrich de recommendation va catalog dung chung du lieu
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js`
+        - `Goi Y Hom Nay` gio goi `/bff/recommendations/home?limit=12`
+        - neu recommendation endpoint tam loi thi fallback ve catalog list cu, khong danh sap homepage
+        - tracking impression/click tiep tuc dung `placement = home_today`, nhung `algorithm` lay dong tu payload recommendation
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/product-page.js`
+        - them section `Goi y san pham tuong tu` tren PDP
+        - goi `/bff/recommendations/products/{id}/similar?limit=8`
+        - them tracking impression/click cho `placement = product_similar`
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+        - them regression:
+          - `GetHomeRecommendations_ReturnsDiversifiedContentBasedItems`
+          - `GetSimilarProducts_RanksClosestContentMatch_First`
+      - verify:
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js` PASS
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/product-page.js` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build` -> `96/96` PASS
+        - runtime:
+          - `GET https://localhost:7085/bff/recommendations/home?limit=4` -> `algorithm = content_based_home_v1`, tra ve recommendation reason/tags that
+        - `GET https://localhost:7085/bff/recommendations/products/104/similar?limit=4` -> `algorithm = content_based_similar_v1`, tra ve danh sach similar co `seedProductId = 104`
+          - artifact UI:
+            - `output/playwright/recommendation-content-based/home-content-based-mvp.png`
+            - `output/playwright/recommendation-content-based/product-104-content-based-mvp.png`
+    - Da mo lat cat `Hybrid` dau tien cho recommendation similar products:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - them `GET /api/orders/product-insights/similar`
+        - aggregate collaborative signals theo `productId + candidateProductIds` tu:
+          - co-purchase trong order thanh cong
+          - co-view session tu `ProductViewEvent`
+          - co-click session tu `SearchClickEvent` + `RecommendationClickEvent`
+        - tra ve `CoPurchaseOrderCount`, `CoViewSessionCount`, `CoClickSessionCount`, `CollaborativeScore`
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/recommendations/products/{id}/similar` gio goi them Ordering similar-signal endpoint
+        - blend collaborative score vao content score khi co data
+        - response `algorithm` tu dong doi sang `hybrid_similar_v1` khi co collaborative signal, nguoc lai giu `content_based_similar_v1`
+        - reason text similar gio surfacing them tag `Hay mua cung` / `Hay duoc quan tam cung` / `Hay duoc xem cung`
+      - test:
+        - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+          - them `GetSimilar_ReturnsCollaborativeSignals_FromOrdersAndSessions`
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+          - them `GetSimilarProducts_PrefersHybridSignal_WhenOrderingProvidesCollaborativeMatch`
+      - verify:
+        - `powershell -ExecutionPolicy Bypass -File scripts/stop-local-core.ps1` -> stop cac process lock file truoc khi build
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `27/27` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `97/97` PASS
+        - runtime:
+          - `GET https://localhost:7018/api/orders/product-insights/similar?productId=104&candidateProductIds=6&candidateProductIds=8&candidateProductIds=35&candidateProductIds=38&limit=5` -> tra row that cho `ProductId = 6` voi `CollaborativeScore = 20`
+          - `GET https://localhost:7085/bff/recommendations/products/104/similar?limit=4` -> doi `algorithm` sang `hybrid_similar_v1`, item dau co them tag `Hay duoc quan tam cung`
+          - da chen session verify tam `codex-hybrid-verify-view` / `codex-hybrid-verify-click` vao `FreshFarmOrderingDB` de confirm runtime, sau do da xoa lai sach (`RemainingRows = 0`)
+    - Da mo them `Hybrid` cho search ranking:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - them `GET /api/orders/product-insights/search-ranking`
+        - aggregate search-intent signals theo `keyword + productIds` tu:
+          - `SearchClickEvent`
+          - `ProductViewEvent` trong cac session da search keyword do
+          - `RecommendationClickEvent` trong cac session da search keyword do
+        - tra ve `SearchClickCount`, `SearchClickSessionCount`, `SearchViewSessionCount`, `SearchRecommendationClickCount`, `HybridSearchScore`
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GET /bff/product-search` gio goi them Ordering search-ranking endpoint khi:
+          - co `keyword`
+          - sort dang o mode `related` / mac dinh
+        - sort `related` gio dung `CalculateHybridSearchScore(...)` = `keyword relevance + hybrid behavior score`
+        - response bo sung `rankingAlgorithm`:
+          - `hybrid_search_v1` khi co search behavior signal
+          - `keyword_relevance_v1` khi chi con ranking theo keyword heuristic
+        - cac sort `newest`, `bestseller`, `price-*` khong bi anh huong
+      - test:
+        - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+          - them `GetSearchRanking_ReturnsKeywordSignals_FromMatchingSearchSessions`
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+          - them `SearchProducts_PrefersHybridKeywordSignal_WhenOrderingProvidesSearchRanking`
+      - verify:
+        - `powershell -ExecutionPolicy Bypass -File scripts/stop-local-core.ps1` -> stop process lock file truoc khi build/test
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `28/28` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `98/98` PASS
+        - runtime:
+          - da chen tam 5 session `codex-search-hybrid-*` vao `FreshFarmOrderingDB` voi keyword `rau` va interaction cho `ProductId = 8`
+          - `GET https://localhost:7018/api/orders/product-insights/search-ranking?keyword=rau&productIds=6&productIds=8&productIds=35&productIds=38&limit=10` -> tra signal that cho `ProductId = 8`, `HybridSearchScore = 200`
+          - `GET https://localhost:7085/bff/product-search?name=rau&page=1&pageSize=5` -> `rankingAlgorithm = hybrid_search_v1`, `ProductId = 8` len dau danh sach
+          - da xoa lai sach toan bo session verify tam (`RemainingRows = 0` cho `SearchEvent`, `SearchClickEvent`, `ProductViewEvent`, `RecommendationClickEvent`)
+        - verify tracking tiep theo:
+          - browser load lai `/` va `/products/104` bang Playwright screenshot:
+            - `output/playwright/recommendation-content-based/home-tracking-pass.png`
+            - `output/playwright/recommendation-content-based/product-104-tracking-pass.png`
+          - DB `FreshFarmOrderingDB.dbo.RecommendationImpressionEvent` ghi dung:
+            - `Placement = home_today`, `Algorithm = content_based_home_v1`
+            - `Placement = product_similar`, `Algorithm = content_based_similar_v1`
+          - da spot-check click path qua `POST https://localhost:7085/bff/events/recommendation-click` voi impression `RecommendationImpressionEventId = 52`
+          - DB `FreshFarmOrderingDB.dbo.RecommendationClickEvent` co row moi:
+            - `RecommendationClickEventId = 1`
+            - `Placement = product_similar`
+            - `Algorithm = content_based_similar_v1`
+    - Da viet xong roadmap recommendation ML tai `docs/RECOMMENDATION_ML_ROADMAP_2026-03-29.md`:
+      - xac nhan hien trang `Goi Y Hom Nay` dang lay tu `/bff/products` + `products.slice(0, 12)`
+      - tong hop signal san co (`OrderDetail`, `CartItem`, `Review`) va signal con thieu (`ProductView`, `SearchEvent`, `SearchClick`, `RecommendationImpression`, `RecommendationClick`, `Wishlist`)
+      - de xuat rollout theo thu tu `Data foundation -> Content-Based MVP -> Collaborative Filtering -> Hybrid`
+      - de xuat tables/events/API/background jobs/UI touchpoints cho recommendation lane
+    - Da bat dau phase 0 recommendation backend-first:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/`
+        - them 5 entity moi: `ProductViewEvent`, `SearchEvent`, `SearchClickEvent`, `RecommendationImpressionEvent`, `RecommendationClickEvent`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+        - them `DbSet<>` + `OnModelCreatingPartial(...)` cho 5 bang event moi, index theo `SessionId/UserId/ProductId/Placement/CreatedAt`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/RecommendationEventsController.cs`
+        - them 5 endpoint:
+          - `POST /api/orders/recommendation-events/product-view`
+          - `POST /api/orders/recommendation-events/search`
+          - `POST /api/orders/recommendation-events/search-click`
+          - `POST /api/orders/recommendation-events/recommendation-impression`
+          - `POST /api/orders/recommendation-events/recommendation-click`
+        - endpoint tu resolve `UserId` tu bearer token neu co, va fallback guest theo `SessionId`
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffRecommendationEventsController.cs`
+        - them proxy route `POST /bff/events/*`
+        - BFF tu gan `SessionId` tu `HttpContext.Session.Id`
+        - neu session co `ACCESS_TOKEN` thi tu forward bearer ve Ordering
+      - migration moi:
+        - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329092025_RecommendationEventTracking20260329.cs`
+        - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329092025_RecommendationEventTracking20260329.Designer.cs`
+        - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/FreshFarmOrderingDBContextModelSnapshot.cs`
+      - test moi:
+        - `src/Tests/FreshFarm.Ordering.Api.Tests/RecommendationEventsControllerTests.cs`
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffRecommendationEventsControllerTests.cs`
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release` -> `24/24` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `92/92` PASS
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet tool run dotnet-ef database update 20260329092025_RecommendationEventTracking20260329 --project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --startup-project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --context FreshFarmOrderingDBContext --configuration Release --no-build` -> APPLY OK
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --startup-project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --context FreshFarmOrderingDBContext --configuration Release --no-build` -> co `20260329092025_RecommendationEventTracking20260329`
+        - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1` -> `Identity/Catalog/Ordering/BFF` deu healthy lai
+    - Da noi phase 0 recommendation event tracking vao frontend public BFF:
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/site.js`
+        - them helper chung:
+          - `createRecommendationRunId(...)`
+          - `trackProductView(...)`
+          - `trackSearch(...)`
+          - `trackSearchClick(...)`
+          - `trackRecommendationImpression(...)`
+          - `trackRecommendationClick(...)`
+        - tracking dung `fetch(..., keepalive: true)` de click event khong de roi khi dieu huong
+        - recommendation impression duoc dedupe theo page-lifetime bang `placement + runId + productId + rank + algorithm`
+        - loi tracking chi `console.warn`, khong duoc phep lam vo UX
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/product-page.js`
+        - khi load PDP thanh cong se ghi `product-view` voi:
+          - `sourcePage = product`
+          - `sourceModule = product_detail` / `product_detail_search`
+        - block `Nhieu shop cung ban` gio ghi:
+          - recommendation impression theo placement `product_offers`
+          - recommendation click cho `Chon mua/Hoi shop/Nhan shop/Vao shop`
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js`
+        - block `Goi Y Hom Nay` gio ghi:
+          - recommendation impression theo placement `home_today`
+          - recommendation click khi bam `Xem chi tiet` hoac `Mua ngay`
+        - block `San pham noi bat` chua bi track recommendation de tranh tron signal merchandising voi recommendation
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/search-page.js`
+        - moi lan reload ket qua thanh cong se ghi `search` event voi filter snapshot va `resultCount`
+        - click vao result card/thumb/name/`Xem chi tiet` se ghi `search-click`
+        - block `San pham lien quan` gio ghi recommendation impression/click theo placement `search_related`
+      - verify:
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/site.js` PASS
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js` PASS
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/search-page.js` PASS
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/product-page.js` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `92/92` PASS
+      - runtime spot-check:
+        - `sqlcmd` vao `FreshFarmOrderingDB` xac nhan truoc verify ca 5 bang event recommendation deu `0 rows`
+        - `npx playwright screenshot --ignore-https-errors https://localhost:7085/products/104 ...` + doi chieu DB:
+          - `dbo.ProductViewEvent` tang len `1 row`
+          - row moi: `ProductId = 104`, `SellerId = 4`, `SourcePage = product`, `SourceModule = product_detail`
+        - `npx playwright screenshot --ignore-https-errors --wait-for-selector \"a[data-action='search-result-click']\" --wait-for-timeout 5000 \"https://localhost:7085/search?q=rau\" ...` + doi chieu DB:
+          - `dbo.SearchEvent` tang len `1 row` (`Keyword = rau`, `ResultCount = 54`)
+          - `dbo.RecommendationImpressionEvent` tang len `4 rows` voi `Placement = search_related`, `Algorithm = search_related_heuristic`
+        - `npx playwright screenshot --ignore-https-errors --wait-for-timeout 8000 --save-har output/playwright/recommendation-event-verify/home.har https://localhost:7085/ ...` + doi chieu DB:
+          - HAR co request `POST /bff/events/recommendation-impression`
+          - `dbo.RecommendationImpressionEvent` tang them row voi `Placement = home_today`, `Algorithm = catalog_fallback`
+          - snapshot count sau verify: `TotalHomeToday = 24`
+        - ket luan: runtime da xac nhan `product_view`, `search`, `search_related impression`, va `home_today impression`
+    - Da canh lai 2 regression test notifications trong `src/Tests/FreshFarm.Web.Bff.Tests/SellerApplicationSummaryDtoTests.cs` cho khop wording DTO hien tai, de giu BFF suite xanh khi rerun full gate.
+    - Da giam them vai tro bootstrap runtime cua `Identity` trong `src/Services/Identity/FreshFarm.Identity.API/Services/SellerSchemaInitializer.cs`:
+      - startup gio thu thap diagnostics truoc khi quyet dinh co chay SQL bootstrap hay khong
+      - neu baseline `Identity` chua duoc stamp nhung seller schema can thiet da ton tai (`SellerStoreSettings`, `SellerKycProfiles`, `SellerKycReviewEvents`) thi startup se giu `diagnostics-only`
+      - chi khi baseline thieu va schema seller chua du thi moi chay `bootstrap-and-diagnostics`
+    - Da cap nhat regression test o `src/Tests/FreshFarm.Identity.Api.Tests/SellerSchemaInitializerTests.cs`:
+      - baseline da co -> khong bootstrap
+      - baseline thieu nhung schema seller da du -> khong bootstrap
+      - baseline thieu va schema seller chua du -> bootstrap
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj -c Release --no-build` -> `57/57` PASS
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -c Release` PASS
+    - Da hoan tat lane notification center buyer/account va deep-link/filter server-side.
+    - Da polish them UX trang `/account/notifications`:
+      - `src/Web/FreshFarm.Web.Bff/Dtos/ProfileDtos.cs`
+        - them helper cho notifications page: `HasAnyNotificationsOverall`, `VisibleUnreadNotifications`, `VisibleRecentNotifications`, `ResultsSummary`
+        - them empty-state helpers: `EmptyStateTitle`, `EmptyStateDescription`, `EmptyStatePrimaryActionLabel`, `EmptyStatePrimaryActionUrl`
+        - them `ActiveFilterChips` + `AccountNotificationFilterChipDto` de Razor hien state bo loc gon hon
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/Notifications.cshtml`
+        - them KPI cards cho `tong/chua doc/moi trong 24h/dang hien thi`
+        - doi action row thanh block "Trang thai hien tai", hien ro `ResultsSummary` va active filter chips
+        - doi empty state generic thanh empty state theo ngu canh, co CTA `Xoa bo loc` hoac `Dang ky nguoi ban/Xem ho so seller`
+      - `src/Tests/FreshFarm.Web.Bff.Tests/SellerApplicationSummaryDtoTests.cs`
+        - them regression test cho active filter chips, result summary, va 2 nhom empty state theo ngu canh
+      - verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build`
+        - ket qua: `82/82` pass
+    - Da browser-verify that cho UX moi cua `/account/notifications` bang user `notifverify0323125000` (`UserId = 52`):
+      - local core services duoc bat lai healthy qua `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1`
+      - artifacts:
+        - `output/playwright/notifications-polish-verify/notifications-default.png`
+        - `output/playwright/notifications-polish-verify/notifications-seller-unread.png`
+        - `output/playwright/notifications-polish-verify/notifications-order-recent.png`
+        - `output/playwright/notifications-polish-verify/notifications-empty-filtered.png`
+        - `output/playwright/notifications-polish-verify/notifications-polish-verify.json`
+      - ket qua runtime:
+        - default state hien hero + KPI cards + action buttons dung nhu polish moi
+        - seller unread state hien active chips `Cap nhat ho so seller` + `Chua doc`, va `Dang hien thi 3`
+        - order recent state roi vao contextual empty state `Khong co thong bao khop bo loc` voi CTA xoa bo loc
+        - keyword filtered state cung hien contextual empty state dung nhu ky vong
+      - user verify da duoc rotate lai password sang gia tri ngau nhien khong luu plaintext sau verify
+    - Da refactor them `src/Web/FreshFarm.Web.Bff/Views/Account/Notifications.cshtml` de view de maintain hon:
+      - dua helper URL sang `AccountNotificationsPageViewModel.BuildNotificationsUrl(...)` trong `src/Web/FreshFarm.Web.Bff/Dtos/ProfileDtos.cs`
+      - them `AccountNotificationSectionViewModel` de partial section khong can dung dynamic state le
+      - tach 3 partial moi:
+        - `src/Web/FreshFarm.Web.Bff/Views/Account/_NotificationStats.cshtml`
+        - `src/Web/FreshFarm.Web.Bff/Views/Account/_NotificationPriorityPanel.cshtml`
+        - `src/Web/FreshFarm.Web.Bff/Views/Account/_NotificationSection.cshtml`
+      - `Notifications.cshtml` gio chu yeu giu page shell, form/filter, empty state, pagination, va script section state
+      - verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build`
+        - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1`
+        - ket qua: `82/82` pass, 4 service core healthy lai
+    - Da browser-verify lai `/account/notifications` sau refactor partial:
+      - `node output/playwright/notifications-polish-verify/verify-notifications.js`
+      - ket qua: login + capture 4 state thanh cong, khong thay lech render so voi truoc refactor
+      - luu y: script verify can tam set password dev-known cho `UserId = 52`, sau do da rotate lai password ngau nhien khong luu plaintext
+    - Da polish lai wording KPI notifications de giam mo ho:
+      - `src/Web/FreshFarm.Web.Bff/Dtos/ProfileDtos.cs`
+        - them `Recent24hSummary`
+        - them `DisplayedCountSummary`
+      - `src/Web/FreshFarm.Web.Bff/Views/Account/_NotificationStats.cshtml`
+        - KPI `Moi trong 24h` gio noi ro day la tong cua toan bo trung tam thong bao
+        - KPI `Dang hien thi` gio phan biet ro state co/khong co bo loc
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build`
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+        - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1`
+        - ket qua: `82/82` pass, build xanh, local core healthy lai
+    - Da them regression test khoa copy moi cho notifications summary:
+      - `src/Tests/FreshFarm.Web.Bff.Tests/SellerApplicationSummaryDtoTests.cs`
+        - `AccountNotificationsPageViewModel_BuildsRecentAndDisplayedSummaries_ForFilteredResults`
+        - `AccountNotificationsPageViewModel_BuildsRecentAndDisplayedSummaries_ForEmptyRecentState`
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build`
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+        - ket qua: `82/82` pass, build xanh
+    - Da them regression test cho nhanh `recent > 0` o notifications:
+      - `src/Tests/FreshFarm.Web.Bff.Tests/SellerApplicationSummaryDtoTests.cs`
+        - `AccountNotificationsPageViewModel_BuildsRecentAndDisplayedSummaries_ForVisibleRecentState`
+        - `AccountNotificationNavSummaryDto_FromPage_UsesRecentLink_WhenSectionHasOnlyRecentItems`
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build`
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+        - ket qua: `82/82` pass, build xanh
+    - Da verify them state `Recent24hNotifications > 0` cho `/account/notifications` bang runtime that:
+      - do local DB khong con notification recent trong 24h, da chen tam `CustomerNotifications.NotificationId = 52` cho `UserId = 52`
+      - browser-verify lai qua `output/playwright/notifications-polish-verify/verify-notifications.js`
+      - ket qua:
+        - default state hien `Moi trong 24h 1` + copy moi `Co 1 cap nhat moi trong 24h tren toan bo trung tam thong bao.`
+        - order recent state khong con empty, hien `Dang hien thi 1` va section `Verify recent notification 2026-03-28`
+      - artifact duoc cap nhat lai trong:
+        - `output/playwright/notifications-polish-verify/notifications-default.png`
+        - `output/playwright/notifications-polish-verify/notifications-order-recent.png`
+        - `output/playwright/notifications-polish-verify/notifications-polish-verify.json`
+      - cleanup:
+        - da xoa notification tam `NotificationId = 52`
+        - da rotate lai password user verify `UserId = 52` sang gia tri ngau nhien khong luu plaintext
+    - Da verify lane email reject seller review:
+      - Gmail that da nhan duoc mail reject.
+      - Reject reason duoc normalize de hien tieng Viet co dau on dinh hon.
+      - SMTP sender da duoc hardening UTF-8 cho subject/body/header/display name.
+    - Da hardening seller GHN flow:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs`
+        - `CreateGhnSandboxOrder(...)` tu choi tao moi neu order da co GHN.
+        - Payload GHN duoc build lai tu `order-info/{orderId}`: receiver, address, item summary, quantity, item price, COD, insurance, content, client order code.
+        - Client chi con cung cap district/ward GHN va dimensions; order thieu receiver info se bi chan som.
+        - Persist metadata sau create gio uu tien internal Ordering endpoint co `X-Internal-Service-Key`.
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shipping/ManageShipping.cshtml`
+        - field receiver/item/COD/insurance/content tren GHN panel da doi sang readonly
+        - thong diep validation client-side da doi tu "nhap tay" sang "khong doc duoc du lieu tu don da chon"
+    - Da hardening lane seller setting/origin phone:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Models/SettingUserSellerModels.cs`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SettingController.cs`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs`
+      - validation phone/oigin invalid da duoc chan som va tra message than thien
+    - Da runtime-verify seller shipping bang session that:
+      - duplicate-block: `OrderId = 161`, lan 1 tao GHN thanh cong, lan 2 bi chan dung thong diep duplicate
+      - origin invalid: seller `tho` (`UserId = 4`) dang co `StorePhone/GhnPickupPhone = 0123456789`; POST `CreateGhnSandboxOrder` tra `success=false` voi message yeu cau cap nhat dia chi + so dien thoai trong Cai dat cua hang
+      - DB sau verify van sach: `Shipping.OrderId = 161` khong phat sinh `GhnOrderCode/GhnClientOrderCode/GhnCreatedAt` khi origin invalid
+      - artifacts:
+        - `.codex-seller-shipping-create-first.json`
+        - `.codex-seller-shipping-create-duplicate.json`
+        - `.codex-seller-shipping-invalid-origin.json`
+        - `.codex-seller-login.html`
+        - `.codex-seller-login-post.html`
+        - `.codex-seller-shipping-manage.html`
+    - Da cleanup legacy seller shipping path:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs`
+        - `Create(Shipping shipping)` khong con forward sang Ordering de them shipping tay
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shipping/ManageShipping.cshtml`
+        - go `addShippingModal` va JS add-form legacy
+        - them callout UX xac nhan shipping row da duoc tao luc checkout
+      - `src/Tests/FreshFarm.Web.Bff.Tests/SellerShippingControllerTests.cs`
+        - co guard test `Create_Rejects_LegacyManualShippingCreation`
+    - Da dọn them lane schema seller runtime trong Identity:
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerSchemaInitializer.cs`
+        - startup gio ensure ca `SellerStoreSettings` + KYC schema, khong chi rieng seller KYC
+        - tu tao bang `SellerStoreSettings` neu chua ton tai
+        - bo sung cac cot GHN seller con thieu (`GhnPickup*`, `GhnProvince*`, `GhnDistrict*`, `GhnWard*`, `AdminNotificationEmail`)
+        - backfill `AdminNotificationEmail`, `GhnPickupName`, `GhnPickupPhone`, `CreatedAt`, `UpdatedAt`
+        - chi tao `UX_SellerStoreSettings_UserId` va `FK_SellerStoreSettings_Users` khi du lieu hien tai an toan
+        - sau bootstrap se tu thu thap diagnostics va log warning neu van con duplicate/orphan/missing constraint o `SellerStoreSettings`, de bootstrap non-destructive khong con "silent skip"
+      - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
+        - doi startup call tu `SellerKycSchemaInitializer` sang `SellerSchemaInitializer`
+      - `src/Tests/FreshFarm.Identity.Api.Tests/SellerSchemaInitializerTests.cs`
+        - them test guard cho SQL bootstrap seller runtime, cac constraint non-destructive, va warning logic diagnostics sau bootstrap
+      - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.delta.sql`
+        - da dong bo lai theo runtime bootstrap:
+          - cover ca `SellerStoreSettings`, GHN seller columns, normalize/backfill, `SellerKycProfiles`, `SellerKycReviewEvents`
+          - giu guard non-destructive cho unique index/FK khi du lieu con duplicate/orphan
+      - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.verify.sql`
+        - da doi sang verify theo kieu `PASS/WARN`:
+          - `THROW` neu thieu bang/cot can co
+          - `WARN` neu van con duplicate/orphan/missing constraint o `SellerStoreSettings`
+          - them output sample rows cho `SellerStoreSettings`, duplicate groups, KYC profiles, review events
+      - `docs/FreshFarmIdentityDb/SCHEMA_ALIGNMENT_2026-03-24_SELLER_RUNTIME.md`
+        - them runbook ngan de giai thich cach apply/verify va cach doc `WARN` trong seller runtime schema
+    - Da harden them runtime Identity de chiu duoc du lieu `SellerStoreSettings` duplicate tu lich su:
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerStoreSettingsResolver.cs`
+        - them resolver de chon row `SellerStoreSettings` moi nhat theo `UpdatedAt`/`SellerStoreSettingId`
+        - log warning khi mot `UserId` co hon 1 row thay vi de flow caller gap loi hoac doc nham row cu
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs`
+        - seller GET/PUT gio dung resolver thay vi `SingleOrDefaultAsync`
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/SellerApplicationController.cs`
+        - `GetCurrent/Upsert` khong con phu thuoc navigation one-to-one cho `SellerStoreSetting`
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminMerchantsController.cs`
+        - `ApproveSeller/RejectSeller` gio resolve row seller setting moi nhat truoc khi xu ly review
+        - danh sach/detail merchant duoc dedupe theo `SellerId` sau projection de giam leak duplicate tu du lieu lich su
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
+        - danh sach shop public va shipping origins duoc dedupe theo `SellerId`, uu tien row co du lieu moi/hop le hon
+      - `src/Tests/FreshFarm.Identity.Api.Tests/SellerApplicationControllerTests.cs`
+        - them regression test cho case controller phai uu tien seller setting moi nhat
+      - `src/Tests/FreshFarm.Identity.Api.Tests/AdminSettingsControllerTests.cs`
+        - them regression test cho seller settings GET khi resolver tra ve row moi nhat
+    - Da giam them dependency runtime vao navigation one-to-one `User.SellerStoreSetting` trong Identity:
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminMerchantsController.cs`
+        - danh sach/detail/search merchant va review approve/reject khong con phu thuoc `u.SellerStoreSetting`
+        - flow approve/reject gio truyen `storeName` tu `sellerStoreSetting` resolve duoc thay vi gan tam `user.SellerStoreSetting`
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
+        - list/detail/shipping-origin gio doc latest seller row qua correlated subquery va dedupe theo `SellerId`
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/CustomerNotificationPublisher.cs`
+        - customer notification publisher nhan `storeName` explicit thay vi doc navigation `user.SellerStoreSetting`
+      - `src/Services/Identity/FreshFarm.Identity.API/Controllers/SellerApplicationController.cs`
+        - `BuildResponse(...)` khong con fallback ve `user.SellerStoreSetting`; response chi dung entity/resolver da nap ro rang
+      - Sau patch nay, direct runtime usage cua `.SellerStoreSetting` trong Identity da duoc loai bo; chi con EF model mapping `WithOne(...)` o `FreshFarmIdentityDBContext`
+      - `src/Tests/FreshFarm.Identity.Api.Tests/SellerApplicationControllerTests.cs`
+        - them regression assert de khoa `storeName` duoc truyen dung qua email + notification khi approve/reject seller
+    - Da harden them catalog BFF de chiu duplicate merchant payload tu Identity:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GetProductOffers(...)` va `BuildAvailableShopsAsync(...)` khong con `ToDictionary` truc tiep tren merchant payload
+        - them `BuildMerchantLookup(...)` + `SelectPreferredMerchant(...)` de dedupe theo `SellerId` va uu tien row co profile day du hon
+        - giam nguy co `500` neu upstream Identity tra duplicate merchant rows trong luc schema/runtime dang duoc chot lai
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+        - them regression test cho `offers` va `search` khi Identity tra duplicate merchant payload
+    - Da harden them checkout BFF de chiu duplicate seller shipping origins tu Identity:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+        - `GetSellerShippingOriginsAsync(...)` gio dedupe theo `SellerId` truoc khi tra ve `sellerOrigins`
+        - them `SelectPreferredSellerShippingOrigin(...)` + score completeness de uu tien row co `HasShippingOrigin`, `GhnDistrictId`, `GhnWardCode`, va `PickupAddressSummary` day du hon
+        - giam nguy co checkout GHN preview chon nham row origin rong/cu khi upstream Identity tra duplicate shipping-origin rows
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CheckoutControllerTests.cs`
+        - them regression test cho `PreviewShippingFee(...)` de khoa case duplicate origin payload van phai dung `FromDistrictId/FromWardCode` cua row day du
+    - Da harden them admin/seller customer BFF de chiu duplicate metrics payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CustomerController.cs`
+        - `ManageCustomers(...)` va `Search(...)` khong con `ToDictionary` truc tiep tren metrics payload
+        - them `BuildCustomerMetricsLookup(...)` + metric score de dedupe theo `userId` va uu tien row co `totalSpent/orderCount` day du hon
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CustomerController.cs`
+        - ap dung cung mot strategy dedupe metrics cho seller scope
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CustomerControllerTests.cs`
+        - them regression test cho admin search va seller search khi Ordering tra duplicate metrics rows
+    - Da harden them admin/seller order BFF de chiu duplicate order row payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/OrderController.cs`
+        - `GetAllOrders/GetOrdersPaged/SearchOrders/SearchOrdersPaged` gio dedupe theo `OrderID` sau khi filter scope
+        - them scoring de uu tien row co `OrderCode/CustomerName/OrderDate/TotalAmount/Status` day du hon thay vi render duplicate hoac giu row ngheo du lieu
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/OrderController.cs`
+        - ap dung cung strategy dedupe scoped order rows cho seller path
+      - `src/Tests/FreshFarm.Web.Bff.Tests/OrderControllerTests.cs`
+        - them regression test cho admin va seller `GetOrdersPaged(...)` khi Ordering tra duplicate rows cung `OrderID`
+    - Da harden them admin merchant BFF de khong leak duplicate seller rows tu Identity:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/MerchantController.cs`
+        - `Index(...)` gio build merchant list qua dedupe theo `SellerId`
+        - them scoring de uu tien row co `ShopName/UserName/FullName/Email/StoreName/StoreAddress/ReviewStatus` day du hon truoc khi map sang UI
+        - giup merchant lane khong render trung seller tren current page neu upstream Identity tra payload ban trong giai doan migration/runtime cleanup
+      - `src/Tests/FreshFarm.Web.Bff.Tests/MerchantControllerTests.cs`
+        - them regression test cho `Index(...)` khi Identity tra duplicate merchants cung `SellerId`
+    - Da harden them coupon customer lookup o admin/seller BFF de khong leak duplicate customer rows tu Identity:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CouponController.cs`
+        - `GetCustomers(...)` va `GetAllCustomerIdsAsync()` gio di qua dedupe customer payload theo `userId`
+        - uu tien row co `fullName/email/phone` day du hon truoc khi map sang UI gui voucher
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CouponController.cs`
+        - `GetCustomers(...)` gio dedupe customer payload truoc khi filter theo seller customer scope
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CouponControllerTests.cs`
+        - them regression test cho admin va seller `GetCustomers(...)` khi Identity tra duplicate customer rows
+    - Da harden them admin user BFF de khong leak duplicate user/role rows tu Identity:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/UserController.cs`
+        - `GetUsersAsync(...)` gio dedupe user payload theo `userId`
+        - `GetRolesAsync(...)` gio dedupe role payload theo `roleId`
+        - uu tien row co `userName/fullName/email/phone/roleName` day du hon truoc khi map sang `ManageUsers`
+      - `src/Tests/FreshFarm.Web.Bff.Tests/UserControllerTests.cs`
+        - them regression test cho `ManageUsers(...)` khi Identity tra duplicate users va roles
+    - Da harden them admin/seller product BFF de khong leak duplicate product/category/unit rows tu Catalog:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ProductController.cs`
+        - `GetProductsAsync(...)`, `GetCategoriesAsync(...)`, `GetUnitsAsync(...)` gio dedupe payload theo `ProductId/CategoryId/UnitId`
+        - uu tien row co `ProductName/Sku/CategoryName/UnitName/description/image/productInfos` day du hon truoc khi map vao `ManageProducts`, `Create`, `Edit`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`
+        - ap dung cung strategy dedupe product/category/unit cho seller product lane
+      - `src/Tests/FreshFarm.Web.Bff.Tests/ProductControllerTests.cs`
+        - them regression test cho admin va seller `ManageProducts(...)` khi Catalog tra duplicate product/category/unit rows
+    - Da harden them category/unit BFF de khong leak duplicate list rows tu Catalog:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CategoryController.cs`
+        - `GetCategoriesAsync(...)` gio dedupe payload theo `CategoryId`
+        - uu tien row co `CategoryName/Description/Image/Slug` day du hon truoc khi map vao `ManageCategories`, `Create`, `Edit`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/UnitController.cs`
+        - `GetAllUnitsAsync(...)` gio dedupe payload theo `UnitId`
+        - uu tien row co `UnitName/Symbol/Description` day du hon truoc khi map vao `Index`, `Create`, `Edit`, `CreateAjax`
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CategoryController.cs`
+        - ap dung cung strategy dedupe category payload cho seller counterpart da bi hard-disable
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/UnitController.cs`
+        - ap dung cung strategy dedupe unit payload cho seller counterpart da bi hard-disable
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CategoryUnitControllerTests.cs`
+        - them regression test cho admin `ManageCategories(...)` va `Index()` khi Catalog tra duplicate category/unit rows
+    - Da harden them admin catalog moderation BFF de khong render duplicate product rows tu Catalog:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogModerationController.cs`
+        - `GetProductsAsync(...)` gio dedupe payload theo `ProductId`
+        - uu tien row co `ProductName/Sku/CategoryName/description/image/price/stock` day du hon truoc khi xep hang moderation
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CatalogModerationControllerTests.cs`
+        - them regression test cho `Index()` khi Catalog tra duplicate product rows
+    - Da harden them admin catalog readiness BFF de khong render duplicate filter/attribute/readiness rows tu Catalog:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogReadinessController.cs`
+        - `Index(...)` gio dedupe `Categories`, `StateOptions`, `Attributes`, va `Readiness` payload truoc khi map vao page model
+        - uu tien row co `CategoryName/AttributeKey/DisplayName/ProductName/Sku/CategoryName` day du hon truoc khi render center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CatalogReadinessControllerTests.cs`
+        - them regression test cho `Index()` khi Catalog tra duplicate category option, attribute, va readiness rows
+    - Da harden them admin fresh ops BFF de khong render duplicate seller/status/lot/recall/fefo rows tu Catalog:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FreshOpsController.cs`
+        - `Index(...)` gio dedupe `Sellers`, `StatusOptions`, `Lots`, `Recalls`, va `FefoQueue` payload truoc khi map vao page model
+        - uu tien row co `ProductName/Sku/LotCode/TraceCode/Title/Reason/ActionRequired/QualityStatus` day du hon truoc khi render center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/FreshOpsControllerTests.cs`
+        - them regression test cho `Index()` khi Catalog tra duplicate seller option, status option, lot, recall, va FEFO rows
+    - Da harden them admin risk center BFF de khong render duplicate overview/filter/row/detail payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/RiskController.cs`
+        - `Index(...)` gio dedupe `Recent`, filter options, va `Rows` payload truoc khi map vao page model
+        - `LoadCaseDetailsAsync(...)` gio dedupe `Signals`, `Decisions`, `VoucherAbuseCases`, va `DecisionOptions`
+        - uu tien row co `Title/Summary/Status/Severity/SignalCode/DecisionType/AbuseType` day du hon truoc khi render risk center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/RiskControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate overview recent, filter options, case rows, va detail payload
+    - Da harden them admin campaign center BFF de khong render duplicate overview/list/ads/detail payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CampaignController.cs`
+        - `Index(...)` gio dedupe `Upcoming`, filter options, `Rows`, ads wallet status options, `Wallets`, `AdsCampaigns`, va `RecentTopups` truoc khi map vao page model
+        - `LoadSelectedCampaignAsync(...)` gio dedupe `Participations` va `Slots`
+        - uu tien row co `Name/CampaignType/Status/VoucherCode/Notes/Channel/ReferenceCode` day du hon truoc khi render campaign center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CampaignControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate overview upcoming, filter options, campaign rows, ads payload, va selected campaign detail
+    - Da harden them admin dispute center BFF de khong render duplicate queue/detail payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`
+        - `MapQueuePayload(...)` gio dedupe `SectionOptions`, `StatusOptions`, `SellerOptions`, va `Rows`
+        - `LoadDetailsAsync(...)` gio dedupe `Timeline`, `ActivityItems`, `EvidenceItems`, `Messages`, `RelatedOrders`, va `RelatedCases`
+        - uu tien row co `Title/Summary/DisplayStatus/SellerLabel/BuyerName/Note/Content` day du hon truoc khi render dispute center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/DisputeControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate filters, queue rows, va detail payload
+    - Da harden them admin finance console BFF de khong render duplicate filter/row/owner payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+        - `MapPayload(...)` gio dedupe `SellerOptions`, `StatusOptions`, `Rows`, va `OwnerSummary`
+        - uu tien row co `SellerLabel/ReferenceCode/ReconciliationStatus/AssignedOwner/PriorityLabel/LastActionSummary` day du hon truoc khi render finance console
+      - `src/Tests/FreshFarm.Web.Bff.Tests/FinanceControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate filters, finance rows, va owner summary
+    - Da harden them admin communication governance BFF de khong render duplicate option/template/policy/preference payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CommunicationController.cs`
+        - `Index(...)` gio dedupe `ChannelOptions`, `EventOptions`, `AudienceOptions`, `DeliveryModeOptions`, `SourceOptions`, `TemplateOptions`, `Templates`, `Policies`, va `Preferences`
+        - uu tien row co `Text/TemplateName/Subject/Body/TemplateName/Notes/Source` day du hon truoc khi render communication center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/CommunicationControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate option lists, template options, templates, policies, va preferences
+    - Da harden them admin delivery BFF de khong render duplicate shipping/staff payload tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DeliveryController.cs`
+        - `List(...)` gio dedupe `RecentShippings` theo order truoc khi map ra JSON
+        - `Staffs()` gio dedupe `DeliveryStaffs` theo staff id truoc khi tra ve danh sach assign
+        - uu tien row co `CustomerName/CustomerPhone/DeliveryAddress/StatusText` day du hon truoc khi map UI
+      - `src/Tests/FreshFarm.Web.Bff.Tests/DeliveryControllerTests.cs`
+        - them regression test cho `List()` va `Staffs()` khi Ordering tra duplicate shipping rows va duplicate staff rows
+    - Da harden them admin audit center BFF de khong render duplicate audit/auth payload tu Ordering va Identity:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AuditController.cs`
+        - `Index(...)` gio dedupe `AreaOptions`, `TypeOptions`, `ActionLogs`, `ModerationAudits`, `SettlementAudits`, `AuthRoleOptions`, `AuthOutcomeOptions`, va `AuthAudits`
+        - uu tien row co `Summary/Decision/Currency/Identifier/UserName/Email/SuspicionReasons` day du hon truoc khi render audit center
+      - `src/Tests/FreshFarm.Web.Bff.Tests/AuditControllerTests.cs`
+        - them regression test cho `Index()` khi Ordering tra duplicate action/moderation/settlement payload va Identity tra duplicate auth audit payload
+    - Da harden them admin report center BFF de khong render duplicate report rows tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ReportController.cs`
+        - `Customer(...)`, `Order(...)`, `Revenue(...)`, `Product(...)`, `Shipping(...)`, `Review(...)` gio normalize payload truoc khi render view
+        - dedupe `TopCustomers`, `RecentOrders`, `TopProducts`, `DailyRevenues`, `TopSellingProducts`, `CategoryRevenues`, `ProductPerformances`, `StaffPerformances`, `DeliveryTimeDistributions`, `RecentShippings`, `DeliveryStaffs`, `StarDistributions`, `TopMentionedTopics`, va `RecentReviews`
+        - `ProductPerformances` gio uu tien nhom theo `ProductName` truoc de gom sparse row va rich row cua cung san pham
+        - `TopMentionedTopics` gio dedupe accent-insensitive theo text normalize, nen topic khac dau/hoa-thuong khong con bi render trung
+      - `src/Tests/FreshFarm.Web.Bff.Tests/ReportControllerTests.cs`
+        - them regression test cho shipping report collections va revenue/product/review representative collections khi Ordering tra duplicate rows
+    - Da harden them admin loyalty BFF de khong render duplicate dashboard/user/history rows tu Ordering:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/LoyaltyController.cs`
+        - `Index()`, `Users(...)`, va `History(...)` gio normalize payload list truoc khi render view
+        - dedupe `TopQuarterUsers`, `RecentActivities`, `Rows` cua users, va `Rows` cua history
+        - loyalty history/activity gio group theo key su kien on dinh (`CreatedAt`, `UserID`, `Points`, `Direction`) va uu tien row co `UserName/OrderID/Reason` day du hon
+      - `src/Tests/FreshFarm.Web.Bff.Tests/LoyaltyControllerTests.cs`
+        - them regression test cho dashboard top users/recent activities va users/history rows khi Ordering tra duplicate payload
+    - Da mo buyer-seller support chat realtime trong BFF:
+      - Truoc patch, buyer shop chat chi polling qua `public-shop-chat.js`, va hub `/hubs/support-chat` chi `[Authorize(Roles = "Seller")]`, nen buyer chua nhan duoc tin nhan seller theo thoi gian thuc
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`
+        - `SendMessage(...)` gio bridge realtime sau khi buyer gui tin:
+          - notify `newConversationOrMessage` sang seller group
+          - notify `receiveMessage` sang conversation group
+        - them `SellerId` vao bridge request de route dung seller group, nhung khong forward field nay len Ordering API
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Hubs/SupportChatHub.cs`
+        - hub gio `[Authorize]` thay vi chi `Seller`
+        - seller van auto-join seller group; buyer co the join conversation group de nhan `receiveMessage` va `userTyping`
+      - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`
+        - load ASP.NET Core SignalR browser client va expose `data-support-chat-hub-url`
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/shop-page.js`
+        - pass `hubUrl` vao `PublicShopChat.init(...)`
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
+        - buyer shop chat gio setup SignalR, join/leave conversation group, nghe `receiveMessage/newConversationOrMessage/userTyping`, va fallback ve polling neu hub khong san sang
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffSupportChatControllerTests.cs`
+        - them regression test khoa case buyer send message phai broadcast sang seller group va conversation group
+      - Da runtime-verify end-to-end qua 2 session that (buyer `thu` / seller `binh`) bang harness `output/support-chat-realtime-verify`:
+        - login buyer + seller qua BFF that, seller di qua lane 2FA, ca hai ket noi `/hubs/support-chat` thanh cong
+        - probe `POST /hubs/support-chat/negotiate?negotiateVersion=1` tra `200` cho ca buyer va seller sau khi auth day du
+        - conversation verify tam `ConversationId = 8` (buyer `1`, seller `2`) nhan event realtime hai chieu:
+          - buyer -> seller: `newConversationOrMessage` trong `49ms`
+          - seller -> buyer: `receiveMessage` trong `13ms`
+        - artifact: `output/support-chat-realtime-verify/runtime-result.json`
+        - cleanup xong sau verify:
+          - restore `UserAuth.PasswordHash` cua `thu` (`UserId = 1`) va `binh` (`UserId = 2`) ve gia tri cu
+          - restore `UserAuth.MfaSecret` cua `binh` ve `NULL`
+          - xoa conversation verify tam `ConversationId = 8` va cac `SupportMessages` lien quan
+    - Da fix bug buyer khong mo lai duoc chat voi seller sau khi thread cu `Closed`:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatBuyerController.cs`
+        - `GetConversation(...)` gio tao thread moi khi `createIfMissing=true` va conversation moi nhat voi seller da `Closed`
+        - thread `Open` hien co van duoc reuse, khong tao trung khong can thiet
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
+        - buyer chat UI gio khong khoa composer vi thread cu da `Closed`
+        - `ensureConversation()` se tu xin thread moi truoc khi gui tin nhan neu state hien tai dang `Closed`
+        - status text tren shop chat doi sang huong "gui tin moi de mo cuoc tro chuyen moi"
+      - `src/Tests/FreshFarm.Ordering.Api.Tests/SupportChatBuyerControllerTests.cs`
+        - them regression test khoa 2 case: reuse thread `Open`, tao thread moi khi thread gan nhat da `Closed`
+      - Runtime verify that qua Ordering API da xac nhan:
+        - truoc call, buyer `UserId = 1` voi seller `AdminId = 2` chi co `ConversationId = 1` trang thai `Closed`
+        - `GET /api/orders/support-chat/sellers/2/conversation?createIfMissing=true` tra thread moi `ConversationId = 9`, `status = Open`
+        - artifact: `.codex-support-chat-reopen-verify.json`
+        - cleanup xong: da xoa lai conversation verify tam `ConversationId = 9`
+    - Da dat baseline migration tooling cho 3 service de di dung roadmap schema/migration seller:
+      - `src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj`
+        - bo sung `Microsoft.EntityFrameworkCore.Design` + `Microsoft.EntityFrameworkCore.Tools`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj`
+        - bo sung `Microsoft.EntityFrameworkCore.Design` + `Microsoft.EntityFrameworkCore.Tools`
+      - `src/Services/Identity/FreshFarm.Identity.API/DesignTime/IdentityDesignTimeDbContextFactory.cs`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/DesignTime/CatalogDesignTimeDbContextFactory.cs`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/DesignTime/OrderingDesignTimeDbContextFactory.cs`
+        - ca 3 service gio co `IDesignTimeDbContextFactory` rieng, doc config tu `appsettings`, user-secrets, env vars
+      - `.config/dotnet-tools.json`
+        - them tool manifest cho `dotnet-ef`
+      - `docs/MIGRATION_BASELINE_2026-03-24.md`
+        - them runbook ngan cho verify/scaffold migration baseline
+      - Verify local:
+        - `dotnet tool restore` -> PASS
+        - `dotnet build` Release cho `Identity/Catalog/Ordering` -> PASS
+        - `dotnet tool run dotnet-ef dbcontext list --configuration Release --no-build` -> PASS cho ca 3 service
+        - `dotnet tool run dotnet-ef migrations list --configuration Release --no-build` -> `No migrations were found.` cho ca 3 service
+      - Ghi nhan:
+        - `dotnet-ef` mac dinh bi fail neu de service debug instance dang chay va khoa binary; workaround xac nhan tot la `--configuration Release --no-build`
+    - Da scaffold migration baseline dau tien cho Identity:
+      - `src/Services/Identity/FreshFarm.Identity.API/Migrations/20260324135630_IdentitySchemaBaseline20260324.cs`
+      - `src/Services/Identity/FreshFarm.Identity.API/Migrations/20260324135630_IdentitySchemaBaseline20260324.Designer.cs`
+      - `src/Services/Identity/FreshFarm.Identity.API/Migrations/FreshFarmIdentityDBContextModelSnapshot.cs`
+      - Migration hien tai la full baseline tao schema Identity hien hanh tu dau, gom ca `SellerStoreSettings`, `SellerKycProfiles`, `SellerKycReviewEvents`, auth tables, role/permission tables, va cac unique index/FK lien quan.
+      - Verify local:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -c Release` -> PASS
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj --configuration Release --no-build` -> `20260324135630_IdentitySchemaBaseline20260324 (Pending)`
+    - Da scaffold baseline migration cho Catalog va Ordering de khop lot migration 3 service:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/20260324135953_CatalogSchemaBaseline20260324.cs`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/20260324135953_CatalogSchemaBaseline20260324.Designer.cs`
+      - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/FreshFarmCatalogDBContextModelSnapshot.cs`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260324140006_OrderingSchemaBaseline20260324.cs`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260324140006_OrderingSchemaBaseline20260324.Designer.cs`
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/FreshFarmOrderingDBContextModelSnapshot.cs`
+      - Verify local:
+        - `dotnet build src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj -c Release` -> PASS
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release` -> PASS
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj --configuration Release --no-build` -> `20260324135953_CatalogSchemaBaseline20260324 (Pending)`
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --configuration Release --no-build` -> `20260324140006_OrderingSchemaBaseline20260324 (Pending)`
+    - Da them runbook apply baseline cho DB hien huu:
+      - `docs/EntityFrameworkBaseline/EF_BASELINE_APPLY_EXISTING_DB_2026-03-24.md`
+        - ghi ro 2 path:
+          - DB moi: co the `database update`
+          - DB hien huu: phai verify/stamp `__EFMigrationsHistory`, khong apply full baseline truc tiep
+      - `docs/EntityFrameworkBaseline/Identity.baseline-stamp.2026-03-24.sql`
+      - `docs/EntityFrameworkBaseline/Catalog.baseline-stamp.2026-03-24.sql`
+      - `docs/EntityFrameworkBaseline/Ordering.baseline-stamp.2026-03-24.sql`
+        - ca 3 script deu:
+          - guard tren cac bang/cot dai dien cua schema hien huu
+          - tu tao `__EFMigrationsHistory` neu chua co
+          - insert row baseline migration neu chua duoc stamp
+    - Da stamp baseline vao 3 DB dev hien huu:
+      - `FreshFarmIdentityDB`
+        - `sqlcmd ... -d FreshFarmIdentityDB -i docs/EntityFrameworkBaseline/Identity.baseline-stamp.2026-03-24.sql` -> PASS
+        - `SELECT MigrationId, ProductVersion FROM dbo.__EFMigrationsHistory` -> `20260324135630_IdentitySchemaBaseline20260324`, `8.0.22`
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj --configuration Release --no-build` -> `20260324135630_IdentitySchemaBaseline20260324`
+      - `FreshFarmCatalogDB`
+        - `sqlcmd ... -d FreshFarmCatalogDB -i docs/EntityFrameworkBaseline/Catalog.baseline-stamp.2026-03-24.sql` -> PASS
+        - `SELECT MigrationId, ProductVersion FROM dbo.__EFMigrationsHistory` -> `20260324135953_CatalogSchemaBaseline20260324`, `8.0.22`
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj --configuration Release --no-build` -> `20260324135953_CatalogSchemaBaseline20260324`
+      - `FreshFarmOrderingDB`
+        - luc dau script stamp fail do guard cu ghi nham `CustomerNotifications.Type`; schema dev that dung `NotificationType`
+        - da cap nhat `docs/EntityFrameworkBaseline/Ordering.baseline-stamp.2026-03-24.sql`
+        - `sqlcmd ... -d FreshFarmOrderingDB -i docs/EntityFrameworkBaseline/Ordering.baseline-stamp.2026-03-24.sql` -> PASS
+        - `SELECT MigrationId, ProductVersion FROM dbo.__EFMigrationsHistory` -> `20260324140006_OrderingSchemaBaseline20260324`, `8.0.22`
+        - `dotnet tool run dotnet-ef migrations list --project src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj --configuration Release --no-build` -> `20260324140006_OrderingSchemaBaseline20260324`
+    - Da giam them vai tro schema bootstrap runtime o Identity sau khi baseline da duoc stamp:
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerSchemaInitializer.cs`
+        - them `IdentityBaselineMigrationId = 20260324135630_IdentitySchemaBaseline20260324`
+        - startup gio check `__EFMigrationsHistory` truoc
+        - neu baseline da duoc apply thi bo qua nhom SQL DDL/backfill va chi chay diagnostics/warning
+        - log mode ro rang: `diagnostics-only` hoac `bootstrap-and-diagnostics`
+      - `src/Tests/FreshFarm.Identity.Api.Tests/SellerSchemaInitializerTests.cs`
+        - them guard test cho nhanh `ShouldRunBootstrapScripts(...)`
+      - Verify local:
+        - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -c Release` -> PASS
+        - `dotnet test src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj -c Release --no-build` -> PASS (`57/57`)
+    - Da cleanup them legacy seller `Status`:
+      - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/StatusController.cs`
+        - rut gon thanh controller hard-disabled cho Seller
+        - GET `Status/StatusType` redirect ve `Seller/Home/Dashboard` kem `TempData["ErrorMessage"]`
+        - cac JSON action `Create/Get/Edit/Delete` cho `Status` va `StatusType` tra `403` voi payload disabled message
+      - `src/Tests/FreshFarm.Web.Bff.Tests/SellerStatusControllerTests.cs`
+        - them guard test cho redirect/dashboard path va `403` JSON payload
+      - Quy tac lane hien tai:
+        - `Status` duoc xac nhan la legacy dead/admin-style surface va da khoa ro rang cho Seller
+        - `Loyalty` van dang service-first qua Ordering, chua bi disable trong lane nay
+    - Da verify local:
+      - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release` -> PASS
+      - `dotnet build src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release` -> PASS
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.MerchantControllerTests` -> PASS (`5/5`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.OrderControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build` -> PASS (`81/81`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.BffCatalogControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --filter "FullyQualifiedName=FreshFarm.Web.Bff.Tests.CheckoutControllerTests.PreviewShippingFee_PrefersMostCompleteDuplicateSellerOrigin_FromIdentity"` -> PASS (`1/1`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.CustomerControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.ProductControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.CategoryUnitControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.CatalogReadinessControllerTests` -> PASS (`1/1`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.ReportControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.LoyaltyControllerTests` -> PASS (`2/2`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --filter FullyQualifiedName~FreshFarm.Web.Bff.Tests.BffSupportChatControllerTests` -> PASS (`1/1`)
+      - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build --list-tests` -> co discover `CatalogModerationControllerTests.Index_DedupesDuplicateCatalogProducts_AndKeepsMostCompleteRow`, `CatalogReadinessControllerTests.Index_DedupesDuplicateCategoriesAttributesAndReadinessRows_FromCatalog`, `FreshOpsControllerTests.Index_DedupesDuplicateSellerStatusLotRecallAndFefoRows_FromCatalog`, `RiskControllerTests.Index_DedupesDuplicateOverviewFiltersRowsAndDetailPayloads_FromOrdering`, `CampaignControllerTests.Index_DedupesDuplicateOverviewListAdsAndDetailPayloads_FromOrdering`, `DisputeControllerTests.Index_DedupesDuplicateQueueFiltersRowsAndDetailPayloads_FromOrdering`, `FinanceControllerTests.Index_DedupesDuplicateFiltersRowsAndOwnerSummary_FromOrdering`, `CommunicationControllerTests.Index_DedupesDuplicateOptionsTemplatesPoliciesAndPreferences_FromOrdering`, `DeliveryControllerTests.List_And_Staffs_DedupeDuplicateShippingRowsAndStaffs_FromOrdering`, `AuditControllerTests.Index_DedupesDuplicateAuditAndAuthPayloads_FromOrderingAndIdentity`, `ReportControllerTests.Shipping_DedupesDuplicateStaffPerformanceDistributionsRecentRowsAndDeliveryStaffs`, `ReportControllerTests.Revenue_Product_And_Review_DedupeRepresentativeCollections`, `LoyaltyControllerTests.Index_DedupesDuplicateTopUsersAndRecentActivities_FromOrdering`, `LoyaltyControllerTests.Users_And_History_DedupeDuplicateRows_FromOrdering`, va `BffSupportChatControllerTests.SendMessage_BroadcastsRealtimeEvents_ToSellerAndConversationGroups`
+      - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js` -> PASS
+      - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/shop-page.js` -> PASS
+      - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -c Release` -> PASS
+      - `dotnet test src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj -c Release` -> PASS (`57/57`)
+      - BFF local dang song; `https://localhost:7085/health` -> `200`
+      - Identity local dang song; `https://localhost:7140/health` -> `200`
+    - Da cleanup du lieu verify tam:
+      - restore lai `UserAuth.PasswordHash` cua seller `tho` (`UserId = 4`) ve gia tri cu, reset `FailedCount/LockoutLevel/LockedUntil`
+      - restore lai `SellerStoreSettings.StorePhone` + `GhnPickupPhone` cua `tho` ve gia tri cu `0123456789`
+      - clear lai cac truong `Ghn*` cua `Shipping.OrderId = 161`
+    - Luu y runtime data issue da xac thuc:
+      - seller `tho` hien dang co `StorePhone/GhnPickupPhone = 0123456789` trong DB dev; day la du lieu khong hop le cho GHN
+      - code moi da chan som/friendly-message cho truong hop nay
+    - Da tao tai lieu Word tong hop thanh tuu hien tai cua san:
+      - `output/doc/FreshFarm_TongHop_ThanhTuu_2026-03-24.docx`
+      - noi dung tom tat cac nhom nang luc chinh: tai khoan, da nguoi ban, order/shipping, chat realtime, notification center, service-first, hardening admin, va migration baseline
+      - artifact `.docx` da ton tai that tren workspace va co cau truc Open XML hop le (`word/document.xml`, `_rels/.rels`, `[Content_Types].xml`)
+    - Da them floating buyer chat widget toan cuc cho public chrome:
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FloatingBuyerChat.cshtml`
+        - them launcher/panel chat noi goc phai, co search + filter unread + danh sach shop da chat + thread composer
+        - guest van thay launcher va duoc dan dang nhap de xem lich su chat
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/floating-buyer-chat.js`
+        - tai `summaries` toan bo, poll badge/list, join SignalR cho conversation dang mo, gui tin nhan ngay trong widget
+        - neu thread cu da `Closed` thi tu goi `createIfMissing=true` de mo lai hoi thoai moi truoc khi gui
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
+        - `Thong bao` da co route that toi `/account/notifications`
+        - `Ho tro` gio mo widget chat noi thay vi `href="#"` placeholder
+      - `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml`
+        - them CSS cho launcher/panel/replies/mobile responsive
+    - Da mo rong support chat summaries contract de phuc vu widget toan cuc:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatBuyerController.cs`
+        - `GET /api/orders/support-chat/summaries` gio tra duoc tat ca shop da chat khi khong truyen `sellerIds`
+        - summaries duoc order theo `lastTime desc` thay vi `sellerId`
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`
+        - `GET /bff/support-chat/summaries` gio enrich them `shopName/avatar/addressSummary/joinedAt` tu Identity public merchants
+      - tests:
+        - `src/Tests/FreshFarm.Ordering.Api.Tests/SupportChatBuyerControllerTests.cs`
+        - `src/Tests/FreshFarm.Web.Bff.Tests/BffSupportChatControllerTests.cs`
+    - Da browser-verify floating buyer chat widget tren runtime that sau khi bat lai `Identity/Ordering/BFF`:
+      - ca 3 health local `https://localhost:7140/health`, `https://localhost:7018/health`, `https://localhost:7085/health` deu `200`
+      - guest state tren trang chu:
+        - launcher hien o goc phai
+        - topbar `Ho tro` mo dung panel chat
+        - panel hien CTA dang nhap va thong diep guest state dung UX
+      - buyer state voi user `thu` (`UserId = 1`):
+        - login thanh cong qua `/account/signin`
+        - launcher subtitle doi thanh `1 shop da tro chuyen`
+        - panel load dung hoi thoai lich su voi `Cua hang Hoang Thanh Binh`
+        - list preview hien `welcome to my channel`, dia chi fallback `Chua cap nhat dia chi hoat dong`, va badge `Da dong`
+        - SignalR hub noi thanh cong khi mo panel (`/hubs/support-chat`)
+      - widget hien tren cac route public da verify:
+        - `/`
+        - `/shop`
+        - `/search?q=rau`
+        - `/shop/2`
+      - password tam `FreshFarm123!` cua `thu` da duoc restore ve hash cu ngay sau verify; `FailedCount/LockoutLevel/LockedUntil` da reset sach
+      - artifacts:
+        - `output/playwright/floating-chat-verify/home-guest-floating-chat.png`
+        - `output/playwright/floating-chat-verify/home-guest-floating-chat.json`
+        - `output/playwright/floating-chat-verify/home-buyer-floating-chat.png`
+        - `output/playwright/floating-chat-verify/home-buyer-floating-chat-diagnostic.png`
+        - `output/playwright/floating-chat-verify/home-buyer-floating-chat-diagnostic.json`
+        - `output/playwright/floating-chat-verify/pages-buyer-floating-chat.json`
+    - Da fix bug launcher chat "mat sau khi dang nhap" tren public homepage:
+      - nguyen nhan: `src/Web/FreshFarm.Web.Bff/Views/Shared/_FloatingBuyerChat.cshtml` va `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml` dang gate theo role `Seller/Admin`, nen user dang nhap bang account co role nay se bi an widget tren public site
+      - patch:
+        - cho phep render/mo floating chat tren tat ca public path (khong nam trong `/Seller` va `/Admin`) bat ke role
+        - giu viec an widget trong backoffice path de tranh UX roi
+      - runtime verify sau fix:
+        - account `tho` (role `Seller`) dang nhap vao homepage van thay launcher `Chat voi shop`
+        - topbar `Ho tro` co `data-floating-buyer-chat-toggle` va mo dung panel chat
+        - artifact:
+          - `output/playwright/floating-chat-verify/home-seller-floating-chat-after-fix.png`
+          - `output/playwright/floating-chat-verify/home-seller-floating-chat-after-fix.json`
+      - cleanup:
+        - password tam cua `v` (`UserId = 5`) da duoc restore ve hash cu
+    - Da fix seller support center realtime fallback o `/Seller/SupportChat/Index`:
+      - nguyen nhan runtime:
+        - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js` check `window.signalR` qua som
+        - khi SignalR browser client chua san sang, seller page roi xuong polling va hien `Realtime chua san sang. Dang cap nhat o che do polling.`
+      - patch:
+        - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
+          - them `ensureSignalRClientScript()` de dynamic-load SignalR client tu CDN neu `window.signalR` chua co
+          - doi `ChatController.init()` va `setupSignalR()` sang async
+          - giu polling fallback neu dynamic load/connection that bai that su
+      - verify runtime that voi seller `tho`:
+        - browser mo `https://localhost:7085/Seller/SupportChat/Index`
+        - `window.signalR` ton tai, `hasHubBuilder = true`
+        - console log co `ASP.NET Core SignalR connected`
+        - WebSocket ket noi thanh cong toi `wss://localhost:7085/hubs/support-chat`
+        - input placeholder quay ve `Nhap cau tra loi...`, khong con thong diep polling fallback
+      - artifacts:
+        - `output/playwright/floating-chat-verify/seller-supportchat-realtime-diagnostic.json`
+        - `output/playwright/floating-chat-verify/seller-supportchat-realtime-after-fix.json`
+        - `output/playwright/floating-chat-verify/seller-supportchat-realtime-after-fix.png`
+    - Da fix timestamp/preview trong danh sach seller support chat khi co tin nhan realtime:
+      - nguyen nhan:
+        - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js` truoc day chi append message vao khung chat dang mo
+        - `LastTime/LastContent` cua `ChatState.allConversations` khong duoc sync ngay theo event realtime, nen list ben trai van hien gio cu den khi poll/reload
+      - patch:
+        - them `syncConversationSummary(...)`, `getMessageCreatedAtIso(...)`, `getMessagePreview(...)`
+        - `receiveMessage`, `newConversationOrMessage`, `sendMessageViaHttp`, `closeConversation` gio cap nhat ngay `LastTime`, `LastContent`, `HasUnread`, `Status`, va day conversation len dau danh sach
+      - verify:
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js` -> PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release` -> PASS
+    - Da fix timezone parse cho `LastTime` tren seller support chat:
+      - nguyen nhan runtime:
+        - Ordering/BFF dang tra `DateTime` dang ISO khong kem timezone suffix
+        - browser parse chuoi nay theo gio local, nen timestamp UTC cua tin nhan moi bi hien thanh `7 gio truoc` thay vi `Vua xong`/`x phut truoc`
+      - patch:
+        - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
+          - them `ChatUtils.parseServerDate(...)`
+          - `formatDate`, `formatRelativeTime`, `formatDateSeparator`, `getDateKey` gio coi cac timestamp ISO khong co offset la UTC bang cach append `Z`
+      - verify runtime:
+        - cung timestamp `verify-lasttime-2026-03-25T06:31:43.739Z` tren seller list truoc day hien `7 gio truoc`
+        - sau patch, reload seller support page cho `tho` hien `8 phut truoc` o dong dau danh sach
+        - artifacts:
+          - `output/playwright/floating-chat-verify/seller-supportchat-lasttime-runtime-verify-after-timezone-fix.json`
+          - `output/playwright/floating-chat-verify/seller-supportchat-lasttime-runtime-verify-after-timezone-fix.png`
+    - Da verify them buyer -> seller realtime list update sau patch timezone:
+      - buyer `thu` gui thanh cong message moi vao `ConversationId = 11` qua BFF route `POST /bff/support-chat/conversations/11/messages`
+      - Ordering DB co message moi:
+        - `MessageId = 23`
+        - `Content = verify-realtime-observed-2026-03-25T06:50:19.082Z`
+      - sau 5 giay, seller page `tho` tren `/Seller/SupportChat/Index` cap nhat dong dau danh sach thanh:
+        - `Khach #1`
+        - `Vua xong`
+        - preview moi cua message vua gui
+      - artifacts:
+        - `output/playwright/floating-chat-verify/seller-supportchat-realtime-list-observed-success.json`
+        - `output/playwright/floating-chat-verify/seller-supportchat-realtime-list-observed-success.png`
+    - Da verify floating buyer chat reopen conversation moi khi thread cu da `Closed`:
+      - seller `tho` dong `ConversationId = 11` tu `/Seller/SupportChat/Index`
+      - floating widget cua buyer `thu` van hien row `Cua hang tho` o trang thai `Da dong`
+      - buyer gui message moi `verify-reopen-2026-03-25T06:52:49.474Z` ngay trong widget
+      - he thong tu tao `ConversationId = 12` moi o trang thai `Open`
+      - Ordering DB co:
+        - `SupportConversations.ConversationId = 12`, `Status = Open`
+        - `SupportMessages.MessageId = 24`, `ConversationId = 12`
+      - seller page cap nhat realtime list:
+        - dong dau moi `Khach #1`
+        - `Vua xong`
+        - preview message reopen moi nhat
+        - dong thread cu van o duoi trang thai `Closed`
+      - artifact:
+        - `output/playwright/floating-chat-verify/floating-chat-reopen-closed-verify.json`
+        - `output/playwright/floating-chat-verify/floating-chat-reopen-seller.png`
+        - `output/playwright/floating-chat-verify/floating-chat-reopen-buyer.png`
+    - Da patch timezone parse cho buyer chat widget va public shop chat:
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/floating-buyer-chat.js`
+        - them `parseServerDate(...)`
+        - `toDate(...)` gio coi cac timestamp ISO khong kem offset la UTC
+      - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
+        - them `parseServerDate(...)`
+        - `formatTime(...)` gio parse timestamp khong co offset theo UTC
+      - verify:
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/floating-buyer-chat.js` -> PASS
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js` -> PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release` -> PASS
+        - browser verify voi buyer `thu`:
+          - floating widget hien `2 phut truoc` thay vi `7 gio truoc`
+          - thread meta hien `Lan gan nhat: 13:52 25/03/2026`
+        - artifacts:
+          - `output/playwright/floating-chat-verify/floating-chat-timezone-buyer-verify.json`
+          - `output/playwright/floating-chat-verify/floating-chat-timezone-buyer-verify.png`
+    - Da fix fallback trang shop de chat inline van hien du endpoint san pham loi:
+      - nguyen nhan:
+        - `src/Web/FreshFarm.Web.Bff/wwwroot/js/shop-page.js` truoc day fail cứng neu `/bff/products?sellerId=...` tra `500`
+        - vi vay ca trang shop + `publicShopChat` khong render, du `/bff/shops/{sellerId}` van tra `200`
+      - patch:
+        - `shop-page.js` gio chi coi `shopEndpoint` la bat buoc
+        - neu `productsEndpoint` loi thi render warning mem: "Chua tai duoc san pham cua shop. Ban van co the xem thong tin shop va nhan tin truc tiep."
+        - van mount `publicShopChat` va hero shop binh thuong
+      - verify:
+        - `node --check src/Web/FreshFarm.Web.Bff/wwwroot/js/shop-page.js` -> PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release` -> PASS
+        - browser verify voi buyer `thu` tai `/shop/4`:
+          - `#publicShopChat` duoc mount
+          - status hien `Lan trao doi gan nhat: 13:52 25/03/2026.`
+          - warning san pham loi hien rieng, khong chan chat
+        - artifacts:
+          - `output/playwright/floating-chat-verify/public-shop-chat-inline-verify.json`
+          - `output/playwright/floating-chat-verify/public-shop-chat-inline-verify.png`
+    - Da harden them `BffCatalogController` de `/bff/products` khong con throw `500` khi Catalog service tam thoi khong song:
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GetProducts`, `SearchProducts`, `GetCategories`, `GetProductById`, `GetProductOffers`, `GetShops`, `GetShopById`, `CreateProduct` gio bat `HttpRequestException`
+        - khi upstream khong ket noi duoc se tra `503 Service Unavailable` voi payload JSON co chu dich:
+          - `error = upstream_unavailable`
+          - `upstreamService = Catalog/Identity`
+          - `message` than thien theo tung route
+        - `GetProductOffers` giu duoc list offers ngay ca khi Identity merchant endpoint tam thoi loi
+      - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+        - them regression test `GetProducts_ReturnsServiceUnavailablePayload_WhenCatalogThrowsHttpRequestException`
+      - verify:
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release` -> PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-build` -> PASS (`82/82`)
+        - runtime verify sau khi restart BFF tren `https://localhost:7085` trong luc `https://localhost:7245` van bi refused:
+          - `curl -k https://localhost:7085/bff/products?sellerId=4` tra `HTTP 503`
+          - body: `{\"error\":\"upstream_unavailable\",\"upstreamService\":\"Catalog\",\"message\":\"Chua ket noi duoc dich vu san pham. Vui long thu lai sau.\"}`
+    - Da dua local core services ve trang thai on dinh de lane shop/catalog khong con phu thuoc start tay tung service:
+      - `src/Services/Catalog/FreshFarm.Catalog.Api`
+        - build Release xanh
+        - Catalog da duoc bat lai dung `https://localhost:7245` / `http://localhost:5102`
+        - verify:
+          - `https://localhost:7245/health` -> `200`
+          - `curl -k https://localhost:7085/bff/products?sellerId=4` -> `200` va tra danh sach san pham seller `4`
+      - `scripts/start-local-core.ps1`
+        - them launcher local de bat/kiem tra `Identity`, `Catalog`, `Ordering`, `BFF` theo dung port dev
+        - script se bo qua service nao da healthy, va canh bao neu binary Release chua duoc build
+        - verify:
+          - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1`
+          - output xac nhan ca 4 service deu healthy
+    - Da verify tiep lane migration-first cua `Identity` va bo sung scripts van hanh local:
+      - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerSchemaInitializer.cs`
+        - code path xac nhan baseline `20260324135630_IdentitySchemaBaseline20260324` trong `__EFMigrationsHistory`
+        - execution mode hien tai la `diagnostics-only` khi baseline da duoc stamp
+      - runtime verify:
+        - `https://localhost:7140/health` -> `200`
+        - `sqlcmd` tren `FreshFarmIdentityDB` tra ve migration `20260324135630_IdentitySchemaBaseline20260324`
+        - `.codex-identity-runtime.log` va `.codex-identity-https.log` co dong:
+          - `Seller schema startup completed in diagnostics-only mode. SellerStoreSettingsRows=8, SellerKycProfilesRows=6, SellerKycReviewEventsRows=8`
+      - `scripts/stop-local-core.ps1`
+        - them script dung 4 service core theo process name
+      - `scripts/restart-local-core.ps1`
+        - them script stop + start lai toan bo local core services
+      - verify:
+        - `powershell -ExecutionPolicy Bypass -File scripts/stop-local-core.ps1`
+        - `powershell -ExecutionPolicy Bypass -File scripts/restart-local-core.ps1`
+        - output xac nhan `Identity`, `Catalog`, `Ordering`, `BFF` deu stop/start thanh cong va healthy lai
+    - Da dong bo quality signal recommendation `AverageRating` + `SoldCount` + `ReviewCount` vao Ordering/BFF:
+      - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+        - them public endpoint `GET /api/orders/product-insights/stats?productIds=...`
+        - aggregate `AverageRating` tu review da duyet, chua delete, `Rating > 0`
+        - aggregate `SoldCount` tu `OrderDetail.Quantity` cua order status thanh cong (`Delivered`/`Completed`)
+      - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+        - `GetProducts`, `SearchProducts`, `GetProductById` gio goi them Ordering product insights de enrich payload truoc khi tra ve frontend
+        - `SearchProducts` ap `minRating`, sort, va `relatedItems` tren payload da co quality signals that
+        - neu Ordering tam loi thi BFF degrade gracefully ve stats mac dinh, khong danh sap list/search/detail
+      - verify:
+        - `dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj -c Release --no-restore` -> `26/26` PASS
+        - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release --no-restore` -> `94/94` PASS
+        - `dotnet build src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj -c Release --no-restore` PASS
+        - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release --no-restore` PASS
+        - `powershell -ExecutionPolicy Bypass -File scripts/start-local-core.ps1` -> `Identity/Catalog/Ordering/BFF` healthy lai
+      - runtime spot-check:
+        - `GET https://localhost:7018/api/orders/product-insights/stats?productIds=104&productIds=205` tra stats that (`104` co `AverageRating = 5.0`, `ReviewCount = 1`)
+        - `GET https://localhost:7085/bff/products?sellerId=4` hien `averageRating`, `soldCount`, `reviewCount` tren payload san pham that
+        - `GET https://localhost:7085/bff/product-search?minRating=1&page=1&pageSize=5` tra ket qua da duoc loc theo rating sau enrich
   - *Now*:
-    - Tong hop ket qua cho user ve 3 hang muc bao mat.
+    - Recommendation foundation da co o muc runtime that:
+      - event tracking o `Ordering` + `BFF` + frontend public (`site/home/search/product`)
+      - quality signals `AverageRating`, `SoldCount`, `ReviewCount` da duoc enrich vao BFF product/list/search payload
+      - runtime da xac nhan `product_view`, `search`, `search_related impression`, `home_today impression`, va product stats qua BFF
+      - `Content-Based MVP` cho `home_today` va `product_similar` da tra payload that va duoc noi vao homepage/PDP public
+      - tracking impression/click cho content-based placements da bat dau ghi dung `content_based_home_v1` va `content_based_similar_v1` trong Ordering DB
+      - code Catalog/BFF da san sang dung `ProductAttributes`, va local Catalog DB da co `CategoryAttribute` + `ProductAttributeValue` cho recommendation seed/attribute scoring
+      - similar recommendation da co lat cat `Hybrid` dau tien qua Ordering collaborative signals, nhung runtime that hien van phu thuoc interaction history; khi chua co signal thi endpoint tu fallback ve `content_based_similar_v1`
+      - search ranking da co lat cat `Hybrid` dau tien qua `SearchClickEvent` / `ProductViewEvent` / `RecommendationClickEvent`; khi co keyword + behavioral signal thi `/bff/product-search` doi sang `rankingAlgorithm = hybrid_search_v1`, nguoc lai fallback ve `keyword_relevance_v1`
+      - homepage recommendation da co lat cat `Hybrid` dau tien qua `home-profile`; khi co user/session preference seeds thi `/bff/recommendations/home` doi sang `algorithm = hybrid_home_v1`, nguoc lai fallback ve `content_based_home_v1`
+      - homepage recommendation gio co them `home-collaborative` candidate generation o Ordering va collaborative blend o BFF; tuy nhien runtime local hien van can tich them traffic/co-occurrence that de nhin thay tag collaborative xuat hien tu nhien, khong can signal verify tam
+      - bug guest session khong on dinh da duoc fix; recommendation event va `/bff/recommendations/home` gio chia se cung mot session persisted cho anonymous traffic
+      - Ordering da co `RecommendationProductAffinity` materialized table + refresh endpoint/background service; `similar` va `home-collaborative` da uu tien doc bang nay truoc khi fallback ve query ad-hoc
+      - Ordering da co them `RecommendationSearchKeywordAffinity` materialized table; `search-ranking` da uu tien doc bang nay truoc khi fallback ve query ad-hoc
+      - Ordering da co them `RecommendationHomePreferenceSeed` materialized table; `home-profile` da uu tien doc bang nay truoc khi fallback ve query ad-hoc
+      - Ordering da co them `RecommendationHomeCollaborativeCandidate` materialized table; `home-collaborative` da uu tien doc bang nay truoc khi fallback ve query ad-hoc, va runtime da xac nhan `X-Recommendation-Signal-Source = materialized`
+      - BFF runtime gio surfacing duoc `contentSignalSource` + `signalSource` / `rankingSignalSource`, va rieng `home/similar` da lo them truong detail de phan biet phan collaborative materialized hay fallback
   - *Next*:
-    - Neu user can, de xuat roadmap de nang CSP len enforce toan lane va thay `X-Service-Key` bang co che manh hon.
+    - Chot backlog recommendation:
+      - can nhac doi gia tri telemetry source thanh namespace ro hon nhu `catalog_content_v1`, `materialized_cf_v1`, `ad_hoc_cf_v1` de de theo doi trend recommendation
+      - mo rong materialized/offline scoring tiep cho `similar/home/search`, giam dan truy van ad-hoc luc request o cac nhanh con lai
+      - can nhac day telemetry/source len BFF (`materialized_home_v1`, `materialized_search_v1`) de de quan sat runtime recommendation hon
+      - surfacing ro hon nguon collaborative `materialized` len response BFF cua `hybrid_home_v1` neu muon tach biet voi content/profile boost
+      - can nhac them endpoint/rule de expose ro `materialized_search_v1` hoac telemetry source cho `hybrid_search_v1`
+      - dung local traffic that de tich interaction history, roi verify lai `hybrid_similar_v1` khong can seed tam
+      - dung local traffic that de tich interaction history, roi verify lai `hybrid_search_v1` khong can seed tam
+      - dung local traffic that de tich interaction history, roi verify lai `hybrid_home_v1` khong can event seed thu cong
+      - sau lat cat materialized dau tien, tiep tuc phase `Collaborative Filtering` / `Hybrid` cho recommendation breadth lon hon (uu tien search/home personalization sau do moi den job offline ranking day du)
+      - neu can tang chat luong content-based, tiep tuc expose/su dung them category attributes, product attributes, va business constraints trong scoring
+    - Neu tiep tuc lane notifications:
+      - co the browser-verify them spacing/mobile state neu muon polish them UI, nhung logic/chinh ta/branch recent da duoc khoa kha day du
+    - Neu tiep tuc lane support chat:
+      - can nhac them indicator dong thoi giua floating widget va `publicShopChat` tren `/shop/{sellerId}` neu muon UX nhat quan hon
+      - doi ten bien/wording `isBuyerEligible` trong widget thanh trung tinh hon vi gio public-account nao cung co the mo launcher tren public site
+    - Neu tiep tuc lane migration-first:
+      - bat dau tach them cac SQL DDL/backfill khoi `SellerSchemaInitializer`, uu tien giu startup o muc diagnostics/warning ngay ca tren DB chua stamp baseline nhung seller schema da ton tai
+      - chuyen phan bootstrap con lai thanh migration/runbook ro rang hon thay vi runtime mutation
+    - Neu tiep tuc lane van hanh local:
+      - co the browser-verify lai `/shop/4` de xac nhan warning san pham da bien mat khi Catalog da song
+    - Neu tiep tuc lane shipping:
+      - co the them hint UX tren trang settings/manage shipping de chi ro ly do origin khong hop le
+    - Sau shipping, tiep tuc productionize multi-seller:
+      - verify runtime `Identity` startup mode moi (`diagnostics-only`) tren local sau khi baseline da stamp
+      - bat dau giam dan `SellerSchemaInitializer`, uu tien tach phan "tao/bien doi schema" ra khoi runtime startup va chi giu diagnostics/warning an toan
+      - tiep tuc doi cac bootstrap schema ad-hoc sang migration/runbook ro rang hon sau khi baseline `Identity` da duoc chot
+      - chot schema/migration Seller va xoa dan legacy con lai (uu tien DB path cu; `Status` da khoa, `Loyalty` can audit tiep truoc khi quyet dinh)
+      - tiep tuc cleanup DB path legacy con sot, dac biet admin/order BFF path khac hoac service khac con gia dinh du lieu upstream luon sach
+      - mo truc marketplace con thieu: `Finance/Settlement/Commission/Refund`, `Returns/After-sales`, `Merchant lifecycle & compliance`
+    - Neu tiep tuc lane support chat:
+      - browser-verify buyer shop chat UI tren trang `Shop` de xac nhan UX reopen thread moi tuong thich voi patch JS moi
+      - can nhac them regression cho admin/seller support lane neu muon ho tro "reopen" explicit tu phia seller sau khi close
 - **Open questions** (UNCONFIRMED if needed):
-  - Khong co.
+  - None hien tai.
 - **Working set** (files/ids/commands):
   - `CONTINUITY.md`
-  - `src/Web/FreshFarm.Web.Bff/Program.cs`
+  - `ROADMAP_SELLER_ADMIN_MIGRATION.md`
+  - `docs/ke-hoach-nang-cap-csdl-va-mo-rong-microservice-seller.md`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ShippingController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/StatusController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/SettingController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Models/SettingUserSellerModels.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Views/Shipping/ManageShipping.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffSupportChatController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/CheckoutController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CustomerController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CouponController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CategoryController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/AuditController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Hubs/SupportChatHub.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CampaignController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogModerationController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CatalogReadinessController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/CommunicationController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DeliveryController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/DisputeController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FinanceController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/FreshOpsController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/LoyaltyController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/MerchantController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/OrderController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ProductController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/ReportController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/RiskController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/UnitController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Admin/Controllers/UserController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CategoryController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CouponController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/CustomerController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/OrderController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/ProductController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Areas/Seller/Controllers/UnitController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Views/Home/Shop.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffCatalogController.cs`
+  - `src/Web/FreshFarm.Web.Bff/Controllers/BffRecommendationEventsController.cs`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/site.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/home-page.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/search-page.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/product-page.js`
+  - `output/playwright/recommendation-event-verify/verify-runtime.js`
+  - `output/playwright/recommendation-event-verify/home.png`
+  - `output/playwright/recommendation-event-verify/home-timeout-only.png`
+  - `output/playwright/recommendation-event-verify/home-har.png`
+  - `output/playwright/recommendation-event-verify/home.har`
+  - `output/playwright/recommendation-event-verify/product-104.png`
+  - `output/playwright/recommendation-event-verify/search-rau.png`
+  - `output/playwright/recommendation-event-verify/search-rau-waited.png`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_FloatingBuyerChat.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_PromoBarLegacy.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/Views/Shared/_MarketplaceChromeStyles.cshtml`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/public-shop-chat.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/floating-buyer-chat.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/Scripts/support-chat-admin.js`
+  - `src/Web/FreshFarm.Web.Bff/wwwroot/js/shop-page.js`
+  - `output/support-chat-realtime-verify/Program.cs`
+  - `output/support-chat-realtime-verify/support-chat-realtime-verify.csproj`
+  - `output/support-chat-realtime-verify/runtime-result.json`
+  - `.codex-support-chat-reopen-verify.json`
+  - `.config/dotnet-tools.json`
+  - `docs/MIGRATION_BASELINE_2026-03-24.md`
+  - `docs/RECOMMENDATION_ML_ROADMAP_2026-03-29.md`
+  - `docs/EntityFrameworkBaseline/EF_BASELINE_APPLY_EXISTING_DB_2026-03-24.md`
+  - `docs/EntityFrameworkBaseline/Identity.baseline-stamp.2026-03-24.sql`
+  - `docs/EntityFrameworkBaseline/Catalog.baseline-stamp.2026-03-24.sql`
+  - `docs/EntityFrameworkBaseline/Ordering.baseline-stamp.2026-03-24.sql`
+  - `output/doc/FreshFarm_TongHop_ThanhTuu_2026-03-24.docx`
+  - `output/playwright/floating-chat-verify/home-buyer-floating-chat.png`
+  - `output/playwright/floating-chat-verify/home-buyer-floating-chat-diagnostic.png`
+  - `output/playwright/floating-chat-verify/home-buyer-floating-chat-diagnostic.json`
+  - `output/playwright/floating-chat-verify/pages-buyer-floating-chat.json`
+  - `output/playwright/floating-chat-verify/home-seller-floating-chat-after-fix.png`
+  - `output/playwright/floating-chat-verify/home-seller-floating-chat-after-fix.json`
+  - `output/playwright/floating-chat-verify/seller-supportchat-realtime-diagnostic.json`
+  - `output/playwright/floating-chat-verify/seller-supportchat-realtime-after-fix.json`
+  - `output/playwright/floating-chat-verify/seller-supportchat-realtime-after-fix.png`
+  - `output/playwright/floating-chat-verify/seller-supportchat-lasttime-runtime-verify-after-timezone-fix.json`
+  - `output/playwright/floating-chat-verify/seller-supportchat-lasttime-runtime-verify-after-timezone-fix.png`
+  - `output/playwright/floating-chat-verify/seller-supportchat-realtime-list-observed-success.json`
+  - `output/playwright/floating-chat-verify/seller-supportchat-realtime-list-observed-success.png`
+  - `output/playwright/floating-chat-verify/floating-chat-reopen-closed-verify.json`
+  - `output/playwright/floating-chat-verify/floating-chat-reopen-seller.png`
+  - `output/playwright/floating-chat-verify/floating-chat-reopen-buyer.png`
+  - `output/playwright/floating-chat-verify/floating-chat-timezone-buyer-verify.json`
+  - `output/playwright/floating-chat-verify/floating-chat-timezone-buyer-verify.png`
+  - `output/playwright/floating-chat-verify/public-shop-chat-inline-verify.json`
+  - `output/playwright/floating-chat-verify/public-shop-chat-inline-verify.png`
+  - `tmp/docs/create_freshfarm_summary_doc.ps1`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/SupportChatBuyerController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/ProductInsightsController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Controllers/RecommendationEventsController.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/DesignTime/OrderingDesignTimeDbContextFactory.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/FreshFarmOrderingDBContext.RecommendationEvents.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/ProductViewEvent.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/SearchEvent.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/SearchClickEvent.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationImpressionEvent.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Models/RecommendationClickEvent.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/DesignTime/IdentityDesignTimeDbContextFactory.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/DesignTime/CatalogDesignTimeDbContextFactory.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Migrations/20260324135630_IdentitySchemaBaseline20260324.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Migrations/20260324135630_IdentitySchemaBaseline20260324.Designer.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Migrations/FreshFarmIdentityDBContextModelSnapshot.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/20260324135953_CatalogSchemaBaseline20260324.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/20260324135953_CatalogSchemaBaseline20260324.Designer.cs`
+  - `src/Services/Catalog/FreshFarm.Catalog.Api/Migrations/FreshFarmCatalogDBContextModelSnapshot.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260324140006_OrderingSchemaBaseline20260324.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260324140006_OrderingSchemaBaseline20260324.Designer.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329092025_RecommendationEventTracking20260329.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/20260329092025_RecommendationEventTracking20260329.Designer.cs`
+  - `src/Services/Ordering/FreshFarm.Ordering.Api/Migrations/FreshFarmOrderingDBContextModelSnapshot.cs`
+  - `src/Tests/FreshFarm.Ordering.Api.Tests/SupportChatBuyerControllerTests.cs`
+  - `src/Tests/FreshFarm.Ordering.Api.Tests/ProductInsightsControllerTests.cs`
+  - `src/Tests/FreshFarm.Ordering.Api.Tests/RecommendationEventsControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/SellerShippingControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/SellerStatusControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/BffCatalogControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/BffRecommendationEventsControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/BffSupportChatControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/AuditControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CampaignControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CatalogModerationControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CatalogReadinessControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CommunicationControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/DeliveryControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/DisputeControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/FinanceControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/FreshOpsControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/LoyaltyControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CategoryUnitControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CouponControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CheckoutControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/CustomerControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/MerchantControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/OrderControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/ProductControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/ReportControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/RiskControllerTests.cs`
+  - `src/Tests/FreshFarm.Web.Bff.Tests/UserControllerTests.cs`
   - `src/Services/Identity/FreshFarm.Identity.API/Program.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Program.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Controllers/InternalInventoryReservationsController.cs`
-  - `src/Services/Catalog/FreshFarm.Catalog.Api/Options/InternalInventoryOptions.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Program.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Services/CatalogInventoryClient.cs`
-  - `src/Services/Ordering/FreshFarm.Ordering.Api/Options/InternalServiceAuthOptions.cs`
-  - `docs/security-hardening-roadmap-2026-03-18.md`
-  - `Get-ChildItem ... | Select-String ...`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerSchemaInitializer.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/SellerStoreSettingsResolver.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/CustomerNotificationPublisher.cs`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.delta.sql`
+  - `docs/FreshFarmIdentityDb/FreshFarmIdentityDb.2026-03-15.seller-store-ghn-settings.verify.sql`
+  - `docs/FreshFarmIdentityDb/SCHEMA_ALIGNMENT_2026-03-24_SELLER_RUNTIME.md`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminMerchantsController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/AdminSettingsController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/PublicMerchantsController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Controllers/SellerApplicationController.cs`
+  - `src/Services/Identity/FreshFarm.Identity.API/Services/AccountEmailSender.cs`
+  - `src/Tests/FreshFarm.Identity.Api.Tests/SellerApplicationControllerTests.cs`
+  - `src/Tests/FreshFarm.Identity.Api.Tests/AdminSettingsControllerTests.cs`
+  - `src/Tests/FreshFarm.Identity.Api.Tests/SellerSchemaInitializerTests.cs`
+  - `src/Tests/FreshFarm.Identity.Api.Tests/AccountEmailSenderTests.cs`
+  - `.codex-seller-shipping-create-first.json`
+  - `.codex-seller-shipping-create-duplicate.json`
+  - `.codex-seller-shipping-invalid-origin.json`
+  - `dotnet build src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj -c Release`
+  - `dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj -c Release`
+  - `dotnet build src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj -c Release`
+  - `dotnet test src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj -c Release --no-build`
+  - `https://localhost:7085/health`
+  - `https://localhost:7140/health`

@@ -312,7 +312,8 @@ public class CategoryController : LegacySellerControllerBase
             return new List<Category>();
         }
 
-        var items = await response.Content.ReadFromJsonAsync<List<ApiCategoryDto>>(JsonOptions) ?? new List<ApiCategoryDto>();
+        var items = DeduplicateCategories(
+            await response.Content.ReadFromJsonAsync<List<ApiCategoryDto>>(JsonOptions) ?? new List<ApiCategoryDto>());
 
         return items.Select(MapCategory).ToList();
     }
@@ -383,6 +384,47 @@ public class CategoryController : LegacySellerControllerBase
             UpdatedDate = dto.UpdatedDate
         };
     }
+
+    private static List<ApiCategoryDto> DeduplicateCategories(IEnumerable<ApiCategoryDto> categories)
+    {
+        return categories
+            .Where(category => category.CategoryId > 0)
+            .GroupBy(category => category.CategoryId)
+            .Select(group => group
+                .OrderByDescending(CalculateCategoryScore)
+                .ThenByDescending(CalculateCategorySignalLength)
+                .ThenByDescending(category => category.UpdatedDate ?? category.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateCategoryScore(ApiCategoryDto category)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(category.CategoryName) ? 3 : 0;
+        score += HasMeaningfulValue(category.Description) ? 1 : 0;
+        score += HasMeaningfulValue(category.ImageCategoriesName) ? 1 : 0;
+        score += HasMeaningfulValue(category.Slug) ? 1 : 0;
+        score += category.IsActive ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateCategorySignalLength(ApiCategoryDto category)
+    {
+        var values = new[]
+        {
+            category.CategoryName,
+            category.Description,
+            category.ImageCategoriesName,
+            category.Slug
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private string? SaveCategoryImage(IFormFile file, string? baseSlug)
     {
