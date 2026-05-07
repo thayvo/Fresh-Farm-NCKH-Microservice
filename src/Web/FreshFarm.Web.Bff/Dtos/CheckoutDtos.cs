@@ -11,6 +11,8 @@ public sealed class CheckoutItemInputDto // 1 dong item user dat.
     public int Quantity { get; set; } // So luong mua.
     public decimal UnitPrice { get; set; } // Don gia tai thoi diem dat.
     public string? UnitSymbol { get; set; } // Don vi tinh (kg, hop...).
+    public int? RecommendationPosition { get; set; } // Vi tri recommendation neu item den tu goi y.
+    public int? Position { get; set; } // Alias vi tri recommendation cho payload don gian.
 }
 
 public sealed class CheckoutSubmitRequestDto // Payload gui qua BFF -> Ordering POST /api/orders.

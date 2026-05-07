@@ -59,7 +59,13 @@ public sealed class CartController : ControllerBase
             return Unauthorized("Token khong co claim user id hop le.");
         }
 
-        var normalizedItems = NormalizeItems(request?.Items ?? new List<UpsertCartItemRequest>());
+        var incomingItems = request?.Items ?? new List<UpsertCartItemRequest>();
+        if (incomingItems.Any(HasInvalidSellerId))
+        {
+            return BadRequest(new { message = "SellerId cua san pham trong gio hang phai > 0." });
+        }
+
+        var normalizedItems = NormalizeItems(incomingItems);
         var cart = await EnsureCartAsync(userId.Value, cancellationToken);
         var existingItems = await _db.CartItems
             .Where(x => x.CartId == cart.CartId)
@@ -139,11 +145,15 @@ public sealed class CartController : ControllerBase
         }
 
         var cart = await EnsureCartAsync(userId.Value, cancellationToken);
-        var normalizedSellerId = Math.Max(0, request.SellerId);
+        if (request.ProductId <= 0 || request.SellerId <= 0)
+        {
+            return BadRequest(new { message = "ProductId va SellerId phai > 0." });
+        }
+
         var existing = await _db.CartItems.FirstOrDefaultAsync(
             x => x.CartId == cart.CartId &&
                  x.ProductId == request.ProductId &&
-                 x.SellerId == normalizedSellerId,
+                 x.SellerId == request.SellerId,
             cancellationToken);
 
         if (existing is null)
@@ -179,11 +189,15 @@ public sealed class CartController : ControllerBase
             return await GetMine(cancellationToken);
         }
 
-        var normalizedSellerId = Math.Max(0, request.SellerId);
+        if (request.ProductId <= 0 || request.SellerId <= 0)
+        {
+            return BadRequest(new { message = "ProductId va SellerId phai > 0." });
+        }
+
         var existing = await _db.CartItems.FirstOrDefaultAsync(
             x => x.CartId == cart.CartId &&
                  x.ProductId == request.ProductId &&
-                 x.SellerId == normalizedSellerId,
+                 x.SellerId == request.SellerId,
             cancellationToken);
 
         if (existing is not null)
@@ -293,7 +307,7 @@ public sealed class CartController : ControllerBase
 
     private static UpsertCartItemRequest? NormalizeItem(UpsertCartItemRequest? item)
     {
-        if (item is null || item.ProductId <= 0)
+        if (item is null || item.ProductId <= 0 || item.SellerId <= 0)
         {
             return null;
         }
@@ -301,7 +315,7 @@ public sealed class CartController : ControllerBase
         return new UpsertCartItemRequest
         {
             ProductId = item.ProductId,
-            SellerId = Math.Max(0, item.SellerId),
+            SellerId = item.SellerId,
             SellerName = item.SellerName?.Trim() ?? string.Empty,
             ProductName = item.ProductName?.Trim() ?? string.Empty,
             ImageFileName = item.ImageFileName?.Trim() ?? string.Empty,
@@ -314,6 +328,11 @@ public sealed class CartController : ControllerBase
     private static string BuildKey(int productId, int sellerId)
     {
         return $"{Math.Max(0, productId)}:{Math.Max(0, sellerId)}";
+    }
+
+    private static bool HasInvalidSellerId(UpsertCartItemRequest? item)
+    {
+        return item is not null && item.ProductId > 0 && item.SellerId <= 0;
     }
 
     private int? TryGetUserIdFromToken()

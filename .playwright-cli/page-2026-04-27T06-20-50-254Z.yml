@@ -1,0 +1,27 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e9]: 
+        - generic [ref=e10]:
+          - generic [ref=e11]: FreshFarm Admin Center
+          - heading "Đăng nhập Quản trị" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Quản lý vận hành nền tảng, người dùng, giao dịch và các module điều phối tập trung của FreshFarm.
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "Trung tâm quản trị FreshFarm" [level=2] [ref=e16]
+        - paragraph [ref=e17]: Chỉ tài khoản có quyền Quản trị mới đăng nhập được tại màn hình này.
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Tên đăng nhập hoặc email
+          - textbox "Tên đăng nhập hoặc email" [ref=e21]:
+            - /placeholder: Tên đăng nhập hoặc email quản trị
+        - generic [ref=e22]:
+          - generic [ref=e23]: Mật khẩu
+          - textbox "Mật khẩu" [ref=e24]:
+            - /placeholder: ••••••
+        - generic [ref=e25]:
+          - checkbox "Ghi nhớ tôi" [ref=e26]
+          - generic [ref=e27]: Ghi nhớ tôi
+        - button "Đăng nhập Quản trị" [ref=e28] [cursor=pointer]
+  - paragraph [ref=e29]: © FreshFarm Admin Center

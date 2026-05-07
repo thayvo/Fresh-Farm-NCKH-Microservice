@@ -1,0 +1,210 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - heading " Kênh người bán" [level=3] [ref=e5]:
+      - generic [ref=e6]: 
+      - text: Kênh người bán
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - link " Bảng điều khiển" [ref=e9] [cursor=pointer]:
+          - /url: /Seller/Home/Dashboard
+          - generic [ref=e10]: 
+          - text: Bảng điều khiển
+      - listitem [ref=e11]:
+        - link " Quản lý đơn hàng" [ref=e12] [cursor=pointer]:
+          - /url: /Seller/Order/ManageOrders
+          - generic [ref=e13]: 
+          - text: Quản lý đơn hàng
+      - listitem [ref=e14]:
+        - link " Quản lý sản phẩm" [ref=e15] [cursor=pointer]:
+          - /url: /Seller/Product/ManageProducts
+          - generic [ref=e16]: 
+          - text: Quản lý sản phẩm
+      - listitem [ref=e17]:
+        - link " Quản lý khách hàng" [ref=e18] [cursor=pointer]:
+          - /url: /Seller/Customer/ManageCustomers
+          - generic [ref=e19]: 
+          - text: Quản lý khách hàng
+      - listitem [ref=e20]:
+        - link " Quản lý mã giảm giá" [ref=e21] [cursor=pointer]:
+          - /url: /Seller/Coupon/ManageCoupons
+          - generic [ref=e22]: 
+          - text: Quản lý mã giảm giá
+      - listitem [ref=e23]:
+        - link " Quản lý đánh giá" [ref=e24] [cursor=pointer]:
+          - /url: /Seller/Review/ManageReview
+          - generic [ref=e25]: 
+          - text: Quản lý đánh giá
+      - listitem [ref=e26]:
+        - link " Quản lý vận chuyển" [ref=e27] [cursor=pointer]:
+          - /url: /Seller/Shipping/ManageShipping
+          - generic [ref=e28]: 
+          - text: Quản lý vận chuyển
+      - listitem [ref=e29]:
+        - link " Đối soát thanh toán" [ref=e30] [cursor=pointer]:
+          - /url: /Seller/Finance/Index
+          - generic [ref=e31]: 
+          - text: Đối soát thanh toán
+      - listitem [ref=e32]:
+        - button " Báo cáo & Thống kê " [ref=e33] [cursor=pointer]:
+          - generic [ref=e34]: 
+          - text: Báo cáo & Thống kê 
+        - text:      
+      - listitem [ref=e35]:
+        - link " Quản lý kho" [ref=e36] [cursor=pointer]:
+          - /url: /Seller/Warehouse/Index
+          - generic [ref=e37]: 
+          - text: Quản lý kho
+      - listitem [ref=e38]:
+        - link " Tài khoản của tôi" [ref=e39] [cursor=pointer]:
+          - /url: /Seller/Profile
+          - generic [ref=e40]: 
+          - text: Tài khoản của tôi
+      - listitem [ref=e41]:
+        - link " Hỗ trợ khách hàng" [ref=e42] [cursor=pointer]:
+          - /url: /Seller/SupportChat/Index
+          - generic [ref=e43]: 
+          - text: Hỗ trợ khách hàng
+      - listitem [ref=e44]:
+        - link " Phản hồi người dùng" [ref=e45] [cursor=pointer]:
+          - /url: /Seller/Feedback/Index
+          - generic [ref=e46]: 
+          - text: Phản hồi người dùng
+      - listitem [ref=e47]:
+        - link " Cài đặt" [ref=e48] [cursor=pointer]:
+          - /url: /Seller/Setting/Index
+          - generic [ref=e49]: 
+          - text: Cài đặt
+  - generic [ref=e50]:
+    - navigation [ref=e51]:
+      - generic [ref=e52]:
+        - button "" [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]: 
+        - list [ref=e56]:
+          - listitem [ref=e57]:
+            - button " tho" [ref=e58] [cursor=pointer]:
+              - generic [ref=e59]: 
+              - text: tho
+    - main [ref=e61]:
+      - generic [ref=e64]:
+        - generic [ref=e66]:
+          - generic [ref=e68]: 
+          - generic [ref=e69]:
+            - heading "Bảng điều khiển" [level=1] [ref=e70]
+            - paragraph [ref=e71]: Tổng quan hoạt động kinh doanh, đơn hàng và khách hàng trong hệ thống
+        - generic [ref=e73]:
+          - generic [ref=e74]: 
+          - generic [ref=e75]: Monday, 27/04/2026
+      - generic [ref=e76]:
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: Doanh thu (Tháng)
+            - generic [ref=e83]: 0₫
+            - generic [ref=e84]:
+              - generic [ref=e85]: 
+              - text: Cập nhật theo đơn hàng mới
+          - generic [ref=e87]: 
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - generic [ref=e93]: Đơn hàng mới
+            - generic [ref=e94]: "20"
+            - generic [ref=e95]:
+              - generic [ref=e96]: 
+              - text: Đang chờ xử lý
+          - generic [ref=e98]: 
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - generic [ref=e104]: Khách hàng
+            - generic [ref=e105]: "8"
+            - generic [ref=e106]:
+              - generic [ref=e107]: 
+              - text: Tổng số khách hàng trong hệ thống
+          - generic [ref=e109]: 
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - generic [ref=e115]: Sản phẩm sắp hết
+            - generic [ref=e116]: "2"
+            - generic [ref=e117]:
+              - generic [ref=e118]: 
+              - text: Cần kiểm tra tồn kho
+          - generic [ref=e120]: 
+      - generic [ref=e121]:
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - generic [ref=e127]: 
+            - text: Doanh thu 7 ngày gần nhất
+          - generic [ref=e128]: Theo dõi xu hướng doanh thu trong tuần
+        - generic [ref=e135]:
+          - generic [ref=e136]:
+            - generic [ref=e137]: 
+            - text: Tỉ lệ danh mục bán chạy
+          - generic [ref=e138]: Tỷ trọng doanh thu theo từng danh mục
+      - generic [ref=e142]:
+        - generic [ref=e144]:
+          - heading " Đơn hàng gần đây" [level=5] [ref=e145]:
+            - generic [ref=e146]: 
+            - text: Đơn hàng gần đây
+          - text: Danh sách các đơn hàng mới nhất trên hệ thống
+        - table [ref=e148]:
+          - rowgroup [ref=e149]:
+            - row "Mã đơn hàng Khách hàng Ngày đặt Tổng tiền Trạng thái" [ref=e150]:
+              - columnheader "Mã đơn hàng" [ref=e151]
+              - columnheader "Khách hàng" [ref=e152]
+              - columnheader "Ngày đặt" [ref=e153]
+              - columnheader "Tổng tiền" [ref=e154]
+              - columnheader "Trạng thái" [ref=e155]
+          - rowgroup [ref=e156]:
+            - row " ORD-000172 E2E Test FreshFarm 27/04/2026 70,500₫ Cho xu ly" [ref=e157]:
+              - cell " ORD-000172" [ref=e158]:
+                - generic [ref=e159]:
+                  - generic [ref=e160]: 
+                  - generic [ref=e161]: ORD-000172
+              - cell "E2E Test FreshFarm" [ref=e162]:
+                - generic [ref=e164]: E2E Test FreshFarm
+              - cell "27/04/2026" [ref=e165]
+              - cell "70,500₫" [ref=e166]
+              - cell "Cho xu ly" [ref=e167]:
+                - generic [ref=e168]: Cho xu ly
+            - row " ORD-000170 Bùi Khắc Vinh 26/04/2026 1,045,100₫ Cho xu ly" [ref=e169]:
+              - cell " ORD-000170" [ref=e170]:
+                - generic [ref=e171]:
+                  - generic [ref=e172]: 
+                  - generic [ref=e173]: ORD-000170
+              - cell "Bùi Khắc Vinh" [ref=e174]:
+                - generic [ref=e176]: Bùi Khắc Vinh
+              - cell "26/04/2026" [ref=e177]
+              - cell "1,045,100₫" [ref=e178]
+              - cell "Cho xu ly" [ref=e179]:
+                - generic [ref=e180]: Cho xu ly
+            - row " ORD-000169 Bùi Khắc Vinh 26/04/2026 1,045,100₫ Cho xu ly" [ref=e181]:
+              - cell " ORD-000169" [ref=e182]:
+                - generic [ref=e183]:
+                  - generic [ref=e184]: 
+                  - generic [ref=e185]: ORD-000169
+              - cell "Bùi Khắc Vinh" [ref=e186]:
+                - generic [ref=e188]: Bùi Khắc Vinh
+              - cell "26/04/2026" [ref=e189]
+              - cell "1,045,100₫" [ref=e190]
+              - cell "Cho xu ly" [ref=e191]:
+                - generic [ref=e192]: Cho xu ly
+            - row " ORD-000164 Bùi Khắc Vinh 19/03/2026 52,900₫ Cho xu ly" [ref=e193]:
+              - cell " ORD-000164" [ref=e194]:
+                - generic [ref=e195]:
+                  - generic [ref=e196]: 
+                  - generic [ref=e197]: ORD-000164
+              - cell "Bùi Khắc Vinh" [ref=e198]:
+                - generic [ref=e200]: Bùi Khắc Vinh
+              - cell "19/03/2026" [ref=e201]
+              - cell "52,900₫" [ref=e202]
+              - cell "Cho xu ly" [ref=e203]:
+                - generic [ref=e204]: Cho xu ly
+            - row " ORD-000163 Bùi Khắc Vinh 19/03/2026 52,900₫ Cho xu ly" [ref=e205]:
+              - cell " ORD-000163" [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]: 
+                  - generic [ref=e209]: ORD-000163
+              - cell "Bùi Khắc Vinh" [ref=e210]:
+                - generic [ref=e212]: Bùi Khắc Vinh
+              - cell "19/03/2026" [ref=e213]
+              - cell "52,900₫" [ref=e214]
+              - cell "Cho xu ly" [ref=e215]:
+                - generic [ref=e216]: Cho xu ly

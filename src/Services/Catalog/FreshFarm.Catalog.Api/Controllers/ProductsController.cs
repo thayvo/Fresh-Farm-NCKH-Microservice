@@ -24,10 +24,12 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Get(
         [FromQuery] string? name,
         [FromQuery] int? sellerId = null,
+        [FromQuery] int[]? productIds = null,
         [FromQuery] int[]? categoryIds = null,
         [FromQuery] string[]? origins = null,
         [FromQuery] string[]? standards = null,
-        [FromQuery] string[]? units = null)
+        [FromQuery] string[]? units = null,
+        [FromQuery] int? limit = null)
     {
         var currentSellerId = TryGetCurrentSellerId();
         try
@@ -36,10 +38,12 @@ public sealed class ProductsController : ControllerBase
                     currentSellerId,
                     name,
                     sellerId,
+                    productIds,
                     categoryIds,
                     origins,
                     standards,
                     units,
+                    limit,
                     includeAttributes: true)
                 .ToListAsync();
             return Ok(result);
@@ -50,14 +54,62 @@ public sealed class ProductsController : ControllerBase
                     currentSellerId,
                     name,
                     sellerId,
+                    productIds,
                     categoryIds,
                     origins,
                     standards,
                     units,
+                    limit,
                     includeAttributes: false)
                 .ToListAsync();
             return Ok(fallbackResult);
         }
+    }
+
+    [HttpGet("seasonality")]
+    public async Task<IActionResult> GetSeasonality([FromQuery] int[]? productIds, CancellationToken cancellationToken)
+    {
+        var normalizedProductIds = (productIds ?? Array.Empty<int>())
+            .Where(idValue => idValue > 0)
+            .Distinct()
+            .Take(200)
+            .ToArray();
+
+        if (normalizedProductIds.Length == 0)
+        {
+            return Ok(Array.Empty<ProductSeasonalityPublicDto>());
+        }
+
+        var rows = await _db.ProductSeasonalities
+            .AsNoTracking()
+            .Where(row => normalizedProductIds.Contains(row.ProductId))
+            .OrderBy(row => row.ProductId)
+            .ThenBy(row => row.StartMonth)
+            .ThenBy(row => row.EndMonth)
+            .ThenBy(row => row.ProductSeasonalityId)
+            .Select(row => new ProductSeasonalityPublicDto
+            {
+                ProductId = row.ProductId,
+                Country = row.Country,
+                ProvinceRegion = row.ProvinceRegion,
+                AreaDetail = row.AreaDetail,
+                SeasonType = row.SeasonType,
+                SeasonLabel = row.SeasonLabel,
+                StartMonth = row.StartMonth,
+                EndMonth = row.EndMonth,
+                PeakMonths = row.PeakMonths,
+                IsYearRound = row.IsYearRound,
+                HasPeakSeason = row.HasPeakSeason,
+                IsControlledCultivation = row.IsControlledCultivation,
+                IsImportedSeason = row.IsImportedSeason,
+                IsOffSeason = row.IsOffSeason,
+                IsPostHarvestAvailability = row.IsPostHarvestAvailability,
+                SeasonScoreWeight = row.SeasonScoreWeight,
+                ConfidenceLevel = row.ConfidenceLevel
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows);
     }
 
     [HttpGet("{id:int}")]
@@ -102,10 +154,12 @@ public sealed class ProductsController : ControllerBase
         int? currentSellerId,
         string? name,
         int? sellerId,
+        int[]? productIds,
         int[]? categoryIds,
         string[]? origins,
         string[]? standards,
         string[]? units,
+        int? limit,
         bool includeAttributes)
     {
         var query = _db.Products
@@ -156,6 +210,17 @@ public sealed class ProductsController : ControllerBase
                     (info.Standard != null && info.Standard.Contains(keyword))));
         }
 
+        var normalizedProductIds = (productIds ?? Array.Empty<int>())
+            .Where(idValue => idValue > 0)
+            .Distinct()
+            .Take(200)
+            .ToArray();
+
+        if (normalizedProductIds.Length > 0)
+        {
+            query = query.Where(p => normalizedProductIds.Contains(p.ProductId));
+        }
+
         var normalizedCategoryIds = (categoryIds ?? Array.Empty<int>())
             .Where(idValue => idValue > 0)
             .Distinct()
@@ -201,8 +266,13 @@ public sealed class ProductsController : ControllerBase
             query = query.Where(p => normalizedUnits.Contains(p.Unit.UnitName.ToLower()));
         }
 
-        return query
-            .OrderByDescending(p => p.CreatedDate)
+        IQueryable<Product> orderedQuery = query.OrderByDescending(p => p.CreatedDate);
+        if (limit.HasValue)
+        {
+            orderedQuery = orderedQuery.Take(Math.Clamp(limit.Value, 1, 200));
+        }
+
+        return orderedQuery
             .Select(p => new ProductPublicListDto
             {
                 ProductId = p.ProductId,
@@ -362,6 +432,27 @@ public sealed class ProductsController : ControllerBase
         public string? Origin { get; set; }
         public string? Standard { get; set; }
         public string? Preservation { get; set; }
+    }
+
+    private sealed class ProductSeasonalityPublicDto
+    {
+        public int ProductId { get; set; }
+        public string? Country { get; set; }
+        public string? ProvinceRegion { get; set; }
+        public string? AreaDetail { get; set; }
+        public string SeasonType { get; set; } = string.Empty;
+        public string SeasonLabel { get; set; } = string.Empty;
+        public byte StartMonth { get; set; }
+        public byte EndMonth { get; set; }
+        public string? PeakMonths { get; set; }
+        public bool IsYearRound { get; set; }
+        public bool HasPeakSeason { get; set; }
+        public bool IsControlledCultivation { get; set; }
+        public bool IsImportedSeason { get; set; }
+        public bool IsOffSeason { get; set; }
+        public bool IsPostHarvestAvailability { get; set; }
+        public int SeasonScoreWeight { get; set; }
+        public string? ConfidenceLevel { get; set; }
     }
 
     private sealed class ProductAttributePublicDto

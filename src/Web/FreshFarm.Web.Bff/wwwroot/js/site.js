@@ -229,9 +229,12 @@
             return null;
         }
 
+        const rank = Math.max(0, Number(request?.position ?? request?.rank) || 0);
         const responsePayload = await postTrackingEvent("/bff/events/recommendation-click", {
             recommendationImpressionEventId: toPositiveIntOrNull(request?.recommendationImpressionEventId),
             productId,
+            position: rank || null,
+            rank: rank || null,
             placement,
             algorithm
         });

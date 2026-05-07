@@ -1,9 +1,12 @@
 using System.Text.Json;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using FreshFarm.Web.Bff.Dtos;
 using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
@@ -13,10 +16,26 @@ public sealed class CartController : Controller
     private const string CheckoutSelectedCartItemKeysSessionKey = "CHECKOUT_SELECTED_CART_ITEM_KEYS";
 
     private readonly ICartSessionService _cart;
+    private readonly IRecommendationMetricsClient _recommendationMetricsClient;
+    private readonly IRecommendationExperimentService _recommendationExperimentService;
 
     public CartController(ICartSessionService cart)
+        : this(
+            cart,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    [ActivatorUtilitiesConstructor]
+    public CartController(
+        ICartSessionService cart,
+        IRecommendationMetricsClient recommendationMetricsClient,
+        IRecommendationExperimentService recommendationExperimentService)
     {
         _cart = cart;
+        _recommendationMetricsClient = recommendationMetricsClient;
+        _recommendationExperimentService = recommendationExperimentService;
     }
 
     [HttpPost("/cart/checkout-selected")]
@@ -66,7 +85,13 @@ public sealed class CartController : Controller
             return BadRequest("ProductId không hợp lệ.");
         }
 
+        if (request.SellerId <= 0)
+        {
+            return BadRequest("SellerId không hợp lệ.");
+        }
+
         await _cart.AddOrIncreaseAsync(request);
+        TrackRecommendationAddToCartFireAndForget(request);
 
         if (WantsJson())
         {
@@ -137,5 +162,50 @@ public sealed class CartController : Controller
 
         var requestedWith = Request.Headers["X-Requested-With"].ToString();
         return string.Equals(requestedWith, "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void TrackRecommendationAddToCartFireAndForget(AddToCartRequestDto request)
+    {
+        if (request.ProductId <= 0)
+        {
+            return;
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+        _ = _recommendationMetricsClient.TrackAddToCartAsync(
+            userId,
+            request.ProductId,
+            NormalizeRecommendationPosition(request.RecommendationPosition ?? request.Position),
+            experimentGroup,
+            CancellationToken.None);
+    }
+
+    private int? ResolveRecommendationUserId()
+    {
+        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue("sub")
+            ?? User.FindFirstValue("userId")
+            ?? User.FindFirstValue("uid");
+
+        return int.TryParse(claimValue, out var userId) && userId > 0
+            ? userId
+            : null;
+    }
+
+    private static int? NormalizeRecommendationPosition(int? position)
+    {
+        return position is > 0 ? position.Value : null;
+    }
+
+    private sealed class NoopRecommendationExperimentService : IRecommendationExperimentService
+    {
+        public static readonly NoopRecommendationExperimentService Instance = new();
+
+        public string ResolveGroup(HttpContext httpContext, int? userId)
+        {
+            return RecommendationExperimentGroups.SessionRerank;
+        }
     }
 }

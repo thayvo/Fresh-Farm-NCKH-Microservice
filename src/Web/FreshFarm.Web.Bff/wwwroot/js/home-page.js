@@ -1,10 +1,14 @@
 (function () {
     const initHomePage = () => {
         const categoryWrapper = document.getElementById("categoryWrapper");
-        const suggestionWrapper = document.getElementById("suggestionWrapper");
+        const homeRecommendationSections = document.getElementById("homeRecommendationSections");
         const featuredGrid = document.getElementById("featuredGrid");
+        const newArrivalsGrid = document.getElementById("newArrivalsGrid");
+        const bestSellersGrid = document.getElementById("bestSellersGrid");
         const suggestionEmpty = document.getElementById("suggestionEmpty");
         const featuredEmpty = document.getElementById("featuredEmpty");
+        const newArrivalsEmpty = document.getElementById("newArrivalsEmpty");
+        const bestSellersEmpty = document.getElementById("bestSellersEmpty");
         const searchForm = document.getElementById("headerSearchForm");
         const searchInput = document.getElementById("headerSearchInput");
         const btnPrev = document.getElementById("btnPrev");
@@ -16,10 +20,14 @@
         const appHelpers = window.FreshFarmApp;
 
         if (!(categoryWrapper instanceof HTMLElement)
-            || !(suggestionWrapper instanceof HTMLElement)
+            || !(homeRecommendationSections instanceof HTMLElement)
             || !(featuredGrid instanceof HTMLElement)
+            || !(newArrivalsGrid instanceof HTMLElement)
+            || !(bestSellersGrid instanceof HTMLElement)
             || !(suggestionEmpty instanceof HTMLElement)
             || !(featuredEmpty instanceof HTMLElement)
+            || !(newArrivalsEmpty instanceof HTMLElement)
+            || !(bestSellersEmpty instanceof HTMLElement)
             || !(searchForm instanceof HTMLFormElement)
             || !(searchInput instanceof HTMLInputElement)
             || !(btnPrev instanceof HTMLElement)
@@ -27,14 +35,15 @@
             return;
         }
 
-        let swiperInstance = null;
         const suggestionRecommendationPlacement = "home_today";
         let suggestionRecommendationAlgorithm = "catalog_fallback";
         let suggestionRecommendationRunId = "";
         const suggestionImpressionIds = new Map();
 
         const endpointBase = "/bff/products";
-        const recommendationEndpoint = "/bff/recommendations/home?limit=12";
+        const recommendationEndpoint = "/bff/recommendations/home?limit=40";
+        const recommendationInitialCount = 8;
+        const recommendationLoadStep = 8;
         const categoryImages = [
             "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
             "https://images.pexels.com/photos/1656666/pexels-photo-1656666.jpeg",
@@ -83,7 +92,67 @@
             const sellerId = raw.sellerId ?? raw.SellerId ?? raw.primarySellerId ?? raw.PrimarySellerId ?? 0;
             const sellerName = raw.sellerName ?? raw.SellerName ?? raw.shopName ?? raw.ShopName ?? "";
             const imageFileName = raw.imageFileName ?? raw.ImageFileName ?? raw.imageUrl ?? raw.ImageUrl ?? "";
-            return { productId, productName, categoryName, unitName, price, sellerId, sellerName, imageFileName };
+            const createdAt = raw.createdAt ?? raw.CreatedAt ?? raw.createdDate ?? raw.CreatedDate ?? null;
+            const recommendationReason = (raw.recommendationReason ?? raw.RecommendationReason ?? "").toString().trim();
+            const recommendationTags = Array.isArray(raw.recommendationTags ?? raw.RecommendationTags)
+                ? (raw.recommendationTags ?? raw.RecommendationTags)
+                    .map((tag) => (tag ?? "").toString().trim())
+                    .filter((tag) => tag.length > 0)
+                : [];
+            const rawSeasonalityScore = raw.seasonalityScore ?? raw.SeasonalityScore;
+            const seasonalityScore = rawSeasonalityScore === null || rawSeasonalityScore === undefined
+                ? null
+                : toNumber(rawSeasonalityScore, 0);
+            const seasonalityLabel = (raw.seasonalityLabel ?? raw.SeasonalityLabel ?? "").toString().trim();
+            const seasonalityBadgeLabel = (raw.seasonalityBadgeLabel ?? raw.SeasonalityBadgeLabel ?? "").toString().trim();
+            return {
+                productId,
+                productName,
+                categoryName,
+                unitName,
+                price,
+                sellerId,
+                sellerName,
+                imageFileName,
+                createdAt,
+                recommendationReason,
+                recommendationTags,
+                seasonalityScore,
+                seasonalityLabel,
+                seasonalityBadgeLabel
+            };
+        };
+
+        const shouldShowSeasonalityBadge = (product) => {
+            const label = (product?.seasonalityBadgeLabel ?? "").toString().trim();
+            return label.length > 0 && (product?.seasonalityScore === null || product?.seasonalityScore > 0);
+        };
+
+        const renderSeasonalityBadge = (product) => shouldShowSeasonalityBadge(product)
+            ? `<div class="recommendation-badge-row seasonality-badge-row"><span class="recommendation-badge seasonality-badge">${escapeHtml(product.seasonalityBadgeLabel)}</span></div>`
+            : "";
+
+        const renderRecommendationMeta = (product, maxTags = 2) => {
+            const tags = Array.isArray(product.recommendationTags)
+                ? product.recommendationTags.filter((tag) => (tag || "").toString().trim().length > 0).slice(0, maxTags)
+                : [];
+            const reason = (product.recommendationReason || "").toString().trim();
+            if (!reason && tags.length === 0) {
+                return "";
+            }
+
+            return `
+                <div class="recommendation-meta">
+                    ${tags.length > 0 ? `
+                        <div class="recommendation-badge-row">
+                            ${tags.map((tag) => `
+                                <span class="recommendation-badge">${escapeHtml(tag)}</span>
+                            `).join("")}
+                        </div>
+                    ` : ""}
+                    ${reason ? `<div class="recommendation-reason">${escapeHtml(reason)}</div>` : ""}
+                </div>
+            `;
         };
 
         const buildCheckoutUrl = (product, qty = 1) => {
@@ -250,7 +319,9 @@
                         <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
                             <span class="fw-bold fs-5">${toVnd(product.price)}</span>
                         </div>
-                        <a href="${buildProductUrl(product)}" class="view-details mb-3">
+                        <a href="${buildProductUrl(product)}"
+                           class="view-details mb-3"
+                           ${product.recommendationRank ? `data-action="suggestion-click" data-product-id="${product.productId}" data-rank="${product.recommendationRank}"` : ""}>
                             <i class="bi bi-eye me-1"></i> Xem chi tiết
                         </a>
                         <div class="d-flex flex-wrap gap-2 justify-content-center">
@@ -265,7 +336,9 @@
                                     data-unit-symbol="${escapeHtml(product.unitName)}">
                                 <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
                             </button>
-                            <a href="${buildCheckoutUrl(product)}" class="btn btn-success btn-sm">
+                            <a href="${buildCheckoutUrl(product)}"
+                               class="btn btn-success btn-sm"
+                               ${product.recommendationRank ? `data-action="suggestion-click" data-product-id="${product.productId}" data-rank="${product.recommendationRank}"` : ""}>
                                 <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
                             </a>
                         </div>
@@ -273,6 +346,8 @@
                     <div class="card-body text-center">
                         <h5 class="card-title h6 mb-1">${escapeHtml(product.productName)}</h5>
                         <span class="fw-bold" style="color: var(--primary-green)">${toVnd(product.price)}</span>
+                        ${renderSeasonalityBadge(product)}
+                        ${renderRecommendationMeta(product, 2)}
                     </div>
                 </div>
             </div>
@@ -318,139 +393,193 @@
             });
         };
 
+        const buildRecommendationSection = (section, defaultPillLabel) => {
+            const items = Array.isArray(section.items) ? section.items : [];
+            if (items.length === 0) {
+                return "";
+            }
+
+            const pillLabel = (section.pillLabel || "").toString().trim() || defaultPillLabel;
+            const sectionId = (section.id || "").toString().trim() || `section-${Math.random().toString(36).slice(2, 10)}`;
+            const initialVisibleCount = Math.min(recommendationInitialCount, items.length);
+
+            return `
+                <section class="recommendation-section-card"
+                         data-section-id="${escapeHtml(sectionId)}"
+                         data-visible-count="${initialVisibleCount}"
+                         data-total-count="${items.length}">
+                    <div class="recommendation-section-header">
+                        <div>
+                            <h3 class="recommendation-section-title">${escapeHtml(section.title || "Gợi ý cho bạn")}</h3>
+                            <p class="recommendation-section-subtitle">${escapeHtml(section.subtitle || "Những món hợp gu và dễ chọn cho hôm nay.")}</p>
+                        </div>
+                        <span class="recommendation-section-pill">${escapeHtml(pillLabel)}</span>
+                    </div>
+                    <div class="recommendation-section-grid">
+                        ${items.map((product, index) => `
+                            <div class="${index >= initialVisibleCount ? "recommendation-card-hidden" : ""}" data-recommendation-card>
+                                ${buildCard(product, "")}
+                            </div>
+                        `).join("")}
+                    </div>
+                    ${items.length > initialVisibleCount ? `
+                        <div class="recommendation-section-actions">
+                            <button type="button"
+                                    class="btn recommendation-load-more"
+                                    data-action="recommendation-load-more">
+                                <span>Xem thêm</span>
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                        </div>
+                    ` : ""}
+                </section>
+            `;
+        };
+
+        const createRecommendationSections = (recommendationPayload, suggestions) => {
+            return [
+                {
+                    id: "today_highlights",
+                    title: "Gợi ý cho bạn hôm nay",
+                    subtitle: "Những món được cá nhân hóa từ lịch sử xem, tìm kiếm, mua hàng và tín hiệu gần đây của bạn.",
+                    pillLabel: "Cá nhân hóa",
+                    items: suggestions.map((item, index) => ({
+                        ...item,
+                        recommendationRank: index + 1
+                    }))
+                }
+            ].filter((section) => section.items.length > 0);
+        };
+
         const renderSuggestions = (recommendationPayload, fallbackProducts) => {
             const recommendationItems = Array.isArray(recommendationPayload?.items)
                 ? recommendationPayload.items.map(normalizeProduct)
                 : [];
             const suggestions = recommendationItems.length > 0
                 ? recommendationItems
-                : (Array.isArray(fallbackProducts) ? fallbackProducts.slice(0, 12) : []);
+                : (Array.isArray(fallbackProducts) ? fallbackProducts.slice(0, 40) : []);
             suggestionRecommendationAlgorithm = (recommendationPayload?.algorithm ?? "").toString().trim() || "catalog_fallback";
-            const swiperHost = document.querySelector(".mySwiper-suggest");
-            const hasSwiperRuntime = typeof window.Swiper === "function";
+            const sections = createRecommendationSections(recommendationPayload, suggestions);
 
             if (suggestions.length === 0) {
-                suggestionWrapper.innerHTML = "";
+                homeRecommendationSections.innerHTML = "";
                 suggestionEmpty.classList.remove("d-none");
                 suggestionImpressionIds.clear();
-                if (swiperHost instanceof HTMLElement) {
-                    swiperHost.classList.remove("suggestion-fallback-grid");
-                }
-                if (swiperInstance) {
-                    swiperInstance.destroy(true, true);
-                    swiperInstance = null;
-                }
                 return;
             }
 
             suggestionEmpty.classList.add("d-none");
-            if (swiperHost instanceof HTMLElement) {
-                swiperHost.classList.toggle("suggestion-fallback-grid", !hasSwiperRuntime);
-            }
-
-            suggestionWrapper.innerHTML = suggestions
-                .map((p, index) => {
-                    const cardMarkup = `
-                        <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
-                            <div class="product-image-wrapper">
-                                <img src="${resolveProductImage(p.imageFileName)}" class="product-image" alt="${escapeHtml(p.productName)}" />
-                            </div>
-                            <div class="product-overlay">
-                                <h5 class="h6 mb-2">${escapeHtml(p.productName)}</h5>
-                                <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-                                    <span class="fw-bold fs-5">${toVnd(p.price)}</span>
-                                </div>
-                                <a href="${buildProductUrl(p)}"
-                                   class="view-details mb-3"
-                                   data-action="suggestion-click"
-                                   data-product-id="${p.productId}"
-                                   data-rank="${index + 1}">
-                                    <i class="bi bi-eye me-1"></i> Xem chi tiết
-                                </a>
-                                <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                    <button type="button"
-                                            class="btn btn-outline-light btn-sm"
-                                            data-action="add-cart"
-                                            data-product-id="${p.productId}"
-                                            data-seller-id="${toNumber(p.sellerId, 0)}"
-                                            data-seller-name="${escapeHtml(p.sellerName)}"
-                                            data-product-name="${escapeHtml(p.productName)}"
-                                            data-unit-price="${toNumber(p.price, 0)}"
-                                            data-unit-symbol="${escapeHtml(p.unitName)}">
-                                        <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
-                                    </button>
-                                    <a href="${buildCheckoutUrl(p)}"
-                                       class="btn btn-success btn-sm"
-                                       data-action="suggestion-click"
-                                       data-product-id="${p.productId}"
-                                       data-rank="${index + 1}">
-                                        <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="card-body text-center">
-                                <h5 class="card-title h6 mb-1">${escapeHtml(p.productName)}</h5>
-                                <span class="fw-bold" style="color: var(--primary-green)">${toVnd(p.price)}</span>
-                            </div>
-                        </div>
-                    `;
-
-                    return hasSwiperRuntime
-                        ? `<div class="swiper-slide">${cardMarkup}</div>`
-                        : `<div>${cardMarkup}</div>`;
-                })
+            homeRecommendationSections.innerHTML = sections
+                .map((section, index) => buildRecommendationSection(
+                    section,
+                    index === 0 ? "Gợi ý hợp gu" : section.id === "buy_again" ? "Ưu tiên mua lại" : "Theo mùa & địa phương"))
                 .join("");
-
-            if (swiperInstance) {
-                swiperInstance.destroy(true, true);
-                swiperInstance = null;
-            }
-
-            if (!hasSwiperRuntime) {
-                console.warn("Swiper runtime unavailable. Rendering suggestions in static grid mode.");
-                registerSuggestionImpressions(suggestions);
-                return;
-            }
-
-            swiperInstance = new window.Swiper(".mySwiper-suggest", {
-                slidesPerView: 2,
-                spaceBetween: 16,
-                breakpoints: {
-                    576: { slidesPerView: 2 },
-                    768: { slidesPerView: 3 },
-                    992: { slidesPerView: 4 },
-                    1200: { slidesPerView: 5 }
-                },
-                loop: suggestions.length > 5,
-                autoplay: {
-                    delay: 3500,
-                    disableOnInteraction: false
-                },
-                navigation: {
-                    nextEl: ".swiper-button-next",
-                    prevEl: ".swiper-button-prev"
-                }
-            });
-
-            const swiperEl = document.querySelector(".mySwiper-suggest");
-            if (swiperEl instanceof HTMLElement && swiperInstance?.autoplay) {
-                swiperEl.addEventListener("mouseenter", () => swiperInstance.autoplay.stop());
-                swiperEl.addEventListener("mouseleave", () => swiperInstance.autoplay.start());
-            }
 
             registerSuggestionImpressions(suggestions);
         };
 
-        const renderFeatured = (products) => {
-            const featured = products.slice(0, 12);
-            if (featured.length === 0) {
+        const buildTrendingEndpoint = (excludedProductIds) => {
+            const query = new URLSearchParams("limit=12");
+            const uniqueIds = new Set(
+                (Array.isArray(excludedProductIds) ? excludedProductIds : [])
+                    .map((id) => toNumber(id, 0))
+                    .filter((id) => id > 0));
+
+            uniqueIds.forEach((id) => query.append("personalizedProductIds", String(id)));
+            return `/bff/products/trending?${query.toString()}`;
+        };
+
+        const buildNewArrivalsEndpoint = (excludedProductIds) => {
+            const query = new URLSearchParams("limit=12");
+            const uniqueIds = new Set(
+                (Array.isArray(excludedProductIds) ? excludedProductIds : [])
+                    .map((id) => toNumber(id, 0))
+                    .filter((id) => id > 0));
+
+            uniqueIds.forEach((id) => query.append("excludeProductIds", String(id)));
+            return `/bff/products/new-arrivals?${query.toString()}`;
+        };
+
+        const buildBestSellersEndpoint = (excludedProductIds) => {
+            const query = new URLSearchParams("limit=12");
+            const uniqueIds = new Set(
+                (Array.isArray(excludedProductIds) ? excludedProductIds : [])
+                    .map((id) => toNumber(id, 0))
+                    .filter((id) => id > 0));
+
+            uniqueIds.forEach((id) => query.append("excludeProductIds", String(id)));
+            return `/bff/products/best-sellers?${query.toString()}`;
+        };
+
+        const revealMoreRecommendationCards = (sectionElement) => {
+            if (!(sectionElement instanceof HTMLElement)) {
+                return;
+            }
+
+            const cards = Array.from(sectionElement.querySelectorAll("[data-recommendation-card]"));
+            const currentVisibleCount = Math.max(0, toNumber(sectionElement.getAttribute("data-visible-count"), recommendationInitialCount));
+            const nextVisibleCount = Math.min(cards.length, currentVisibleCount + recommendationLoadStep);
+
+            cards.forEach((card, index) => {
+                if (!(card instanceof HTMLElement)) {
+                    return;
+                }
+
+                card.classList.toggle("recommendation-card-hidden", index >= nextVisibleCount);
+            });
+
+            sectionElement.setAttribute("data-visible-count", String(nextVisibleCount));
+
+            const loadMoreButton = sectionElement.querySelector("[data-action='recommendation-load-more']");
+            if (!(loadMoreButton instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            if (nextVisibleCount >= cards.length) {
+                loadMoreButton.closest(".recommendation-section-actions")?.remove();
+            }
+        };
+
+        const renderTrending = (products, excludedProductIds = [], allowControlledOverlap = false) => {
+            const excluded = new Set(
+                (Array.isArray(excludedProductIds) ? excludedProductIds : [])
+                    .map((id) => toNumber(id, 0))
+                    .filter((id) => id > 0));
+            const trending = products
+                .filter((product) => allowControlledOverlap || !excluded.has(toNumber(product.productId, 0)))
+                .slice(0, 12);
+            if (trending.length === 0) {
                 featuredGrid.innerHTML = "";
                 featuredEmpty.classList.remove("d-none");
                 return;
             }
 
             featuredEmpty.classList.add("d-none");
-            featuredGrid.innerHTML = featured.map((p) => buildCard(p)).join("");
+            featuredGrid.innerHTML = trending.map((p) => buildCard(p)).join("");
+        };
+
+        const renderNewArrivals = (products) => {
+            const arrivals = products.slice(0, 12);
+            if (arrivals.length === 0) {
+                newArrivalsGrid.innerHTML = "";
+                newArrivalsEmpty.classList.remove("d-none");
+                return;
+            }
+
+            newArrivalsEmpty.classList.add("d-none");
+            newArrivalsGrid.innerHTML = arrivals.map((p) => buildCard(p)).join("");
+        };
+
+        const renderBestSellers = (products) => {
+            const bestSellers = products.slice(0, 12);
+            if (bestSellers.length === 0) {
+                bestSellersGrid.innerHTML = "";
+                bestSellersEmpty.classList.remove("d-none");
+                return;
+            }
+
+            bestSellersEmpty.classList.add("d-none");
+            bestSellersGrid.innerHTML = bestSellers.map((p) => buildCard(p)).join("");
         };
 
         document.addEventListener("click", (event) => {
@@ -468,28 +597,36 @@
                 void appHelpers?.trackRecommendationClick?.({
                     recommendationImpressionEventId: suggestionImpressionIds.get(impressionKey) ?? null,
                     productId,
+                    rank,
                     placement: suggestionRecommendationPlacement,
                     algorithm: suggestionRecommendationAlgorithm
                 });
             }
 
             const addCartButton = target.closest("button[data-action='add-cart']");
-            if (!(addCartButton instanceof HTMLButtonElement)) {
+            if (addCartButton instanceof HTMLButtonElement) {
+                event.preventDefault();
+
+                const product = {
+                    productId: toNumber(addCartButton.getAttribute("data-product-id"), 0),
+                    sellerId: toNumber(addCartButton.getAttribute("data-seller-id"), 0),
+                    sellerName: addCartButton.getAttribute("data-seller-name") ?? "",
+                    productName: addCartButton.getAttribute("data-product-name") ?? "",
+                    price: toNumber(addCartButton.getAttribute("data-unit-price"), 0),
+                    unitName: addCartButton.getAttribute("data-unit-symbol") ?? "đơn vị"
+                };
+
+                void submitAddToCart(product, 1, addCartButton);
+                return;
+            }
+
+            const loadMoreButton = target.closest("button[data-action='recommendation-load-more']");
+            if (!(loadMoreButton instanceof HTMLButtonElement)) {
                 return;
             }
 
             event.preventDefault();
-
-            const product = {
-                productId: toNumber(addCartButton.getAttribute("data-product-id"), 0),
-                sellerId: toNumber(addCartButton.getAttribute("data-seller-id"), 0),
-                sellerName: addCartButton.getAttribute("data-seller-name") ?? "",
-                productName: addCartButton.getAttribute("data-product-name") ?? "",
-                price: toNumber(addCartButton.getAttribute("data-unit-price"), 0),
-                unitName: addCartButton.getAttribute("data-unit-symbol") ?? "đơn vị"
-            };
-
-            void submitAddToCart(product, 1, addCartButton);
+            revealMoreRecommendationCards(loadMoreButton.closest(".recommendation-section-card"));
         });
 
         const loadHomeProducts = async (keyword = "") => {
@@ -528,15 +665,89 @@
                     recommendationData = recommendationResult.ok ? recommendationPayload : null;
                 }
 
+                const personalizedProductIds = Array.isArray(recommendationData?.items)
+                    ? recommendationData.items
+                        .map((item) => toNumber(item.productId ?? item.ProductId, 0))
+                        .filter((id) => id > 0)
+                    : [];
+                let trendingProducts = [];
+                try {
+                    const trendingResponse = await fetch(buildTrendingEndpoint(personalizedProductIds), {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    });
+                    const { payload: trendingPayload } = appHelpers
+                        ? await appHelpers.tryParsePayload(trendingResponse)
+                        : { payload: await trendingResponse.json() };
+                    if (trendingResponse.ok && Array.isArray(trendingPayload?.items)) {
+                        trendingProducts = trendingPayload.items.map(normalizeProduct);
+                    }
+                } catch {
+                    trendingProducts = [];
+                }
+
+                const trendingProductIds = trendingProducts
+                    .map((item) => toNumber(item.productId, 0))
+                    .filter((id) => id > 0);
+                let newArrivalProducts = [];
+                try {
+                    const newArrivalsResponse = await fetch(buildNewArrivalsEndpoint([
+                        ...personalizedProductIds,
+                        ...trendingProductIds
+                    ]), {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    });
+                    const { payload: newArrivalsPayload } = appHelpers
+                        ? await appHelpers.tryParsePayload(newArrivalsResponse)
+                        : { payload: await newArrivalsResponse.json() };
+                    if (newArrivalsResponse.ok && Array.isArray(newArrivalsPayload?.items)) {
+                        newArrivalProducts = newArrivalsPayload.items.map(normalizeProduct);
+                    }
+                } catch {
+                    newArrivalProducts = [];
+                }
+                const newArrivalProductIds = newArrivalProducts
+                    .map((item) => toNumber(item.productId, 0))
+                    .filter((id) => id > 0);
+                let bestSellerProducts = [];
+                try {
+                    const bestSellersResponse = await fetch(buildBestSellersEndpoint([
+                        ...personalizedProductIds,
+                        ...trendingProductIds,
+                        ...newArrivalProductIds
+                    ]), {
+                        method: "GET",
+                        headers: { Accept: "application/json" }
+                    });
+                    const { payload: bestSellersPayload } = appHelpers
+                        ? await appHelpers.tryParsePayload(bestSellersResponse)
+                        : { payload: await bestSellersResponse.json() };
+                    if (bestSellersResponse.ok && Array.isArray(bestSellersPayload?.items)) {
+                        bestSellerProducts = bestSellersPayload.items.map(normalizeProduct);
+                    }
+                } catch {
+                    bestSellerProducts = [];
+                }
+
                 renderCategories(products);
                 renderSuggestions(recommendationData, products);
-                renderFeatured(products);
+                renderTrending(
+                    trendingProducts.length > 0 ? trendingProducts : products,
+                    personalizedProductIds,
+                    trendingProducts.length > 0);
+                renderNewArrivals(newArrivalProducts);
+                renderBestSellers(bestSellerProducts);
             } catch (error) {
                 categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";
-                suggestionWrapper.innerHTML = "";
+                homeRecommendationSections.innerHTML = "";
                 featuredGrid.innerHTML = "";
+                newArrivalsGrid.innerHTML = "";
+                bestSellersGrid.innerHTML = "";
                 suggestionEmpty.classList.remove("d-none");
                 featuredEmpty.classList.remove("d-none");
+                newArrivalsEmpty.classList.remove("d-none");
+                bestSellersEmpty.classList.remove("d-none");
                 console.error(error);
             }
         };

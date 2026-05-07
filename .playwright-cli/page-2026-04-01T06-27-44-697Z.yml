@@ -1,0 +1,411 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - link "Kênh Người Bán" [ref=e5] [cursor=pointer]:
+        - /url: /account/become-seller
+      - generic [ref=e6]: "|"
+      - link "Trở thành Người bán FreshFarm" [ref=e7] [cursor=pointer]:
+        - /url: /account/become-seller
+    - generic [ref=e8]:
+      - link " Thông báo" [ref=e9] [cursor=pointer]:
+        - /url: /account/notifications
+        - generic [ref=e10]: 
+        - text: Thông báo
+      - link " Hỗ trợ" [ref=e11] [cursor=pointer]:
+        - /url: "#buyerChatWidget"
+        - generic [ref=e12]: 
+        - text: Hỗ trợ
+      - generic [ref=e13]: "|"
+      - link " abcdef123 " [ref=e15] [cursor=pointer]:
+        - /url: /account/profile
+        - generic [ref=e16]: 
+        - text: abcdef123
+        - generic [ref=e17]: 
+  - generic [ref=e18]:
+    - button " Chat với shop Chưa có hội thoại nào" [ref=e19] [cursor=pointer]:
+      - generic [ref=e21]: 
+      - generic [ref=e22]:
+        - strong [ref=e23]: Chat với shop
+        - generic [ref=e24]: Chưa có hội thoại nào
+    - text:     
+  - banner [ref=e25]:
+    - generic [ref=e27]:
+      - link "Logo FreshFarm FRESHFARM Nông sản sạch mỗi ngày" [ref=e29] [cursor=pointer]:
+        - /url: /
+        - img "Logo FreshFarm" [ref=e31]
+        - generic [ref=e32]:
+          - generic [ref=e33]: FRESHFARM
+          - img "Nông sản sạch mỗi ngày" [ref=e34]
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - searchbox "Tìm kiếm nông sản, trái cây, rau sạch..." [ref=e37]
+          - button "" [ref=e38] [cursor=pointer]:
+            - generic [ref=e39]: 
+        - generic [ref=e40]:
+          - link "Rau sạch" [ref=e41] [cursor=pointer]:
+            - /url: "#"
+          - link "Trái cây" [ref=e42] [cursor=pointer]:
+            - /url: "#"
+          - link "Nông sản hữu cơ" [ref=e43] [cursor=pointer]:
+            - /url: "#"
+          - link "Thực phẩm tươi" [ref=e44] [cursor=pointer]:
+            - /url: "#"
+          - link "Giao nhanh" [ref=e45] [cursor=pointer]:
+            - /url: "#"
+      - link " Giỏ hàng" [ref=e48] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e49]: 
+        - generic [ref=e50]: Giỏ hàng
+  - navigation [ref=e51]:
+    - list [ref=e54]:
+      - listitem [ref=e55]:
+        - link "Trang Chủ" [ref=e56] [cursor=pointer]:
+          - /url: /
+      - listitem [ref=e57]:
+        - link "Danh mục" [ref=e58] [cursor=pointer]:
+          - /url: "#section-categories"
+      - listitem [ref=e59]:
+        - link "Gợi Ý Hôm Nay" [ref=e60] [cursor=pointer]:
+          - /url: "#section-suggest"
+      - listitem [ref=e61]:
+        - link "Sản phẩm nổi bật" [ref=e62] [cursor=pointer]:
+          - /url: "#section-featured"
+      - listitem [ref=e63]:
+        - link "Lịch sử đơn" [ref=e64] [cursor=pointer]:
+          - /url: /account/orders
+  - generic [ref=e65]:
+    - generic [ref=e66]:
+      - button [ref=e67] [cursor=pointer]
+      - button [ref=e68] [cursor=pointer]
+      - button [ref=e69] [cursor=pointer]
+    - img "Banner 1" [ref=e72]
+    - button [ref=e73] [cursor=pointer]
+    - button [ref=e75] [cursor=pointer]
+  - generic [ref=e78]:
+    - heading "Danh mục" [level=2] [ref=e79]
+    - generic [ref=e81]:
+      - link "Rau ăn hoa / thân / mầm Rau ăn hoa / thân / mầm" [ref=e82] [cursor=pointer]:
+        - /url: "#"
+        - img "Rau ăn hoa / thân / mầm" [ref=e83]
+        - generic [ref=e84]: Rau ăn hoa / thân / mầm
+      - link "Rau ăn quả Rau ăn quả" [ref=e85] [cursor=pointer]:
+        - /url: "#"
+        - img "Rau ăn quả" [ref=e86]
+        - generic [ref=e87]: Rau ăn quả
+      - link "Củ & rễ Củ & rễ" [ref=e88] [cursor=pointer]:
+        - /url: "#"
+        - img "Củ & rễ" [ref=e89]
+        - generic [ref=e90]: Củ & rễ
+      - link "Nấm Nấm" [ref=e91] [cursor=pointer]:
+        - /url: "#"
+        - img "Nấm" [ref=e92]
+        - generic [ref=e93]: Nấm
+      - link "Rau thơm & gia vị Rau thơm & gia vị" [ref=e94] [cursor=pointer]:
+        - /url: "#"
+        - img "Rau thơm & gia vị" [ref=e95]
+        - generic [ref=e96]: Rau thơm & gia vị
+      - link "Trái cây Trái cây" [ref=e97] [cursor=pointer]:
+        - /url: "#"
+        - img "Trái cây" [ref=e98]
+        - generic [ref=e99]: Trái cây
+      - link "Rau lá Rau lá" [ref=e100] [cursor=pointer]:
+        - /url: "#"
+        - img "Rau lá" [ref=e101]
+        - generic [ref=e102]: Rau lá
+    - button "" [ref=e103] [cursor=pointer]:
+      - generic [ref=e104]: 
+    - button "" [ref=e105] [cursor=pointer]:
+      - generic [ref=e106]: 
+  - generic [ref=e107]:
+    - generic [ref=e108]:
+      - heading "Gợi ý dành cho bạn" [level=2] [ref=e109]
+      - paragraph [ref=e110]: Tách rõ theo lịch sử quan tâm, món đã từng mua và nông sản đúng mùa gần bạn.
+    - generic [ref=e111]:
+      - generic [ref=e112]:
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - heading "Dành cho bạn" [level=3] [ref=e115]
+            - paragraph [ref=e116]: Dựa trên sản phẩm bạn vừa xem, tìm kiếm và chọn gần đây.
+          - generic [ref=e117]: Cá nhân hóa
+        - generic [ref=e118]:
+          - generic [ref=e120]:
+            - img "Cải thìa" [ref=e122]
+            - generic [ref=e123]:
+              - heading "Cải thìa" [level=5] [ref=e124]
+              - generic [ref=e125]: 16.500 ₫
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - generic [ref=e128]: Hay được mua cùng mối quan tâm của bạn
+                  - generic [ref=e129]: Hợp với mối quan tâm gần đây
+                - generic [ref=e130]: Hay được mua cùng mối quan tâm của bạn · Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem
+          - generic [ref=e132]:
+            - img "Bông cải xanh" [ref=e134]
+            - generic [ref=e135]:
+              - heading "Bông cải xanh" [level=5] [ref=e136]
+              - generic [ref=e137]: 30.000 ₫
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]: Hay được mua cùng mối quan tâm của bạn
+                  - generic [ref=e141]: Hợp với mối quan tâm gần đây
+                - generic [ref=e142]: Hay được mua cùng mối quan tâm của bạn · Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem
+          - generic [ref=e144]:
+            - img "Ổi xá lị" [ref=e146]
+            - generic [ref=e147]:
+              - heading "Ổi xá lị" [level=5] [ref=e148]
+              - generic [ref=e149]: 28.000 ₫
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e153]: Cùng xuất xứ bạn vừa xem
+                - generic [ref=e154]: Hợp với mối quan tâm gần đây · Cùng xuất xứ bạn vừa xem · Cùng Kết cấu
+          - generic [ref=e156]:
+            - img "Măng tây xanh" [ref=e158]
+            - generic [ref=e159]:
+              - heading "Măng tây xanh" [level=5] [ref=e160]
+              - generic [ref=e161]: 45.000 ₫
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - generic [ref=e164]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e165]: Từ shop cùng vùng bạn vừa xem
+                - generic [ref=e166]: Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem · Cùng Hương vị
+          - generic [ref=e168]:
+            - img "Bí đỏ" [ref=e170]
+            - generic [ref=e171]:
+              - heading "Bí đỏ" [level=5] [ref=e172]
+              - generic [ref=e173]: 20.000 ₫
+              - generic [ref=e174]:
+                - generic [ref=e175]:
+                  - generic [ref=e176]: Hay được mua cùng mối quan tâm của bạn
+                  - generic [ref=e177]: Hợp với mối quan tâm gần đây
+                - generic [ref=e178]: Hay được mua cùng mối quan tâm của bạn · Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem
+          - generic [ref=e180]:
+            - img "Tỏi tây" [ref=e182]
+            - generic [ref=e183]:
+              - heading "Tỏi tây" [level=5] [ref=e184]
+              - generic [ref=e185]: 35.000 ₫
+              - generic [ref=e186]:
+                - generic [ref=e187]:
+                  - generic [ref=e188]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e189]: Cùng Hương vị
+                - generic [ref=e190]: Hợp với mối quan tâm gần đây · Cùng Hương vị · Đánh giá tốt
+      - generic [ref=e191]:
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - heading "Mua lại từ lịch sử" [level=3] [ref=e194]
+            - paragraph [ref=e195]: Món bạn mua gần đây vẫn đang sẵn để đặt lại nhanh hôm nay.
+          - generic [ref=e196]: Mua nhanh lần nữa
+        - generic [ref=e199]:
+          - img "Rau muống" [ref=e201]
+          - generic [ref=e202]:
+            - heading "Rau muống" [level=5] [ref=e203]
+            - generic [ref=e204]: 30.000 ₫
+            - generic [ref=e205]:
+              - generic [ref=e206]:
+                - generic [ref=e207]: Bạn đã mua 2 lần
+                - generic [ref=e208]: Mới mua gần đây
+              - generic [ref=e209]: Bạn đã mua 2 lần · Mới mua gần đây · Sẵn để đặt lại ngay
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - heading "Đúng mùa gần bạn" [level=3] [ref=e213]
+            - paragraph [ref=e214]: Ưu tiên nông sản đang đúng mùa, đúng vùng trồng hoặc cùng khu vực giao nhanh.
+          - generic [ref=e215]: Theo mùa & địa phương
+        - generic [ref=e216]:
+          - generic [ref=e218]:
+            - img "Khoai lang tím" [ref=e220]
+            - generic [ref=e221]:
+              - heading "Khoai lang tím" [level=5] [ref=e222]
+              - generic [ref=e223]: 18.000 ₫
+              - generic [ref=e224]:
+                - generic [ref=e225]:
+                  - generic [ref=e226]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e227]: Đánh giá tốt
+                - generic [ref=e228]: Hợp với mối quan tâm gần đây · Đánh giá tốt · Từ Bình Dương
+          - generic [ref=e230]:
+            - img "Cải ngồng" [ref=e232]
+            - generic [ref=e233]:
+              - heading "Cải ngồng" [level=5] [ref=e234]
+              - generic [ref=e235]: 14.500 ₫
+              - generic [ref=e236]:
+                - generic [ref=e237]:
+                  - generic [ref=e238]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e239]: Từ shop cùng vùng bạn vừa xem
+                - generic [ref=e240]: Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem · Cùng danh mục bạn quan tâm
+          - generic [ref=e242]:
+            - img "Rau cải ngọt" [ref=e244]
+            - generic [ref=e245]:
+              - heading "Rau cải ngọt" [level=5] [ref=e246]
+              - generic [ref=e247]: 13.000 ₫
+              - generic [ref=e248]:
+                - generic [ref=e249]:
+                  - generic [ref=e250]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e251]: Từ shop cùng vùng bạn vừa xem
+                - generic [ref=e252]: Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem · Cùng danh mục bạn quan tâm
+          - generic [ref=e254]:
+            - img "Rau má" [ref=e256]
+            - generic [ref=e257]:
+              - heading "Rau má" [level=5] [ref=e258]
+              - generic [ref=e259]: 11.000 ₫
+              - generic [ref=e260]:
+                - generic [ref=e261]:
+                  - generic [ref=e262]: Hợp với mối quan tâm gần đây
+                  - generic [ref=e263]: Cùng vùng nông sản bạn vừa xem
+                - generic [ref=e264]: Hợp với mối quan tâm gần đây · Cùng vùng nông sản bạn vừa xem · Từ shop cùng vùng bạn vừa xem
+          - generic [ref=e266]:
+            - img "Cà rốt" [ref=e268]
+            - generic [ref=e269]:
+              - heading "Cà rốt" [level=5] [ref=e270]
+              - generic [ref=e271]: 22.000 ₫
+              - generic [ref=e272]:
+                - generic [ref=e273]:
+                  - generic [ref=e274]: Hay được mua cùng mối quan tâm của bạn
+                  - generic [ref=e275]: Hợp với mối quan tâm gần đây
+                - generic [ref=e276]: Hay được mua cùng mối quan tâm của bạn · Hợp với mối quan tâm gần đây · Từ shop cùng vùng bạn vừa xem
+  - generic [ref=e277]:
+    - generic [ref=e278]:
+      - heading "Sản phẩm nổi bật" [level=2] [ref=e279]
+      - link "Xem thêm " [ref=e280] [cursor=pointer]:
+        - /url: "#section-featured"
+        - text: Xem thêm
+        - generic [ref=e281]: 
+    - generic [ref=e282]:
+      - generic [ref=e284]:
+        - img "Bông cải xanh baby" [ref=e286]
+        - generic [ref=e287]:
+          - heading "Bông cải xanh baby" [level=5] [ref=e288]
+          - generic [ref=e289]: 32.000 ₫
+      - generic [ref=e291]:
+        - img "Bông cải trắng mini" [ref=e293]
+        - generic [ref=e294]:
+          - heading "Bông cải trắng mini" [level=5] [ref=e295]
+          - generic [ref=e296]: 28.000 ₫
+      - generic [ref=e298]:
+        - img "Cà chua beef" [ref=e300]
+        - generic [ref=e301]:
+          - heading "Cà chua beef" [level=5] [ref=e302]
+          - generic [ref=e303]: 25.000 ₫
+      - generic [ref=e305]:
+        - img "Bí đao" [ref=e307]
+        - generic [ref=e308]:
+          - heading "Bí đao" [level=5] [ref=e309]
+          - generic [ref=e310]: 18.000 ₫
+      - generic [ref=e312]:
+        - img "Đậu que" [ref=e314]
+        - generic [ref=e315]:
+          - heading "Đậu que" [level=5] [ref=e316]
+          - generic [ref=e317]: 22.000 ₫
+      - generic [ref=e319]:
+        - img "Su hào" [ref=e321]
+        - generic [ref=e322]:
+          - heading "Su hào" [level=5] [ref=e323]
+          - generic [ref=e324]: 19.000 ₫
+      - generic [ref=e326]:
+        - img "Củ cải đỏ" [ref=e328]
+        - generic [ref=e329]:
+          - heading "Củ cải đỏ" [level=5] [ref=e330]
+          - generic [ref=e331]: 21.000 ₫
+      - generic [ref=e333]:
+        - img "Nấm đùi gà tươi" [ref=e335]
+        - generic [ref=e336]:
+          - heading "Nấm đùi gà tươi" [level=5] [ref=e337]
+          - generic [ref=e338]: 38.000 ₫
+      - generic [ref=e340]:
+        - img "Nấm hương tươi" [ref=e342]
+        - generic [ref=e343]:
+          - heading "Nấm hương tươi" [level=5] [ref=e344]
+          - generic [ref=e345]: 42.000 ₫
+      - generic [ref=e347]:
+        - img "Ngò gai" [ref=e349]
+        - generic [ref=e350]:
+          - heading "Ngò gai" [level=5] [ref=e351]
+          - generic [ref=e352]: 7.000 ₫
+      - generic [ref=e354]:
+        - img "Rau húng" [ref=e356]
+        - generic [ref=e357]:
+          - heading "Rau húng" [level=5] [ref=e358]
+          - generic [ref=e359]: 6.000 ₫
+      - generic [ref=e361]:
+        - img "Tỏi tây" [ref=e363]
+        - generic [ref=e364]:
+          - heading "Tỏi tây" [level=5] [ref=e365]
+          - generic [ref=e366]: 35.000 ₫
+  - text:           
+  - contentinfo [ref=e367]:
+    - generic [ref=e368]:
+      - generic [ref=e369]:
+        - generic [ref=e370]:
+          - generic [ref=e371]:
+            - img "Logo FreshFarm" [ref=e373]
+            - generic [ref=e374]:
+              - generic [ref=e375]: FreshFarm
+              - img "Nông sản sạch mỗi ngày" [ref=e376]
+          - paragraph [ref=e377]: FreshFarm mang đến những sản phẩm nông sản sạch, an toàn và chất lượng cao, vì sức khỏe của mỗi gia đình Việt.
+        - generic [ref=e378]:
+          - heading "Về chúng tôi" [level=6] [ref=e379]
+          - list [ref=e380]:
+            - listitem [ref=e381]:
+              - link "Giới thiệu" [ref=e382] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e383]:
+              - link "Liên hệ" [ref=e384] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e385]:
+              - link "Chính sách giao hàng" [ref=e386] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e387]:
+              - link "Chính sách đổi trả" [ref=e388] [cursor=pointer]:
+                - /url: "#"
+        - generic [ref=e389]:
+          - heading "Tài khoản" [level=6] [ref=e390]
+          - list [ref=e391]:
+            - listitem [ref=e392]:
+              - link "Đăng nhập" [ref=e393] [cursor=pointer]:
+                - /url: /account/signin?returnUrl=%2F
+            - listitem [ref=e394]:
+              - link "Lịch sử đơn hàng" [ref=e395] [cursor=pointer]:
+                - /url: /account/orders
+            - listitem [ref=e396]:
+              - link "Sản phẩm" [ref=e397] [cursor=pointer]:
+                - /url: "#section-featured"
+            - listitem [ref=e398]:
+              - link "Điều khoản sử dụng" [ref=e399] [cursor=pointer]:
+                - /url: /account/terms
+            - listitem [ref=e400]:
+              - link "Chính sách quyền riêng tư" [ref=e401] [cursor=pointer]:
+                - /url: /account/privacy
+        - generic [ref=e402]:
+          - heading "Liên hệ" [level=6] [ref=e403]
+          - paragraph [ref=e404]:
+            - generic [ref=e405]: 
+            - text: 123 Đường ABC, Quận 1, TP.HCM
+          - paragraph [ref=e406]:
+            - generic [ref=e407]: 
+            - text: support@freshfarm.vn
+          - paragraph [ref=e408]:
+            - generic [ref=e409]: 
+            - text: +84 123 456 789
+          - generic [ref=e410]:
+            - link "Facebook" [ref=e411] [cursor=pointer]:
+              - /url: https://www.facebook.com/
+              - img "Facebook" [ref=e412]
+              - text: 
+            - link "Instagram" [ref=e413] [cursor=pointer]:
+              - /url: https://www.instagram.com/
+              - img "Instagram" [ref=e414]
+              - text: 
+            - link "Zalo" [ref=e415] [cursor=pointer]:
+              - /url: https://zalo.me/
+              - img "Zalo" [ref=e416]
+              - text: 
+            - link "Google" [ref=e417] [cursor=pointer]:
+              - /url: https://www.google.com/
+              - img "Google" [ref=e418]
+              - text: 
+            - link "TikTok" [ref=e419] [cursor=pointer]:
+              - /url: https://www.tiktok.com/
+              - img "TikTok" [ref=e420]
+              - text: 
+      - separator [ref=e421]
+      - generic [ref=e422]:
+        - text: © 2026 Bản quyền thuộc về
+        - strong [ref=e423]: FreshFarm

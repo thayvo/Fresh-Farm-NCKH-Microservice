@@ -1,0 +1,262 @@
+﻿{
+   "CodeGenerationMode": 4,
+   "ContextClassName": "FreshFarmOrderingDBContext",
+   "ContextNamespace": null,
+   "FilterSchemas": false,
+   "IncludeConnectionString": false,
+   "IrregularWords": null,
+   "MinimumProductVersion": "2.6.1378",
+   "ModelNamespace": null,
+   "OutputContextPath": null,
+   "OutputPath": "Models",
+   "PluralRules": null,
+   "PreserveCasingWithRegex": true,
+   "ProjectRootNamespace": "FreshFarm.Ordering.Api",
+   "Schemas": null,
+   "SelectedHandlebarsLanguage": 2,
+   "SelectedToBeGenerated": 0,
+   "SingularRules": null,
+   "T4TemplatePath": null,
+   "Tables": [
+      {
+         "Name": "[dbo].[AdminActionLog]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsCampaign]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsSpendLedger]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[AdsTopup]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Campaign]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CampaignProductSlot]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CampaignSellerParticipation]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CancelReasons]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Cart]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CartItem]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CommunicationTemplate]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ContactMessages]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CouponDistribution]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Coupons]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CouponUsageHistory]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[CustomerNotifications]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[InventoryReservation]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[LoyaltyConfig]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[LoyaltyPointHistory]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ModerationAudit]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[NotificationPolicyRule]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[NotificationPreference]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[OrderDetail]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[OrderDetailInvalidProductArchive]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Orders]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[OrderStatusHistory]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Payment]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PaymentTransactions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[PayoutItems]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Payouts]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ReconciliationLog]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RefundTransactions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ReturnRequests]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Review]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ReviewReport]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RiskCase]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RiskDecision]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[RiskSignal]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SellerAdsWallet]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SellerOrderItems]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SellerOrders]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SettlementAudit]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ShipmentEvents]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Shipments]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Shipping]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[Status]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[StatusType]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportConversations]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportMessageReactions]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[SupportMessages]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[VoucherAbuseCase]",
+         "ObjectType": 0
+      },
+      {
+         "Name": "[dbo].[ufn_Loyalty_IsPaid]",
+         "ObjectType": 2
+      },
+      {
+         "Name": "[dbo].[ufn_Loyalty_PaidWhen]",
+         "ObjectType": 2
+      }
+   ],
+   "UiHint": null,
+   "UncountableWords": null,
+   "UseAsyncStoredProcedureCalls": true,
+   "UseBoolPropertiesWithoutDefaultSql": false,
+   "UseDatabaseNames": false,
+   "UseDatabaseNamesForRoutines": true,
+   "UseDateOnlyTimeOnly": true,
+   "UseDbContextSplitting": false,
+   "UseDecimalDataAnnotationForSprocResult": true,
+   "UseFluentApiOnly": true,
+   "UseHandleBars": false,
+   "UseHierarchyId": false,
+   "UseInflector": true,
+   "UseInternalAccessModifiersForSprocsAndFunctions": false,
+   "UseLegacyPluralizer": false,
+   "UseManyToManyEntity": false,
+   "UseNoDefaultConstructor": false,
+   "UseNoNavigations": false,
+   "UseNoObjectFilter": false,
+   "UseNodaTime": false,
+   "UseNullableReferences": false,
+   "UsePrefixNavigationNaming": false,
+   "UseSchemaFolders": false,
+   "UseSchemaNamespaces": false,
+   "UseSpatial": false,
+   "UseT4": false,
+   "UseT4Split": false,
+   "UseTypedTvpParameters": true
+}

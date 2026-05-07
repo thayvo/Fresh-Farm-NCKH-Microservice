@@ -10,6 +10,8 @@ public partial class FreshFarmCatalogDBContext
 
     public virtual DbSet<FreshQualityRecall> FreshQualityRecalls { get; set; }
 
+    public virtual DbSet<ProductSeasonality> ProductSeasonalities { get; set; }
+
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CategoryAttribute>(entity =>
@@ -139,6 +141,65 @@ public partial class FreshFarmCatalogDBContext
             entity.HasOne(d => d.FreshInventoryLot).WithMany()
                 .HasForeignKey(d => d.FreshInventoryLotId)
                 .HasConstraintName("FK_FreshQualityRecall_FreshInventoryLot");
+        });
+
+        modelBuilder.Entity<ProductSeasonality>(entity =>
+        {
+            entity.HasKey(e => e.ProductSeasonalityId);
+
+            entity.ToTable("ProductSeasonality");
+
+            entity.HasIndex(e => new { e.ProductId, e.SeasonLabel, e.StartMonth, e.EndMonth }, "UX_ProductSeasonality_Product_Season")
+                .IsUnique();
+            entity.HasIndex(e => e.ProductId, "IX_ProductSeasonality_ProductID");
+            entity.HasIndex(e => new { e.StartMonth, e.EndMonth, e.IsYearRound, e.HasPeakSeason }, "IX_ProductSeasonality_MonthWindow");
+
+            entity.Property(e => e.ProductSeasonalityId).HasColumnName("ProductSeasonalityID");
+            entity.Property(e => e.ProductId).HasColumnName("ProductID");
+            entity.Property(e => e.Country).HasMaxLength(80);
+            entity.Property(e => e.ProvinceRegion).HasMaxLength(200);
+            entity.Property(e => e.AreaDetail).HasMaxLength(200);
+            entity.Property(e => e.SeasonType)
+                .IsRequired()
+                .HasMaxLength(60);
+            entity.Property(e => e.SeasonLabel)
+                .IsRequired()
+                .HasMaxLength(180);
+            entity.Property(e => e.PeakMonths).HasMaxLength(80);
+            entity.Property(e => e.IsYearRound)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_IsYearRound");
+            entity.Property(e => e.HasPeakSeason)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_HasPeakSeason");
+            entity.Property(e => e.IsControlledCultivation)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_IsControlledCultivation");
+            entity.Property(e => e.IsImportedSeason)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_IsImportedSeason");
+            entity.Property(e => e.IsOffSeason)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_IsOffSeason");
+            entity.Property(e => e.IsPostHarvestAvailability)
+                .HasDefaultValue(false)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_IsPostHarvestAvailability");
+            entity.Property(e => e.SeasonScoreWeight)
+                .HasDefaultValue(50)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_ProductSeasonality_SeasonScoreWeight");
+            entity.Property(e => e.ConfidenceLevel).HasMaxLength(40);
+            entity.Property(e => e.SourceNote).HasMaxLength(600);
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasColumnType("datetime2(0)");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("(sysutcdatetime())")
+                .HasColumnType("datetime2(0)");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.ProductSeasonalities)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ProductSeasonality_Products_ProductID");
         });
     }
 }

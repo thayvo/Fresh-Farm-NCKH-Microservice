@@ -1,12 +1,15 @@
 ﻿using FreshFarm.Web.Bff.Dtos; // DTO checkout.
 using FreshFarm.Web.Bff.Services; // Service cart session.
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication; // SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // CookieAuthenticationDefaults.
 using Microsoft.AspNetCore.Authorization; // [Authorize].
 using Microsoft.AspNetCore.Mvc; // Controller + IActionResult.
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Headers; // AuthenticationHeaderValue.
 using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json; // thêm ở đầu file
 using Microsoft.Extensions.Configuration;
@@ -32,6 +35,8 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     private readonly VnPayOptions _vnPayOptions;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CheckoutController> _logger;
+    private readonly IRecommendationMetricsClient _recommendationMetricsClient;
+    private readonly IRecommendationExperimentService _recommendationExperimentService;
 
     public CheckoutController(
         IHttpClientFactory httpClientFactory,
@@ -41,6 +46,30 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         IOptions<VnPayOptions> vnPayOptions,
         IConfiguration configuration,
         ILogger<CheckoutController> logger) // Inject dependencies.
+        : this(
+            httpClientFactory,
+            cart,
+            ghnSandboxService,
+            vnPayService,
+            vnPayOptions,
+            configuration,
+            logger,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    [ActivatorUtilitiesConstructor]
+    public CheckoutController(
+        IHttpClientFactory httpClientFactory,
+        ICartSessionService cart,
+        IGhnSandboxService ghnSandboxService,
+        IVnPayService vnPayService,
+        IOptions<VnPayOptions> vnPayOptions,
+        IConfiguration configuration,
+        ILogger<CheckoutController> logger,
+        IRecommendationMetricsClient recommendationMetricsClient,
+        IRecommendationExperimentService recommendationExperimentService)
     {
         _httpClientFactory = httpClientFactory;
         _cart = cart;
@@ -49,6 +78,8 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         _vnPayOptions = vnPayOptions.Value;
         _configuration = configuration;
         _logger = logger;
+        _recommendationMetricsClient = recommendationMetricsClient;
+        _recommendationExperimentService = recommendationExperimentService;
     }
 
     [HttpGet("/checkout")] // Render checkout từ dữ liệu cart hiện tại.
@@ -182,6 +213,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                     }
                 }
 
+                TrackRecommendationPurchasesFireAndForget(pendingCheckout.Request.Items);
                 await RemovePurchasedCartItemsAsync(pendingCheckout.PurchasedCartItemKeys);
                 HttpContext.Session.Remove(CheckoutSelectedCartItemKeysSessionKey);
             }
@@ -340,8 +372,26 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             });
         }
 
+        if (HasInvalidCheckoutSeller(request?.Items))
+        {
+            return Json(new CheckoutShippingFeePreviewResultDto
+            {
+                Success = false,
+                Message = "Có sản phẩm chưa xác định shop. Vui lòng xóa sản phẩm đó khỏi giỏ hàng và thêm lại."
+            });
+        }
+
         var (savedAddresses, _) = await GetSavedAddressesAsync(token);
         var normalizedRequest = NormalizeShippingFeePreviewRequest(request);
+        if (HasInvalidCheckoutSeller(normalizedRequest.Items))
+        {
+            return Json(new CheckoutShippingFeePreviewResultDto
+            {
+                Success = false,
+                Message = "Có sản phẩm chưa xác định shop. Vui lòng xóa sản phẩm đó khỏi giỏ hàng và thêm lại."
+            });
+        }
+
         var preview = await PreviewShippingFeeInternalAsync(
             normalizedRequest.AddressMode,
             normalizedRequest.SelectedAddressId,
@@ -391,6 +441,13 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 selectedAddressId = selectedAddress.AddressId; // Đồng bộ id để render lại đúng lựa chọn.
                 ApplySavedAddressToShipping(request, selectedAddress); // Đổ shipping từ địa chỉ đã chọn.
             }
+        }
+
+        if (HasInvalidCheckoutSeller(request.Items))
+        {
+            ModelState.AddModelError(string.Empty, "Có sản phẩm chưa xác định shop. Vui lòng xóa sản phẩm đó khỏi giỏ hàng và thêm lại.");
+            PopulateAddressSelectionViewData(savedAddresses, addressMode, selectedAddressId, addressLoadError);
+            return View(request);
         }
 
         request = NormalizeRequest(request); // Chuẩn hóa payload để tránh dữ liệu bẩn.
@@ -543,6 +600,7 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             }
         }
 
+        TrackRecommendationPurchasesFireAndForget(request.Items);
         await RemovePurchasedCartItemsAsync(purchasedKeys);
         HttpContext.Session.Remove(CheckoutSelectedCartItemKeysSessionKey);
         ClearPendingVnPayCheckout();
@@ -577,7 +635,9 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 CartItemKey = x.CartItemKey,
                 Quantity = x.Quantity <= 0 ? 1 : x.Quantity,
                 UnitPrice = x.UnitPrice < 0m ? 0m : x.UnitPrice,
-                UnitSymbol = string.IsNullOrWhiteSpace(x.UnitSymbol) ? "đơn vị" : x.UnitSymbol
+                UnitSymbol = string.IsNullOrWhiteSpace(x.UnitSymbol) ? "đơn vị" : x.UnitSymbol,
+                RecommendationPosition = NormalizeRecommendationPosition(x.RecommendationPosition ?? x.Position),
+                Position = NormalizeRecommendationPosition(x.RecommendationPosition ?? x.Position)
             }).ToList(),
             SellerShippingBreakdowns = new List<CheckoutSellerShippingInputDto>(),
             ShippingFee = DefaultShippingFee,
@@ -594,11 +654,11 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         request.Items ??= new List<CheckoutItemInputDto>();
         request.SellerShippingBreakdowns ??= new List<CheckoutSellerShippingInputDto>();
         request.Items = request.Items
-            .Where(x => x.ProductId > 0)
+            .Where(x => x.ProductId > 0 && x.SellerId > 0)
             .Select(x => new CheckoutItemInputDto
             {
                 ProductId = x.ProductId,
-                SellerId = x.SellerId > 0 ? x.SellerId : 0,
+                SellerId = x.SellerId,
                 SellerName = string.IsNullOrWhiteSpace(x.SellerName) ? string.Empty : x.SellerName.Trim(),
                 ProductName = string.IsNullOrWhiteSpace(x.ProductName) ? $"Sản phẩm #{x.ProductId}" : x.ProductName.Trim(),
                 CartItemKey = string.IsNullOrWhiteSpace(x.CartItemKey)
@@ -606,7 +666,9 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                     : x.CartItemKey.Trim(),
                 Quantity = x.Quantity <= 0 ? 1 : x.Quantity,
                 UnitPrice = x.UnitPrice < 0m ? 0m : x.UnitPrice,
-                UnitSymbol = string.IsNullOrWhiteSpace(x.UnitSymbol) ? "đơn vị" : x.UnitSymbol
+                UnitSymbol = string.IsNullOrWhiteSpace(x.UnitSymbol) ? "đơn vị" : x.UnitSymbol,
+                RecommendationPosition = NormalizeRecommendationPosition(x.RecommendationPosition ?? x.Position),
+                Position = NormalizeRecommendationPosition(x.RecommendationPosition ?? x.Position)
             })
             .ToList();
         request.SellerShippingBreakdowns = request.SellerShippingBreakdowns
@@ -649,17 +711,22 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         return request;
     }
 
-    private static CheckoutShippingFeePreviewRequestDto NormalizeShippingFeePreviewRequest(CheckoutShippingFeePreviewRequestDto request)
+    private static bool HasInvalidCheckoutSeller(IEnumerable<CheckoutItemInputDto>? items)
+    {
+        return items?.Any(x => x.ProductId > 0 && x.SellerId <= 0) == true;
+    }
+
+    private static CheckoutShippingFeePreviewRequestDto NormalizeShippingFeePreviewRequest(CheckoutShippingFeePreviewRequestDto? request)
     {
         request ??= new CheckoutShippingFeePreviewRequestDto();
         request.AddressMode = NormalizeAddressMode(request.AddressMode);
         request.Items ??= new List<CheckoutItemInputDto>();
         request.Items = request.Items
-            .Where(x => x.ProductId > 0)
+            .Where(x => x.ProductId > 0 && x.SellerId > 0)
             .Select(x => new CheckoutItemInputDto
             {
                 ProductId = x.ProductId,
-                SellerId = x.SellerId > 0 ? x.SellerId : 0,
+                SellerId = x.SellerId,
                 SellerName = string.IsNullOrWhiteSpace(x.SellerName) ? string.Empty : x.SellerName.Trim(),
                 ProductName = string.IsNullOrWhiteSpace(x.ProductName) ? $"Sản phẩm #{x.ProductId}" : x.ProductName.Trim(),
                 CartItemKey = string.IsNullOrWhiteSpace(x.CartItemKey)
@@ -1062,12 +1129,21 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             };
         }
 
+        if (HasInvalidCheckoutSeller(items))
+        {
+            return new CheckoutShippingFeePreviewResultDto
+            {
+                Success = false,
+                Message = "Có sản phẩm chưa xác định shop. Vui lòng xóa sản phẩm đó khỏi giỏ hàng và thêm lại."
+            };
+        }
+
         var normalizedItems = items
             .Where(x => x.ProductId > 0)
             .Select(x => new CheckoutItemInputDto
             {
                 ProductId = x.ProductId,
-                SellerId = x.SellerId > 0 ? x.SellerId : 0,
+                SellerId = x.SellerId,
                 SellerName = string.IsNullOrWhiteSpace(x.SellerName) ? string.Empty : x.SellerName.Trim(),
                 ProductName = string.IsNullOrWhiteSpace(x.ProductName) ? $"Sản phẩm #{x.ProductId}" : x.ProductName.Trim(),
                 CartItemKey = string.IsNullOrWhiteSpace(x.CartItemKey)
@@ -1573,6 +1649,58 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
             };
         }
     }
+
+    private void TrackRecommendationPurchasesFireAndForget(IReadOnlyCollection<CheckoutItemInputDto> items)
+    {
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+        foreach (var item in items.Where(item => item.ProductId > 0))
+        {
+            var quantity = item.Quantity <= 0 ? 1 : item.Quantity;
+            var revenue = Math.Max(0m, item.UnitPrice) * quantity;
+            _ = _recommendationMetricsClient.TrackPurchaseAsync(
+                userId,
+                item.ProductId,
+                NormalizeRecommendationPosition(item.RecommendationPosition ?? item.Position),
+                revenue,
+                experimentGroup,
+                CancellationToken.None);
+        }
+    }
+
+    private int? ResolveRecommendationUserId()
+    {
+        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue("sub")
+            ?? User.FindFirstValue("userId")
+            ?? User.FindFirstValue("uid");
+
+        return int.TryParse(claimValue, out var userId) && userId > 0
+            ? userId
+            : null;
+    }
+
+    private static int? NormalizeRecommendationPosition(int? position)
+    {
+        return position is > 0 ? position.Value : null;
+    }
+
+    private sealed class NoopRecommendationExperimentService : IRecommendationExperimentService
+    {
+        public static readonly NoopRecommendationExperimentService Instance = new();
+
+        public string ResolveGroup(HttpContext httpContext, int? userId)
+        {
+            return RecommendationExperimentGroups.SessionRerank;
+        }
+    }
+
     private IReadOnlyCollection<string> GetSelectedCartItemKeysFromSession()
     {
         var raw = HttpContext.Session.GetString(CheckoutSelectedCartItemKeysSessionKey);
@@ -1655,6 +1783,11 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
         var sellerId = int.TryParse(sellerIdRaw, out var parsedSellerId) && parsedSellerId > 0
             ? parsedSellerId
             : 0;
+        if (sellerId <= 0)
+        {
+            TempData["CheckoutError"] = "Không xác định được shop của sản phẩm. Vui lòng chọn lại sản phẩm từ gian hàng.";
+            return null;
+        }
 
         return new CartItemDto
         {

@@ -448,8 +448,12 @@ public sealed class CartSessionService : ICartSessionService
             return items.FirstOrDefault(x => string.Equals(x.CartItemKey, normalizedKey, StringComparison.OrdinalIgnoreCase));
         }
 
-        var normalizedSellerId = NormalizeSellerId(sellerId);
-        return items.FirstOrDefault(x => x.ProductId == productId && NormalizeSellerId(x.SellerId) == normalizedSellerId);
+        if (sellerId <= 0)
+        {
+            return null;
+        }
+
+        return items.FirstOrDefault(x => x.ProductId == productId && x.SellerId == sellerId);
     }
 
     private static List<CartItemDto> NormalizeItems(IEnumerable<CartItemDto> items)
@@ -522,49 +526,51 @@ public sealed class CartSessionService : ICartSessionService
 
     private static CartItemDto? NormalizeItem(CartItemDto? item)
     {
-        if (item is null || item.ProductId <= 0)
+        if (item is null || item.ProductId <= 0 || item.SellerId <= 0)
         {
             return null;
         }
 
-        var sellerId = NormalizeSellerId(item.SellerId);
         return new CartItemDto
         {
             ProductId = item.ProductId,
-            SellerId = sellerId,
+            SellerId = item.SellerId,
             SellerName = item.SellerName?.Trim() ?? string.Empty,
             ProductName = item.ProductName?.Trim() ?? string.Empty,
             ImageFileName = item.ImageFileName?.Trim() ?? string.Empty,
             UnitPrice = item.UnitPrice < 0m ? 0m : item.UnitPrice,
             UnitSymbol = string.IsNullOrWhiteSpace(item.UnitSymbol) ? "đơn vị" : item.UnitSymbol.Trim(),
-            Quantity = Math.Max(1, item.Quantity)
+            Quantity = Math.Max(1, item.Quantity),
+            RecommendationPosition = NormalizeRecommendationPosition(item.RecommendationPosition ?? item.Position),
+            Position = NormalizeRecommendationPosition(item.RecommendationPosition ?? item.Position)
         };
     }
 
     private static CartItemDto? NormalizeItem(AddToCartRequestDto? item)
     {
-        if (item is null || item.ProductId <= 0)
+        if (item is null || item.ProductId <= 0 || item.SellerId <= 0)
         {
             return null;
         }
 
-        var sellerId = NormalizeSellerId(item.SellerId);
         return new CartItemDto
         {
             ProductId = item.ProductId,
-            SellerId = sellerId,
+            SellerId = item.SellerId,
             SellerName = item.SellerName?.Trim() ?? string.Empty,
             ProductName = item.ProductName?.Trim() ?? string.Empty,
             ImageFileName = item.ImageFileName?.Trim() ?? string.Empty,
             UnitPrice = item.UnitPrice < 0m ? 0m : item.UnitPrice,
             UnitSymbol = string.IsNullOrWhiteSpace(item.UnitSymbol) ? "đơn vị" : item.UnitSymbol.Trim(),
-            Quantity = Math.Max(1, item.Quantity)
+            Quantity = Math.Max(1, item.Quantity),
+            RecommendationPosition = NormalizeRecommendationPosition(item.RecommendationPosition ?? item.Position),
+            Position = NormalizeRecommendationPosition(item.RecommendationPosition ?? item.Position)
         };
     }
 
-    private static int NormalizeSellerId(int sellerId)
+    private static int? NormalizeRecommendationPosition(int? position)
     {
-        return sellerId > 0 ? sellerId : 0;
+        return position is > 0 ? position.Value : null;
     }
 
     private static UpsertCartItemRequestDto MapToUpsertRequest(CartItemDto item)

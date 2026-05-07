@@ -39,7 +39,12 @@ public sealed class AdminAccountController : LegacySellerControllerBase
 
         if (User.Identity?.IsAuthenticated == true)
         {
-            return RedirectToLocal(normalizedReturnUrl);
+            if (User.IsInRole("Admin"))
+            {
+                return RedirectToLocal(normalizedReturnUrl);
+            }
+
+            ModelState.AddModelError(string.Empty, "Tài khoản hiện tại không có quyền Quản trị. Vui lòng đăng nhập bằng tài khoản Admin.");
         }
 
         ViewBag.ReturnUrl = normalizedReturnUrl;

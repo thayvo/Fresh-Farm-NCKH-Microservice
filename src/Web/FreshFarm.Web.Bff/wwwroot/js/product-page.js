@@ -860,38 +860,62 @@
                     return;
                 }
 
+                const renderSimilarMeta = (item, maxTags = 2) => {
+                    const tags = Array.isArray(item?.recommendationTags)
+                        ? item.recommendationTags
+                            .map((tag) => (tag ?? "").toString().trim())
+                            .filter((tag) => tag.length > 0)
+                            .slice(0, maxTags)
+                        : [];
+                    const reason = (item?.recommendationReason ?? "").toString().trim();
+                    if (!reason && tags.length === 0) {
+                        return "";
+                    }
+
+                    return `
+                        <div class="similar-meta">
+                            ${tags.length > 0 ? `
+                                <div class="similar-tag-row">
+                                    ${tags.map((tag) => `<span class="similar-tag">${escapeHtml(tag)}</span>`).join("")}
+                                </div>
+                            ` : ""}
+                            ${reason ? `<div class="similar-reason">${escapeHtml(reason)}</div>` : ""}
+                        </div>
+                    `;
+                };
+
                 similarNode.innerHTML = `
-                    <div class="row g-3">
+                    <div class="similar-grid">
                         ${items.map((item, index) => `
-                            <div class="col-12 col-md-6 col-xl-3">
-                                <article class="h-100 border rounded-4 bg-white shadow-sm overflow-hidden">
-                                    <img src="${item.image}" alt="${escapeHtml(item.productName)}" class="w-100" style="aspect-ratio:1/1;object-fit:cover;" />
-                                    <div class="p-3 d-grid gap-2 h-100">
-                                        <div class="d-flex flex-wrap gap-2">
-                                            <span class="badge text-bg-light border">${escapeHtml(item.categoryName || "Cùng nhóm")}</span>
-                                            ${(item.recommendationTags || []).slice(0, 2).map((tag) => `
-                                                <span class="badge rounded-pill text-bg-success-subtle border border-success-subtle text-success-emphasis">${escapeHtml(tag)}</span>
-                                            `).join("")}
-                                        </div>
-                                        <div class="fw-bold fs-6">${escapeHtml(item.productName)}</div>
-                                        <div class="text-muted small">${escapeHtml(item.recommendationReason || "Phù hợp để xem thêm từ cùng nhóm.")}</div>
-                                        <div class="small text-secondary">Đánh giá ${item.averageRating.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · Đã bán ${item.soldCount.toLocaleString("vi-VN")}</div>
-                                        <div class="fw-bold text-danger fs-5">${vnd(item.price)}</div>
-                                        <div class="mt-auto d-grid gap-2">
-                                            <a href="/products/${item.productId}"
-                                               class="btn btn-outline-success"
+                            <article class="similar-card">
+                                <img src="${item.image}" alt="${escapeHtml(item.productName)}" class="similar-thumb" />
+                                <div class="similar-card-body">
+                                    <div class="similar-topline">
+                                        <span class="similar-category-badge">${escapeHtml(item.categoryName || "Cùng nhóm")}</span>
+                                        <span class="similar-rating-pill"><i class="bi bi-star-fill"></i> ${item.averageRating.toLocaleString("vi-VN", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
+                                    </div>
+                                    <div class="similar-title">${escapeHtml(item.productName)}</div>
+                                    ${renderSimilarMeta(item, 2)}
+                                    <div class="similar-stats">
+                                        <span>Đã bán ${item.soldCount.toLocaleString("vi-VN")}</span>
+                                        <span>${item.reviewCount.toLocaleString("vi-VN")} đánh giá</span>
+                                    </div>
+                                    <div class="similar-origin"><i class="bi bi-geo-alt"></i> ${escapeHtml(item.origin || "Xuất xứ đang cập nhật")}</div>
+                                    <div class="similar-price">${vnd(item.price)}</div>
+                                    <div class="similar-actions">
+                                        <a href="/products/${item.productId}"
+                                               class="similar-action-link detail"
                                                data-action="similar-recommendation-click"
                                                data-product-id="${item.productId}"
                                                data-rank="${index + 1}">Xem chi tiết</a>
                                             <a href="${buildCheckoutUrl(item)}"
-                                               class="btn btn-success"
+                                               class="similar-action-link buy"
                                                data-action="similar-recommendation-click"
                                                data-product-id="${item.productId}"
                                                data-rank="${index + 1}">Mua nhanh</a>
-                                        </div>
                                     </div>
-                                </article>
-                            </div>
+                                </div>
+                            </article>
                         `).join("")}
                     </div>
                 `;
@@ -1152,6 +1176,7 @@
                     void appHelpers?.trackRecommendationClick?.({
                         recommendationImpressionEventId: offerImpressionIds.get(impressionKey) ?? null,
                         productId: toNumber(offerLink.getAttribute("data-product-id"), 0),
+                        rank,
                         placement: offerRecommendationPlacement,
                         algorithm: offerRecommendationAlgorithm
                     });
@@ -1170,6 +1195,7 @@
                 void appHelpers?.trackRecommendationClick?.({
                     recommendationImpressionEventId: similarImpressionIds.get(impressionKey) ?? null,
                     productId: productIdValue,
+                    rank,
                     placement: similarRecommendationPlacement,
                     algorithm: similarRecommendationAlgorithm
                 });

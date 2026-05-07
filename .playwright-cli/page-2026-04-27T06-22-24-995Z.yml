@@ -1,0 +1,702 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - heading " Admin" [level=3] [ref=e5]:
+        - generic [ref=e6]: 
+        - text: Admin
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link " Bảng điều khiển" [ref=e9] [cursor=pointer]:
+            - /url: /Admin
+            - generic [ref=e10]: 
+            - text: Bảng điều khiển
+        - listitem [ref=e11]:
+          - link " Quản lý người dùng" [ref=e12] [cursor=pointer]:
+            - /url: /Admin/User/ManageUsers
+            - generic [ref=e13]: 
+            - text: Quản lý người dùng
+        - listitem [ref=e14]:
+          - link " Admin" [ref=e15] [cursor=pointer]:
+            - /url: /Admin/User/ManageAdmins
+            - generic [ref=e16]: 
+            - text: Admin
+        - listitem [ref=e17]:
+          - link " Seller" [ref=e18] [cursor=pointer]:
+            - /url: /Admin/User/ManageSellers
+            - generic [ref=e19]: 
+            - text: Seller
+        - listitem [ref=e20]:
+          - link " Nhà bán hàng & tuân thủ" [ref=e21] [cursor=pointer]:
+            - /url: /Admin/Merchant/Index
+            - generic [ref=e22]: 
+            - text: Nhà bán hàng & tuân thủ
+        - listitem [ref=e23]:
+          - link " Buyer" [ref=e24] [cursor=pointer]:
+            - /url: /Admin/User/ManageBuyers
+            - generic [ref=e25]: 
+            - text: Buyer
+        - listitem [ref=e26]:
+          - link " Quản lý đơn hàng" [ref=e27] [cursor=pointer]:
+            - /url: /Admin/Order/ManageOrders
+            - generic [ref=e28]: 
+            - text: Quản lý đơn hàng
+        - listitem [ref=e29]:
+          - link " Quản lý vận chuyển" [ref=e30] [cursor=pointer]:
+            - /url: /Admin/Shipping/ManageShipping
+            - generic [ref=e31]: 
+            - text: Quản lý vận chuyển
+        - listitem [ref=e32]:
+          - link " Tài chính & đối soát" [ref=e33] [cursor=pointer]:
+            - /url: /Admin/Finance/Index
+            - generic [ref=e34]: 
+            - text: Tài chính & đối soát
+        - listitem [ref=e35]:
+          - link " Điều phối giao hàng" [ref=e36] [cursor=pointer]:
+            - /url: /Admin/Delivery/Index
+            - generic [ref=e37]: 
+            - text: Điều phối giao hàng
+        - listitem [ref=e38]:
+          - link " Báo cáo" [ref=e39] [cursor=pointer]:
+            - /url: /Admin/Report/Revenue
+            - generic [ref=e40]: 
+            - text: Báo cáo
+        - listitem [ref=e41]:
+          - link " Voucher sàn" [ref=e42] [cursor=pointer]:
+            - /url: /Admin/Coupon/ManageCoupons
+            - generic [ref=e43]: 
+            - text: Voucher sàn
+        - listitem [ref=e44]:
+          - link " Trung tâm chiến dịch" [ref=e45] [cursor=pointer]:
+            - /url: /Admin/Campaign/Index
+            - generic [ref=e46]: 
+            - text: Trung tâm chiến dịch
+        - listitem [ref=e47]:
+          - link " Trung tâm rủi ro" [ref=e48] [cursor=pointer]:
+            - /url: /Admin/Risk/Index
+            - generic [ref=e49]: 
+            - text: Trung tâm rủi ro
+        - listitem [ref=e50]:
+          - link " Trung tâm kiểm toán" [ref=e51] [cursor=pointer]:
+            - /url: /Admin/Audit/Index
+            - generic [ref=e52]: 
+            - text: Trung tâm kiểm toán
+        - listitem [ref=e53]:
+          - link " Danh mục" [ref=e54] [cursor=pointer]:
+            - /url: /Admin/Category/ManageCategories
+            - generic [ref=e55]: 
+            - text: Danh mục
+        - listitem [ref=e56]:
+          - link " Sản phẩm" [ref=e57] [cursor=pointer]:
+            - /url: /Admin/Product/ManageProducts
+            - generic [ref=e58]: 
+            - text: Sản phẩm
+        - listitem [ref=e59]:
+          - link " Kiểm duyệt sản phẩm" [ref=e60] [cursor=pointer]:
+            - /url: /Admin/CatalogModeration/Index
+            - generic [ref=e61]: 
+            - text: Kiểm duyệt sản phẩm
+        - listitem [ref=e62]:
+          - link " Sẵn sàng danh mục" [ref=e63] [cursor=pointer]:
+            - /url: /Admin/CatalogReadiness/Index
+            - generic [ref=e64]: 
+            - text: Sẵn sàng danh mục
+        - listitem [ref=e65]:
+          - link " Vận hành hàng tươi" [ref=e66] [cursor=pointer]:
+            - /url: /Admin/FreshOps/Index
+            - generic [ref=e67]: 
+            - text: Vận hành hàng tươi
+        - listitem [ref=e68]:
+          - link " Đơn vị tính" [ref=e69] [cursor=pointer]:
+            - /url: /Admin/Unit/Index
+            - generic [ref=e70]: 
+            - text: Đơn vị tính
+        - listitem [ref=e71]:
+          - link " Trạng thái" [ref=e72] [cursor=pointer]:
+            - /url: /Admin/Status/Status
+            - generic [ref=e73]: 
+            - text: Trạng thái
+        - listitem [ref=e74]:
+          - link " Loại trạng thái" [ref=e75] [cursor=pointer]:
+            - /url: /Admin/Status/StatusType
+            - generic [ref=e76]: 
+            - text: Loại trạng thái
+        - listitem [ref=e77]:
+          - link " Phản hồi khách hàng" [ref=e78] [cursor=pointer]:
+            - /url: /Admin/Feedback/Index
+            - generic [ref=e79]: 
+            - text: Phản hồi khách hàng
+        - listitem [ref=e80]:
+          - link " Hỗ trợ trực tuyến" [ref=e81] [cursor=pointer]:
+            - /url: /Admin/SupportChat/Index
+            - generic [ref=e82]: 
+            - text: Hỗ trợ trực tuyến
+        - listitem [ref=e83]:
+          - link " Tranh chấp & CS" [ref=e84] [cursor=pointer]:
+            - /url: /Admin/Dispute/Index
+            - generic [ref=e85]: 
+            - text: Tranh chấp & CS
+        - listitem [ref=e86]:
+          - link " Trung tâm thông báo" [ref=e87] [cursor=pointer]:
+            - /url: /Admin/Notification/Index
+            - generic [ref=e88]: 
+            - text: Trung tâm thông báo
+        - listitem [ref=e89]:
+          - link " Quản trị truyền thông" [ref=e90] [cursor=pointer]:
+            - /url: /Admin/Communication/Index
+            - generic [ref=e91]: 
+            - text: Quản trị truyền thông
+        - listitem [ref=e92]:
+          - link " Khách hàng" [ref=e93] [cursor=pointer]:
+            - /url: /Admin/Customer/ManageCustomers
+            - generic [ref=e94]: 
+            - text: Khách hàng
+        - listitem [ref=e95]:
+          - link " Tích điểm" [ref=e96] [cursor=pointer]:
+            - /url: /Admin/Loyalty/Index
+            - generic [ref=e97]: 
+            - text: Tích điểm
+        - listitem [ref=e98]:
+          - link " Cài đặt hệ thống" [ref=e99] [cursor=pointer]:
+            - /url: /Admin/Setting/Index
+            - generic [ref=e100]: 
+            - text: Cài đặt hệ thống
+    - generic [ref=e101]:
+      - navigation [ref=e102]:
+        - generic [ref=e103]:
+          - button "" [ref=e104] [cursor=pointer]:
+            - generic [ref=e105]: 
+          - list [ref=e107]:
+            - listitem [ref=e108]:
+              - button " a" [ref=e109] [cursor=pointer]:
+                - generic [ref=e110]: 
+                - text: a
+      - generic [ref=e112]:
+        - generic [ref=e117]:
+          - generic [ref=e119]: 
+          - generic [ref=e120]:
+            - heading "Quản Lý Vận Chuyển" [level=1] [ref=e121]
+            - paragraph [ref=e122]: Theo dõi và quản lý đơn hàng vận chuyển hiệu quả
+        - generic [ref=e123]:
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e127]: 
+              - generic [ref=e128]:
+                - heading "Điều phối GHN sandbox" [level=5] [ref=e129]
+                - paragraph [ref=e130]: Tạo vận đơn GHN, xem phí, leadtime và tra cứu trạng thái ngay trên màn vận chuyển.
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - generic [ref=e133]: 
+                - text: Đã cấu hình GHN sandbox
+              - generic [ref=e134]:
+                - generic [ref=e135]: 
+                - text: "ShopId: 199591"
+          - generic [ref=e136]:
+            - generic [ref=e138]:
+              - generic [ref=e139]:
+                - generic [ref=e140]: Đơn đang chuẩn bị gửi GHN
+                - textbox [ref=e141]: Chưa chọn dòng đơn
+                - generic [ref=e142]: "Chỉ tạo vận đơn cho đơn đã bind `OrderId`. Bấm nút xe tải ở từng dòng hoặc chọn đơn trong form thêm vận chuyển để đổ dữ liệu vào đây."
+                - generic [ref=e143]:
+                  - generic [ref=e144]: 
+                  - text: Phí ship và COD của buyer được lấy từ đơn nội bộ đã chọn; khu vực GHN chỉ dùng để đối chiếu và tạo vận đơn đúng luồng.
+              - generic [ref=e145]:
+                - generic [ref=e146]: Người nhận
+                - textbox "Nguyễn Văn A" [ref=e147]
+              - generic [ref=e148]:
+                - generic [ref=e149]: Số điện thoại
+                - textbox "0912345678" [ref=e150]
+              - generic [ref=e151]:
+                - generic [ref=e152]: Địa chỉ chi tiết
+                - textbox "45 Nguyen Van Cu" [ref=e153]
+              - generic [ref=e155]:
+                - generic [ref=e156]: 
+                - text: Hệ thống sẽ tự nhận diện tỉnh/quận/phường GHN từ địa chỉ chi tiết bên trên.
+              - generic [ref=e157]:
+                - generic [ref=e158]: Cân nặng (gram)
+                - spinbutton [ref=e159]: "500"
+              - generic [ref=e160]:
+                - generic [ref=e161]: Dài
+                - spinbutton [ref=e162]: "20"
+              - generic [ref=e163]:
+                - generic [ref=e164]: Rộng
+                - spinbutton [ref=e165]: "20"
+              - generic [ref=e166]:
+                - generic [ref=e167]: Cao
+                - spinbutton [ref=e168]: "10"
+              - generic [ref=e169]:
+                - generic [ref=e170]: Thu hộ COD
+                - spinbutton [ref=e171]: "150000"
+              - generic [ref=e172]:
+                - generic [ref=e173]: Giá trị bảo hiểm
+                - spinbutton [ref=e174]: "150000"
+              - generic [ref=e175]:
+                - generic [ref=e176]: Mã theo dõi nội bộ
+                - textbox "Sinh tự động theo đơn đã chọn" [ref=e177]
+                - generic [ref=e178]: "Mã này luôn bám theo `OrderId` để tránh tạo vận đơn tay ngoài luồng."
+              - generic [ref=e179]:
+                - generic [ref=e180]: Nội dung vận đơn
+                - textbox [ref=e181]: Đơn hàng thử nghiệm FreshFarm
+              - generic [ref=e182]:
+                - generic [ref=e183]: Tên mặt hàng
+                - textbox [ref=e184]: Nông sản FreshFarm
+              - generic [ref=e185]:
+                - generic [ref=e186]: Mã hàng
+                - textbox "RAU-001" [ref=e187]
+              - generic [ref=e188]:
+                - generic [ref=e189]: Số lượng
+                - spinbutton [ref=e190]: "1"
+              - generic [ref=e191]:
+                - generic [ref=e192]: Giá món hàng
+                - spinbutton [ref=e193]: "150000"
+              - generic [ref=e194]:
+                - button " Lấy thông tin shop" [ref=e195] [cursor=pointer]:
+                  - generic [ref=e196]: 
+                  - text: Lấy thông tin shop
+                - button " Tính phí" [ref=e197] [cursor=pointer]:
+                  - generic [ref=e198]: 
+                  - text: Tính phí
+                - button " Lấy leadtime" [ref=e199] [cursor=pointer]:
+                  - generic [ref=e200]: 
+                  - text: Lấy leadtime
+                - button " Tạo đơn GHN" [disabled]:
+                  - generic: 
+                  - text: Tạo đơn GHN
+            - generic [ref=e202]:
+              - generic [ref=e204]:
+                - generic [ref=e205]:
+                  - heading " Shop GHN" [level=6] [ref=e206]:
+                    - generic [ref=e207]: 
+                    - text: Shop GHN
+                  - generic [ref=e208]: Origin và ghi chú cấu hình
+                - generic [ref=e209]: Chưa tải thông tin shop.
+              - generic [ref=e211]:
+                - generic [ref=e212]:
+                  - heading " Kết quả phí và leadtime" [level=6] [ref=e213]:
+                    - generic [ref=e214]: 
+                    - text: Kết quả phí và leadtime
+                  - generic [ref=e215]: Dùng để so sánh trước khi tạo đơn
+                - generic [ref=e216]: Chưa tính phí hoặc leadtime.
+              - generic [ref=e218]:
+                - generic [ref=e219]:
+                  - heading " Kết quả tạo đơn" [level=6] [ref=e220]:
+                    - generic [ref=e221]: 
+                    - text: Kết quả tạo đơn
+                  - button "Dùng mã vừa tạo để tra cứu" [ref=e222] [cursor=pointer]
+                - generic [ref=e223]: Chưa tạo đơn GHN.
+              - generic [ref=e225]:
+                - heading " Tra cứu vận đơn GHN" [level=6] [ref=e226]:
+                  - generic [ref=e227]: 
+                  - text: Tra cứu vận đơn GHN
+                - generic [ref=e228]:
+                  - textbox "Nhập orderCode GHN" [ref=e230]
+                  - generic [ref=e231]:
+                    - button " Tra cứu" [ref=e232] [cursor=pointer]:
+                      - generic [ref=e233]: 
+                      - text: Tra cứu
+                    - button " Đồng bộ vào bảng" [ref=e234] [cursor=pointer]:
+                      - generic [ref=e235]: 
+                      - text: Đồng bộ vào bảng
+                - generic [ref=e236]:
+                  - button " Đồng bộ các đơn GHN trên trang" [ref=e238] [cursor=pointer]:
+                    - generic [ref=e239]: 
+                    - text: Đồng bộ các đơn GHN trên trang
+                  - generic [ref=e240]: Chưa tra cứu vận đơn.
+        - generic [ref=e241]:
+          - generic [ref=e242]:
+            - generic [ref=e244]: 
+            - heading "Bộ lọc tìm kiếm" [level=5] [ref=e245]
+          - generic [ref=e246]:
+            - generic [ref=e247]:
+              - generic [ref=e248]:
+                - generic [ref=e249]: 
+                - text: Trạng thái đơn hàng
+              - combobox [ref=e250]:
+                - option "Tất cả trạng thái" [selected]
+                - option "⏳ Chờ xử lý"
+                - option "⚙️ Đang xử lý"
+                - option "🚚 Đang giao hàng"
+                - option "✅ Đã giao hàng"
+                - option "❌ Đã hủy"
+            - text: 
+            - generic [ref=e251]:
+              - generic [ref=e252]:
+                - generic [ref=e253]: 
+                - text: Nhân viên giao hàng
+              - combobox [ref=e254]:
+                - option "Tất cả nhân viên" [selected]
+            - generic [ref=e255]:
+              - generic [ref=e256]:
+                - generic [ref=e257]: 
+                - text: Tìm kiếm
+              - generic [ref=e258]:
+                - generic [ref=e259]: 
+                - textbox "Mã đơn, người nhận, SĐT..." [ref=e260]
+            - generic [ref=e261]:
+              - generic [ref=e262]:
+                - generic [ref=e263]: 
+                - text: Số dòng/trang
+              - combobox [ref=e264]:
+                - option "10 dòng" [selected]
+                - option "20 dòng"
+                - option "50 dòng"
+            - button " Áp dụng" [ref=e266] [cursor=pointer]:
+              - generic [ref=e267]: 
+              - generic [ref=e268]: Áp dụng
+        - generic [ref=e269]:
+          - table [ref=e271]:
+            - rowgroup [ref=e272]:
+              - row "#  Mã đơn hàng  NV giao hàng  Người nhận  SĐT  Địa chỉ  Trạng thái  Thao tác" [ref=e273]:
+                - columnheader "#" [ref=e274]
+                - columnheader " Mã đơn hàng" [ref=e275]:
+                  - link " Mã đơn hàng" [ref=e276] [cursor=pointer]:
+                    - /url: /Admin/Shipping/ManageShipping?page=1&pageSize=10&sort=code_asc
+                    - generic [ref=e277]: 
+                    - text: Mã đơn hàng
+                - columnheader " NV giao hàng" [ref=e278]:
+                  - generic [ref=e279]: 
+                  - text: NV giao hàng
+                - columnheader " Người nhận" [ref=e280]:
+                  - link " Người nhận" [ref=e281] [cursor=pointer]:
+                    - /url: /Admin/Shipping/ManageShipping?page=1&pageSize=10&sort=receiver_asc
+                    - generic [ref=e282]: 
+                    - text: Người nhận
+                - columnheader " SĐT" [ref=e283]:
+                  - generic [ref=e284]: 
+                  - text: SĐT
+                - columnheader " Địa chỉ" [ref=e285]:
+                  - generic [ref=e286]: 
+                  - text: Địa chỉ
+                - columnheader " Trạng thái" [ref=e287]:
+                  - link " Trạng thái" [ref=e288] [cursor=pointer]:
+                    - /url: /Admin/Shipping/ManageShipping?page=1&pageSize=10&sort=status_asc
+                    - generic [ref=e289]: 
+                    - text: Trạng thái
+                - columnheader " Thao tác" [ref=e290]:
+                  - generic [ref=e291]: 
+                  - text: Thao tác
+            - rowgroup [ref=e292]:
+              - 'row "1  #DH00172  Chưa phân công E2E Test FreshFarm  0900000000  E2E Test - 123 Nguyen Hue, Phường Bến Nghé, Quận 1, Hồ Chí Minh Đang xử lý" [ref=e293]':
+                - cell "1" [ref=e294]:
+                  - generic [ref=e295]: "1"
+                - 'cell " #DH00172" [ref=e296]':
+                  - generic [ref=e297]:
+                    - generic [ref=e298]: 
+                    - generic [ref=e299]: "#DH00172"
+                - cell " Chưa phân công" [ref=e300]:
+                  - generic [ref=e301]:
+                    - generic [ref=e303]: 
+                    - generic [ref=e304]: Chưa phân công
+                - cell "E2E Test FreshFarm" [ref=e305]
+                - cell " 0900000000" [ref=e306]:
+                  - generic [ref=e307]:
+                    - generic [ref=e308]: 
+                    - generic [ref=e309]: "0900000000"
+                - cell " E2E Test - 123 Nguyen Hue, Phường Bến Nghé, Quận 1, Hồ Chí Minh" [ref=e310]:
+                  - generic [ref=e311]:
+                    - generic [ref=e312]: 
+                    - generic [ref=e313]: E2E Test - 123 Nguyen Hue, Phường Bến Nghé, Quận 1, Hồ Chí Minh
+                - cell "Đang xử lý" [ref=e314]:
+                  - generic [ref=e316]: Đang xử lý
+                - cell [ref=e317]:
+                  - group [ref=e318]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e319] [cursor=pointer]:
+                      - generic [ref=e320]: 
+                    - button "Sửa" [ref=e321] [cursor=pointer]:
+                      - generic [ref=e322]: 
+                    - button "Xóa" [ref=e323] [cursor=pointer]:
+                      - generic [ref=e324]: 
+              - 'row "2  #DH00171  Chưa phân công Finance Smoke Buyer  0123456789  Finance smoke address Đã giao / Đã đối soát" [ref=e325]':
+                - cell "2" [ref=e326]:
+                  - generic [ref=e327]: "2"
+                - 'cell " #DH00171" [ref=e328]':
+                  - generic [ref=e329]:
+                    - generic [ref=e330]: 
+                    - generic [ref=e331]: "#DH00171"
+                - cell " Chưa phân công" [ref=e332]:
+                  - generic [ref=e333]:
+                    - generic [ref=e335]: 
+                    - generic [ref=e336]: Chưa phân công
+                - cell "Finance Smoke Buyer" [ref=e337]
+                - cell " 0123456789" [ref=e338]:
+                  - generic [ref=e339]:
+                    - generic [ref=e340]: 
+                    - generic [ref=e341]: "0123456789"
+                - cell " Finance smoke address" [ref=e342]:
+                  - generic [ref=e343]:
+                    - generic [ref=e344]: 
+                    - generic [ref=e345]: Finance smoke address
+                - cell "Đã giao / Đã đối soát" [ref=e346]:
+                  - generic [ref=e348]: Đã giao / Đã đối soát
+                - cell [ref=e349]:
+                  - group [ref=e350]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e351] [cursor=pointer]:
+                      - generic [ref=e352]: 
+                    - button "Sửa" [ref=e353] [cursor=pointer]:
+                      - generic [ref=e354]: 
+                    - button "Xóa" [ref=e355] [cursor=pointer]:
+                      - generic [ref=e356]: 
+                    - button "Bỏ đối soát COD" [ref=e357] [cursor=pointer]:
+                      - generic [ref=e358]: 
+              - 'row "3  #DH00170  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Chờ xử lý" [ref=e359]':
+                - cell "3" [ref=e360]:
+                  - generic [ref=e361]: "3"
+                - 'cell " #DH00170" [ref=e362]':
+                  - generic [ref=e363]:
+                    - generic [ref=e364]: 
+                    - generic [ref=e365]: "#DH00170"
+                - cell " Chưa phân công" [ref=e366]:
+                  - generic [ref=e367]:
+                    - generic [ref=e369]: 
+                    - generic [ref=e370]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e371]
+                - cell " 0328898307" [ref=e372]:
+                  - generic [ref=e373]:
+                    - generic [ref=e374]: 
+                    - generic [ref=e375]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e376]:
+                  - generic [ref=e377]:
+                    - generic [ref=e378]: 
+                    - generic [ref=e379]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Chờ xử lý" [ref=e380]:
+                  - generic [ref=e382]: Chờ xử lý
+                - cell [ref=e383]:
+                  - group [ref=e384]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e385] [cursor=pointer]:
+                      - generic [ref=e386]: 
+                    - button "Sửa" [ref=e387] [cursor=pointer]:
+                      - generic [ref=e388]: 
+                    - button "Xóa" [ref=e389] [cursor=pointer]:
+                      - generic [ref=e390]: 
+              - 'row "4  #DH00169  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Chờ xử lý" [ref=e391]':
+                - cell "4" [ref=e392]:
+                  - generic [ref=e393]: "4"
+                - 'cell " #DH00169" [ref=e394]':
+                  - generic [ref=e395]:
+                    - generic [ref=e396]: 
+                    - generic [ref=e397]: "#DH00169"
+                - cell " Chưa phân công" [ref=e398]:
+                  - generic [ref=e399]:
+                    - generic [ref=e401]: 
+                    - generic [ref=e402]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e403]
+                - cell " 0328898307" [ref=e404]:
+                  - generic [ref=e405]:
+                    - generic [ref=e406]: 
+                    - generic [ref=e407]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e408]:
+                  - generic [ref=e409]:
+                    - generic [ref=e410]: 
+                    - generic [ref=e411]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Chờ xử lý" [ref=e412]:
+                  - generic [ref=e414]: Chờ xử lý
+                - cell [ref=e415]:
+                  - group [ref=e416]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e417] [cursor=pointer]:
+                      - generic [ref=e418]: 
+                    - button "Sửa" [ref=e419] [cursor=pointer]:
+                      - generic [ref=e420]: 
+                    - button "Xóa" [ref=e421] [cursor=pointer]:
+                      - generic [ref=e422]: 
+              - 'row "5  #DH00166  Chưa phân công Notif Verify Buyer  0900000052  Runtime verify shipping , Phuong 1, TP. Ho Chi Minh Đang xử lý" [ref=e423]':
+                - cell "5" [ref=e424]:
+                  - generic [ref=e425]: "5"
+                - 'cell " #DH00166" [ref=e426]':
+                  - generic [ref=e427]:
+                    - generic [ref=e428]: 
+                    - generic [ref=e429]: "#DH00166"
+                - cell " Chưa phân công" [ref=e430]:
+                  - generic [ref=e431]:
+                    - generic [ref=e433]: 
+                    - generic [ref=e434]: Chưa phân công
+                - cell "Notif Verify Buyer" [ref=e435]
+                - cell " 0900000052" [ref=e436]:
+                  - generic [ref=e437]:
+                    - generic [ref=e438]: 
+                    - generic [ref=e439]: "0900000052"
+                - cell " Runtime verify shipping , Phuong 1, TP. Ho Chi Minh" [ref=e440]:
+                  - generic [ref=e441]:
+                    - generic [ref=e442]: 
+                    - generic [ref=e443]: Runtime verify shipping , Phuong 1, TP. Ho Chi Minh
+                - cell "Đang xử lý" [ref=e444]:
+                  - generic [ref=e446]: Đang xử lý
+                - cell [ref=e447]:
+                  - group [ref=e448]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e449] [cursor=pointer]:
+                      - generic [ref=e450]: 
+                    - button "Sửa" [ref=e451] [cursor=pointer]:
+                      - generic [ref=e452]: 
+                    - button "Xóa" [ref=e453] [cursor=pointer]:
+                      - generic [ref=e454]: 
+              - 'row "6  #DH00164  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Expired" [ref=e455]':
+                - cell "6" [ref=e456]:
+                  - generic [ref=e457]: "6"
+                - 'cell " #DH00164" [ref=e458]':
+                  - generic [ref=e459]:
+                    - generic [ref=e460]: 
+                    - generic [ref=e461]: "#DH00164"
+                - cell " Chưa phân công" [ref=e462]:
+                  - generic [ref=e463]:
+                    - generic [ref=e465]: 
+                    - generic [ref=e466]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e467]
+                - cell " 0328898307" [ref=e468]:
+                  - generic [ref=e469]:
+                    - generic [ref=e470]: 
+                    - generic [ref=e471]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e472]:
+                  - generic [ref=e473]:
+                    - generic [ref=e474]: 
+                    - generic [ref=e475]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Expired" [ref=e476]:
+                  - generic [ref=e478]: Expired
+                - cell [ref=e479]:
+                  - group [ref=e480]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e481] [cursor=pointer]:
+                      - generic [ref=e482]: 
+                    - button "Sửa" [ref=e483] [cursor=pointer]:
+                      - generic [ref=e484]: 
+                    - button "Xóa" [ref=e485] [cursor=pointer]:
+                      - generic [ref=e486]: 
+              - 'row "7  #DH00163  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Expired" [ref=e487]':
+                - cell "7" [ref=e488]:
+                  - generic [ref=e489]: "7"
+                - 'cell " #DH00163" [ref=e490]':
+                  - generic [ref=e491]:
+                    - generic [ref=e492]: 
+                    - generic [ref=e493]: "#DH00163"
+                - cell " Chưa phân công" [ref=e494]:
+                  - generic [ref=e495]:
+                    - generic [ref=e497]: 
+                    - generic [ref=e498]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e499]
+                - cell " 0328898307" [ref=e500]:
+                  - generic [ref=e501]:
+                    - generic [ref=e502]: 
+                    - generic [ref=e503]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e504]:
+                  - generic [ref=e505]:
+                    - generic [ref=e506]: 
+                    - generic [ref=e507]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Expired" [ref=e508]:
+                  - generic [ref=e510]: Expired
+                - cell [ref=e511]:
+                  - group [ref=e512]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e513] [cursor=pointer]:
+                      - generic [ref=e514]: 
+                    - button "Sửa" [ref=e515] [cursor=pointer]:
+                      - generic [ref=e516]: 
+                    - button "Xóa" [ref=e517] [cursor=pointer]:
+                      - generic [ref=e518]: 
+              - 'row "8  #DH00162  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Expired" [ref=e519]':
+                - cell "8" [ref=e520]:
+                  - generic [ref=e521]: "8"
+                - 'cell " #DH00162" [ref=e522]':
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: 
+                    - generic [ref=e525]: "#DH00162"
+                - cell " Chưa phân công" [ref=e526]:
+                  - generic [ref=e527]:
+                    - generic [ref=e529]: 
+                    - generic [ref=e530]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e531]
+                - cell " 0328898307" [ref=e532]:
+                  - generic [ref=e533]:
+                    - generic [ref=e534]: 
+                    - generic [ref=e535]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e536]:
+                  - generic [ref=e537]:
+                    - generic [ref=e538]: 
+                    - generic [ref=e539]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Expired" [ref=e540]:
+                  - generic [ref=e542]: Expired
+                - cell [ref=e543]:
+                  - group [ref=e544]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e545] [cursor=pointer]:
+                      - generic [ref=e546]: 
+                    - button "Sửa" [ref=e547] [cursor=pointer]:
+                      - generic [ref=e548]: 
+                    - button "Xóa" [ref=e549] [cursor=pointer]:
+                      - generic [ref=e550]: 
+              - 'row "9  #DH00161  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Chờ xử lý" [ref=e551]':
+                - cell "9" [ref=e552]:
+                  - generic [ref=e553]: "9"
+                - 'cell " #DH00161" [ref=e554]':
+                  - generic [ref=e555]:
+                    - generic [ref=e556]: 
+                    - generic [ref=e557]: "#DH00161"
+                - cell " Chưa phân công" [ref=e558]:
+                  - generic [ref=e559]:
+                    - generic [ref=e561]: 
+                    - generic [ref=e562]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e563]
+                - cell " 0328898307" [ref=e564]:
+                  - generic [ref=e565]:
+                    - generic [ref=e566]: 
+                    - generic [ref=e567]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e568]:
+                  - generic [ref=e569]:
+                    - generic [ref=e570]: 
+                    - generic [ref=e571]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Chờ xử lý" [ref=e572]:
+                  - generic [ref=e574]: Chờ xử lý
+                - cell [ref=e575]:
+                  - group [ref=e576]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e577] [cursor=pointer]:
+                      - generic [ref=e578]: 
+                    - button "Sửa" [ref=e579] [cursor=pointer]:
+                      - generic [ref=e580]: 
+                    - button "Xóa" [ref=e581] [cursor=pointer]:
+                      - generic [ref=e582]: 
+              - 'row "10  #DH00160  Chưa phân công Bùi Khắc Vinh  0328898307  Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương Expired" [ref=e583]':
+                - cell "10" [ref=e584]:
+                  - generic [ref=e585]: "10"
+                - 'cell " #DH00160" [ref=e586]':
+                  - generic [ref=e587]:
+                    - generic [ref=e588]: 
+                    - generic [ref=e589]: "#DH00160"
+                - cell " Chưa phân công" [ref=e590]:
+                  - generic [ref=e591]:
+                    - generic [ref=e593]: 
+                    - generic [ref=e594]: Chưa phân công
+                - cell "Bùi Khắc Vinh" [ref=e595]
+                - cell " 0328898307" [ref=e596]:
+                  - generic [ref=e597]:
+                    - generic [ref=e598]: 
+                    - generic [ref=e599]: "0328898307"
+                - cell " Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương" [ref=e600]:
+                  - generic [ref=e601]:
+                    - generic [ref=e602]: 
+                    - generic [ref=e603]: Số 6, Phường Phú Lợi, Thành phố Thủ Dầu Một, Bình Dương
+                - cell "Expired" [ref=e604]:
+                  - generic [ref=e606]: Expired
+                - cell [ref=e607]:
+                  - group [ref=e608]:
+                    - button "Đổ thông tin dòng này sang bảng điều khiển GHN" [ref=e609] [cursor=pointer]:
+                      - generic [ref=e610]: 
+                    - button "Sửa" [ref=e611] [cursor=pointer]:
+                      - generic [ref=e612]: 
+                    - button "Xóa" [ref=e613] [cursor=pointer]:
+                      - generic [ref=e614]: 
+          - generic [ref=e615]:
+            - generic [ref=e616]:
+              - generic [ref=e617]: 
+              - text: Trang 1 / 15 • Tổng 148 mục
+            - list [ref=e618]:
+              - listitem [ref=e619]:
+                - link "":
+                  - /url: /Admin/Shipping/ManageShipping?page=0&sort=date_desc&pageSize=10
+                  - generic: 
+              - listitem [ref=e620]:
+                - link "1" [ref=e621] [cursor=pointer]:
+                  - /url: /Admin/Shipping/ManageShipping?page=1&sort=date_desc&pageSize=10
+              - listitem [ref=e622]:
+                - link "2" [ref=e623] [cursor=pointer]:
+                  - /url: /Admin/Shipping/ManageShipping?page=2&sort=date_desc&pageSize=10
+              - listitem [ref=e624]:
+                - link "3" [ref=e625] [cursor=pointer]:
+                  - /url: /Admin/Shipping/ManageShipping?page=3&sort=date_desc&pageSize=10
+              - listitem [ref=e626]:
+                - link "" [ref=e627] [cursor=pointer]:
+                  - /url: /Admin/Shipping/ManageShipping?page=2&sort=date_desc&pageSize=10
+                  - generic [ref=e628]: 
+  - text:                          

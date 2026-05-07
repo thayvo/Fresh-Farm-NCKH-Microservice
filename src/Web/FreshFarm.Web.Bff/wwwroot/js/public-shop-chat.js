@@ -248,7 +248,6 @@
 
             const setupSignalR = () => {
                 if (!window.signalR || !window.signalR.HubConnectionBuilder) {
-                    console.warn("[public-shop-chat] ASP.NET Core SignalR client not loaded. Fallback to polling mode.");
                     state.isRealtimeReady = false;
                     return false;
                 }

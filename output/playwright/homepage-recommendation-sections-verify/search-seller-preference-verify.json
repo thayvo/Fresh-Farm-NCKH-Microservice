@@ -1,0 +1,34 @@
+{
+  "capturedAtUtc": "2026-04-02T16:18:18.382Z",
+  "status": 200,
+  "rankingAlgorithm": "hybrid_search_v1",
+  "rankingSignalSource": "materialized_category_pref_v1",
+  "rankingFallbackReason": null,
+  "signalBreakdown": {
+    "content": "catalog_keyword_v1",
+    "overall": "materialized_category_pref_v1",
+    "overallReason": null,
+    "preference": "materialized_category_pref_v1",
+    "preferenceReason": null
+  },
+  "topItems": [
+    {
+      "productId": 27,
+      "productName": "Khoai lang tím",
+      "primarySellerId": 4,
+      "recommendationReason": "Bạn hay mua nhóm Củ & rễ · Được chọn nhiều · Đánh giá tốt"
+    },
+    {
+      "productId": 14,
+      "productName": "Khoai tây vàng",
+      "primarySellerId": 51,
+      "recommendationReason": "Bạn hay mua nhóm Củ & rễ · Được chọn nhiều · Từ Đà Lạt"
+    },
+    {
+      "productId": 46,
+      "productName": "Khoai lang Nhật",
+      "primarySellerId": 4,
+      "recommendationReason": "Bạn hay mua nhóm Củ & rễ · Từ Nhật Bản (trồng VN)"
+    }
+  ]
+}

@@ -6,13 +6,16 @@ public sealed class RecommendationAffinityRefreshBackgroundService : BackgroundS
 
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly ILogger<RecommendationAffinityRefreshBackgroundService> _logger;
+    private readonly RecommendationAffinityRefreshSignal _refreshSignal;
 
     public RecommendationAffinityRefreshBackgroundService(
         IServiceScopeFactory serviceScopeFactory,
-        ILogger<RecommendationAffinityRefreshBackgroundService> logger)
+        ILogger<RecommendationAffinityRefreshBackgroundService> logger,
+        RecommendationAffinityRefreshSignal refreshSignal)
     {
         _serviceScopeFactory = serviceScopeFactory;
         _logger = logger;
+        _refreshSignal = refreshSignal;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -21,6 +24,7 @@ public sealed class RecommendationAffinityRefreshBackgroundService : BackgroundS
         {
             try
             {
+                await _refreshSignal.WaitForRefreshSignalAsync(Interval, stoppingToken);
                 using var scope = _serviceScopeFactory.CreateScope();
                 var affinityService = scope.ServiceProvider.GetRequiredService<RecommendationAffinityService>();
                 await affinityService.RebuildAsync(stoppingToken);
@@ -33,8 +37,6 @@ public sealed class RecommendationAffinityRefreshBackgroundService : BackgroundS
             {
                 _logger.LogError(ex, "Khong the refresh recommendation product affinity.");
             }
-
-            await Task.Delay(Interval, stoppingToken);
         }
     }
 }

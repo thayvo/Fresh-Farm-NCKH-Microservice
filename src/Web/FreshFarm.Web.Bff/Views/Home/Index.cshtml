@@ -131,6 +131,68 @@
             overflow: hidden;
         }
 
+        .product-card .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .recommendation-meta {
+            display: grid;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .08) 0%, rgba(250, 204, 21, .14) 100%);
+            border: 1px solid rgba(22, 163, 74, .12);
+        }
+
+        .recommendation-badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .recommendation-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #166534;
+            background: rgba(240, 253, 244, .92);
+            border: 1px solid rgba(34, 197, 94, .2);
+            white-space: nowrap;
+        }
+
+        .recommendation-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: .7;
+        }
+
+        .seasonality-badge-row {
+            justify-content: center;
+            margin-top: 6px;
+        }
+
+        .recommendation-badge.seasonality-badge {
+            color: #047857;
+            background: rgba(236, 253, 245, .96);
+            border-color: rgba(16, 185, 129, .28);
+        }
+
+        .recommendation-reason {
+            font-size: .79rem;
+            line-height: 1.45;
+            color: #4b5563;
+        }
+
         .product-image-wrapper {
             position: relative;
             width: 100%;
@@ -158,6 +220,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 2;
             background-color: rgba(0, 0, 0, .5);
             color: #fff;
             display: flex;
@@ -168,16 +231,19 @@
             padding: 1rem;
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
             transition: opacity .4s ease, visibility .4s ease;
         }
 
         .product-card:hover .product-overlay {
             opacity: 1;
             visibility: visible;
+            pointer-events: auto;
         }
 
         .product-card:hover .card-body {
             opacity: 0;
+            pointer-events: none;
             transition: opacity .3s ease;
         }
 
@@ -210,6 +276,92 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
+        }
+
+        .recommendation-section-stack {
+            display: grid;
+            gap: 24px;
+        }
+
+        .recommendation-section-card {
+            background: #fff;
+            border: 1px solid rgba(22, 163, 74, .08);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, .06);
+        }
+
+        .recommendation-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .recommendation-section-title {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .recommendation-section-subtitle {
+            margin: 6px 0 0;
+            color: #64748b;
+            line-height: 1.6;
+            font-size: .94rem;
+        }
+
+        .recommendation-section-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 700;
+            color: #166534;
+            background: rgba(240, 253, 244, .9);
+            border: 1px solid rgba(34, 197, 94, .18);
+            white-space: nowrap;
+        }
+
+        .recommendation-section-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .recommendation-card-hidden {
+            display: none !important;
+        }
+
+        .recommendation-section-actions {
+            display: flex;
+            justify-content: center;
+            margin-top: 22px;
+        }
+
+        .recommendation-load-more {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border: 1px solid rgba(22, 163, 74, .18);
+            border-radius: 999px;
+            background: rgba(240, 253, 244, .92);
+            color: #166534;
+            font-size: .92rem;
+            font-weight: 700;
+            transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+        }
+
+        .recommendation-load-more:hover {
+            background: #dcfce7;
+            box-shadow: 0 12px 28px rgba(22, 163, 74, .12);
+            transform: translateY(-1px);
         }
 
         .empty-state {
@@ -545,6 +697,10 @@
         }
 
         @@media (max-width: 991.98px) {
+            .recommendation-section-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
             .header-main-wrap {
                 align-items: flex-start;
             }
@@ -566,6 +722,10 @@
         }
 
         @@media (max-width: 767.98px) {
+            .recommendation-section-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .header-cart-link span {
                 display: none !important;
             }
@@ -589,6 +749,14 @@
         }
 
         @@media (max-width: 576px) {
+            .recommendation-section-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .recommendation-meta {
+                padding: 9px 10px;
+            }
+
             .popup-container {
                 width: 95%;
                 margin: 10px;
@@ -641,23 +809,41 @@
     </section>
 
     <section id="section-suggest" class="container my-5">
-        <h2 class="text-center fw-bold mb-4">Gợi Ý Hôm Nay</h2>
-        <div class="swiper mySwiper-suggest">
-            <div id="suggestionWrapper" class="swiper-wrapper"></div>
-            <div class="swiper-button-prev"></div>
-            <div class="swiper-button-next"></div>
+        <div class="text-center mb-4">
+            <h2 class="fw-bold mb-2">Gợi ý cho bạn hôm nay</h2>
         </div>
+        <div id="homeRecommendationSections" class="recommendation-section-stack"></div>
         <div id="suggestionEmpty" class="empty-state d-none mt-3">Chưa có sản phẩm gợi ý.</div>
     </section>
 
     <section id="section-featured" class="container my-5">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <h2 class="fw-bold mb-0">Sản phẩm nổi bật</h2>
+            <h2 class="fw-bold mb-0">Trending products</h2>
             <a href="#section-featured" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
         </div>
 
         <div id="featuredGrid" class="row g-4"></div>
-        <div id="featuredEmpty" class="empty-state d-none">Không có sản phẩm để hiển thị.</div>
+        <div id="featuredEmpty" class="empty-state d-none">Chưa có sản phẩm thịnh hành để hiển thị.</div>
+    </section>
+
+    <section id="section-new-arrivals" class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0">New arrivals</h2>
+            <a href="#section-new-arrivals" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
+        </div>
+
+        <div id="newArrivalsGrid" class="row g-4"></div>
+        <div id="newArrivalsEmpty" class="empty-state d-none">Chưa có sản phẩm mới để hiển thị.</div>
+    </section>
+
+    <section id="section-best-sellers" class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0">Best sellers</h2>
+            <a href="#section-best-sellers" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
+        </div>
+
+        <div id="bestSellersGrid" class="row g-4"></div>
+        <div id="bestSellersEmpty" class="empty-state d-none">Chưa có sản phẩm bán chạy để hiển thị.</div>
     </section>
 
     <div class="popup-overlay" id="welcomePopup">

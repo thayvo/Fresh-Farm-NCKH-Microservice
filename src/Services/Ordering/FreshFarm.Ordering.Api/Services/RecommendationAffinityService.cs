@@ -8,12 +8,21 @@ public sealed class RecommendationAffinityService
     private static readonly string[] SuccessfulOrderStatuses = ["delivered", "completed"];
     private static readonly TimeSpan LookbackWindow = TimeSpan.FromDays(180);
     private static readonly TimeSpan HomePreferenceLookbackWindow = TimeSpan.FromDays(90);
+    private static readonly TimeSpan ReplenishmentLookbackWindow = TimeSpan.FromDays(365);
+    private static readonly TimeSpan NegativeFeedbackLookbackWindow = TimeSpan.FromDays(30);
     private const int MaxAffinitiesPerSeed = 48;
     private const int MaxKeywordAffinitiesPerKeyword = 48;
     private const int MaxHomePreferenceSeedsPerScope = 48;
     private const int MaxHomeCollaborativeCandidatesPerScope = 48;
+    private const int MaxUserProductScoresPerUser = 96;
+    private const int MaxUserCategoryScoresPerUser = 24;
+    private const int MaxUserSellerScoresPerUser = 32;
+    private const int MaxBasketAffinitiesPerProduct = 48;
+    private const int MaxReplenishmentProfilesPerUser = 48;
+    private const double NegativeFeedbackScoreScale = 10d;
 
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly CatalogInventoryClient _catalogInventoryClient;
     private readonly ILogger<RecommendationAffinityService> _logger;
 
     private sealed record SearchSessionKeyword(string SessionId, string Keyword);
@@ -21,9 +30,11 @@ public sealed class RecommendationAffinityService
 
     public RecommendationAffinityService(
         FreshFarmOrderingDBContext db,
+        CatalogInventoryClient catalogInventoryClient,
         ILogger<RecommendationAffinityService> logger)
     {
         _db = db;
+        _catalogInventoryClient = catalogInventoryClient;
         _logger = logger;
     }
 
@@ -180,23 +191,59 @@ public sealed class RecommendationAffinityService
             recommendationClickPairs,
             productViewPairs,
             computedAt);
+        var negativeFeedbackScores = await RecommendationNegativeFeedbackScoring.LoadUserProductScoreMapAsync(
+            _db,
+            computedAt.Subtract(NegativeFeedbackLookbackWindow),
+            computedAt,
+            computedAt,
+            cancellationToken);
+        var userProductScores = await BuildUserProductScoresAsync(
+            DateTime.UtcNow.Subtract(ReplenishmentLookbackWindow),
+            computedAt,
+            negativeFeedbackScores,
+            cancellationToken);
+        var userCategoryScores = await BuildUserCategoryScoresAsync(
+            userProductScores,
+            computedAt,
+            cancellationToken);
+        var userSellerScores = await BuildUserSellerScoresAsync(
+            DateTime.UtcNow.Subtract(ReplenishmentLookbackWindow),
+            computedAt,
+            cancellationToken);
+        var basketAffinities = BuildBasketAffinities(materializedRows, computedAt);
+        var replenishmentProfiles = await BuildReplenishmentProfilesAsync(
+            DateTime.UtcNow.Subtract(ReplenishmentLookbackWindow),
+            computedAt,
+            cancellationToken);
         var homePreferenceSeeds = await BuildHomePreferenceSeedsAsync(
             DateTime.UtcNow.Subtract(HomePreferenceLookbackWindow),
             computedAt,
+            negativeFeedbackScores,
             cancellationToken);
         var homeCollaborativeCandidates = BuildHomeCollaborativeCandidates(
             homePreferenceSeeds,
             materializedRows,
+            negativeFeedbackScores,
             computedAt);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         _db.RecommendationProductAffinities.RemoveRange(_db.RecommendationProductAffinities);
         _db.RecommendationSearchKeywordAffinities.RemoveRange(_db.RecommendationSearchKeywordAffinities);
+        _db.RecommendationUserProductScores.RemoveRange(_db.RecommendationUserProductScores);
+        _db.RecommendationUserCategoryScores.RemoveRange(_db.RecommendationUserCategoryScores);
+        _db.RecommendationUserSellerScores.RemoveRange(_db.RecommendationUserSellerScores);
+        _db.RecommendationBasketAffinities.RemoveRange(_db.RecommendationBasketAffinities);
+        _db.RecommendationReplenishmentProfiles.RemoveRange(_db.RecommendationReplenishmentProfiles);
         _db.RecommendationHomePreferenceSeeds.RemoveRange(_db.RecommendationHomePreferenceSeeds);
         _db.RecommendationHomeCollaborativeCandidates.RemoveRange(_db.RecommendationHomeCollaborativeCandidates);
         await _db.SaveChangesAsync(cancellationToken);
         await _db.RecommendationProductAffinities.AddRangeAsync(materializedRows, cancellationToken);
         await _db.RecommendationSearchKeywordAffinities.AddRangeAsync(keywordAffinities, cancellationToken);
+        await _db.RecommendationUserProductScores.AddRangeAsync(userProductScores, cancellationToken);
+        await _db.RecommendationUserCategoryScores.AddRangeAsync(userCategoryScores, cancellationToken);
+        await _db.RecommendationUserSellerScores.AddRangeAsync(userSellerScores, cancellationToken);
+        await _db.RecommendationBasketAffinities.AddRangeAsync(basketAffinities, cancellationToken);
+        await _db.RecommendationReplenishmentProfiles.AddRangeAsync(replenishmentProfiles, cancellationToken);
         await _db.RecommendationHomePreferenceSeeds.AddRangeAsync(homePreferenceSeeds, cancellationToken);
         await _db.RecommendationHomeCollaborativeCandidates.AddRangeAsync(homeCollaborativeCandidates, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
@@ -209,6 +256,16 @@ public sealed class RecommendationAffinityService
             DistinctSeedProductCount = materializedRows.Select(item => item.SeedProductId).Distinct().Count(),
             MaterializedKeywordRowCount = keywordAffinities.Count,
             DistinctKeywordCount = keywordAffinities.Select(item => item.Keyword).Distinct(StringComparer.Ordinal).Count(),
+            MaterializedUserProductScoreRowCount = userProductScores.Count,
+            DistinctUserProductScoreUserCount = userProductScores.Select(item => item.UserId).Distinct().Count(),
+            MaterializedUserCategoryScoreRowCount = userCategoryScores.Count,
+            DistinctUserCategoryScoreUserCount = userCategoryScores.Select(item => item.UserId).Distinct().Count(),
+            MaterializedUserSellerScoreRowCount = userSellerScores.Count,
+            DistinctUserSellerScoreUserCount = userSellerScores.Select(item => item.UserId).Distinct().Count(),
+            MaterializedBasketAffinityRowCount = basketAffinities.Count,
+            DistinctBasketAffinityProductCount = basketAffinities.Select(item => item.ProductId).Distinct().Count(),
+            MaterializedReplenishmentProfileRowCount = replenishmentProfiles.Count,
+            DistinctReplenishmentUserCount = replenishmentProfiles.Select(item => item.UserId).Distinct().Count(),
             MaterializedHomePreferenceRowCount = homePreferenceSeeds.Count,
             DistinctHomePreferenceScopeCount = homePreferenceSeeds
                 .Select(item => $"{item.ScopeType}:{item.ScopeKey}")
@@ -222,11 +279,21 @@ public sealed class RecommendationAffinityService
         };
 
         _logger.LogInformation(
-            "Da rebuild recommendation affinity. Seeds={SeedCount}, PairRows={RowCount}, Keywords={KeywordCount}, KeywordRows={KeywordRowCount}, HomeScopes={HomeScopeCount}, HomeRows={HomeRowCount}, HomeCandidateScopes={HomeCandidateScopeCount}, HomeCandidateRows={HomeCandidateRowCount}, ComputedAt={ComputedAtUtc}",
+            "Da rebuild recommendation affinity. Seeds={SeedCount}, PairRows={RowCount}, Keywords={KeywordCount}, KeywordRows={KeywordRowCount}, UserScoreUsers={UserScoreUsers}, UserScoreRows={UserScoreRows}, UserCategoryUsers={UserCategoryUsers}, UserCategoryRows={UserCategoryRows}, UserSellerUsers={UserSellerUsers}, UserSellerRows={UserSellerRows}, BasketProducts={BasketProducts}, BasketRows={BasketRows}, ReplenishmentUsers={ReplenishmentUsers}, ReplenishmentRows={ReplenishmentRows}, HomeScopes={HomeScopeCount}, HomeRows={HomeRowCount}, HomeCandidateScopes={HomeCandidateScopeCount}, HomeCandidateRows={HomeCandidateRowCount}, ComputedAt={ComputedAtUtc}",
             result.DistinctSeedProductCount,
             result.MaterializedRowCount,
             result.DistinctKeywordCount,
             result.MaterializedKeywordRowCount,
+            result.DistinctUserProductScoreUserCount,
+            result.MaterializedUserProductScoreRowCount,
+            result.DistinctUserCategoryScoreUserCount,
+            result.MaterializedUserCategoryScoreRowCount,
+            result.DistinctUserSellerScoreUserCount,
+            result.MaterializedUserSellerScoreRowCount,
+            result.DistinctBasketAffinityProductCount,
+            result.MaterializedBasketAffinityRowCount,
+            result.DistinctReplenishmentUserCount,
+            result.MaterializedReplenishmentProfileRowCount,
             result.DistinctHomePreferenceScopeCount,
             result.MaterializedHomePreferenceRowCount,
             result.DistinctHomeCollaborativeScopeCount,
@@ -333,6 +400,7 @@ public sealed class RecommendationAffinityService
     private async Task<List<RecommendationHomePreferenceSeed>> BuildHomePreferenceSeedsAsync(
         DateTime lookbackFromUtc,
         DateTime computedAt,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         CancellationToken cancellationToken)
     {
         var seedsByScope = new Dictionary<(string ScopeType, string ScopeKey, int ProductId), RecommendationHomePreferenceSeed>();
@@ -527,6 +595,12 @@ public sealed class RecommendationAffinityService
                 + (seed.SearchClickCount * 28d)
                 + (seed.RecommendationClickCount * 22d)
                 + (seed.PurchaseCount * 35d);
+
+            if (seed.UserId.HasValue
+                && negativeFeedbackScores.TryGetValue((seed.UserId.Value, seed.ProductId), out var negativeFeedback))
+            {
+                seed.PreferenceScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
+            }
         }
 
         return seedsByScope.Values
@@ -547,6 +621,7 @@ public sealed class RecommendationAffinityService
     private static List<RecommendationHomeCollaborativeCandidate> BuildHomeCollaborativeCandidates(
         IReadOnlyCollection<RecommendationHomePreferenceSeed> homePreferenceSeeds,
         IReadOnlyCollection<RecommendationProductAffinity> productAffinities,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         DateTime computedAt)
     {
         if (homePreferenceSeeds.Count == 0 || productAffinities.Count == 0)
@@ -607,6 +682,15 @@ public sealed class RecommendationAffinityService
             }
         }
 
+        foreach (var candidate in candidatesByScope.Values)
+        {
+            if (candidate.UserId.HasValue
+                && negativeFeedbackScores.TryGetValue((candidate.UserId.Value, candidate.ProductId), out var negativeFeedback))
+            {
+                candidate.CollaborativeScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
+            }
+        }
+
         return candidatesByScope.Values
             .Where(item => item.CollaborativeScore > 0d)
             .GroupBy(item => (item.ScopeType, item.ScopeKey))
@@ -616,7 +700,518 @@ public sealed class RecommendationAffinityService
                 .ThenByDescending(item => item.CoClickSessionCount)
                 .ThenByDescending(item => item.CoViewSessionCount)
                 .ThenBy(item => item.ProductId)
-                .Take(MaxHomeCollaborativeCandidatesPerScope))
+            .Take(MaxHomeCollaborativeCandidatesPerScope))
+            .ToList();
+    }
+
+    private async Task<List<RecommendationUserProductScore>> BuildUserProductScoresAsync(
+        DateTime lookbackFromUtc,
+        DateTime computedAt,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
+        CancellationToken cancellationToken)
+    {
+        var scoresByUserProduct = new Dictionary<(int UserId, int ProductId), RecommendationUserProductScore>();
+
+        void UpdateScore(int userId, int productId, Action<RecommendationUserProductScore> apply)
+        {
+            if (userId <= 0 || productId <= 0)
+            {
+                return;
+            }
+
+            var key = (userId, productId);
+            if (!scoresByUserProduct.TryGetValue(key, out var score))
+            {
+                score = new RecommendationUserProductScore
+                {
+                    UserId = userId,
+                    ProductId = productId,
+                    ComputedAt = computedAt
+                };
+                scoresByUserProduct[key] = score;
+            }
+
+            apply(score);
+        }
+
+        var userViewSignals = await _db.ProductViewEvents
+            .AsNoTracking()
+            .Where(item => item.CreatedAt >= lookbackFromUtc && item.ProductId > 0 && item.UserId.HasValue && item.UserId.Value > 0)
+            .GroupBy(item => new { UserId = item.UserId!.Value, item.ProductId })
+            .Select(grouped => new
+            {
+                grouped.Key.UserId,
+                grouped.Key.ProductId,
+                ViewCount = grouped.Count(),
+                LastInteractedAtUtc = grouped.Max(item => item.CreatedAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userViewSignals)
+        {
+            UpdateScore(signal.UserId, signal.ProductId, item =>
+            {
+                item.ViewCount = signal.ViewCount;
+                item.LastInteractedAtUtc = MaxUtc(item.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        var userSearchClickSignals = await _db.SearchClickEvents
+            .AsNoTracking()
+            .Where(item => item.CreatedAt >= lookbackFromUtc && item.ProductId > 0 && item.UserId.HasValue && item.UserId.Value > 0)
+            .GroupBy(item => new { UserId = item.UserId!.Value, item.ProductId })
+            .Select(grouped => new
+            {
+                grouped.Key.UserId,
+                grouped.Key.ProductId,
+                SearchClickCount = grouped.Count(),
+                LastInteractedAtUtc = grouped.Max(item => item.CreatedAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userSearchClickSignals)
+        {
+            UpdateScore(signal.UserId, signal.ProductId, item =>
+            {
+                item.SearchClickCount = signal.SearchClickCount;
+                item.LastInteractedAtUtc = MaxUtc(item.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        var userRecommendationClickSignals = await _db.RecommendationClickEvents
+            .AsNoTracking()
+            .Where(item => item.CreatedAt >= lookbackFromUtc && item.ProductId > 0 && item.UserId.HasValue && item.UserId.Value > 0)
+            .GroupBy(item => new { UserId = item.UserId!.Value, item.ProductId })
+            .Select(grouped => new
+            {
+                grouped.Key.UserId,
+                grouped.Key.ProductId,
+                RecommendationClickCount = grouped.Count(),
+                LastInteractedAtUtc = grouped.Max(item => item.CreatedAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userRecommendationClickSignals)
+        {
+            UpdateScore(signal.UserId, signal.ProductId, item =>
+            {
+                item.RecommendationClickCount = signal.RecommendationClickCount;
+                item.LastInteractedAtUtc = MaxUtc(item.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        var purchaseSignals = await (
+                from order in _db.Orders.AsNoTracking()
+                join detail in _db.OrderDetails.AsNoTracking() on order.OrderId equals detail.OrderId
+                where order.UserId > 0
+                    && detail.ProductId > 0
+                    && order.OrderDate >= lookbackFromUtc
+                    && SuccessfulOrderStatuses.Contains((order.Status ?? string.Empty).Trim().ToLower())
+                group new { order, detail } by new { order.UserId, detail.ProductId }
+                into grouped
+                select new
+                {
+                    grouped.Key.UserId,
+                    grouped.Key.ProductId,
+                    PurchaseCount = grouped.Sum(item => item.detail.Quantity),
+                    LastInteractedAtUtc = grouped.Max(item => item.order.OrderDate)
+                })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in purchaseSignals)
+        {
+            UpdateScore(signal.UserId, signal.ProductId, item =>
+            {
+                item.PurchaseCount = signal.PurchaseCount;
+                item.LastInteractedAtUtc = MaxUtc(item.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        foreach (var item in scoresByUserProduct.Values)
+        {
+            item.UserProductScore =
+                (item.PurchaseCount * 42d)
+                + (item.SearchClickCount * 22d)
+                + (item.RecommendationClickCount * 18d)
+                + (item.ViewCount * 8d);
+
+            if (item.LastInteractedAtUtc.HasValue)
+            {
+                var ageDays = Math.Max(0d, (computedAt - item.LastInteractedAtUtc.Value).TotalDays);
+                item.UserProductScore += Math.Max(0d, 18d - Math.Min(ageDays, 18d));
+            }
+
+            if (negativeFeedbackScores.TryGetValue((item.UserId, item.ProductId), out var negativeFeedback))
+            {
+                item.UserProductScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
+            }
+        }
+
+        return scoresByUserProduct.Values
+            .Where(item => item.UserProductScore > 0d)
+            .GroupBy(item => item.UserId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.UserProductScore)
+                .ThenByDescending(item => item.PurchaseCount)
+                .ThenByDescending(item => item.SearchClickCount)
+                .ThenByDescending(item => item.RecommendationClickCount)
+                .ThenByDescending(item => item.ViewCount)
+                .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+                .ThenBy(item => item.ProductId)
+                .Take(MaxUserProductScoresPerUser))
+            .ToList();
+    }
+
+    private async Task<List<RecommendationUserSellerScore>> BuildUserSellerScoresAsync(
+        DateTime lookbackFromUtc,
+        DateTime computedAt,
+        CancellationToken cancellationToken)
+    {
+        var scoresByUserSeller = new Dictionary<(int UserId, int SellerId), RecommendationUserSellerScore>();
+
+        void UpdateScore(int userId, int sellerId, Action<RecommendationUserSellerScore> apply)
+        {
+            if (userId <= 0 || sellerId <= 0)
+            {
+                return;
+            }
+
+            var key = (userId, sellerId);
+            if (!scoresByUserSeller.TryGetValue(key, out var score))
+            {
+                score = new RecommendationUserSellerScore
+                {
+                    UserId = userId,
+                    SellerId = sellerId,
+                    ComputedAt = computedAt
+                };
+                scoresByUserSeller[key] = score;
+            }
+
+            apply(score);
+        }
+
+        var userViewSignals = await _db.ProductViewEvents
+            .AsNoTracking()
+            .Where(item =>
+                item.CreatedAt >= lookbackFromUtc
+                && item.UserId.HasValue
+                && item.UserId > 0
+                && item.SellerId.HasValue
+                && item.SellerId > 0)
+            .GroupBy(item => new { UserId = item.UserId!.Value, SellerId = item.SellerId!.Value })
+            .Select(group => new
+            {
+                group.Key.UserId,
+                group.Key.SellerId,
+                ViewCount = group.Count(),
+                LastInteractedAtUtc = group.Max(item => item.CreatedAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userViewSignals)
+        {
+            UpdateScore(signal.UserId, signal.SellerId, score =>
+            {
+                score.ViewCount = signal.ViewCount;
+                score.LastInteractedAtUtc = MaxUtc(score.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        var userSearchClickSignals = await _db.SearchClickEvents
+            .AsNoTracking()
+            .Where(item =>
+                item.CreatedAt >= lookbackFromUtc
+                && item.UserId.HasValue
+                && item.UserId > 0
+                && item.SellerId.HasValue
+                && item.SellerId > 0)
+            .GroupBy(item => new { UserId = item.UserId!.Value, SellerId = item.SellerId!.Value })
+            .Select(group => new
+            {
+                group.Key.UserId,
+                group.Key.SellerId,
+                SearchClickCount = group.Count(),
+                LastInteractedAtUtc = group.Max(item => item.CreatedAt)
+            })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userSearchClickSignals)
+        {
+            UpdateScore(signal.UserId, signal.SellerId, score =>
+            {
+                score.SearchClickCount = signal.SearchClickCount;
+                score.LastInteractedAtUtc = MaxUtc(score.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        var userPurchaseSignals = await (
+                from sellerOrder in _db.SellerOrders.AsNoTracking()
+                join order in _db.Orders.AsNoTracking() on sellerOrder.OrderId equals order.OrderId
+                join sellerOrderItem in _db.SellerOrderItems.AsNoTracking() on sellerOrder.SellerOrderId equals sellerOrderItem.SellerOrderId
+                where order.UserId > 0
+                      && sellerOrder.SellerId > 0
+                      && order.OrderDate >= lookbackFromUtc
+                      && SuccessfulOrderStatuses.Contains((order.Status ?? string.Empty).Trim().ToLower())
+                group new { order, sellerOrderItem } by new { order.UserId, sellerOrder.SellerId }
+                into grouped
+                select new
+                {
+                    grouped.Key.UserId,
+                    grouped.Key.SellerId,
+                    PurchaseCount = grouped.Sum(item => item.sellerOrderItem.Quantity),
+                    LastInteractedAtUtc = grouped.Max(item => item.order.OrderDate)
+                })
+            .ToListAsync(cancellationToken);
+
+        foreach (var signal in userPurchaseSignals)
+        {
+            UpdateScore(signal.UserId, signal.SellerId, score =>
+            {
+                score.PurchaseCount = signal.PurchaseCount;
+                score.LastInteractedAtUtc = MaxUtc(score.LastInteractedAtUtc, signal.LastInteractedAtUtc);
+            });
+        }
+
+        return scoresByUserSeller.Values
+            .Select(score =>
+            {
+                score.UserSellerScore =
+                    (score.PurchaseCount * 42d)
+                    + (score.SearchClickCount * 14d)
+                    + (score.ViewCount * 4d);
+                score.ComputedAt = computedAt;
+                return score;
+            })
+            .Where(score => score.UserSellerScore > 0d)
+            .GroupBy(score => score.UserId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.UserSellerScore)
+                .ThenByDescending(item => item.PurchaseCount)
+                .ThenByDescending(item => item.SearchClickCount)
+                .ThenByDescending(item => item.ViewCount)
+                .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+                .ThenBy(item => item.SellerId)
+                .Take(MaxUserSellerScoresPerUser))
+            .ToList();
+    }
+
+    private async Task<List<RecommendationUserCategoryScore>> BuildUserCategoryScoresAsync(
+        IReadOnlyCollection<RecommendationUserProductScore> userProductScores,
+        DateTime computedAt,
+        CancellationToken cancellationToken)
+    {
+        if (userProductScores.Count == 0)
+        {
+            return new List<RecommendationUserCategoryScore>();
+        }
+
+        IReadOnlyDictionary<int, CatalogProductCategoryMappingItem> categoryMappings;
+        try
+        {
+            categoryMappings = await _catalogInventoryClient.GetProductCategoryMappingsAsync(
+                userProductScores.Select(item => item.ProductId),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Khong lay duoc category mapping tu Catalog khi rebuild UserCategoryScore.");
+            return new List<RecommendationUserCategoryScore>();
+        }
+
+        if (categoryMappings.Count == 0)
+        {
+            return new List<RecommendationUserCategoryScore>();
+        }
+
+        var scoresByUserCategory = new Dictionary<(int UserId, int CategoryId), RecommendationUserCategoryScore>();
+
+        void UpdateScore(
+            int userId,
+            int categoryId,
+            string categoryName,
+            Action<RecommendationUserCategoryScore> apply)
+        {
+            if (userId <= 0 || categoryId <= 0)
+            {
+                return;
+            }
+
+            var key = (userId, categoryId);
+            if (!scoresByUserCategory.TryGetValue(key, out var score))
+            {
+                score = new RecommendationUserCategoryScore
+                {
+                    UserId = userId,
+                    CategoryId = categoryId,
+                    CategoryName = string.IsNullOrWhiteSpace(categoryName)
+                        ? $"Category {categoryId}"
+                        : categoryName.Trim(),
+                    ComputedAt = computedAt
+                };
+                scoresByUserCategory[key] = score;
+            }
+            else if (!string.IsNullOrWhiteSpace(categoryName))
+            {
+                score.CategoryName = categoryName.Trim();
+            }
+
+            apply(score);
+        }
+
+        foreach (var userProductScore in userProductScores)
+        {
+            if (!categoryMappings.TryGetValue(userProductScore.ProductId, out var mapping)
+                || mapping.CategoryId <= 0)
+            {
+                continue;
+            }
+
+            UpdateScore(userProductScore.UserId, mapping.CategoryId, mapping.CategoryName, score =>
+            {
+                score.ViewCount += userProductScore.ViewCount;
+                score.SearchClickCount += userProductScore.SearchClickCount;
+                score.RecommendationClickCount += userProductScore.RecommendationClickCount;
+                score.PurchaseCount += userProductScore.PurchaseCount;
+                if (userProductScore.LastInteractedAtUtc.HasValue)
+                {
+                    score.LastInteractedAtUtc = MaxUtc(score.LastInteractedAtUtc, userProductScore.LastInteractedAtUtc.Value);
+                }
+
+                score.UserCategoryScore += userProductScore.UserProductScore
+                    + CalculateLongTermCategoryLift(userProductScore, computedAt);
+            });
+        }
+
+        return scoresByUserCategory.Values
+            .Where(score => score.UserCategoryScore > 0d)
+            .GroupBy(score => score.UserId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.UserCategoryScore)
+                .ThenByDescending(item => item.PurchaseCount)
+                .ThenByDescending(item => item.SearchClickCount)
+                .ThenByDescending(item => item.RecommendationClickCount)
+                .ThenByDescending(item => item.ViewCount)
+                .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+                .ThenBy(item => item.CategoryId)
+                .Take(MaxUserCategoryScoresPerUser))
+            .ToList();
+    }
+
+    private static List<RecommendationBasketAffinity> BuildBasketAffinities(
+        IReadOnlyCollection<RecommendationProductAffinity> productAffinities,
+        DateTime computedAt)
+    {
+        return productAffinities
+            .Where(item => item.CoPurchaseOrderCount > 0)
+            .Select(item => new RecommendationBasketAffinity
+            {
+                ProductId = item.SeedProductId,
+                CandidateProductId = item.CandidateProductId,
+                CoPurchaseOrderCount = item.CoPurchaseOrderCount,
+                BasketScore = (item.CoPurchaseOrderCount * 30d) + (item.CoClickSessionCount * 6d),
+                ComputedAt = computedAt
+            })
+            .Where(item => item.BasketScore > 0d)
+            .GroupBy(item => item.ProductId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.BasketScore)
+                .ThenByDescending(item => item.CoPurchaseOrderCount)
+                .ThenBy(item => item.CandidateProductId)
+                .Take(MaxBasketAffinitiesPerProduct))
+            .ToList();
+    }
+
+    private async Task<List<RecommendationReplenishmentProfile>> BuildReplenishmentProfilesAsync(
+        DateTime lookbackFromUtc,
+        DateTime computedAt,
+        CancellationToken cancellationToken)
+    {
+        var purchaseRows = await (
+                from order in _db.Orders.AsNoTracking()
+                join detail in _db.OrderDetails.AsNoTracking() on order.OrderId equals detail.OrderId
+                where order.UserId > 0
+                    && detail.ProductId > 0
+                    && order.OrderDate >= lookbackFromUtc
+                    && SuccessfulOrderStatuses.Contains((order.Status ?? string.Empty).Trim().ToLower())
+                select new
+                {
+                    order.UserId,
+                    detail.ProductId,
+                    order.OrderDate,
+                    detail.Quantity
+                })
+            .ToListAsync(cancellationToken);
+
+        var profiles = new List<RecommendationReplenishmentProfile>();
+        foreach (var grouped in purchaseRows
+                     .GroupBy(item => new { item.UserId, item.ProductId }))
+        {
+            var orderedPurchases = grouped
+                .OrderBy(item => item.OrderDate)
+                .ToList();
+            if (orderedPurchases.Count == 0)
+            {
+                continue;
+            }
+
+            var purchaseCount = orderedPurchases.Sum(item => item.Quantity);
+            var lastPurchasedAtUtc = orderedPurchases[^1].OrderDate;
+            var averageRepurchaseDays = 0d;
+            DateTime? expectedReorderAtUtc = null;
+
+            if (orderedPurchases.Count >= 2)
+            {
+                var gaps = new List<double>(orderedPurchases.Count - 1);
+                for (var i = 1; i < orderedPurchases.Count; i++)
+                {
+                    var gap = (orderedPurchases[i].OrderDate - orderedPurchases[i - 1].OrderDate).TotalDays;
+                    if (gap > 0d)
+                    {
+                        gaps.Add(gap);
+                    }
+                }
+
+                if (gaps.Count > 0)
+                {
+                    averageRepurchaseDays = gaps.Average();
+                    expectedReorderAtUtc = lastPurchasedAtUtc.AddDays(averageRepurchaseDays);
+                }
+            }
+
+            var daysSinceLastPurchase = Math.Max(0d, (computedAt - lastPurchasedAtUtc).TotalDays);
+            var timingScore = expectedReorderAtUtc.HasValue
+                ? Math.Max(0d, 30d - Math.Abs((expectedReorderAtUtc.Value - computedAt).TotalDays))
+                : Math.Max(0d, 14d - Math.Min(daysSinceLastPurchase, 14d));
+
+            var replenishmentScore = (purchaseCount * 14d) + timingScore;
+            if (averageRepurchaseDays > 0d)
+            {
+                replenishmentScore += Math.Max(0d, 18d - Math.Min(averageRepurchaseDays, 18d));
+            }
+
+            profiles.Add(new RecommendationReplenishmentProfile
+            {
+                UserId = grouped.Key.UserId,
+                ProductId = grouped.Key.ProductId,
+                PurchaseCount = purchaseCount,
+                LastPurchasedAtUtc = lastPurchasedAtUtc,
+                AverageRepurchaseDays = Math.Round(averageRepurchaseDays, 2),
+                ExpectedReorderAtUtc = expectedReorderAtUtc,
+                ReplenishmentScore = Math.Round(replenishmentScore, 2),
+                ComputedAt = computedAt
+            });
+        }
+
+        return profiles
+            .Where(item => item.ReplenishmentScore > 0d)
+            .GroupBy(item => item.UserId)
+            .SelectMany(group => group
+                .OrderByDescending(item => item.ReplenishmentScore)
+                .ThenByDescending(item => item.PurchaseCount)
+                .ThenByDescending(item => item.LastPurchasedAtUtc)
+                .ThenBy(item => item.ProductId)
+                .Take(MaxReplenishmentProfilesPerUser))
             .ToList();
     }
 
@@ -627,6 +1222,25 @@ public sealed class RecommendationAffinityService
         => !current.HasValue || candidate > current.Value
             ? candidate
             : current;
+
+    private static double CalculateLongTermCategoryLift(
+        RecommendationUserProductScore userProductScore,
+        DateTime computedAt)
+    {
+        var lift =
+            (userProductScore.PurchaseCount * 8d)
+            + (userProductScore.SearchClickCount * 4d)
+            + (userProductScore.RecommendationClickCount * 3d)
+            + (userProductScore.ViewCount * 1.5d);
+
+        if (userProductScore.LastInteractedAtUtc.HasValue)
+        {
+            var ageDays = Math.Max(0d, (computedAt - userProductScore.LastInteractedAtUtc.Value).TotalDays);
+            lift += Math.Max(0d, 12d - Math.Min(ageDays, 12d));
+        }
+
+        return lift;
+    }
 }
 
 public sealed class RecommendationAffinityRefreshResult
@@ -638,6 +1252,26 @@ public sealed class RecommendationAffinityRefreshResult
     public int MaterializedKeywordRowCount { get; set; }
 
     public int DistinctKeywordCount { get; set; }
+
+    public int MaterializedUserProductScoreRowCount { get; set; }
+
+    public int DistinctUserProductScoreUserCount { get; set; }
+
+    public int MaterializedUserCategoryScoreRowCount { get; set; }
+
+    public int DistinctUserCategoryScoreUserCount { get; set; }
+
+    public int MaterializedUserSellerScoreRowCount { get; set; }
+
+    public int DistinctUserSellerScoreUserCount { get; set; }
+
+    public int MaterializedBasketAffinityRowCount { get; set; }
+
+    public int DistinctBasketAffinityProductCount { get; set; }
+
+    public int MaterializedReplenishmentProfileRowCount { get; set; }
+
+    public int DistinctReplenishmentUserCount { get; set; }
 
     public int MaterializedHomePreferenceRowCount { get; set; }
 

@@ -1,0 +1,324 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - heading " Kênh người bán" [level=3] [ref=e5]:
+        - generic [ref=e6]: 
+        - text: Kênh người bán
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link " Bảng điều khiển" [ref=e9] [cursor=pointer]:
+            - /url: /Seller/Home/Dashboard
+            - generic [ref=e10]: 
+            - text: Bảng điều khiển
+        - listitem [ref=e11]:
+          - link " Quản lý đơn hàng" [ref=e12] [cursor=pointer]:
+            - /url: /Seller/Order/ManageOrders
+            - generic [ref=e13]: 
+            - text: Quản lý đơn hàng
+        - listitem [ref=e14]:
+          - link " Quản lý sản phẩm" [ref=e15] [cursor=pointer]:
+            - /url: /Seller/Product/ManageProducts
+            - generic [ref=e16]: 
+            - text: Quản lý sản phẩm
+        - listitem [ref=e17]:
+          - link " Quản lý khách hàng" [ref=e18] [cursor=pointer]:
+            - /url: /Seller/Customer/ManageCustomers
+            - generic [ref=e19]: 
+            - text: Quản lý khách hàng
+        - listitem [ref=e20]:
+          - link " Quản lý mã giảm giá" [ref=e21] [cursor=pointer]:
+            - /url: /Seller/Coupon/ManageCoupons
+            - generic [ref=e22]: 
+            - text: Quản lý mã giảm giá
+        - listitem [ref=e23]:
+          - link " Quản lý đánh giá" [ref=e24] [cursor=pointer]:
+            - /url: /Seller/Review/ManageReview
+            - generic [ref=e25]: 
+            - text: Quản lý đánh giá
+        - listitem [ref=e26]:
+          - link " Quản lý vận chuyển" [ref=e27] [cursor=pointer]:
+            - /url: /Seller/Shipping/ManageShipping
+            - generic [ref=e28]: 
+            - text: Quản lý vận chuyển
+        - listitem [ref=e29]:
+          - link " Đối soát thanh toán" [ref=e30] [cursor=pointer]:
+            - /url: /Seller/Finance/Index
+            - generic [ref=e31]: 
+            - text: Đối soát thanh toán
+        - listitem [ref=e32]:
+          - button " Báo cáo & Thống kê " [ref=e33] [cursor=pointer]:
+            - generic [ref=e34]: 
+            - text: Báo cáo & Thống kê 
+          - text:      
+        - listitem [ref=e35]:
+          - link " Quản lý kho" [ref=e36] [cursor=pointer]:
+            - /url: /Seller/Warehouse/Index
+            - generic [ref=e37]: 
+            - text: Quản lý kho
+        - listitem [ref=e38]:
+          - link " Tài khoản của tôi" [ref=e39] [cursor=pointer]:
+            - /url: /Seller/Profile
+            - generic [ref=e40]: 
+            - text: Tài khoản của tôi
+        - listitem [ref=e41]:
+          - link " Hỗ trợ khách hàng" [ref=e42] [cursor=pointer]:
+            - /url: /Seller/SupportChat/Index
+            - generic [ref=e43]: 
+            - text: Hỗ trợ khách hàng
+        - listitem [ref=e44]:
+          - link " Phản hồi người dùng" [ref=e45] [cursor=pointer]:
+            - /url: /Seller/Feedback/Index
+            - generic [ref=e46]: 
+            - text: Phản hồi người dùng
+        - listitem [ref=e47]:
+          - link " Cài đặt" [ref=e48] [cursor=pointer]:
+            - /url: /Seller/Setting/Index
+            - generic [ref=e49]: 
+            - text: Cài đặt
+    - generic [ref=e50]:
+      - navigation [ref=e51]:
+        - generic [ref=e52]:
+          - button "" [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]: 
+          - list [ref=e56]:
+            - listitem [ref=e57]:
+              - button " tho" [ref=e58] [cursor=pointer]:
+                - generic [ref=e59]: 
+                - text: tho
+      - main [ref=e60]:
+        - generic [ref=e65]:
+          - generic [ref=e67]: 
+          - generic [ref=e68]:
+            - heading "Quản Lý Đơn Hàng" [level=1] [ref=e69]
+            - paragraph [ref=e70]: Theo dõi, cập nhật trạng thái và xử lý đơn hàng tập trung
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e74]: 
+            - heading "Bộ lọc tìm kiếm" [level=5] [ref=e75]
+          - generic [ref=e76]:
+            - generic [ref=e78]:
+              - generic [ref=e79]: 
+              - textbox "Tìm theo mã đơn hàng, tên khách hàng..." [ref=e80]
+            - combobox [ref=e82]:
+              - option "Lọc theo trạng thái" [selected]
+              - option "Tất cả"
+              - option "Chờ xử lý"
+              - option "Đang xử lý"
+              - option "Đã xử lý / Sẵn sàng giao"
+              - option "Đang giao hàng"
+              - option "Đã giao hàng"
+              - option "Đã hủy"
+            - textbox [ref=e84]
+            - button " Tìm kiếm" [ref=e86] [cursor=pointer]:
+              - generic [ref=e87]: 
+              - text: Tìm kiếm
+        - generic [ref=e88]:
+          - table [ref=e90]:
+            - rowgroup [ref=e91]:
+              - row "Mã ĐH Khách hàng Ngày đặt Tổng tiền Trạng thái Hành động" [ref=e92]:
+                - columnheader "Mã ĐH" [ref=e93]
+                - columnheader "Khách hàng" [ref=e94]
+                - columnheader "Ngày đặt" [ref=e95]
+                - columnheader "Tổng tiền" [ref=e96]
+                - columnheader "Trạng thái" [ref=e97]
+                - columnheader "Hành động" [ref=e98]
+            - rowgroup [ref=e99]:
+              - row "#000172 E2E Test FreshFarm 04:11:30 27/4/2026 70.500₫ Chờ xử lý   " [ref=e100]:
+                - cell "#000172" [ref=e101]
+                - cell "E2E Test FreshFarm" [ref=e102]
+                - cell "04:11:30 27/4/2026" [ref=e103]
+                - cell "70.500₫" [ref=e104]:
+                  - strong [ref=e105]: 70.500₫
+                - cell "Chờ xử lý" [ref=e106]:
+                  - generic [ref=e107]: Chờ xử lý
+                - cell "  " [ref=e108]:
+                  - button "" [ref=e109] [cursor=pointer]:
+                    - generic [ref=e110]: 
+                  - button "" [ref=e111] [cursor=pointer]:
+                    - generic [ref=e112]: 
+                  - button "" [ref=e113] [cursor=pointer]:
+                    - generic [ref=e114]: 
+              - row "#000170 Bùi Khắc Vinh 14:28:36 26/4/2026 1.045.100₫ Chờ xử lý   " [ref=e115]:
+                - cell "#000170" [ref=e116]
+                - cell "Bùi Khắc Vinh" [ref=e117]
+                - cell "14:28:36 26/4/2026" [ref=e118]
+                - cell "1.045.100₫" [ref=e119]:
+                  - strong [ref=e120]: 1.045.100₫
+                - cell "Chờ xử lý" [ref=e121]:
+                  - generic [ref=e122]: Chờ xử lý
+                - cell "  " [ref=e123]:
+                  - button "" [ref=e124] [cursor=pointer]:
+                    - generic [ref=e125]: 
+                  - button "" [ref=e126] [cursor=pointer]:
+                    - generic [ref=e127]: 
+                  - button "" [ref=e128] [cursor=pointer]:
+                    - generic [ref=e129]: 
+              - row "#000169 Bùi Khắc Vinh 14:28:31 26/4/2026 1.045.100₫ Chờ xử lý   " [ref=e130]:
+                - cell "#000169" [ref=e131]
+                - cell "Bùi Khắc Vinh" [ref=e132]
+                - cell "14:28:31 26/4/2026" [ref=e133]
+                - cell "1.045.100₫" [ref=e134]:
+                  - strong [ref=e135]: 1.045.100₫
+                - cell "Chờ xử lý" [ref=e136]:
+                  - generic [ref=e137]: Chờ xử lý
+                - cell "  " [ref=e138]:
+                  - button "" [ref=e139] [cursor=pointer]:
+                    - generic [ref=e140]: 
+                  - button "" [ref=e141] [cursor=pointer]:
+                    - generic [ref=e142]: 
+                  - button "" [ref=e143] [cursor=pointer]:
+                    - generic [ref=e144]: 
+              - row "#000164 Bùi Khắc Vinh 09:39:41 19/3/2026 52.900₫ Expired   " [ref=e145]:
+                - cell "#000164" [ref=e146]
+                - cell "Bùi Khắc Vinh" [ref=e147]
+                - cell "09:39:41 19/3/2026" [ref=e148]
+                - cell "52.900₫" [ref=e149]:
+                  - strong [ref=e150]: 52.900₫
+                - cell "Expired" [ref=e151]:
+                  - generic [ref=e152]: Expired
+                - cell "  " [ref=e153]:
+                  - button "" [ref=e154] [cursor=pointer]:
+                    - generic [ref=e155]: 
+                  - button "" [ref=e156] [cursor=pointer]:
+                    - generic [ref=e157]: 
+                  - button "" [ref=e158] [cursor=pointer]:
+                    - generic [ref=e159]: 
+              - row "#000163 Bùi Khắc Vinh 09:36:32 19/3/2026 52.900₫ Expired   " [ref=e160]:
+                - cell "#000163" [ref=e161]
+                - cell "Bùi Khắc Vinh" [ref=e162]
+                - cell "09:36:32 19/3/2026" [ref=e163]
+                - cell "52.900₫" [ref=e164]:
+                  - strong [ref=e165]: 52.900₫
+                - cell "Expired" [ref=e166]:
+                  - generic [ref=e167]: Expired
+                - cell "  " [ref=e168]:
+                  - button "" [ref=e169] [cursor=pointer]:
+                    - generic [ref=e170]: 
+                  - button "" [ref=e171] [cursor=pointer]:
+                    - generic [ref=e172]: 
+                  - button "" [ref=e173] [cursor=pointer]:
+                    - generic [ref=e174]: 
+              - row "#000162 Bùi Khắc Vinh 09:35:37 19/3/2026 52.900₫ Expired   " [ref=e175]:
+                - cell "#000162" [ref=e176]
+                - cell "Bùi Khắc Vinh" [ref=e177]
+                - cell "09:35:37 19/3/2026" [ref=e178]
+                - cell "52.900₫" [ref=e179]:
+                  - strong [ref=e180]: 52.900₫
+                - cell "Expired" [ref=e181]:
+                  - generic [ref=e182]: Expired
+                - cell "  " [ref=e183]:
+                  - button "" [ref=e184] [cursor=pointer]:
+                    - generic [ref=e185]: 
+                  - button "" [ref=e186] [cursor=pointer]:
+                    - generic [ref=e187]: 
+                  - button "" [ref=e188] [cursor=pointer]:
+                    - generic [ref=e189]: 
+              - row "#000161 Bùi Khắc Vinh 09:35:21 19/3/2026 45.900₫ Chờ xử lý   " [ref=e190]:
+                - cell "#000161" [ref=e191]
+                - cell "Bùi Khắc Vinh" [ref=e192]
+                - cell "09:35:21 19/3/2026" [ref=e193]
+                - cell "45.900₫" [ref=e194]:
+                  - strong [ref=e195]: 45.900₫
+                - cell "Chờ xử lý" [ref=e196]:
+                  - generic [ref=e197]: Chờ xử lý
+                - cell "  " [ref=e198]:
+                  - button "" [ref=e199] [cursor=pointer]:
+                    - generic [ref=e200]: 
+                  - button "" [ref=e201] [cursor=pointer]:
+                    - generic [ref=e202]: 
+                  - button "" [ref=e203] [cursor=pointer]:
+                    - generic [ref=e204]: 
+              - row "#000160 Bùi Khắc Vinh 09:26:55 19/3/2026 45.900₫ Expired   " [ref=e205]:
+                - cell "#000160" [ref=e206]
+                - cell "Bùi Khắc Vinh" [ref=e207]
+                - cell "09:26:55 19/3/2026" [ref=e208]
+                - cell "45.900₫" [ref=e209]:
+                  - strong [ref=e210]: 45.900₫
+                - cell "Expired" [ref=e211]:
+                  - generic [ref=e212]: Expired
+                - cell "  " [ref=e213]:
+                  - button "" [ref=e214] [cursor=pointer]:
+                    - generic [ref=e215]: 
+                  - button "" [ref=e216] [cursor=pointer]:
+                    - generic [ref=e217]: 
+                  - button "" [ref=e218] [cursor=pointer]:
+                    - generic [ref=e219]: 
+              - row "#000159 Bùi Khắc Vinh 09:22:30 19/3/2026 45.900₫ Expired   " [ref=e220]:
+                - cell "#000159" [ref=e221]
+                - cell "Bùi Khắc Vinh" [ref=e222]
+                - cell "09:22:30 19/3/2026" [ref=e223]
+                - cell "45.900₫" [ref=e224]:
+                  - strong [ref=e225]: 45.900₫
+                - cell "Expired" [ref=e226]:
+                  - generic [ref=e227]: Expired
+                - cell "  " [ref=e228]:
+                  - button "" [ref=e229] [cursor=pointer]:
+                    - generic [ref=e230]: 
+                  - button "" [ref=e231] [cursor=pointer]:
+                    - generic [ref=e232]: 
+                  - button "" [ref=e233] [cursor=pointer]:
+                    - generic [ref=e234]: 
+              - row "#000158 Bùi Khắc Vinh 09:22:05 19/3/2026 45.900₫ Chờ xử lý   " [ref=e235]:
+                - cell "#000158" [ref=e236]
+                - cell "Bùi Khắc Vinh" [ref=e237]
+                - cell "09:22:05 19/3/2026" [ref=e238]
+                - cell "45.900₫" [ref=e239]:
+                  - strong [ref=e240]: 45.900₫
+                - cell "Chờ xử lý" [ref=e241]:
+                  - generic [ref=e242]: Chờ xử lý
+                - cell "  " [ref=e243]:
+                  - button "" [ref=e244] [cursor=pointer]:
+                    - generic [ref=e245]: 
+                  - button "" [ref=e246] [cursor=pointer]:
+                    - generic [ref=e247]: 
+                  - button "" [ref=e248] [cursor=pointer]:
+                    - generic [ref=e249]: 
+          - generic [ref=e250]:
+            - generic [ref=e251]: Hiển thị 1-10 / 53
+            - navigation [ref=e252]:
+              - list [ref=e253]:
+                - listitem [ref=e254]:
+                  - link "«":
+                    - /url: "#"
+                - listitem [ref=e255]:
+                  - link "1" [ref=e256] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e257]:
+                  - link "2" [ref=e258] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e259]:
+                  - link "3" [ref=e260] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e261]:
+                  - generic: …
+                - listitem [ref=e262]:
+                  - link "6" [ref=e263] [cursor=pointer]:
+                    - /url: "#"
+                - listitem [ref=e264]:
+                  - link "»" [ref=e265] [cursor=pointer]:
+                    - /url: "#"
+  - text:  
+  - dialog [active] [ref=e266]:
+    - generic [ref=e267]:
+      - generic [ref=e268]:
+        - heading "Cập nhật đơn hàng" [level=5] [ref=e269]
+        - button [ref=e270] [cursor=pointer]
+      - generic [ref=e271]:
+        - paragraph [ref=e272]:
+          - text: "Mã đơn hàng:"
+          - strong [ref=e273]: "#000172"
+        - generic [ref=e274]:
+          - generic [ref=e275]: Trạng thái đơn hàng
+          - combobox "Trạng thái đơn hàng" [ref=e276]:
+            - option "Chờ xử lý" [selected]
+            - option "Đang xử lý"
+            - option "Đã xử lý / Sẵn sàng giao"
+            - option "Đang giao hàng"
+            - option "Đã giao hàng"
+            - option "Đã hủy"
+      - generic [ref=e277]:
+        - button "Hủy" [ref=e278] [cursor=pointer]
+        - button " Lưu thay đổi" [ref=e279] [cursor=pointer]:
+          - generic [ref=e280]: 
+          - text: Lưu thay đổi
+  - text:   

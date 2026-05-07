@@ -2,20 +2,27 @@ using FreshFarm.Web.Bff.Areas.Seller.Hubs;
 using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
 using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 using StackExchange.Redis;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args); // Tao host builder cho app.
+builder.Configuration.AddJsonFile(
+    Path.Combine("App_Data", "session-aware-rerank-tuning.json"),
+    optional: true,
+    reloadOnChange: true);
 
 var dataProtectionKeysPath = builder.Configuration["DataProtection:KeysPath"];
 if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
@@ -38,6 +45,14 @@ builder.Services.Configure<GhnBackgroundSyncOptions>(
     builder.Configuration.GetSection(GhnBackgroundSyncOptions.SectionName));
 builder.Services.Configure<GhnOrderStatusWebhookOptions>(
     builder.Configuration.GetSection(GhnOrderStatusWebhookOptions.SectionName));
+builder.Services.Configure<SessionAwareRecommendationOptions>(
+    builder.Configuration.GetSection(SessionAwareRecommendationOptions.SectionName));
+builder.Services.Configure<RecommendationExperimentOptions>(
+    builder.Configuration.GetSection(RecommendationExperimentOptions.SectionName));
+builder.Services.Configure<SessionAwareRecommendationTuningOptions>(
+    builder.Configuration.GetSection(SessionAwareRecommendationTuningOptions.SectionName));
+builder.Services.Configure<MultiObjectiveRecommendationRolloutOptions>(
+    builder.Configuration.GetSection(MultiObjectiveRecommendationRolloutOptions.SectionName));
 builder.Services.AddSingleton<IRateLimitTelemetryService, RateLimitTelemetryService>();
 
 var sessionStoreOptions = builder.Configuration
@@ -108,22 +123,15 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: BuildRateLimitKey(httpContext, "global"),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 120,
+                PermitLimit = 900,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
 
     options.AddPolicy("auth-form", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: BuildRateLimitKey(httpContext, "auth-form"),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
+        RateLimitPartition.GetNoLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "auth-form")));
 
     options.AddPolicy("password-recovery", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
@@ -163,7 +171,7 @@ builder.Services.AddRateLimiter(options =>
             partitionKey: BuildRateLimitKey(httpContext, "public-read"),
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 90,
+                PermitLimit = 900,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
@@ -236,28 +244,10 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
-if (string.Equals(sessionStoreOptions.Provider, "Redis", StringComparison.OrdinalIgnoreCase))
-{
-    if (string.IsNullOrWhiteSpace(sessionStoreOptions.RedisConnectionString))
-    {
-        throw new InvalidOperationException(
-            "SessionStore:RedisConnectionString chưa được cấu hình dù Provider = Redis.");
-    }
-
-    builder.Services.AddStackExchangeRedisCache(options =>
-    {
-        var redisConfiguration = ConfigurationOptions.Parse(sessionStoreOptions.RedisConnectionString, true);
-        redisConfiguration.AbortOnConnectFail = sessionStoreOptions.AbortOnConnectFail;
-        redisConfiguration.ConnectTimeout = sessionStoreOptions.ConnectTimeoutMilliseconds;
-        redisConfiguration.Ssl = sessionStoreOptions.Ssl;
-        options.ConfigurationOptions = redisConfiguration;
-        options.InstanceName = sessionStoreOptions.InstanceName;
-    });
-}
-else
-{
-    builder.Services.AddDistributedMemoryCache(); // Session store fallback cho local/dev mot instance.
-}
+var redisCacheState = ConfigureDistributedCache(builder.Services, sessionStoreOptions);
+builder.Services.AddSingleton(redisCacheState);
+builder.Services.AddHealthChecks()
+    .AddCheck<RedisHealthCheck>("redis", tags: new[] { "redis", "dependency" });
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -452,12 +442,32 @@ builder.Services.AddSwaggerGen(c => // Swagger cho endpoint API o BFF.
 
 builder.Services.AddHttpContextAccessor(); // Bắt buộc vì CartSessionService cần HttpContext.
 builder.Services.AddScoped<ICartSessionService, CartSessionService>(); // Mỗi request dùng 1 instance service cart.
+builder.Services.AddScoped<ISessionAwareRecommendationReranker, SessionAwareRecommendationReranker>(); // Re-rank ML.NET candidates with Redis session signals.
+builder.Services.AddSingleton<ISessionSignalService, SessionSignalService>(); // Lưu recent search/click vào Redis cho recommendation session.
+builder.Services.AddSingleton<IRecommendationMetricsClient, RecommendationMetricsClient>(); // Fire-and-forget recommendation impression/click metrics to Ordering.
+builder.Services.AddSingleton<IRecommendationExperimentService, RecommendationExperimentService>(); // Stable A/B group assignment for recommendation strategy experiments.
+builder.Services.AddSingleton<ISessionAwareRecommendationConfigStore, JsonSessionAwareRecommendationConfigStore>(); // Persist tuned rerank weights to reloadable config.
+builder.Services.AddSingleton<ISessionAwareRecommendationWeightTuningService, SessionAwareRecommendationWeightTuningService>(); // Daily CTR-by-position based weight tuning.
+builder.Services.AddHostedService<SessionAwareRecommendationWeightTuningBackgroundService>();
+builder.Services.AddSingleton<IMultiObjectiveRecommendationRolloutService, MultiObjectiveRecommendationRolloutService>(); // Hourly guarded rollout and objective-metric guardrails.
+builder.Services.AddHostedService<MultiObjectiveRecommendationRolloutBackgroundService>();
 builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
 builder.Services.AddScoped<ISellerKycStorageService, SellerKycStorageService>(); // Lưu/xóa giấy tờ KYC seller trong wwwroot/uploads/seller-kyc.
 builder.Services.AddSingleton<IVnPayService, VnPayService>(); // Ký URL + verify callback VNPay sandbox.
 builder.Services.AddSingleton<ISignUpCaptchaService, SignUpCaptchaService>();
 
 var app = builder.Build(); // Build app pipeline.
+var redisSessionCacheState = app.Services.GetRequiredService<RedisSessionCacheState>();
+if (redisSessionCacheState.RedisConfigured && !redisSessionCacheState.UsingRedis)
+{
+    app.Logger.LogWarning(
+        "Redis session cache unavailable at startup. Falling back to in-memory IDistributedCache. Reason={Reason}",
+        redisSessionCacheState.FailureReason);
+}
+else if (redisSessionCacheState.UsingRedis)
+{
+    app.Logger.LogInformation("Redis session cache is available and active.");
+}
 
 if (!app.Environment.IsDevelopment()) // Pipeline production.
 {
@@ -490,7 +500,7 @@ app.Use(async (context, next) =>
             .Append("; ")
             .Append("object-src 'none'; ")
             .Append("img-src 'self' data: https:; ")
-            .Append("font-src 'self' data: https://cdn.jsdelivr.net; ")
+            .Append("font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; ")
             .Append("connect-src 'self' https: wss:; ");
 
         var strictScriptDirective = new StringBuilder()
@@ -566,8 +576,121 @@ app.MapControllerRoute( // Map MVC default route.
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapGet("/health", () => Results.Ok("ok")); // Health check endpoint.
+app.MapHealthChecks("/health/redis", new HealthCheckOptions
+{
+    Predicate = registration => string.Equals(registration.Name, "redis", StringComparison.OrdinalIgnoreCase),
+    ResponseWriter = WriteHealthCheckResponseAsync
+});
 
 app.Run(); // Chay app.
+
+static RedisSessionCacheState ConfigureDistributedCache(
+    IServiceCollection services,
+    SessionStoreOptions sessionStoreOptions)
+{
+    var configuredProvider = string.IsNullOrWhiteSpace(sessionStoreOptions.Provider)
+        ? "Memory"
+        : sessionStoreOptions.Provider.Trim();
+
+    if (!string.Equals(configuredProvider, "Redis", StringComparison.OrdinalIgnoreCase))
+    {
+        services.AddDistributedMemoryCache(); // Session store fallback cho local/dev mot instance.
+        return new RedisSessionCacheState(
+            configuredProvider,
+            redisConfigured: false,
+            usingRedis: false,
+            effectiveProvider: "Memory",
+            failureReason: "SessionStore:Provider is not Redis.");
+    }
+
+    if (string.IsNullOrWhiteSpace(sessionStoreOptions.RedisConnectionString))
+    {
+        services.AddDistributedMemoryCache();
+        return new RedisSessionCacheState(
+            configuredProvider,
+            redisConfigured: true,
+            usingRedis: false,
+            effectiveProvider: "Memory",
+            failureReason: "SessionStore:RedisConnectionString is empty.");
+    }
+
+    try
+    {
+        var redisConfiguration = BuildRedisConfiguration(sessionStoreOptions, forceAbortOnConnectFail: true);
+        var redisConnection = ConnectionMultiplexer.Connect(redisConfiguration);
+        if (!redisConnection.IsConnected)
+        {
+            redisConnection.Dispose();
+            services.AddDistributedMemoryCache();
+            return new RedisSessionCacheState(
+                configuredProvider,
+                redisConfigured: true,
+                usingRedis: false,
+                effectiveProvider: "Memory",
+                failureReason: "Redis connection was created but no endpoint is connected.");
+        }
+
+        services.AddSingleton<IConnectionMultiplexer>(redisConnection);
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.ConfigurationOptions = BuildRedisConfiguration(sessionStoreOptions, forceAbortOnConnectFail: false);
+            options.InstanceName = sessionStoreOptions.InstanceName;
+            options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redisConnection);
+        });
+
+        return new RedisSessionCacheState(
+            configuredProvider,
+            redisConfigured: true,
+            usingRedis: true,
+            effectiveProvider: "Redis",
+            failureReason: null);
+    }
+    catch (Exception ex) when (ex is RedisConnectionException
+                              or RedisTimeoutException
+                              or TimeoutException
+                              or InvalidOperationException
+                              or ArgumentException)
+    {
+        services.AddDistributedMemoryCache();
+        return new RedisSessionCacheState(
+            configuredProvider,
+            redisConfigured: true,
+            usingRedis: false,
+            effectiveProvider: "Memory",
+            failureReason: ex.Message);
+    }
+}
+
+static ConfigurationOptions BuildRedisConfiguration(
+    SessionStoreOptions sessionStoreOptions,
+    bool forceAbortOnConnectFail)
+{
+    var redisConfiguration = ConfigurationOptions.Parse(sessionStoreOptions.RedisConnectionString!, true);
+    redisConfiguration.AbortOnConnectFail = forceAbortOnConnectFail || sessionStoreOptions.AbortOnConnectFail;
+    redisConfiguration.ConnectTimeout = Math.Clamp(sessionStoreOptions.ConnectTimeoutMilliseconds, 1, 1_000);
+    redisConfiguration.SyncTimeout = Math.Clamp(sessionStoreOptions.ConnectTimeoutMilliseconds, 1, 1_000);
+    redisConfiguration.Ssl = sessionStoreOptions.Ssl;
+    return redisConfiguration;
+}
+
+static Task WriteHealthCheckResponseAsync(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json; charset=utf-8";
+    var payload = new
+    {
+        status = report.Status.ToString(),
+        checks = report.Entries.Select(entry => new
+        {
+            name = entry.Key,
+            status = entry.Value.Status.ToString(),
+            description = entry.Value.Description,
+            durationMs = Math.Round(entry.Value.Duration.TotalMilliseconds, 2),
+            data = entry.Value.Data
+        })
+    };
+
+    return context.Response.WriteAsync(JsonSerializer.Serialize(payload));
+}
 
 static string BuildRateLimitKey(HttpContext context, string scope)
 {

@@ -1,0 +1,703 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - heading " Admin" [level=3] [ref=e5]:
+      - generic [ref=e6]: 
+      - text: Admin
+    - list [ref=e7]:
+      - listitem [ref=e8]:
+        - link " Bảng điều khiển" [ref=e9] [cursor=pointer]:
+          - /url: /Admin
+          - generic [ref=e10]: 
+          - text: Bảng điều khiển
+      - listitem [ref=e11]:
+        - link " Quản lý người dùng" [ref=e12] [cursor=pointer]:
+          - /url: /Admin/User/ManageUsers
+          - generic [ref=e13]: 
+          - text: Quản lý người dùng
+      - listitem [ref=e14]:
+        - link " Admin" [ref=e15] [cursor=pointer]:
+          - /url: /Admin/User/ManageAdmins
+          - generic [ref=e16]: 
+          - text: Admin
+      - listitem [ref=e17]:
+        - link " Seller" [ref=e18] [cursor=pointer]:
+          - /url: /Admin/User/ManageSellers
+          - generic [ref=e19]: 
+          - text: Seller
+      - listitem [ref=e20]:
+        - link " Nhà bán hàng & tuân thủ" [ref=e21] [cursor=pointer]:
+          - /url: /Admin/Merchant/Index
+          - generic [ref=e22]: 
+          - text: Nhà bán hàng & tuân thủ
+      - listitem [ref=e23]:
+        - link " Buyer" [ref=e24] [cursor=pointer]:
+          - /url: /Admin/User/ManageBuyers
+          - generic [ref=e25]: 
+          - text: Buyer
+      - listitem [ref=e26]:
+        - link " Quản lý đơn hàng" [ref=e27] [cursor=pointer]:
+          - /url: /Admin/Order/ManageOrders
+          - generic [ref=e28]: 
+          - text: Quản lý đơn hàng
+      - listitem [ref=e29]:
+        - link " Quản lý vận chuyển" [ref=e30] [cursor=pointer]:
+          - /url: /Admin/Shipping/ManageShipping
+          - generic [ref=e31]: 
+          - text: Quản lý vận chuyển
+      - listitem [ref=e32]:
+        - link " Tài chính & đối soát" [ref=e33] [cursor=pointer]:
+          - /url: /Admin/Finance/Index
+          - generic [ref=e34]: 
+          - text: Tài chính & đối soát
+      - listitem [ref=e35]:
+        - link " Điều phối giao hàng" [ref=e36] [cursor=pointer]:
+          - /url: /Admin/Delivery/Index
+          - generic [ref=e37]: 
+          - text: Điều phối giao hàng
+      - listitem [ref=e38]:
+        - link " Báo cáo" [ref=e39] [cursor=pointer]:
+          - /url: /Admin/Report/Revenue
+          - generic [ref=e40]: 
+          - text: Báo cáo
+      - listitem [ref=e41]:
+        - link " Voucher sàn" [ref=e42] [cursor=pointer]:
+          - /url: /Admin/Coupon/ManageCoupons
+          - generic [ref=e43]: 
+          - text: Voucher sàn
+      - listitem [ref=e44]:
+        - link " Trung tâm chiến dịch" [ref=e45] [cursor=pointer]:
+          - /url: /Admin/Campaign/Index
+          - generic [ref=e46]: 
+          - text: Trung tâm chiến dịch
+      - listitem [ref=e47]:
+        - link " Trung tâm rủi ro" [ref=e48] [cursor=pointer]:
+          - /url: /Admin/Risk/Index
+          - generic [ref=e49]: 
+          - text: Trung tâm rủi ro
+      - listitem [ref=e50]:
+        - link " Trung tâm kiểm toán" [ref=e51] [cursor=pointer]:
+          - /url: /Admin/Audit/Index
+          - generic [ref=e52]: 
+          - text: Trung tâm kiểm toán
+      - listitem [ref=e53]:
+        - link " Danh mục" [ref=e54] [cursor=pointer]:
+          - /url: /Admin/Category/ManageCategories
+          - generic [ref=e55]: 
+          - text: Danh mục
+      - listitem [ref=e56]:
+        - link " Sản phẩm" [ref=e57] [cursor=pointer]:
+          - /url: /Admin/Product/ManageProducts
+          - generic [ref=e58]: 
+          - text: Sản phẩm
+      - listitem [ref=e59]:
+        - link " Kiểm duyệt sản phẩm" [ref=e60] [cursor=pointer]:
+          - /url: /Admin/CatalogModeration/Index
+          - generic [ref=e61]: 
+          - text: Kiểm duyệt sản phẩm
+      - listitem [ref=e62]:
+        - link " Sẵn sàng danh mục" [ref=e63] [cursor=pointer]:
+          - /url: /Admin/CatalogReadiness/Index
+          - generic [ref=e64]: 
+          - text: Sẵn sàng danh mục
+      - listitem [ref=e65]:
+        - link " Vận hành hàng tươi" [ref=e66] [cursor=pointer]:
+          - /url: /Admin/FreshOps/Index
+          - generic [ref=e67]: 
+          - text: Vận hành hàng tươi
+      - listitem [ref=e68]:
+        - link " Đơn vị tính" [ref=e69] [cursor=pointer]:
+          - /url: /Admin/Unit/Index
+          - generic [ref=e70]: 
+          - text: Đơn vị tính
+      - listitem [ref=e71]:
+        - link " Trạng thái" [ref=e72] [cursor=pointer]:
+          - /url: /Admin/Status/Status
+          - generic [ref=e73]: 
+          - text: Trạng thái
+      - listitem [ref=e74]:
+        - link " Loại trạng thái" [ref=e75] [cursor=pointer]:
+          - /url: /Admin/Status/StatusType
+          - generic [ref=e76]: 
+          - text: Loại trạng thái
+      - listitem [ref=e77]:
+        - link " Phản hồi khách hàng" [ref=e78] [cursor=pointer]:
+          - /url: /Admin/Feedback/Index
+          - generic [ref=e79]: 
+          - text: Phản hồi khách hàng
+      - listitem [ref=e80]:
+        - link " Hỗ trợ trực tuyến" [ref=e81] [cursor=pointer]:
+          - /url: /Admin/SupportChat/Index
+          - generic [ref=e82]: 
+          - text: Hỗ trợ trực tuyến
+      - listitem [ref=e83]:
+        - link " Tranh chấp & CS" [ref=e84] [cursor=pointer]:
+          - /url: /Admin/Dispute/Index
+          - generic [ref=e85]: 
+          - text: Tranh chấp & CS
+      - listitem [ref=e86]:
+        - link " Trung tâm thông báo" [ref=e87] [cursor=pointer]:
+          - /url: /Admin/Notification/Index
+          - generic [ref=e88]: 
+          - text: Trung tâm thông báo
+      - listitem [ref=e89]:
+        - link " Quản trị truyền thông" [ref=e90] [cursor=pointer]:
+          - /url: /Admin/Communication/Index
+          - generic [ref=e91]: 
+          - text: Quản trị truyền thông
+      - listitem [ref=e92]:
+        - link " Khách hàng" [ref=e93] [cursor=pointer]:
+          - /url: /Admin/Customer/ManageCustomers
+          - generic [ref=e94]: 
+          - text: Khách hàng
+      - listitem [ref=e95]:
+        - link " Tích điểm" [ref=e96] [cursor=pointer]:
+          - /url: /Admin/Loyalty/Index
+          - generic [ref=e97]: 
+          - text: Tích điểm
+      - listitem [ref=e98]:
+        - link " Cài đặt hệ thống" [ref=e99] [cursor=pointer]:
+          - /url: /Admin/Setting/Index
+          - generic [ref=e100]: 
+          - text: Cài đặt hệ thống
+  - generic [ref=e101]:
+    - navigation [ref=e102]:
+      - generic [ref=e103]:
+        - button "" [ref=e104] [cursor=pointer]:
+          - generic [ref=e105]: 
+        - list [ref=e107]:
+          - listitem [ref=e108]:
+            - button " a" [ref=e109] [cursor=pointer]:
+              - generic [ref=e110]: 
+              - text: a
+    - main [ref=e111]:
+      - generic [ref=e114]:
+        - generic [ref=e116]:
+          - generic [ref=e118]: 
+          - generic [ref=e119]:
+            - heading "Quản Lý Buyer" [level=1] [ref=e120]
+            - paragraph [ref=e121]: Rà soát khách mua hàng, lịch sử tài khoản và tình trạng hoạt động theo lane Buyer
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - generic [ref=e124]: 
+            - text: Lane Buyer
+          - generic [ref=e125]:
+            - generic [ref=e126]: 
+            - text: Tìm theo username, họ tên, email, SĐT
+      - generic [ref=e127]:
+        - link " Tất cả Buyer + Seller + Admin" [ref=e128] [cursor=pointer]:
+          - /url: /Admin/User/ManageUsers
+          - generic [ref=e129]: 
+          - generic [ref=e130]:
+            - strong [ref=e131]: Tất cả
+            - generic [ref=e132]: Buyer + Seller + Admin
+        - link " Admin Vận hành hệ thống" [ref=e133] [cursor=pointer]:
+          - /url: /Admin/User/ManageAdmins
+          - generic [ref=e134]: 
+          - generic [ref=e135]:
+            - strong [ref=e136]: Admin
+            - generic [ref=e137]: Vận hành hệ thống
+        - link " Seller Nhà bán trên sàn" [ref=e138] [cursor=pointer]:
+          - /url: /Admin/User/ManageSellers
+          - generic [ref=e139]: 
+          - generic [ref=e140]:
+            - strong [ref=e141]: Seller
+            - generic [ref=e142]: Nhà bán trên sàn
+        - link " Buyer Khách mua hàng" [ref=e143] [cursor=pointer]:
+          - /url: /Admin/User/ManageBuyers
+          - generic [ref=e144]: 
+          - generic [ref=e145]:
+            - strong [ref=e146]: Buyer
+            - generic [ref=e147]: Khách mua hàng
+      - generic [ref=e148]:
+        - generic [ref=e149]:
+          - generic [ref=e151]: 
+          - heading "Tìm kiếm & thao tác" [level=5] [ref=e152]
+        - generic [ref=e153]:
+          - generic [ref=e156]:
+            - combobox [ref=e158]:
+              - option "Tất cả người dùng"
+              - option "Chỉ Admin"
+              - option "Chỉ Seller"
+              - option "Chỉ Buyer" [selected]
+            - combobox [ref=e160]:
+              - option "Tất cả trạng thái" [selected]
+              - option "Đang hoạt động"
+              - option "Tạm ngưng"
+            - generic [ref=e162]:
+              - generic [ref=e163]: 
+              - textbox "Tìm kiếm username, họ tên, email, SĐT..." [ref=e164]
+            - textbox "Từ ngày tạo" [ref=e166]
+            - textbox "Đến ngày tạo" [ref=e168]
+            - button " Tìm kiếm" [ref=e169] [cursor=pointer]:
+              - generic [ref=e170]: 
+              - text: Tìm kiếm
+          - button " Thêm buyer" [ref=e172] [cursor=pointer]:
+            - generic [ref=e173]: 
+            - text: Thêm buyer
+      - generic [ref=e174]:
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - heading " Danh sách buyer" [level=6] [ref=e178]:
+              - generic [ref=e179]: 
+              - text: Danh sách buyer
+            - generic [ref=e180]:
+              - generic [ref=e181]: 
+              - text: "Tổng:"
+              - strong [ref=e182]: "17"
+              - text: "• Hoạt động:"
+              - strong [ref=e183]: "17"
+              - text: "• Ngưng:"
+              - strong [ref=e184]: "0"
+          - table [ref=e186]:
+            - rowgroup [ref=e187]:
+              - row "ID Tên đăng nhập Họ tên SĐT Quyền Trạng thái Thao tác" [ref=e188]:
+                - columnheader "ID" [ref=e189]
+                - columnheader "Tên đăng nhập" [ref=e190]
+                - columnheader "Họ tên" [ref=e191]
+                - columnheader "SĐT" [ref=e192]
+                - columnheader "Quyền" [ref=e193]
+                - columnheader "Trạng thái" [ref=e194]
+                - columnheader "Thao tác" [ref=e195]
+            - rowgroup [ref=e196]:
+              - row "#52 N notifverify0323125000 Notification Verify  0912345901  Customer  Hoạt động  " [ref=e197]:
+                - cell "#52" [ref=e198]
+                - cell "N notifverify0323125000" [ref=e199]:
+                  - generic [ref=e200]:
+                    - generic [ref=e201]: "N"
+                    - generic [ref=e202]: notifverify0323125000
+                - cell "Notification Verify" [ref=e203]
+                - cell " 0912345901" [ref=e204]:
+                  - generic [ref=e205]:
+                    - generic [ref=e206]: 
+                    - text: "0912345901"
+                - cell " Customer" [ref=e207]:
+                  - generic [ref=e208]:
+                    - generic [ref=e209]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e210]:
+                  - generic [ref=e211]:
+                    - generic [ref=e212]: 
+                    - text: Hoạt động
+                - cell " " [ref=e213]:
+                  - button "" [ref=e214] [cursor=pointer]:
+                    - generic [ref=e215]: 
+                  - button "" [ref=e216] [cursor=pointer]:
+                    - generic [ref=e217]: 
+              - row "#51 S sellernotifapprove0323114737 Seller Notification Approve  0803231147  Customer  Hoạt động  " [ref=e218]:
+                - cell "#51" [ref=e219]
+                - cell "S sellernotifapprove0323114737" [ref=e220]:
+                  - generic [ref=e221]:
+                    - generic [ref=e222]: S
+                    - generic [ref=e223]: sellernotifapprove0323114737
+                - cell "Seller Notification Approve" [ref=e224]
+                - cell " 0803231147" [ref=e225]:
+                  - generic [ref=e226]:
+                    - generic [ref=e227]: 
+                    - text: "0803231147"
+                - cell " Customer" [ref=e228]:
+                  - generic [ref=e229]:
+                    - generic [ref=e230]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e231]:
+                  - generic [ref=e232]:
+                    - generic [ref=e233]: 
+                    - text: Hoạt động
+                - cell " " [ref=e234]:
+                  - button "" [ref=e235] [cursor=pointer]:
+                    - generic [ref=e236]: 
+                  - button "" [ref=e237] [cursor=pointer]:
+                    - generic [ref=e238]: 
+              - row "#50 S sellernotifreject0323114737 Seller Notification Reject  0903231147  Customer  Hoạt động  " [ref=e239]:
+                - cell "#50" [ref=e240]
+                - cell "S sellernotifreject0323114737" [ref=e241]:
+                  - generic [ref=e242]:
+                    - generic [ref=e243]: S
+                    - generic [ref=e244]: sellernotifreject0323114737
+                - cell "Seller Notification Reject" [ref=e245]
+                - cell " 0903231147" [ref=e246]:
+                  - generic [ref=e247]:
+                    - generic [ref=e248]: 
+                    - text: "0903231147"
+                - cell " Customer" [ref=e249]:
+                  - generic [ref=e250]:
+                    - generic [ref=e251]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e252]:
+                  - generic [ref=e253]:
+                    - generic [ref=e254]: 
+                    - text: Hoạt động
+                - cell " " [ref=e255]:
+                  - button "" [ref=e256] [cursor=pointer]:
+                    - generic [ref=e257]: 
+                  - button "" [ref=e258] [cursor=pointer]:
+                    - generic [ref=e259]: 
+              - row "#49 S sellernotifapprove0323095010 Seller Notification Approve  0803230950  Customer  Hoạt động  " [ref=e260]:
+                - cell "#49" [ref=e261]
+                - cell "S sellernotifapprove0323095010" [ref=e262]:
+                  - generic [ref=e263]:
+                    - generic [ref=e264]: S
+                    - generic [ref=e265]: sellernotifapprove0323095010
+                - cell "Seller Notification Approve" [ref=e266]
+                - cell " 0803230950" [ref=e267]:
+                  - generic [ref=e268]:
+                    - generic [ref=e269]: 
+                    - text: "0803230950"
+                - cell " Customer" [ref=e270]:
+                  - generic [ref=e271]:
+                    - generic [ref=e272]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e273]:
+                  - generic [ref=e274]:
+                    - generic [ref=e275]: 
+                    - text: Hoạt động
+                - cell " " [ref=e276]:
+                  - button "" [ref=e277] [cursor=pointer]:
+                    - generic [ref=e278]: 
+                  - button "" [ref=e279] [cursor=pointer]:
+                    - generic [ref=e280]: 
+              - row "#48 S sellernotifreject0323095010 Seller Notification Reject  0903230950  Customer  Hoạt động  " [ref=e281]:
+                - cell "#48" [ref=e282]
+                - cell "S sellernotifreject0323095010" [ref=e283]:
+                  - generic [ref=e284]:
+                    - generic [ref=e285]: S
+                    - generic [ref=e286]: sellernotifreject0323095010
+                - cell "Seller Notification Reject" [ref=e287]
+                - cell " 0903230950" [ref=e288]:
+                  - generic [ref=e289]:
+                    - generic [ref=e290]: 
+                    - text: "0903230950"
+                - cell " Customer" [ref=e291]:
+                  - generic [ref=e292]:
+                    - generic [ref=e293]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e294]:
+                  - generic [ref=e295]:
+                    - generic [ref=e296]: 
+                    - text: Hoạt động
+                - cell " " [ref=e297]:
+                  - button "" [ref=e298] [cursor=pointer]:
+                    - generic [ref=e299]: 
+                  - button "" [ref=e300] [cursor=pointer]:
+                    - generic [ref=e301]: 
+              - row "#47 S sellerverify0323085600 Bui Khac Vinh Verify  0916487130  Customer  Hoạt động  " [ref=e302]:
+                - cell "#47" [ref=e303]
+                - cell "S sellerverify0323085600" [ref=e304]:
+                  - generic [ref=e305]:
+                    - generic [ref=e306]: S
+                    - generic [ref=e307]: sellerverify0323085600
+                - cell "Bui Khac Vinh Verify" [ref=e308]
+                - cell " 0916487130" [ref=e309]:
+                  - generic [ref=e310]:
+                    - generic [ref=e311]: 
+                    - text: "0916487130"
+                - cell " Customer" [ref=e312]:
+                  - generic [ref=e313]:
+                    - generic [ref=e314]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e315]:
+                  - generic [ref=e316]:
+                    - generic [ref=e317]: 
+                    - text: Hoạt động
+                - cell " " [ref=e318]:
+                  - button "" [ref=e319] [cursor=pointer]:
+                    - generic [ref=e320]: 
+                  - button "" [ref=e321] [cursor=pointer]:
+                    - generic [ref=e322]: 
+              - row "#46 B bkvmailtest0322 Bui Khac Vinh  0901234567  Customer  Hoạt động  " [ref=e323]:
+                - cell "#46" [ref=e324]
+                - cell "B bkvmailtest0322" [ref=e325]:
+                  - generic [ref=e326]:
+                    - generic [ref=e327]: B
+                    - generic [ref=e328]: bkvmailtest0322
+                - cell "Bui Khac Vinh" [ref=e329]
+                - cell " 0901234567" [ref=e330]:
+                  - generic [ref=e331]:
+                    - generic [ref=e332]: 
+                    - text: "0901234567"
+                - cell " Customer" [ref=e333]:
+                  - generic [ref=e334]:
+                    - generic [ref=e335]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e336]:
+                  - generic [ref=e337]:
+                    - generic [ref=e338]: 
+                    - text: Hoạt động
+                - cell " " [ref=e339]:
+                  - button "" [ref=e340] [cursor=pointer]:
+                    - generic [ref=e341]: 
+                  - button "" [ref=e342] [cursor=pointer]:
+                    - generic [ref=e343]: 
+              - row "#45 P pwcustfix0322134452 Playwright Customer Fix  0912345682  Customer  Hoạt động  " [ref=e344]:
+                - cell "#45" [ref=e345]
+                - cell "P pwcustfix0322134452" [ref=e346]:
+                  - generic [ref=e347]:
+                    - generic [ref=e348]: P
+                    - generic [ref=e349]: pwcustfix0322134452
+                - cell "Playwright Customer Fix" [ref=e350]
+                - cell " 0912345682" [ref=e351]:
+                  - generic [ref=e352]:
+                    - generic [ref=e353]: 
+                    - text: "0912345682"
+                - cell " Customer" [ref=e354]:
+                  - generic [ref=e355]:
+                    - generic [ref=e356]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e357]:
+                  - generic [ref=e358]:
+                    - generic [ref=e359]: 
+                    - text: Hoạt động
+                - cell " " [ref=e360]:
+                  - button "" [ref=e361] [cursor=pointer]:
+                    - generic [ref=e362]: 
+                  - button "" [ref=e363] [cursor=pointer]:
+                    - generic [ref=e364]: 
+              - row "#34 V vinh3 Bùi Khắc Vinh  0903000750  Customer  Hoạt động  " [ref=e365]:
+                - cell "#34" [ref=e366]
+                - cell "V vinh3" [ref=e367]:
+                  - generic [ref=e368]:
+                    - generic [ref=e369]: V
+                    - generic [ref=e370]: vinh3
+                - cell "Bùi Khắc Vinh" [ref=e371]
+                - cell " 0903000750" [ref=e372]:
+                  - generic [ref=e373]:
+                    - generic [ref=e374]: 
+                    - text: "0903000750"
+                - cell " Customer" [ref=e375]:
+                  - generic [ref=e376]:
+                    - generic [ref=e377]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e378]:
+                  - generic [ref=e379]:
+                    - generic [ref=e380]: 
+                    - text: Hoạt động
+                - cell " " [ref=e381]:
+                  - button "" [ref=e382] [cursor=pointer]:
+                    - generic [ref=e383]: 
+                  - button "" [ref=e384] [cursor=pointer]:
+                    - generic [ref=e385]: 
+              - row "#29 N nguyenhy18ok Hy Nguyen  0179205141  Customer  Hoạt động  " [ref=e386]:
+                - cell "#29" [ref=e387]
+                - cell "N nguyenhy18ok" [ref=e388]:
+                  - generic [ref=e389]:
+                    - generic [ref=e390]: "N"
+                    - generic [ref=e391]: nguyenhy18ok
+                - cell "Hy Nguyen" [ref=e392]
+                - cell " 0179205141" [ref=e393]:
+                  - generic [ref=e394]:
+                    - generic [ref=e395]: 
+                    - text: "0179205141"
+                - cell " Customer" [ref=e396]:
+                  - generic [ref=e397]:
+                    - generic [ref=e398]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e399]:
+                  - generic [ref=e400]:
+                    - generic [ref=e401]: 
+                    - text: Hoạt động
+                - cell " " [ref=e402]:
+                  - button "" [ref=e403] [cursor=pointer]:
+                    - generic [ref=e404]: 
+                  - button "" [ref=e405] [cursor=pointer]:
+                    - generic [ref=e406]: 
+              - row "#28 V vinh1 Lê Thị Hồng Phúc  0903000333  Customer  Hoạt động  " [ref=e407]:
+                - cell "#28" [ref=e408]
+                - cell "V vinh1" [ref=e409]:
+                  - generic [ref=e410]:
+                    - generic [ref=e411]: V
+                    - generic [ref=e412]: vinh1
+                - cell "Lê Thị Hồng Phúc" [ref=e413]
+                - cell " 0903000333" [ref=e414]:
+                  - generic [ref=e415]:
+                    - generic [ref=e416]: 
+                    - text: "0903000333"
+                - cell " Customer" [ref=e417]:
+                  - generic [ref=e418]:
+                    - generic [ref=e419]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e420]:
+                  - generic [ref=e421]:
+                    - generic [ref=e422]: 
+                    - text: Hoạt động
+                - cell " " [ref=e423]:
+                  - button "" [ref=e424] [cursor=pointer]:
+                    - generic [ref=e425]: 
+                  - button "" [ref=e426] [cursor=pointer]:
+                    - generic [ref=e427]: 
+              - row "#24 T thienlioi5 Vinh Khắc  0903000666  Customer  Hoạt động  " [ref=e428]:
+                - cell "#24" [ref=e429]
+                - cell "T thienlioi5" [ref=e430]:
+                  - generic [ref=e431]:
+                    - generic [ref=e432]: T
+                    - generic [ref=e433]: thienlioi5
+                - cell "Vinh Khắc" [ref=e434]
+                - cell " 0903000666" [ref=e435]:
+                  - generic [ref=e436]:
+                    - generic [ref=e437]: 
+                    - text: "0903000666"
+                - cell " Customer" [ref=e438]:
+                  - generic [ref=e439]:
+                    - generic [ref=e440]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e441]:
+                  - generic [ref=e442]:
+                    - generic [ref=e443]: 
+                    - text: Hoạt động
+                - cell " " [ref=e444]:
+                  - button "" [ref=e445] [cursor=pointer]:
+                    - generic [ref=e446]: 
+                  - button "" [ref=e447] [cursor=pointer]:
+                    - generic [ref=e448]: 
+              - row "#9 M minha Nguyễn Minh A  0123455555  Customer  Hoạt động  " [ref=e449]:
+                - cell "#9" [ref=e450]
+                - cell "M minha" [ref=e451]:
+                  - generic [ref=e452]:
+                    - generic [ref=e453]: M
+                    - generic [ref=e454]: minha
+                - cell "Nguyễn Minh A" [ref=e455]
+                - cell " 0123455555" [ref=e456]:
+                  - generic [ref=e457]:
+                    - generic [ref=e458]: 
+                    - text: "0123455555"
+                - cell " Customer" [ref=e459]:
+                  - generic [ref=e460]:
+                    - generic [ref=e461]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e462]:
+                  - generic [ref=e463]:
+                    - generic [ref=e464]: 
+                    - text: Hoạt động
+                - cell " " [ref=e465]:
+                  - button "" [ref=e466] [cursor=pointer]:
+                    - generic [ref=e467]: 
+                  - button "" [ref=e468] [cursor=pointer]:
+                    - generic [ref=e469]: 
+              - row "#8 A abcdef123 abc  0397894618  Customer  Hoạt động  " [ref=e470]:
+                - cell "#8" [ref=e471]
+                - cell "A abcdef123" [ref=e472]:
+                  - generic [ref=e473]:
+                    - generic [ref=e474]: A
+                    - generic [ref=e475]: abcdef123
+                - cell "abc" [ref=e476]
+                - cell " 0397894618" [ref=e477]:
+                  - generic [ref=e478]:
+                    - generic [ref=e479]: 
+                    - text: "0397894618"
+                - cell " Customer" [ref=e480]:
+                  - generic [ref=e481]:
+                    - generic [ref=e482]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e483]:
+                  - generic [ref=e484]:
+                    - generic [ref=e485]: 
+                    - text: Hoạt động
+                - cell " " [ref=e486]:
+                  - button "" [ref=e487] [cursor=pointer]:
+                    - generic [ref=e488]: 
+                  - button "" [ref=e489] [cursor=pointer]:
+                    - generic [ref=e490]: 
+              - row "#7 D diemtrinhdao05 Trinh Đào  0174472396  Customer  Hoạt động  " [ref=e491]:
+                - cell "#7" [ref=e492]
+                - cell "D diemtrinhdao05" [ref=e493]:
+                  - generic [ref=e494]:
+                    - generic [ref=e495]: D
+                    - generic [ref=e496]: diemtrinhdao05
+                - cell "Trinh Đào" [ref=e497]
+                - cell " 0174472396" [ref=e498]:
+                  - generic [ref=e499]:
+                    - generic [ref=e500]: 
+                    - text: "0174472396"
+                - cell " Customer" [ref=e501]:
+                  - generic [ref=e502]:
+                    - generic [ref=e503]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e504]:
+                  - generic [ref=e505]:
+                    - generic [ref=e506]: 
+                    - text: Hoạt động
+                - cell " " [ref=e507]:
+                  - button "" [ref=e508] [cursor=pointer]:
+                    - generic [ref=e509]: 
+                  - button "" [ref=e510] [cursor=pointer]:
+                    - generic [ref=e511]: 
+              - row "#6 B buikhacvinh2 Vinh Bùi  0874420552  Customer  Hoạt động  " [ref=e512]:
+                - cell "#6" [ref=e513]
+                - cell "B buikhacvinh2" [ref=e514]:
+                  - generic [ref=e515]:
+                    - generic [ref=e516]: B
+                    - generic [ref=e517]: buikhacvinh2
+                - cell "Vinh Bùi" [ref=e518]
+                - cell " 0874420552" [ref=e519]:
+                  - generic [ref=e520]:
+                    - generic [ref=e521]: 
+                    - text: "0874420552"
+                - cell " Customer" [ref=e522]:
+                  - generic [ref=e523]:
+                    - generic [ref=e524]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e525]:
+                  - generic [ref=e526]:
+                    - generic [ref=e527]: 
+                    - text: Hoạt động
+                - cell " " [ref=e528]:
+                  - button "" [ref=e529] [cursor=pointer]:
+                    - generic [ref=e530]: 
+                  - button "" [ref=e531] [cursor=pointer]:
+                    - generic [ref=e532]: 
+              - row "#1 T thu Vũ Thị Thu  0328898307  Customer  Hoạt động  " [ref=e533]:
+                - cell "#1" [ref=e534]
+                - cell "T thu" [ref=e535]:
+                  - generic [ref=e536]:
+                    - generic [ref=e537]: T
+                    - generic [ref=e538]: thu
+                - cell "Vũ Thị Thu" [ref=e539]
+                - cell " 0328898307" [ref=e540]:
+                  - generic [ref=e541]:
+                    - generic [ref=e542]: 
+                    - text: "0328898307"
+                - cell " Customer" [ref=e543]:
+                  - generic [ref=e544]:
+                    - generic [ref=e545]: 
+                    - text: Customer
+                - cell " Hoạt động" [ref=e546]:
+                  - generic [ref=e547]:
+                    - generic [ref=e548]: 
+                    - text: Hoạt động
+                - cell " " [ref=e549]:
+                  - button "" [ref=e550] [cursor=pointer]:
+                    - generic [ref=e551]: 
+                  - button "" [ref=e552] [cursor=pointer]:
+                    - generic [ref=e553]: 
+          - generic [ref=e555]:
+            - generic [ref=e556]: 
+            - text: "Cập nhật lần cuối: 13:23 27/04/2026"
+        - generic [ref=e558]:
+          - generic [ref=e559]:
+            - generic [ref=e560]: 
+            - text: Tổng số người dùng
+          - generic [ref=e561]: "17"
+          - generic [ref=e562]:
+            - generic [ref=e563]:
+              - generic [ref=e564]: 
+              - text: Đang hoạt động
+            - generic [ref=e565]: "17"
+          - generic [ref=e566]:
+            - generic [ref=e567]:
+              - generic [ref=e568]: 
+              - text: Tạm ngưng
+            - generic [ref=e569]: "0"
+          - generic [ref=e570]:
+            - generic [ref=e571]:
+              - generic [ref=e572]: 
+              - text: Admin
+            - generic [ref=e573]: "0"
+          - generic [ref=e574]:
+            - generic [ref=e575]:
+              - generic [ref=e576]: 
+              - text: Seller
+            - generic [ref=e577]: "0"
+          - generic [ref=e578]:
+            - generic [ref=e579]:
+              - generic [ref=e580]: 
+              - text: Buyer
+            - generic [ref=e581]: "17"
+    - text:                           

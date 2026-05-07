@@ -707,6 +707,71 @@
             font-weight: 700;
         }
 
+        .search-recommendation-meta {
+            display: grid;
+            gap: 7px;
+            margin-top: 2px;
+            padding: 9px 10px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .08) 0%, rgba(249, 115, 22, .08) 100%);
+            border: 1px solid rgba(22, 163, 74, .12);
+        }
+
+        .search-recommendation-meta .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #166534 !important;
+            background: rgba(240, 253, 244, .96) !important;
+            border: 1px solid rgba(34, 197, 94, .2) !important;
+            white-space: nowrap;
+        }
+
+        .search-recommendation-meta .badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: .72;
+        }
+
+        .search-recommendation-meta .small {
+            font-size: .78rem !important;
+            line-height: 1.45;
+            color: #4b5563 !important;
+        }
+
+        .search-seasonality-badge {
+            display: inline-flex;
+            align-items: center;
+            width: max-content;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #047857;
+            background: rgba(236, 253, 245, .96);
+            border: 1px solid rgba(16, 185, 129, .28);
+            white-space: nowrap;
+        }
+
+        .search-seasonality-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: .72;
+        }
+
         .search-product-actions {
             margin-top: auto;
             display: grid;
@@ -1207,6 +1272,12 @@
                 const weight = (raw.weight ?? raw.Weight ?? "").toString().trim();
                 const image = resolveImageUrl(raw);
                 const certifications = [standard].filter((value) => !!value);
+                const rawSeasonalityScore = raw.seasonalityScore ?? raw.SeasonalityScore;
+                const seasonalityScore = rawSeasonalityScore === null || rawSeasonalityScore === undefined
+                    ? null
+                    : toNumber(rawSeasonalityScore, 0);
+                const seasonalityLabel = (raw.seasonalityLabel ?? raw.SeasonalityLabel ?? "").toString().trim();
+                const seasonalityBadgeLabel = (raw.seasonalityBadgeLabel ?? raw.SeasonalityBadgeLabel ?? "").toString().trim();
 
                 return {
                     productId,
@@ -1223,12 +1294,24 @@
                     standard,
                     preservation,
                     weight,
-                availabilityKey: resolveAvailability(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity),
+                    availabilityKey: resolveAvailability(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity),
                     location: origin,
                     image,
-                    certifications
+                    certifications,
+                    seasonalityScore,
+                    seasonalityLabel,
+                    seasonalityBadgeLabel
                 };
             };
+
+            const shouldShowSeasonalityBadge = (product) => {
+                const label = (product?.seasonalityBadgeLabel ?? "").toString().trim();
+                return label.length > 0 && (product?.seasonalityScore === null || product?.seasonalityScore > 0);
+            };
+
+            const renderSeasonalityBadge = (product) => shouldShowSeasonalityBadge(product)
+                ? `<span class="search-seasonality-badge">${escapeHtml(product.seasonalityBadgeLabel)}</span>`
+                : "";
 
             const buildCheckoutUrl = (product, qty = 1) => {
                 const sellerId = toNumber(product.primarySellerId, 0);
@@ -2119,6 +2202,7 @@
                                 <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" />
                                 <div class="shop-related-meta">
                                     <div class="shop-related-name">${escapeHtml(product.productName)}</div>
+                                    ${renderSeasonalityBadge(product)}
                                     <div class="shop-related-price">${vnd(product.price)}</div>
                                     <div class="shop-related-stock ${availability.key}">${escapeHtml(availability.label)}</div>
                                 </div>
@@ -2177,6 +2261,7 @@
                                             <span class="search-unit">${escapeHtml(product.unitName)}</span>
                                         </div>
                                         <a href="${buildProductUrl(product)}" class="search-product-name search-product-name-link">${escapeHtml(product.productName)}</a>
+                                        ${renderSeasonalityBadge(product)}
                                         <div class="small text-success fw-semibold">${escapeHtml(product.standard || product.origin || "Chưa có chuẩn nông sản")}</div>
                                         <div class="search-product-price">${vnd(product.price)}</div>
                                         <div class="search-product-stats">

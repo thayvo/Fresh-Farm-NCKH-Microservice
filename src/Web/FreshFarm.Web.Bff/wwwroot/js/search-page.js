@@ -159,6 +159,18 @@
                 const weight = (raw.weight ?? raw.Weight ?? "").toString().trim();
                 const image = resolveImageUrl(raw);
                 const certifications = [standard].filter((value) => !!value);
+                const recommendationReason = (raw.recommendationReason ?? raw.RecommendationReason ?? "").toString().trim();
+                const recommendationTags = Array.isArray(raw.recommendationTags ?? raw.RecommendationTags)
+                    ? (raw.recommendationTags ?? raw.RecommendationTags)
+                        .map((tag) => (tag ?? "").toString().trim())
+                        .filter((tag) => tag.length > 0)
+                    : [];
+                const rawSeasonalityScore = raw.seasonalityScore ?? raw.SeasonalityScore;
+                const seasonalityScore = rawSeasonalityScore === null || rawSeasonalityScore === undefined
+                    ? null
+                    : toNumber(rawSeasonalityScore, 0);
+                const seasonalityLabel = (raw.seasonalityLabel ?? raw.SeasonalityLabel ?? "").toString().trim();
+                const seasonalityBadgeLabel = (raw.seasonalityBadgeLabel ?? raw.SeasonalityBadgeLabel ?? "").toString().trim();
 
                 return {
                     productId,
@@ -178,8 +190,45 @@
                 availabilityKey: resolveAvailability(raw.availableStock ?? raw.AvailableStock ?? raw.stockQuantity ?? raw.StockQuantity),
                     location: origin,
                     image,
-                    certifications
+                    certifications,
+                    recommendationReason,
+                    recommendationTags,
+                    seasonalityScore,
+                    seasonalityLabel,
+                    seasonalityBadgeLabel
                 };
+            };
+
+            const shouldShowSeasonalityBadge = (product) => {
+                const label = (product?.seasonalityBadgeLabel ?? "").toString().trim();
+                return label.length > 0 && (product?.seasonalityScore === null || product?.seasonalityScore > 0);
+            };
+
+            const renderSeasonalityBadge = (product) => shouldShowSeasonalityBadge(product)
+                ? `<span class="search-seasonality-badge">${escapeHtml(product.seasonalityBadgeLabel)}</span>`
+                : "";
+
+            const renderRecommendationHints = (product, maxTags = 2) => {
+                const tags = Array.isArray(product?.recommendationTags)
+                    ? product.recommendationTags.filter((tag) => (tag || "").toString().trim().length > 0).slice(0, maxTags)
+                    : [];
+                const reason = (product?.recommendationReason ?? "").toString().trim();
+                if (!reason && tags.length === 0) {
+                    return "";
+                }
+
+                return `
+                    <div class="search-recommendation-meta">
+                        ${tags.length > 0 ? `
+                            <div class="d-flex flex-wrap gap-1 mb-1">
+                                ${tags.map((tag) => `
+                                    <span class="badge">${escapeHtml(tag)}</span>
+                                `).join("")}
+                            </div>
+                        ` : ""}
+                        ${reason ? `<div class="small">${escapeHtml(reason)}</div>` : ""}
+                    </div>
+                `;
             };
 
             const buildCheckoutUrl = (product, qty = 1) => {
@@ -1120,11 +1169,12 @@
                                data-product-id="${product.productId}"
                                data-rank="${index + 1}">
                                 <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" />
-                                <div class="shop-related-meta">
-                                    <div class="shop-related-name">${escapeHtml(product.productName)}</div>
-                                    <div class="shop-related-price">${vnd(product.price)}</div>
-                                    <div class="shop-related-stock ${availability.key}">${escapeHtml(availability.label)}</div>
-                                </div>
+                                    <div class="shop-related-meta">
+                                        <div class="shop-related-name">${escapeHtml(product.productName)}</div>
+                                        ${renderSeasonalityBadge(product)}
+                                        <div class="shop-related-price">${vnd(product.price)}</div>
+                                        <div class="shop-related-stock ${availability.key}">${escapeHtml(availability.label)}</div>
+                                    </div>
                             </a>
                         `;
                     })
@@ -1193,6 +1243,7 @@
                                            data-product-id="${product.productId}"
                                            data-seller-id="${toNumber(product.primarySellerId, 0)}"
                                            data-rank="${resultRank}">${escapeHtml(product.productName)}</a>
+                                        ${renderSeasonalityBadge(product)}
                                         <div class="small text-success fw-semibold">${escapeHtml(product.standard || product.origin || "Chưa có chuẩn nông sản")}</div>
                                         <div class="search-product-price">${vnd(product.price)}</div>
                                         <div class="search-product-stats">
@@ -1223,6 +1274,7 @@
                                                 ${renderShopTrustBadges(shop)}
                                             </div>
                                         ` : ""}
+                                        ${renderRecommendationHints(product, 2)}
                                         ${(() => {
                                             if (!buildShopUrl(product)) {
                                                 return "";
@@ -1745,6 +1797,7 @@
                     void appHelpers?.trackRecommendationClick?.({
                         recommendationImpressionEventId: relatedImpressionIds.get(impressionKey) ?? null,
                         productId,
+                        rank,
                         placement: relatedRecommendationPlacement,
                         algorithm: relatedRecommendationAlgorithm
                     });

@@ -122,6 +122,7 @@ public sealed class FinanceController : LegacySellerControllerBase
             GrossMerchandiseValue = payload.Stats?.GrossMerchandiseValue ?? 0m,
             CapturedPayments = payload.Stats?.CapturedPayments ?? 0m,
             PlatformCommission = payload.Stats?.PlatformCommission ?? 0m,
+            SellerEarning = payload.Stats?.SellerEarning ?? 0m,
             PendingPayoutAmount = payload.Stats?.PendingPayoutAmount ?? 0m,
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,

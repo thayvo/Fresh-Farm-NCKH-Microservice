@@ -1,0 +1,64 @@
+{
+  "capturedAtUtc": "2026-04-05T08:43:15.128Z",
+  "status": 200,
+  "rankingAlgorithm": "hybrid_search_v1",
+  "rankingSignalSource": "materialized_cf_v1+materialized_category_pref_v1+materialized_seller_pref_v1",
+  "signalBreakdown": {
+    "content": "catalog_keyword_v1",
+    "overall": "materialized_cf_v1+materialized_category_pref_v1+materialized_seller_pref_v1",
+    "overallReason": null,
+    "preference": "materialized_category_pref_v1+materialized_seller_pref_v1",
+    "preferenceReason": null
+  },
+  "topItems": [
+    {
+      "productId": 1,
+      "productName": "Rau muống",
+      "primarySellerId": 2,
+      "recommendationReason": "Hay được bấm với từ khóa này · Hay được xem sau tìm kiếm này · Bạn hay mua nhóm Rau lá"
+    },
+    {
+      "productId": 3,
+      "productName": "Rau lang",
+      "primarySellerId": 2,
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Đánh giá tốt · Từ Tiền Giang"
+    },
+    {
+      "productId": 103,
+      "productName": "Rau diếp",
+      "primarySellerId": 4,
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Từ Lâm Đồng"
+    },
+    {
+      "productId": 31,
+      "productName": "Rau mồng tơi",
+      "primarySellerId": 4,
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Từ Long An"
+    },
+    {
+      "productId": 15,
+      "productName": "Rau cải ngọt",
+      "primarySellerId": 51,
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Từ Đà Lạt"
+    },
+    {
+      "productId": 17,
+      "productName": "Rau diếp cá",
+      "primarySellerId": 51,
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Từ Đồng Nai"
+    },
+    {
+      "productId": 9,
+      "productName": "Rau mầm hướng dương",
+      "primarySellerId": 47,
+      "recommendationReason": "Bạn hay mua nhóm Rau ăn hoa / thân / mầm · Từ Cần Thơ"
+    },
+    {
+      "productId": 8,
+      "productName": "Măng tây xanh",
+      "primarySellerId": 47,
+      "recommendationReason": "Bạn hay mua nhóm Rau ăn hoa / thân / mầm · Được chọn nhiều · Đánh giá tốt"
+    }
+  ],
+  "favoriteSellerItems": []
+}

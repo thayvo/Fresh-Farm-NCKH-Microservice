@@ -1,0 +1,61 @@
+{
+  "capturedAtUtc": "2026-04-02T16:25:28.600Z",
+  "status": 200,
+  "algorithm": "hybrid_similar_v1",
+  "signalSource": "materialized_category_pref_v1+materialized_seller_pref_v1+materialized_cf_v1",
+  "preferenceSignalSource": "materialized_category_pref_v1+materialized_seller_pref_v1",
+  "collaborativeSignalSource": "materialized_cf_v1",
+  "fallbackReason": null,
+  "preferenceFallbackReason": null,
+  "collaborativeFallbackReason": null,
+  "topItems": [
+    {
+      "productId": 4,
+      "productName": "Cải thìa",
+      "primarySellerId": 2,
+      "origin": "Đà Lạt, Việt Nam",
+      "recommendationReason": "Hay mua cùng · Bạn hay mua nhóm Rau lá · Từ Đà Lạt",
+      "recommendationTags": [
+        "Hay mua cùng",
+        "Bạn hay mua nhóm Rau lá",
+        "Từ Đà Lạt"
+      ]
+    },
+    {
+      "productId": 102,
+      "productName": "Cải bẹ xanh",
+      "primarySellerId": 4,
+      "origin": "Long An, Việt Nam",
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Cùng xuất xứ · Cùng Kết cấu",
+      "recommendationTags": [
+        "Bạn hay mua nhóm Rau lá",
+        "Cùng xuất xứ",
+        "Cùng Kết cấu"
+      ]
+    },
+    {
+      "productId": 18,
+      "productName": "Rau má",
+      "primarySellerId": 51,
+      "origin": "Tiền Giang, Việt Nam",
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Cùng vùng trồng · Shop cùng vùng",
+      "recommendationTags": [
+        "Bạn hay mua nhóm Rau lá",
+        "Cùng vùng trồng",
+        "Shop cùng vùng"
+      ]
+    },
+    {
+      "productId": 16,
+      "productName": "Cải ngồng",
+      "primarySellerId": 51,
+      "origin": "Lâm Đồng, Việt Nam",
+      "recommendationReason": "Bạn hay mua nhóm Rau lá · Từ Lâm Đồng · Shop cùng vùng",
+      "recommendationTags": [
+        "Bạn hay mua nhóm Rau lá",
+        "Từ Lâm Đồng",
+        "Shop cùng vùng"
+      ]
+    }
+  ]
+}

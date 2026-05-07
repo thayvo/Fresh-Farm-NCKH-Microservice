@@ -1,0 +1,115 @@
+{
+  "sessionAwareRecommendation": {
+    "topPositionBoostFactor": 0.65,
+    "midPositionBoostFactor": 1,
+    "ctrWeight": 0.12,
+    "addToCartWeight": 0.08,
+    "purchaseWeight": 0.35,
+    "revenueWeight": 0.45,
+    "objectiveScoreScale": 30
+  },
+  "sessionAwareRecommendationTuning": {
+    "baselineTopPositionBoostFactor": 0,
+    "baselineMidPositionBoostFactor": 0,
+    "computedAtUtc": "0001-01-01T00:00:00",
+    "reason": "",
+    "runs": [],
+    "versions": []
+  },
+  "recommendationExperiment": {
+    "sessionRerankTrafficPercent": 20
+  },
+  "multiObjectiveRecommendationRollout": {
+    "trafficPercent": 20,
+    "stableWindowCount": 0,
+    "stageStartedAtUtc": "2026-04-29T11:29:56.5265722Z",
+    "isLocked": false,
+    "computedAtUtc": "2026-05-07T02:25:26.7127403Z",
+    "reason": "insufficient_data",
+    "runs": [
+      {
+        "computedAtUtc": "2026-04-29T11:29:56.5265722Z",
+        "baselineImpressions": 220,
+        "variantImpressions": 110,
+        "baselineCtr": 0,
+        "variantCtr": 0,
+        "baselinePurchaseRate": 0,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.000000,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "warming_up_20_percent"
+      },
+      {
+        "computedAtUtc": "2026-04-29T12:29:56.6574899Z",
+        "baselineImpressions": 220,
+        "variantImpressions": 110,
+        "baselineCtr": 0,
+        "variantCtr": 0,
+        "baselinePurchaseRate": 0,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.000000,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "warming_up_20_percent"
+      },
+      {
+        "computedAtUtc": "2026-04-29T13:29:56.7563436Z",
+        "baselineImpressions": 220,
+        "variantImpressions": 110,
+        "baselineCtr": 0,
+        "variantCtr": 0,
+        "baselinePurchaseRate": 0,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.000000,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "warming_up_20_percent"
+      },
+      {
+        "computedAtUtc": "2026-04-29T14:05:22.0816725Z",
+        "baselineImpressions": 273,
+        "variantImpressions": 590,
+        "baselineCtr": 0.01465201465201465,
+        "variantCtr": 0,
+        "baselinePurchaseRate": 0.00732600732600732,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.904395,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "rollback_purchase_rate_drop_gt_5_percent"
+      },
+      {
+        "computedAtUtc": "2026-04-29T15:20:04.787004Z",
+        "baselineImpressions": 524,
+        "variantImpressions": 1796,
+        "baselineCtr": 0.00763358778625954,
+        "variantCtr": 0.00501113585746102,
+        "baselinePurchaseRate": 0.00381679389312977,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.471183,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "rollback_purchase_rate_drop_gt_5_percent"
+      },
+      {
+        "computedAtUtc": "2026-04-29T16:20:05.0004009Z",
+        "baselineImpressions": 524,
+        "variantImpressions": 1796,
+        "baselineCtr": 0.00763358778625954,
+        "variantCtr": 0.00501113585746102,
+        "baselinePurchaseRate": 0.00381679389312977,
+        "variantPurchaseRate": 0,
+        "baselineRevenuePerImpression": 0.471183,
+        "variantRevenuePerImpression": 0.000000,
+        "decision": "rollback_purchase_rate_drop_gt_5_percent"
+      }
+    ],
+    "versions": [
+      {
+        "computedAtUtc": "2026-04-29T11:29:56.5265722Z",
+        "ctrWeight": 0.12,
+        "addToCartWeight": 0.08,
+        "purchaseWeight": 0.35,
+        "revenueWeight": 0.45,
+        "trafficPercent": 20,
+        "reason": "baseline_config"
+      }
+    ]
+  }
+}

@@ -1,10 +1,17 @@
-using System.Text.Json;
 using System.Security.Claims;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using FreshFarm.Ordering.Api.Controllers;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace FreshFarm.Ordering.Api.Tests;
@@ -44,6 +51,20 @@ public sealed class ProductInsightsControllerTests
                 BuyerFullName = "Buyer 2",
                 BuyerPhone = "0900000002",
                 BuyerEmail = "buyer2@example.com"
+            },
+            new Order
+            {
+                OrderId = 3,
+                UserId = 12,
+                OrderDate = DateTime.UtcNow.AddDays(-120),
+                ShippingFee = 0,
+                TotalAmount = 280_000m,
+                OrderNote = string.Empty,
+                Status = "Delivered",
+                PaymentStatus = "Paid",
+                BuyerFullName = "Buyer 3",
+                BuyerPhone = "0900000003",
+                BuyerEmail = "buyer3@example.com"
             });
 
         db.OrderDetails.AddRange(
@@ -72,6 +93,15 @@ public sealed class ProductInsightsControllerTests
                 ProductId = 205,
                 Quantity = 2,
                 UnitPrice = 30_000m,
+                UnitSymbol = "kg"
+            },
+            new OrderDetail
+            {
+                OrderDetailId = 4,
+                OrderId = 3,
+                ProductId = 104,
+                Quantity = 7,
+                UnitPrice = 40_000m,
                 UnitSymbol = "kg"
             });
 
@@ -123,9 +153,9 @@ public sealed class ProductInsightsControllerTests
 
         await db.SaveChangesAsync();
 
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
 
-        var result = await controller.GetStats([104, 205], CancellationToken.None);
+        var result = await controller.GetStats([104, 205], recentWindowDays: 90, cancellationToken: CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
@@ -133,12 +163,14 @@ public sealed class ProductInsightsControllerTests
         Assert.Equal(2, items.Count);
 
         var product104 = items.Single(item => item.GetProperty("ProductId").GetInt32() == 104);
-        Assert.Equal(3, product104.GetProperty("SoldCount").GetInt32());
+        Assert.Equal(10, product104.GetProperty("SoldCount").GetInt32());
+        Assert.Equal(3, product104.GetProperty("RecentSoldCount").GetInt32());
         Assert.Equal(2, product104.GetProperty("ReviewCount").GetInt32());
         Assert.Equal(4.5m, product104.GetProperty("AverageRating").GetDecimal());
 
         var product205 = items.Single(item => item.GetProperty("ProductId").GetInt32() == 205);
         Assert.Equal(2, product205.GetProperty("SoldCount").GetInt32());
+        Assert.Equal(2, product205.GetProperty("RecentSoldCount").GetInt32());
         Assert.Equal(0, product205.GetProperty("ReviewCount").GetInt32());
         Assert.Equal(0m, product205.GetProperty("AverageRating").GetDecimal());
     }
@@ -147,13 +179,222 @@ public sealed class ProductInsightsControllerTests
     public async Task GetStats_ReturnsEmptyArray_WhenProductIdsAreMissing()
     {
         await using var db = CreateDbContext();
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
 
-        var result = await controller.GetStats([0, -3], CancellationToken.None);
+        var result = await controller.GetStats([0, -3], cancellationToken: CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
         Assert.Empty(payload.RootElement.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task GetUserProductScores_ReturnsMaterializedLongTermScores_ForResolvedUser()
+    {
+        await using var db = CreateDbContext();
+
+        db.RecommendationUserProductScores.AddRange(
+            new RecommendationUserProductScore
+            {
+                RecommendationUserProductScoreId = 1,
+                UserId = 42,
+                ProductId = 901,
+                ViewCount = 3,
+                SearchClickCount = 2,
+                RecommendationClickCount = 1,
+                PurchaseCount = 4,
+                UserProductScore = 250,
+                LastInteractedAtUtc = DateTime.UtcNow.AddHours(-2),
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationUserProductScore
+            {
+                RecommendationUserProductScoreId = 2,
+                UserId = 42,
+                ProductId = 902,
+                ViewCount = 1,
+                SearchClickCount = 0,
+                RecommendationClickCount = 0,
+                PurchaseCount = 1,
+                UserProductScore = 60,
+                LastInteractedAtUtc = DateTime.UtcNow.AddDays(-2),
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationUserProductScore
+            {
+                RecommendationUserProductScoreId = 3,
+                UserId = 9,
+                ProductId = 903,
+                ViewCount = 9,
+                SearchClickCount = 9,
+                RecommendationClickCount = 9,
+                PurchaseCount = 9,
+                UserProductScore = 999,
+                LastInteractedAtUtc = DateTime.UtcNow,
+                ComputedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, userId: 42);
+        var result = await controller.GetUserProductScores(null, [901, 902, 903], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(901, items[0].GetProperty("ProductId").GetInt32());
+        Assert.Equal(4, items[0].GetProperty("PurchaseCount").GetInt32());
+        Assert.Equal(250d, items[0].GetProperty("UserProductScore").GetDouble());
+        Assert.Equal("mlnet_user_product_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.Equal(JsonValueKind.String, items[0].GetProperty("ComputedAtUtc").ValueKind);
+        Assert.DoesNotContain(items, item => item.GetProperty("ProductId").GetInt32() == 903);
+    }
+
+    [Fact]
+    public async Task GetUserSellerScores_ReturnsMaterializedLongTermScores_ForResolvedUser()
+    {
+        await using var db = CreateDbContext();
+
+        db.RecommendationUserSellerScores.AddRange(
+            new RecommendationUserSellerScore
+            {
+                RecommendationUserSellerScoreId = 1,
+                UserId = 42,
+                SellerId = 4,
+                ViewCount = 3,
+                SearchClickCount = 2,
+                PurchaseCount = 4,
+                UserSellerScore = 280,
+                LastInteractedAtUtc = DateTime.UtcNow.AddHours(-2),
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationUserSellerScore
+            {
+                RecommendationUserSellerScoreId = 2,
+                UserId = 42,
+                SellerId = 7,
+                ViewCount = 1,
+                SearchClickCount = 0,
+                PurchaseCount = 1,
+                UserSellerScore = 60,
+                LastInteractedAtUtc = DateTime.UtcNow.AddDays(-2),
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationUserSellerScore
+            {
+                RecommendationUserSellerScoreId = 3,
+                UserId = 9,
+                SellerId = 99,
+                ViewCount = 9,
+                SearchClickCount = 9,
+                PurchaseCount = 9,
+                UserSellerScore = 999,
+                LastInteractedAtUtc = DateTime.UtcNow,
+                ComputedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, authenticatedUserIdFromScheme: 42);
+        var result = await controller.GetUserSellerScores(null, [4, 7, 99], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(4, items[0].GetProperty("SellerId").GetInt32());
+        Assert.Equal(4, items[0].GetProperty("PurchaseCount").GetInt32());
+        Assert.Equal(280d, items[0].GetProperty("UserSellerScore").GetDouble());
+        Assert.DoesNotContain(items, item => item.GetProperty("SellerId").GetInt32() == 99);
+    }
+
+    [Fact]
+    public async Task GetBasketAffinity_ReturnsMaterializedCoPurchaseCandidates()
+    {
+        await using var db = CreateDbContext();
+
+        db.RecommendationBasketAffinities.AddRange(
+            new RecommendationBasketAffinity
+            {
+                RecommendationBasketAffinityId = 1,
+                ProductId = 501,
+                CandidateProductId = 601,
+                CoPurchaseOrderCount = 5,
+                BasketScore = 180,
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationBasketAffinity
+            {
+                RecommendationBasketAffinityId = 2,
+                ProductId = 501,
+                CandidateProductId = 602,
+                CoPurchaseOrderCount = 2,
+                BasketScore = 66,
+                ComputedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db);
+        var result = await controller.GetBasketAffinity(501, [601, 602], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(601, items[0].GetProperty("CandidateProductId").GetInt32());
+        Assert.Equal(5, items[0].GetProperty("CoPurchaseOrderCount").GetInt32());
+        Assert.Equal(180d, items[0].GetProperty("BasketScore").GetDouble());
+    }
+
+    [Fact]
+    public async Task GetReplenishmentProfile_ReturnsMaterializedReorderCandidates_ForResolvedUser()
+    {
+        await using var db = CreateDbContext();
+
+        db.RecommendationReplenishmentProfiles.AddRange(
+            new RecommendationReplenishmentProfile
+            {
+                RecommendationReplenishmentProfileId = 1,
+                UserId = 42,
+                ProductId = 701,
+                PurchaseCount = 3,
+                LastPurchasedAtUtc = DateTime.UtcNow.AddDays(-8),
+                AverageRepurchaseDays = 10,
+                ExpectedReorderAtUtc = DateTime.UtcNow.AddDays(2),
+                ReplenishmentScore = 72,
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationReplenishmentProfile
+            {
+                RecommendationReplenishmentProfileId = 2,
+                UserId = 42,
+                ProductId = 702,
+                PurchaseCount = 1,
+                LastPurchasedAtUtc = DateTime.UtcNow.AddDays(-30),
+                AverageRepurchaseDays = 0,
+                ExpectedReorderAtUtc = null,
+                ReplenishmentScore = 18,
+                ComputedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, authenticatedUserIdFromScheme: 42);
+        var result = await controller.GetReplenishmentProfile(null, [701, 702], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(701, items[0].GetProperty("ProductId").GetInt32());
+        Assert.Equal(3, items[0].GetProperty("PurchaseCount").GetInt32());
+        Assert.Equal(72d, items[0].GetProperty("ReplenishmentScore").GetDouble());
     }
 
     [Fact]
@@ -215,7 +456,7 @@ public sealed class ProductInsightsControllerTests
 
         await db.SaveChangesAsync();
 
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
 
         var result = await controller.GetSimilar(104, [105, 106], limit: 4, cancellationToken: CancellationToken.None);
 
@@ -269,7 +510,7 @@ public sealed class ProductInsightsControllerTests
 
         await db.SaveChangesAsync();
 
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
         var result = await controller.GetSimilar(104, [105, 106], limit: 4, cancellationToken: CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -336,7 +577,7 @@ public sealed class ProductInsightsControllerTests
 
         await db.SaveChangesAsync();
 
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
 
         var result = await controller.GetSearchRanking("rau", [501, 502, 503], limit: 5, cancellationToken: CancellationToken.None);
 
@@ -356,6 +597,46 @@ public sealed class ProductInsightsControllerTests
 
         Assert.Equal(502, items[0].GetProperty("ProductId").GetInt32());
         Assert.True(items[0].GetProperty("HybridSearchScore").GetDouble() > items[1].GetProperty("HybridSearchScore").GetDouble());
+        Assert.Equal("ad_hoc_cf_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.Equal("no_materialized_keyword_affinity", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetSearchRanking_RequestsRefreshSignal_WhenFallingBackToAdHocSignals()
+    {
+        await using var db = CreateDbContext();
+
+        db.SearchEvents.Add(
+            new SearchEvent
+            {
+                SearchEventId = 1,
+                SessionId = "search-refresh",
+                Keyword = "rau",
+                ResultCount = 5,
+                CreatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+
+        db.SearchClickEvents.Add(
+            new SearchClickEvent
+            {
+                SearchClickEventId = 1,
+                SearchEventId = 1,
+                SessionId = "search-refresh",
+                ProductId = 501,
+                Rank = 1,
+                CreatedAt = DateTime.UtcNow.AddHours(-10)
+            });
+
+        await db.SaveChangesAsync();
+
+        var refreshSignal = new RecommendationAffinityRefreshSignal();
+        var controller = CreateController(db, refreshSignal: refreshSignal);
+
+        var result = await controller.GetSearchRanking("rau", [501], limit: 5, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(1, refreshSignal.RequestCount);
+        Assert.Equal("ad_hoc_cf_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
     }
 
     [Fact]
@@ -391,7 +672,7 @@ public sealed class ProductInsightsControllerTests
 
         await db.SaveChangesAsync();
 
-        var controller = new ProductInsightsController(db);
+        var controller = CreateController(db);
         var result = await controller.GetSearchRanking("rau", [501, 502], limit: 5, cancellationToken: CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -401,6 +682,101 @@ public sealed class ProductInsightsControllerTests
         Assert.Equal(502, items[0].GetProperty("ProductId").GetInt32());
         Assert.Equal(108d, items[0].GetProperty("HybridSearchScore").GetDouble());
         Assert.Equal(4, items[0].GetProperty("SearchClickCount").GetInt32());
+        Assert.Equal("materialized_cf_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Fallback-Reason"));
+    }
+
+    [Fact]
+    public async Task GetSearchRanking_ReturnsFallbackReason_WhenKeywordHasNoTrackedSessions()
+    {
+        await using var db = CreateDbContext();
+
+        var controller = CreateController(db);
+        var result = await controller.GetSearchRanking("mini", [105, 118, 11], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        Assert.Empty(payload.RootElement.EnumerateArray());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Signal-Source"));
+        Assert.Equal("no_tracked_keyword_sessions", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetSearchRanking_ReturnsBehaviorFallbackReason_WhenSessionsExistButNoSignalsMatchCandidates()
+    {
+        await using var db = CreateDbContext();
+
+        db.SearchEvents.Add(
+            new SearchEvent
+            {
+                SearchEventId = 1,
+                SessionId = "search-mini",
+                Keyword = "mini",
+                ResultCount = 3,
+                CreatedAt = DateTime.UtcNow.AddDays(-1)
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db);
+        var result = await controller.GetSearchRanking("mini", [105, 118, 11], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        Assert.Empty(payload.RootElement.EnumerateArray());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Signal-Source"));
+        Assert.Equal("no_behavioral_signal_for_keyword", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetUserCategoryScores_ReturnsMaterializedLongTermScores_ForResolvedUser()
+    {
+        await using var db = CreateDbContext();
+
+        db.RecommendationUserCategoryScores.AddRange(
+            new RecommendationUserCategoryScore
+            {
+                RecommendationUserCategoryScoreId = 1,
+                UserId = 10,
+                CategoryId = 3,
+                CategoryName = "Rau la",
+                ViewCount = 4,
+                SearchClickCount = 2,
+                RecommendationClickCount = 1,
+                PurchaseCount = 3,
+                UserCategoryScore = 288,
+                LastInteractedAtUtc = DateTime.UtcNow.AddHours(-8),
+                ComputedAt = DateTime.UtcNow
+            },
+            new RecommendationUserCategoryScore
+            {
+                RecommendationUserCategoryScoreId = 2,
+                UserId = 10,
+                CategoryId = 7,
+                CategoryName = "Nam",
+                ViewCount = 1,
+                SearchClickCount = 1,
+                RecommendationClickCount = 0,
+                PurchaseCount = 1,
+                UserCategoryScore = 92,
+                LastInteractedAtUtc = DateTime.UtcNow.AddDays(-2),
+                ComputedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db);
+        var result = await controller.GetUserCategoryScores(userId: 10, categoryIds: [3, 7], limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(3, items[0].GetProperty("CategoryId").GetInt32());
+        Assert.Equal("Rau la", items[0].GetProperty("CategoryName").GetString());
+        Assert.Equal(288d, items[0].GetProperty("UserCategoryScore").GetDouble());
+        Assert.Equal(7, items[1].GetProperty("CategoryId").GetInt32());
     }
 
     [Fact]
@@ -529,6 +905,96 @@ public sealed class ProductInsightsControllerTests
 
         var product902 = items.Single(item => item.GetProperty("ProductId").GetInt32() == 902);
         Assert.Equal(2, product902.GetProperty("PurchaseCount").GetInt32());
+        Assert.Equal("materialized_profile_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Fallback-Reason"));
+    }
+
+    [Fact]
+    public async Task GetHomeProfile_UsesJwtBearerAuthenticateResult_WhenHttpContextUserIsEmpty()
+    {
+        await using var db = CreateDbContext();
+
+        db.Orders.Add(new Order
+        {
+            OrderId = 1,
+            UserId = 42,
+            OrderDate = DateTime.UtcNow.AddDays(-2),
+            ShippingFee = 0,
+            TotalAmount = 240_000m,
+            OrderNote = string.Empty,
+            Status = "Delivered",
+            PaymentStatus = "Paid",
+            BuyerFullName = "Buyer Jwt",
+            BuyerPhone = "0900000042",
+            BuyerEmail = "buyer42@example.com"
+        });
+
+        db.OrderDetails.Add(
+            new OrderDetail
+            {
+                OrderDetailId = 1,
+                OrderId = 1,
+                ProductId = 901,
+                Quantity = 3,
+                UnitPrice = 80_000m,
+                UnitSymbol = "kg"
+            });
+
+        await db.SaveChangesAsync();
+
+        var controller = CreateController(db, authenticatedUserIdFromScheme: 42);
+        var result = await controller.GetHomeProfile(null, limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var items = payload.RootElement.EnumerateArray().ToList();
+
+        Assert.Single(items);
+        Assert.Equal(901, items[0].GetProperty("ProductId").GetInt32());
+        Assert.Equal(3, items[0].GetProperty("PurchaseCount").GetInt32());
+        Assert.Equal("ad_hoc_profile_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.Equal("no_materialized_profile_seed", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetHomeProfile_RequestsRefreshSignal_WhenFallingBackToAdHocProfile()
+    {
+        await using var db = CreateDbContext();
+
+        db.ProductViewEvents.Add(
+            new ProductViewEvent
+            {
+                ProductViewEventId = 1,
+                SessionId = "home-refresh",
+                ProductId = 901,
+                CreatedAt = DateTime.UtcNow.AddHours(-3)
+            });
+
+        await db.SaveChangesAsync();
+
+        var refreshSignal = new RecommendationAffinityRefreshSignal();
+        var controller = CreateController(db, refreshSignal: refreshSignal);
+        var result = await controller.GetHomeProfile("home-refresh", limit: 5, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(1, refreshSignal.RequestCount);
+        Assert.Equal("ad_hoc_profile_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.Equal("no_materialized_profile_seed", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetHomeProfile_ReturnsInteractionFallbackReason_WhenNoPreferenceInteractionsExist()
+    {
+        await using var db = CreateDbContext();
+
+        var controller = CreateController(db);
+        var result = await controller.GetHomeProfile("cold-home-session", limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        Assert.Empty(payload.RootElement.EnumerateArray());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Signal-Source"));
+        Assert.Equal("no_tracked_preference_interactions", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
     }
 
     [Fact]
@@ -643,6 +1109,57 @@ public sealed class ProductInsightsControllerTests
         Assert.Equal(2, items[0].GetProperty("CoPurchaseOrderCount").GetInt32());
     }
 
+    [Fact]
+    public async Task GetHomeCollaborative_ReturnsCollaborativeSeedFallbackReason_WhenNoPreferenceSeedsExist()
+    {
+        await using var db = CreateDbContext();
+
+        var controller = CreateController(db);
+        var result = await controller.GetHomeCollaborative("cold-start-session", limit: 5, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        Assert.Empty(payload.RootElement.EnumerateArray());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Signal-Source"));
+        Assert.Equal("no_preference_seed_for_collaborative", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetSimilar_ReturnsInteractionFallbackReason_WhenNoCollaborativeSignalsExist()
+    {
+        await using var db = CreateDbContext();
+
+        var controller = CreateController(db);
+        var result = await controller.GetSimilar(104, [105, 106], limit: 4, cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var payload = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        Assert.Empty(payload.RootElement.EnumerateArray());
+        Assert.False(controller.Response.Headers.ContainsKey("X-Recommendation-Signal-Source"));
+        Assert.Equal("no_collaborative_interactions_for_seed_product", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
+    [Fact]
+    public async Task GetSimilar_RequestsRefreshSignal_WhenFallingBackToAdHocCollaborativeSignals()
+    {
+        await using var db = CreateDbContext();
+
+        db.ProductViewEvents.AddRange(
+            new ProductViewEvent { ProductViewEventId = 1, SessionId = "view-refresh", ProductId = 104, CreatedAt = DateTime.UtcNow.AddDays(-1) },
+            new ProductViewEvent { ProductViewEventId = 2, SessionId = "view-refresh", ProductId = 105, CreatedAt = DateTime.UtcNow.AddDays(-1) });
+
+        await db.SaveChangesAsync();
+
+        var refreshSignal = new RecommendationAffinityRefreshSignal();
+        var controller = CreateController(db, refreshSignal: refreshSignal);
+        var result = await controller.GetSimilar(104, [105], limit: 4, cancellationToken: CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(1, refreshSignal.RequestCount);
+        Assert.Equal("ad_hoc_cf_v1", controller.Response.Headers["X-Recommendation-Signal-Source"].ToString());
+        Assert.Equal("no_materialized_collaborative_candidates", controller.Response.Headers["X-Recommendation-Fallback-Reason"].ToString());
+    }
+
     private static FreshFarmOrderingDBContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<FreshFarmOrderingDBContext>()
@@ -651,25 +1168,67 @@ public sealed class ProductInsightsControllerTests
         return new FreshFarmOrderingDBContext(options);
     }
 
-    private static ProductInsightsController CreateController(FreshFarmOrderingDBContext db, int? userId = null)
+    private static ProductInsightsController CreateController(
+        FreshFarmOrderingDBContext db,
+        int? userId = null,
+        int? authenticatedUserIdFromScheme = null,
+        RecommendationAffinityRefreshSignal? refreshSignal = null)
     {
-        var controller = new ProductInsightsController(db);
-        if (!userId.HasValue)
+        var httpContext = new DefaultHttpContext();
+        if (authenticatedUserIdFromScheme.HasValue)
         {
-            return controller;
+            var services = new ServiceCollection();
+            services.AddSingleton<IAuthenticationService>(new FakeAuthenticationService(authenticatedUserIdFromScheme.Value));
+            httpContext.RequestServices = services.BuildServiceProvider();
         }
+
+        if (userId.HasValue)
+        {
+            httpContext.User = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                    [new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString())],
+                    authenticationType: "Test"));
+        }
+
+        var controller = refreshSignal is null
+            ? new ProductInsightsController(db)
+            : new ProductInsightsController(db, refreshSignal);
 
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext
-            {
-                User = new ClaimsPrincipal(
-                    new ClaimsIdentity(
-                        [new Claim(ClaimTypes.NameIdentifier, userId.Value.ToString())],
-                        authenticationType: "Test"))
-            }
+            HttpContext = httpContext
         };
-
         return controller;
+    }
+
+    private sealed class FakeAuthenticationService(int userId) : IAuthenticationService
+    {
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
+        {
+            if (!string.Equals(scheme, JwtBearerDefaults.AuthenticationScheme, StringComparison.Ordinal))
+            {
+                return Task.FromResult(AuthenticateResult.NoResult());
+            }
+
+            var principal = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                    [new Claim(ClaimTypes.NameIdentifier, userId.ToString())],
+                    authenticationType: JwtBearerDefaults.AuthenticationScheme));
+
+            var ticket = new AuthenticationTicket(principal, JwtBearerDefaults.AuthenticationScheme);
+            return Task.FromResult(AuthenticateResult.Success(ticket));
+        }
+
+        public Task ChallengeAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
+            => Task.CompletedTask;
+
+        public Task ForbidAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
+            => Task.CompletedTask;
+
+        public Task SignInAsync(HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
+            => Task.CompletedTask;
+
+        public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
+            => Task.CompletedTask;
     }
 }

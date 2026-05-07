@@ -22,6 +22,18 @@
     string FormatMoney(decimal? value) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:#,0} đ", value ?? 0m);
     string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-";
     bool IsOverdue(DateTime? value) => value.HasValue && value.Value < DateTime.UtcNow;
+    bool CanReleasePayout(FreshFarm.Web.Bff.Areas.Admin.Models.FinanceConsoleRowViewModel row)
+    {
+        var normalized = (row.Status ?? string.Empty).Trim().ToLowerInvariant();
+        var amountNet = row.AmountNet ?? ((row.AmountGross ?? 0m) - (row.FeeAmount ?? 0m));
+        return Model.Section == "payouts"
+            && amountNet > 0m
+            && (normalized == "pending"
+                || normalized == "queued"
+                || normalized == "scheduled"
+                || normalized == "processing"
+                || normalized == "waiting");
+    }
 }
 
 <style>
@@ -200,6 +212,14 @@
                 <div class="card-body">
                     <div class="finance-stat-label">Hoa hồng nền tảng</div>
                     <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.PlatformCommission)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Thu nhập người bán</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.SellerEarning)</div>
                 </div>
             </div>
         </div>
@@ -484,6 +504,20 @@
                 @if (areaName == "Admin")
                 {
                     <div class="d-flex flex-wrap gap-2 align-items-center">
+                        @if (Model.Section == "payouts")
+                        {
+                            <form method="post" action="@Url.Action("GeneratePayouts", controllerName, new { area = areaName })" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="q" value="@Model.Query" />
+                                <input type="hidden" name="status" value="@Model.Status" />
+                                <input type="hidden" name="followUpBucket" value="@Model.FollowUpBucket" />
+                                <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                                <input type="hidden" name="page" value="@Model.Page" />
+                                <button type="submit" class="btn btn-primary rounded-pill px-3">
+                                    <i class="bi bi-plus-circle me-2"></i>Tạo payout chờ chi trả
+                                </button>
+                            </form>
+                        }
                         <a class="btn btn-outline-primary rounded-pill px-3" href="@Url.Action("Export", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = Model.FollowUpBucket, sellerId = Model.SellerId })">
                             <i class="bi bi-download me-2"></i>Xuất CSV
                         </a>
@@ -618,6 +652,7 @@
                                         ? "done"
                                         : "pending";
                                 var isFollowUpOverdue = IsOverdue(row.FollowUpAt);
+                                var canReleasePayout = CanReleasePayout(row);
 
                                 <tr>
                                     @if (areaName == "Admin")
@@ -773,7 +808,14 @@
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="send-reminder">Nhắc phụ trách</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="mark-exported">Xuất</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
-                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
+                                                        @if (canReleasePayout)
+                                                        {
+                                                            <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" disabled title="Chỉ chi trả payout đang chờ xử lý và có AmountNet > 0">Chi trả</button>
+                                                        }
                                                         <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill" name="actionName" value="hold">Giữ</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" name="actionName" value="reject">Lỗi</button>
                                                     }

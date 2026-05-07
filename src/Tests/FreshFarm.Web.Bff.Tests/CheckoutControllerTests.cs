@@ -114,6 +114,45 @@ public sealed class CheckoutControllerTests
         Assert.Equal("20308", ghnService.FeeRequests[0].OriginOverride?.FromWardCode);
     }
 
+    [Fact]
+    public async Task PreviewShippingFee_WithMissingSellerId_ReturnsFailureWithoutCallingGhn()
+    {
+        var catalogHandler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        var identityHandler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        var ghnService = new FakeGhnSandboxService();
+        var controller = CreateController(catalogHandler, identityHandler, ghnService);
+
+        var result = await controller.PreviewShippingFee(new CheckoutShippingFeePreviewRequestDto
+        {
+            AddressMode = "new",
+            Items =
+            [
+                new CheckoutItemInputDto
+                {
+                    ProductId = 501,
+                    SellerId = 0,
+                    ProductName = "Rau Muong",
+                    Quantity = 1,
+                    UnitPrice = 25000m
+                }
+            ],
+            Shipping = new CheckoutShippingInputDto
+            {
+                FullName = "Nguyen Van A",
+                Phone = "0912345678",
+                AddressDetail = "45 Le Loi",
+                ProvinceName = "Ho Chi Minh",
+                DistrictName = "Quan 1",
+                WardName = "Phuong Ben Nghe"
+            }
+        }, CancellationToken.None);
+
+        var payload = Assert.IsType<CheckoutShippingFeePreviewResultDto>(result.Value);
+        Assert.False(payload.Success);
+        Assert.Contains("chưa xác định shop", payload.Message);
+        Assert.Empty(ghnService.FeeRequests);
+    }
+
     private static CheckoutController CreateController(
         RecordingHttpMessageHandler catalogHandler,
         RecordingHttpMessageHandler identityHandler,

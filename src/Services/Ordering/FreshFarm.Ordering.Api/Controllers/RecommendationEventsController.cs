@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +13,20 @@ namespace FreshFarm.Ordering.Api.Controllers;
 public sealed class RecommendationEventsController : ControllerBase
 {
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly RecommendationAffinityRefreshSignal? _refreshSignal;
 
     public RecommendationEventsController(FreshFarmOrderingDBContext db)
     {
         _db = db;
+    }
+
+    [ActivatorUtilitiesConstructor]
+    public RecommendationEventsController(
+        FreshFarmOrderingDBContext db,
+        RecommendationAffinityRefreshSignal refreshSignal)
+        : this(db)
+    {
+        _refreshSignal = refreshSignal;
     }
 
     [HttpPost("product-view")]
@@ -53,6 +64,7 @@ public sealed class RecommendationEventsController : ControllerBase
 
         _db.ProductViewEvents.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+        _refreshSignal?.RequestRefresh();
 
         return Ok(new { ok = true, eventId = entity.ProductViewEventId });
     }
@@ -92,6 +104,7 @@ public sealed class RecommendationEventsController : ControllerBase
 
         _db.SearchEvents.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+        _refreshSignal?.RequestRefresh();
 
         return Ok(new { ok = true, eventId = entity.SearchEventId });
     }
@@ -130,6 +143,7 @@ public sealed class RecommendationEventsController : ControllerBase
 
         _db.SearchClickEvents.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+        _refreshSignal?.RequestRefresh();
 
         return Ok(new { ok = true, eventId = entity.SearchClickEventId });
     }
@@ -225,6 +239,7 @@ public sealed class RecommendationEventsController : ControllerBase
 
         _db.RecommendationClickEvents.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+        _refreshSignal?.RequestRefresh();
 
         return Ok(new { ok = true, eventId = entity.RecommendationClickEventId });
     }

@@ -87,6 +87,10 @@ builder.Services.Configure<CatalogServiceOptions>(
     builder.Configuration.GetSection(CatalogServiceOptions.SectionName));
 builder.Services.Configure<InternalServiceAuthOptions>(
     builder.Configuration.GetSection(InternalServiceAuthOptions.SectionName));
+builder.Services.Configure<FinanceOptions>(
+    builder.Configuration.GetSection(FinanceOptions.SectionName));
+builder.Services.Configure<RecommendationMlOptions>(
+    builder.Configuration.GetSection(RecommendationMlOptions.SectionName));
 builder.Services.AddHttpClient("Catalog", client =>
 {
     var baseUrl = builder.Configuration[$"{CatalogServiceOptions.SectionName}:BaseUrl"];
@@ -99,9 +103,17 @@ builder.Services.AddScoped<CatalogInventoryClient>();
 builder.Services.AddScoped<OrderReservationService>();
 builder.Services.AddScoped<InventoryReconciliationService>();
 builder.Services.AddScoped<CustomerNotificationService>();
+builder.Services.AddScoped<IFinanceCommissionService, FinanceCommissionService>();
+builder.Services.AddScoped<PayoutGenerationService>();
+builder.Services.AddScoped<IPayoutTransferProvider, ManualPayoutTransferProvider>();
 builder.Services.AddScoped<RecommendationAffinityService>();
+builder.Services.AddScoped<RecommendationMlTrainingService>();
+builder.Services.AddScoped<IRecommendationMetricsDao, RecommendationMetricsDao>();
+builder.Services.AddScoped<IRecommendationMetricsService, RecommendationMetricsService>();
+builder.Services.AddSingleton<RecommendationAffinityRefreshSignal>();
 builder.Services.AddHostedService<PendingPaymentExpirationBackgroundService>();
 builder.Services.AddHostedService<RecommendationAffinityRefreshBackgroundService>();
+builder.Services.AddHostedService<RecommendationMlRefreshBackgroundService>();
 
 var app = builder.Build();
 

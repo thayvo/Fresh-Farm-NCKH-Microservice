@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FreshFarm.Ordering.Api.Controllers;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -59,15 +60,58 @@ public sealed class RecommendationEventsControllerTests
         Assert.Empty(await db.RecommendationClickEvents.ToListAsync());
     }
 
-    private static RecommendationEventsController CreateController(FreshFarmOrderingDBContext db, int? userId)
+    [Fact]
+    public async Task TrackSearch_RequestsAffinityRefreshSignal_AfterPersistingEvent()
     {
-        return new RecommendationEventsController(db)
+        await using var db = CreateDbContext();
+        var refreshSignal = new RecommendationAffinityRefreshSignal();
+        var controller = CreateController(db, 47, refreshSignal);
+
+        var result = await controller.TrackSearch(new RecommendationEventsController.TrackSearchRequest
         {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = BuildHttpContext(userId)
-            }
+            SessionId = "session-refresh",
+            Keyword = "rau",
+            ResultCount = 5
+        }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(1, refreshSignal.RequestCount);
+    }
+
+    [Fact]
+    public async Task TrackRecommendationImpression_DoesNotRequestAffinityRefreshSignal()
+    {
+        await using var db = CreateDbContext();
+        var refreshSignal = new RecommendationAffinityRefreshSignal();
+        var controller = CreateController(db, userId: null, refreshSignal);
+
+        var result = await controller.TrackRecommendationImpression(new RecommendationEventsController.TrackRecommendationImpressionRequest
+        {
+            SessionId = "guest-session",
+            Placement = "home_today",
+            RecommendationRunId = "run-1",
+            ProductId = 17,
+            Rank = 1,
+            Algorithm = "hybrid_home_v1"
+        }, CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(0, refreshSignal.RequestCount);
+    }
+
+    private static RecommendationEventsController CreateController(
+        FreshFarmOrderingDBContext db,
+        int? userId,
+        RecommendationAffinityRefreshSignal? refreshSignal = null)
+    {
+        var controller = refreshSignal is null
+            ? new RecommendationEventsController(db)
+            : new RecommendationEventsController(db, refreshSignal);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext(userId)
         };
+        return controller;
     }
 
     private static DefaultHttpContext BuildHttpContext(int? userId)

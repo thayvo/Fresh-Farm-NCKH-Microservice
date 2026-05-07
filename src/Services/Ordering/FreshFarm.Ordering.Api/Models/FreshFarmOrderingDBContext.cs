@@ -91,6 +91,8 @@ public partial class FreshFarmOrderingDBContext : DbContext
 
     public virtual DbSet<SellerAdsWallet> SellerAdsWallets { get; set; }
 
+    public virtual DbSet<SellerCommissionSetting> SellerCommissionSettings { get; set; }
+
     public virtual DbSet<SellerOrder> SellerOrders { get; set; }
 
     public virtual DbSet<SellerOrderItem> SellerOrderItems { get; set; }
@@ -389,16 +391,17 @@ public partial class FreshFarmOrderingDBContext : DbContext
         {
             entity.HasKey(e => e.CartItemId).HasName("PK__CartItem__488B0B2A7E7BEB70");
 
-            entity.ToTable("CartItem");
+            entity.ToTable("CartItem", table =>
+            {
+                table.HasCheckConstraint("CK_CartItem_SellerID_Positive", "[SellerID] > 0");
+            });
 
             entity.HasIndex(e => new { e.CartId, e.ProductId, e.SellerId }, "IX_CartItem_Cart_Product_Seller").IsUnique();
 
             entity.Property(e => e.CartItemId).HasColumnName("CartItemID");
             entity.Property(e => e.CartId).HasColumnName("CartID");
             entity.Property(e => e.ProductId).HasColumnName("ProductID");
-            entity.Property(e => e.SellerId)
-                .HasDefaultValue(0)
-                .HasColumnName("SellerID");
+            entity.Property(e => e.SellerId).HasColumnName("SellerID");
             entity.Property(e => e.Quantity).HasDefaultValue(1);
             entity.Property(e => e.SnapshotImageFileName).HasMaxLength(255);
             entity.Property(e => e.SnapshotProductName).HasMaxLength(255);
@@ -996,6 +999,8 @@ public partial class FreshFarmOrderingDBContext : DbContext
         {
             entity.HasKey(e => e.PayoutItemId).HasName("PK__PayoutIt__3414EEFEFA459973");
 
+            entity.HasIndex(e => e.SellerOrderId, "UX_PayoutItems_SellerOrderID").IsUnique();
+
             entity.Property(e => e.PayoutItemId).HasColumnName("PayoutItemID");
             entity.Property(e => e.Amount).HasColumnType("decimal(18, 2)");
             entity.Property(e => e.Note).HasMaxLength(255);
@@ -1284,6 +1289,29 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.TotalTopup)
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_SellerAdsWallet_TotalTopup")
                 .HasColumnType("decimal(18, 2)");
+            entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<SellerCommissionSetting>(entity =>
+        {
+            entity.ToTable("SellerCommissionSetting");
+
+            entity.HasKey(e => e.SellerCommissionSettingId);
+
+            entity.HasIndex(e => new { e.SellerId, e.IsActive, e.EffectiveFrom }, "IX_SellerCommissionSetting_Seller_Active_EffectiveFrom")
+                .IsDescending(false, false, true);
+
+            entity.Property(e => e.SellerCommissionSettingId).HasColumnName("SellerCommissionSettingID");
+            entity.Property(e => e.CommissionRate).HasColumnType("decimal(9, 4)");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EffectiveFrom)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasColumnType("datetime");
+            entity.Property(e => e.EffectiveTo).HasColumnType("datetime");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.SellerId).HasColumnName("SellerID");
             entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         });
 

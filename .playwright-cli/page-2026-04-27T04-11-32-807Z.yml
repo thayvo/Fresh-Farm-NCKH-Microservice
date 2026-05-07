@@ -1,0 +1,56 @@
+- generic [ref=e5]:
+  - generic [ref=e6]: 
+  - heading "Cảm ơn bạn đã đặt hàng!" [level=2] [ref=e7]
+  - paragraph [ref=e8]:
+    - text: Đơn hàng của bạn
+    - strong [ref=e9]: FF000172
+    - text: đã được tạo thành công.
+  - paragraph [ref=e10]: Chúng tôi đã ghi nhận đơn hàng và sẽ sớm liên hệ xác nhận đơn của bạn.
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Thông tin đơn hàng" [level=5] [ref=e13]
+      - paragraph [ref=e14]:
+        - strong [ref=e15]: "Mã đơn hàng:"
+        - text: FF000172
+      - paragraph [ref=e16]:
+        - strong [ref=e17]: "Ngày đặt:"
+        - text: 27/04/2026 11:11
+      - paragraph [ref=e18]:
+        - strong [ref=e19]: "Tổng tiền:"
+        - strong [ref=e20]: 70.500 ₫
+      - paragraph [ref=e21]:
+        - strong [ref=e22]: "Phương thức thanh toán:"
+        - text: COD
+    - generic [ref=e23]:
+      - heading "Địa chỉ giao hàng" [level=5] [ref=e24]
+      - paragraph [ref=e25]:
+        - strong [ref=e26]: "Người nhận:"
+        - text: E2E Test FreshFarm
+      - paragraph [ref=e27]:
+        - strong [ref=e28]: "Số điện thoại:"
+        - text: "0900000000"
+      - paragraph [ref=e29]:
+        - strong [ref=e30]: "Địa chỉ:"
+        - text: E2E Test - 123 Nguyen Hue, Phường Bến Nghé, Quận 1, Hồ Chí Minh
+  - alert [ref=e31]:
+    - generic [ref=e32]: 
+    - text: Bạn có thể theo dõi đơn hàng trong mục
+    - strong [ref=e33]: Lịch sử đơn hàng
+    - text: .
+  - alert [ref=e34]:
+    - generic [ref=e35]: 
+    - text: Địa chỉ giao hàng mới đã được lưu vào sổ địa chỉ của bạn.
+  - paragraph [ref=e36]: Tự động chuyển về trang chủ sau 7 giây.
+  - generic [ref=e37]:
+    - link " Về trang chủ" [ref=e38] [cursor=pointer]:
+      - /url: /?from=thankyou
+      - generic [ref=e39]: 
+      - text: Về trang chủ
+    - link " Xem chi tiết đơn vừa đặt" [ref=e40] [cursor=pointer]:
+      - /url: /account/orders/172
+      - generic [ref=e41]: 
+      - text: Xem chi tiết đơn vừa đặt
+    - link " Xem đơn hàng của tôi" [ref=e42] [cursor=pointer]:
+      - /url: /account/orders
+      - generic [ref=e43]: 
+      - text: Xem đơn hàng của tôi

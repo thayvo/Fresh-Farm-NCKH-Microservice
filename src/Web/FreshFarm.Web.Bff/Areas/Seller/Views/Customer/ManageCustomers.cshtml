@@ -748,49 +748,58 @@
 
                 const avatarBase = '@Url.Action("AvatarById", "Account", new { area = "" })';
                 customers.forEach(customer => {
+                    const userId = customer.UserID ?? customer.userID ?? customer.userId ?? customer.id;
+                    const fullName = customer.FullName ?? customer.fullName ?? '';
+                    const email = customer.Email ?? customer.email ?? '';
+                    const phone = customer.Phone ?? customer.phone ?? '';
+                    const totalSpent = Number(customer.TotalSpent ?? customer.totalSpent ?? 0);
+                    const orderCount = Number(customer.OrderCount ?? customer.orderCount ?? 0);
+                    const createdDateValue = customer.CreatedDate ?? customer.createdDate;
+                    const createdDate = createdDateValue ? new Date(createdDateValue).toLocaleDateString('vi-VN') : '';
+
                     const row = document.createElement('tr');
-                    row.dataset.id = customer.UserID;
+                    row.dataset.id = userId;
                     row.innerHTML = `
                         <td>
                             <div class="d-flex align-items-center">
-                                <img src="${avatarBase}/${customer.UserID}"
+                                <img src="${avatarBase}/${userId}"
                                      class="customer-avatar rounded-circle me-3"
                                      alt="Avatar" />
                                 <div>
-                                    <div class="fw-bold text-primary-blue">${customer.FullName}</div>
-                                    <div class="text-muted small">${customer.Email}</div>
+                                    <div class="fw-bold text-primary-blue">${fullName}</div>
+                                    <div class="text-muted small">${email}</div>
                                 </div>
                             </div>
                         </td>
-                        <td>${customer.Phone || 'N/A'}</td>
-                        <td>${customer.TotalSpent.toLocaleString('vi-VN')}₫</td>
-                        <td>${customer.OrderCount}</td>
-                        <td>${new Date(customer.CreatedDate).toLocaleDateString('vi-VN')}</td>
+                        <td>${phone || 'N/A'}</td>
+                        <td>${totalSpent.toLocaleString('vi-VN')}₫</td>
+                        <td>${orderCount}</td>
+                        <td>${createdDate}</td>
                         <td>
-                            ${customer.OrderCount > 0
+                            ${orderCount > 0
                             ? '<span class="badge bg-success">Hoạt động</span>'
                             : '<span class="badge bg-secondary">Chưa mua hàng</span>'}
                         </td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-success btn-detail me-1" title="Chi tiết"
-                                    data-id="${customer.UserID}"
-                                    data-name="${customer.FullName}"
-                                    data-email="${customer.Email}"
-                                    data-phone="${customer.Phone || 'N/A'}"
-                                    data-date="${new Date(customer.CreatedDate).toLocaleDateString('vi-VN')}"
-                                    data-spent="${customer.TotalSpent.toLocaleString('vi-VN')}₫"
-                                    data-orders="${customer.OrderCount}"
+                                    data-id="${userId}"
+                                    data-name="${fullName}"
+                                    data-email="${email}"
+                                    data-phone="${phone || 'N/A'}"
+                                    data-date="${createdDate}"
+                                    data-spent="${totalSpent.toLocaleString('vi-VN')}₫"
+                                    data-orders="${orderCount}"
                                     data-bs-toggle="modal"
                                     data-bs-target="#customerDetailModal">
                                 <i class="bi bi-eye-fill"></i>
                             </button>
-                            <a href="@Url.Action("Edit", "Customer", new { area = areaName })?id=${customer.UserID}"
+                            <a href="@Url.Action("Edit", "Customer", new { area = areaName })?id=${userId}"
                                class="btn btn-sm btn-primary me-1" title="Sửa">
                                 <i class="bi bi-pencil-square"></i>
                             </a>
                             <button class="btn btn-sm btn-danger btn-delete" title="Xóa"
-                                    data-id="${customer.UserID}"
-                                    data-name="${customer.FullName}"
+                                    data-id="${userId}"
+                                    data-name="${fullName}"
                                     data-bs-toggle="modal"
                                     data-bs-target="#deleteModal">
                                 <i class="bi bi-trash"></i>

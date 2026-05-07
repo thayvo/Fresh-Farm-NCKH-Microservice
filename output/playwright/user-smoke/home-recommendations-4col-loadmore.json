@@ -1,0 +1,11 @@
+{
+  "cssRules": [
+    ".recommendation-card-hidden { display: none !important; }"
+  ],
+  "sections": 1,
+  "totalCards": 24,
+  "hasButton": true,
+  "visibleBefore": 8,
+  "visibleAfter": 16,
+  "gridTemplateColumns": "298px 298px 298px 298px"
+}

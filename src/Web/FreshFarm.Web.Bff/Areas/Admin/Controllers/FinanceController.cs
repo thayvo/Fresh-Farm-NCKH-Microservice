@@ -137,6 +137,29 @@ public sealed class FinanceController : LegacySellerControllerBase
         return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeneratePayouts(string? q, string? status, string? followUpBucket, int? sellerId, int page = 1)
+    {
+        try
+        {
+            var client = CreateOrderingClient();
+            var endpoint = sellerId.HasValue && sellerId.Value > 0
+                ? $"/api/orders/admin/finance/payouts/generate?sellerId={sellerId.Value}"
+                : "/api/orders/admin/finance/payouts/generate";
+            var response = await client.PostAsJsonAsync(endpoint, new { });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã tạo payout chờ chi trả." : "Không thể tạo payout chờ chi trả.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi tạo payout chờ chi trả: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new { section = "payouts", q, status, followUpBucket, sellerId, page });
+    }
+
     [HttpGet]
     public async Task<IActionResult> Export(string? section = null, string? q = null, string? status = null, string? followUpBucket = null, int? sellerId = null)
     {
@@ -227,6 +250,7 @@ public sealed class FinanceController : LegacySellerControllerBase
             GrossMerchandiseValue = payload.Stats?.GrossMerchandiseValue ?? 0m,
             CapturedPayments = payload.Stats?.CapturedPayments ?? 0m,
             PlatformCommission = payload.Stats?.PlatformCommission ?? 0m,
+            SellerEarning = payload.Stats?.SellerEarning ?? 0m,
             PendingPayoutAmount = payload.Stats?.PendingPayoutAmount ?? 0m,
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,

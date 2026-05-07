@@ -1,0 +1,533 @@
+{
+  "generatedAtUtc": "2026-04-29T15:12:34.5386975Z",
+  "weakUser": 63,
+  "weakBaselineTop10": [
+    {
+      "rank": 1,
+      "id": 8,
+      "name": "Măng tây xanh",
+      "base": 131.98,
+      "final": 131.98,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 47
+    },
+    {
+      "rank": 2,
+      "id": 1,
+      "name": "Rau muống",
+      "base": 126.66,
+      "final": 126.66,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 3,
+      "id": 6,
+      "name": "Bông cải xanh",
+      "base": 125.64,
+      "final": 125.64,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 2
+    },
+    {
+      "rank": 4,
+      "id": 29,
+      "name": "Nấm mỡ",
+      "base": 121.23,
+      "final": 121.23,
+      "delta": 0.0,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 5,
+      "id": 27,
+      "name": "Khoai lang tím",
+      "base": 112.68,
+      "final": 112.68,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 4
+    },
+    {
+      "rank": 6,
+      "id": 3,
+      "name": "Rau lang",
+      "base": 100.32,
+      "final": 100.32,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 7,
+      "id": 115,
+      "name": "Tỏi tây",
+      "base": 97.91,
+      "final": 97.91,
+      "delta": 0.0,
+      "category": "Rau thơm & gia vị",
+      "seller": 4
+    },
+    {
+      "rank": 8,
+      "id": 12,
+      "name": "Bí đỏ",
+      "base": 76.71,
+      "final": 76.71,
+      "delta": 0.0,
+      "category": "Rau ăn quả",
+      "seller": 47
+    },
+    {
+      "rank": 9,
+      "id": 13,
+      "name": "Cà rốt",
+      "base": 113.32,
+      "final": 113.32,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    },
+    {
+      "rank": 10,
+      "id": 14,
+      "name": "Khoai tây vàng",
+      "base": 101.55,
+      "final": 101.55,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    }
+  ],
+  "weakAfterUnmatchedSearchTop10": [
+    {
+      "rank": 1,
+      "id": 8,
+      "name": "Măng tây xanh",
+      "base": 131.98,
+      "final": 131.98,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 47
+    },
+    {
+      "rank": 2,
+      "id": 1,
+      "name": "Rau muống",
+      "base": 126.66,
+      "final": 126.66,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 3,
+      "id": 6,
+      "name": "Bông cải xanh",
+      "base": 125.64,
+      "final": 125.64,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 2
+    },
+    {
+      "rank": 4,
+      "id": 29,
+      "name": "Nấm mỡ",
+      "base": 121.23,
+      "final": 121.23,
+      "delta": 0.0,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 5,
+      "id": 27,
+      "name": "Khoai lang tím",
+      "base": 112.68,
+      "final": 112.68,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 4
+    },
+    {
+      "rank": 6,
+      "id": 3,
+      "name": "Rau lang",
+      "base": 100.32,
+      "final": 100.32,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 7,
+      "id": 115,
+      "name": "Tỏi tây",
+      "base": 97.91,
+      "final": 97.91,
+      "delta": 0.0,
+      "category": "Rau thơm & gia vị",
+      "seller": 4
+    },
+    {
+      "rank": 8,
+      "id": 12,
+      "name": "Bí đỏ",
+      "base": 76.71,
+      "final": 76.71,
+      "delta": 0.0,
+      "category": "Rau ăn quả",
+      "seller": 47
+    },
+    {
+      "rank": 9,
+      "id": 13,
+      "name": "Cà rốt",
+      "base": 113.32,
+      "final": 113.32,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    },
+    {
+      "rank": 10,
+      "id": 14,
+      "name": "Khoai tây vàng",
+      "base": 101.55,
+      "final": 101.55,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    }
+  ],
+  "weakMaxDelta": 0.0,
+  "matchUser": 66,
+  "clickedId": 10,
+  "matchBaselineTop10": [
+    {
+      "rank": 1,
+      "id": 8,
+      "name": "Măng tây xanh",
+      "base": 131.98,
+      "final": 131.98,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 47
+    },
+    {
+      "rank": 2,
+      "id": 1,
+      "name": "Rau muống",
+      "base": 126.66,
+      "final": 126.66,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 3,
+      "id": 6,
+      "name": "Bông cải xanh",
+      "base": 125.64,
+      "final": 125.64,
+      "delta": 0.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 2
+    },
+    {
+      "rank": 4,
+      "id": 29,
+      "name": "Nấm mỡ",
+      "base": 121.23,
+      "final": 121.23,
+      "delta": 0.0,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 5,
+      "id": 27,
+      "name": "Khoai lang tím",
+      "base": 112.68,
+      "final": 112.68,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 4
+    },
+    {
+      "rank": 6,
+      "id": 3,
+      "name": "Rau lang",
+      "base": 100.32,
+      "final": 100.32,
+      "delta": 0.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 7,
+      "id": 115,
+      "name": "Tỏi tây",
+      "base": 97.91,
+      "final": 97.91,
+      "delta": 0.0,
+      "category": "Rau thơm & gia vị",
+      "seller": 4
+    },
+    {
+      "rank": 8,
+      "id": 12,
+      "name": "Bí đỏ",
+      "base": 76.71,
+      "final": 76.71,
+      "delta": 0.0,
+      "category": "Rau ăn quả",
+      "seller": 47
+    },
+    {
+      "rank": 9,
+      "id": 13,
+      "name": "Cà rốt",
+      "base": 113.32,
+      "final": 113.32,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    },
+    {
+      "rank": 10,
+      "id": 14,
+      "name": "Khoai tây vàng",
+      "base": 101.55,
+      "final": 101.55,
+      "delta": 0.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    }
+  ],
+  "matchAfterSearchTop10": [
+    {
+      "rank": 1,
+      "id": 10,
+      "name": "Cà chua bi",
+      "base": 111.12,
+      "final": 141.12,
+      "delta": 30.0,
+      "category": "Rau ăn quả",
+      "seller": 47
+    },
+    {
+      "rank": 2,
+      "id": 8,
+      "name": "Măng tây xanh",
+      "base": 131.98,
+      "final": 135.98,
+      "delta": 4.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 47
+    },
+    {
+      "rank": 3,
+      "id": 1,
+      "name": "Rau muống",
+      "base": 126.66,
+      "final": 130.66,
+      "delta": 4.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 4,
+      "id": 13,
+      "name": "Cà rốt",
+      "base": 113.32,
+      "final": 130.32,
+      "delta": 17.0,
+      "category": "Củ & rễ",
+      "seller": 51
+    },
+    {
+      "rank": 5,
+      "id": 6,
+      "name": "Bông cải xanh",
+      "base": 125.64,
+      "final": 129.64,
+      "delta": 4.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 2
+    },
+    {
+      "rank": 6,
+      "id": 29,
+      "name": "Nấm mỡ",
+      "base": 121.23,
+      "final": 127.23,
+      "delta": 6.0,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 7,
+      "id": 27,
+      "name": "Khoai lang tím",
+      "base": 112.68,
+      "final": 118.68,
+      "delta": 6.0,
+      "category": "Củ & rễ",
+      "seller": 4
+    },
+    {
+      "rank": 8,
+      "id": 4,
+      "name": "Cải thìa",
+      "base": 113.18,
+      "final": 117.18,
+      "delta": 4.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 9,
+      "id": 28,
+      "name": "Nấm đùi gà",
+      "base": 110.55,
+      "final": 116.55,
+      "delta": 6.0,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 10,
+      "id": 37,
+      "name": "Bắp cải tím",
+      "base": 107.77,
+      "final": 113.77,
+      "delta": 6.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 4
+    }
+  ],
+  "matchAfterClickTop10": [
+    {
+      "rank": 1,
+      "id": 10,
+      "name": "Cà chua bi",
+      "base": 111.12,
+      "final": 177.12,
+      "delta": 66.0,
+      "category": "Rau ăn quả",
+      "seller": 47
+    },
+    {
+      "rank": 2,
+      "id": 8,
+      "name": "Măng tây xanh",
+      "base": 131.98,
+      "final": 126.75,
+      "delta": -5.23,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 47
+    },
+    {
+      "rank": 3,
+      "id": 6,
+      "name": "Bông cải xanh",
+      "base": 125.64,
+      "final": 121.37,
+      "delta": -4.27,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 2
+    },
+    {
+      "rank": 4,
+      "id": 13,
+      "name": "Cà rốt",
+      "base": 113.32,
+      "final": 119.77,
+      "delta": 6.45,
+      "category": "Củ & rễ",
+      "seller": 51
+    },
+    {
+      "rank": 5,
+      "id": 29,
+      "name": "Nấm mỡ",
+      "base": 121.23,
+      "final": 118.01,
+      "delta": -3.22,
+      "category": "Nấm",
+      "seller": 4
+    },
+    {
+      "rank": 6,
+      "id": 4,
+      "name": "Cải thìa",
+      "base": 113.18,
+      "final": 117.18,
+      "delta": 4.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 7,
+      "id": 1,
+      "name": "Rau muống",
+      "base": 126.66,
+      "final": 116.88,
+      "delta": -9.78,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 8,
+      "id": 2,
+      "name": "Cải bó xôi",
+      "base": 109.1,
+      "final": 113.1,
+      "delta": 4.0,
+      "category": "Rau lá",
+      "seller": 2
+    },
+    {
+      "rank": 9,
+      "id": 105,
+      "name": "Bông cải trắng mini",
+      "base": 106.91,
+      "final": 112.91,
+      "delta": 6.0,
+      "category": "Rau ăn hoa / thân / mầm",
+      "seller": 4
+    },
+    {
+      "rank": 10,
+      "id": 28,
+      "name": "Nấm đùi gà",
+      "base": 110.55,
+      "final": 111.7,
+      "delta": 1.15,
+      "category": "Nấm",
+      "seller": 4
+    }
+  ],
+  "tomatoAfterSearch": {
+    "rank": 1,
+    "id": 10,
+    "name": "Cà chua bi",
+    "base": 111.12,
+    "final": 141.12,
+    "delta": 30.0
+  },
+  "tomatoAfterClick": {
+    "rank": 1,
+    "id": 10,
+    "name": "Cà chua bi",
+    "base": 111.12,
+    "final": 177.12,
+    "delta": 66.0
+  }
+}

@@ -47,6 +47,8 @@ public sealed class FinanceConsoleStatsViewModel
 
     public decimal PlatformCommission { get; set; }
 
+    public decimal SellerEarning { get; set; }
+
     public decimal PendingPayoutAmount { get; set; }
 
     public decimal RefundedAmount { get; set; }
@@ -192,6 +194,8 @@ internal sealed class FinanceConsoleStatsApiDto
     public decimal CapturedPayments { get; set; }
 
     public decimal PlatformCommission { get; set; }
+
+    public decimal SellerEarning { get; set; }
 
     public decimal PendingPayoutAmount { get; set; }
 

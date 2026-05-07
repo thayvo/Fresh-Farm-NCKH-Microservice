@@ -923,6 +923,212 @@
             font-size: .95rem;
         }
 
+        .similar-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .similar-card {
+            height: 100%;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            border-radius: 20px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(248, 250, 252, .96));
+            border: 1px solid rgba(226, 232, 240, .96);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, .08);
+            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+        }
+
+        .similar-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(34, 197, 94, .3);
+            box-shadow: 0 22px 44px rgba(22, 163, 74, .12);
+        }
+
+        .similar-thumb {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .similar-card-body {
+            display: grid;
+            gap: 10px;
+            padding: 14px;
+        }
+
+        .similar-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .similar-category-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #334155;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .similar-category-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #16a34a;
+            opacity: .75;
+        }
+
+        .similar-rating-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #92400e;
+            background: rgba(254, 243, 199, .95);
+        }
+
+        .similar-title {
+            font-size: .98rem;
+            line-height: 1.4;
+            font-weight: 800;
+            color: #0f172a;
+            min-height: 2.8em;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .similar-meta {
+            display: grid;
+            gap: 7px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .08) 0%, rgba(249, 115, 22, .08) 100%);
+            border: 1px solid rgba(22, 163, 74, .12);
+        }
+
+        .similar-tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .similar-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #166534;
+            background: rgba(240, 253, 244, .96);
+            border: 1px solid rgba(34, 197, 94, .2);
+            white-space: nowrap;
+        }
+
+        .similar-tag::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: .72;
+        }
+
+        .similar-reason {
+            font-size: .79rem;
+            line-height: 1.48;
+            color: #4b5563;
+        }
+
+        .similar-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: .82rem;
+            color: #64748b;
+            font-weight: 700;
+        }
+
+        .similar-origin {
+            font-size: .8rem;
+            color: #475569;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .similar-price {
+            color: #dc2626;
+            font-size: 1.18rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .similar-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .similar-action-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 42px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: .84rem;
+            font-weight: 800;
+            transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease;
+        }
+
+        .similar-action-link:hover {
+            transform: translateY(-1px);
+        }
+
+        .similar-action-link.detail {
+            background: #fff;
+            color: #166534;
+            border: 1px solid rgba(34, 197, 94, .22);
+        }
+
+        .similar-action-link.detail:hover {
+            background: #f0fdf4;
+            color: #166534;
+        }
+
+        .similar-action-link.buy {
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+            color: #fff;
+            border: 0;
+            box-shadow: 0 12px 22px rgba(22, 163, 74, .18);
+        }
+
+        .similar-action-link.buy:hover {
+            color: #fff;
+            box-shadow: 0 14px 26px rgba(22, 163, 74, .24);
+        }
+
         .state-box {
             background: #fff;
             border: 1px dashed #cbd5e1;
@@ -944,6 +1150,10 @@
 
             .review-summary-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .similar-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -980,6 +1190,10 @@
 
             .offer-price {
                 text-align: left;
+            }
+
+            .similar-grid {
+                grid-template-columns: 1fr;
             }
         }
 

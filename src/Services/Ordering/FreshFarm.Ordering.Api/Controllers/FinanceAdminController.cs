@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using FreshFarm.Ordering.Api.Models;
+using FreshFarm.Ordering.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -28,10 +29,17 @@ public sealed class FinanceAdminController : ControllerBase
     private static readonly string[] ReturnRejectedStatuses = ["rejected", "cancelled", "canceled", "denied"];
 
     private readonly FreshFarmOrderingDBContext _db;
+    private readonly PayoutGenerationService _payoutGenerationService;
+    private readonly IPayoutTransferProvider _payoutTransferProvider;
 
-    public FinanceAdminController(FreshFarmOrderingDBContext db)
+    public FinanceAdminController(
+        FreshFarmOrderingDBContext db,
+        PayoutGenerationService payoutGenerationService,
+        IPayoutTransferProvider payoutTransferProvider)
     {
         _db = db;
+        _payoutGenerationService = payoutGenerationService;
+        _payoutTransferProvider = payoutTransferProvider;
     }
 
     [HttpGet("console")]
@@ -79,6 +87,7 @@ public sealed class FinanceAdminController : ControllerBase
             x => (decimal?)((x.SellerEarning) + (x.CommissionAmount)),
             cancellationToken) ?? 0m;
         var platformCommission = await sellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
+        var sellerEarning = await sellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
         var capturedPayments = await paymentTransactionsQuery
             .Where(x => x.PaidAt.HasValue || PayoutPaidStatuses.Contains((x.Status ?? string.Empty).ToLower()))
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
@@ -187,6 +196,7 @@ public sealed class FinanceAdminController : ControllerBase
                 grossMerchandiseValue,
                 capturedPayments,
                 platformCommission,
+                sellerEarning,
                 pendingPayoutAmount,
                 refundedAmount,
                 openReturns,
@@ -213,6 +223,23 @@ public sealed class FinanceAdminController : ControllerBase
             },
             ownerSummary,
             rows
+        });
+    }
+
+    [HttpPost("payouts/generate")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> GeneratePayouts([FromQuery] int? sellerId = null, CancellationToken cancellationToken = default)
+    {
+        var result = await _payoutGenerationService.GeneratePendingPayoutsAsync(sellerId, cancellationToken);
+        return Ok(new
+        {
+            success = true,
+            message = $"Da tao {result.CreatedPayoutCount} payout pending voi {result.CreatedPayoutItemCount} seller order.",
+            result.CreatedPayoutCount,
+            result.CreatedPayoutItemCount,
+            result.AmountGross,
+            result.FeeAmount,
+            result.AmountNet
         });
     }
 
@@ -390,7 +417,7 @@ public sealed class FinanceAdminController : ControllerBase
             {
                 "refunds" => await ApplyRefundActionAsync(recordId, actionName, note, cancellationToken),
                 "returns" => await ApplyReturnActionAsync(recordId, actionName, note, cancellationToken),
-                _ => await ApplyPayoutActionAsync(recordId, actionName, note, cancellationToken)
+                _ => (await ApplyPayoutActionAsync(recordId, actionName, note, cancellationToken)).Success
             };
         }
 
@@ -526,20 +553,23 @@ public sealed class FinanceAdminController : ControllerBase
 
     private async Task<IActionResult> HandlePayoutActionAsync(int payoutId, string actionName, string? note, CancellationToken cancellationToken)
     {
-        if (!await ApplyPayoutActionAsync(payoutId, actionName, note, cancellationToken))
+        var result = await ApplyPayoutActionAsync(payoutId, actionName, note, cancellationToken);
+        if (!result.Success)
         {
-            return NotFound(new { success = false, message = "Khong tim thay payout." });
+            return StatusCode(result.StatusCode, new { success = false, message = result.Message });
         }
 
         return Ok(new { success = true, message = $"Da {GetFinanceActionLabel(actionName)} payout #{payoutId}." });
     }
 
-    private async Task<bool> ApplyPayoutActionAsync(int payoutId, string actionName, string? note, CancellationToken cancellationToken)
+    private async Task<FinanceActionApplyResult> ApplyPayoutActionAsync(int payoutId, string actionName, string? note, CancellationToken cancellationToken)
     {
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
         var payout = await _db.Payouts.FirstOrDefaultAsync(x => x.PayoutId == payoutId, cancellationToken);
         if (payout is null)
         {
-            return false;
+            return FinanceActionApplyResult.NotFound("Khong tim thay payout.");
         }
 
         switch (actionName)
@@ -548,6 +578,28 @@ public sealed class FinanceAdminController : ControllerBase
                 payout.Status = "processing";
                 break;
             case "release":
+                var normalizedStatus = (payout.Status ?? string.Empty).Trim().ToLowerInvariant();
+                var amountNet = payout.AmountNet ?? (payout.AmountGross - payout.FeeAmount);
+                if (!PayoutPendingStatuses.Contains(normalizedStatus))
+                {
+                    return FinanceActionApplyResult.Conflict(
+                        $"Payout #{payoutId} dang o trang thai '{(string.IsNullOrWhiteSpace(payout.Status) ? "unknown" : payout.Status)}', chi duoc chi tra khi con pending.");
+                }
+
+                if (amountNet <= 0m)
+                {
+                    return FinanceActionApplyResult.BadRequest("Payout khong co AmountNet hop le de chi tra.");
+                }
+
+                var transferResult = await _payoutTransferProvider.ReleaseAsync(payout, note, cancellationToken);
+                if (!transferResult.Success)
+                {
+                    return FinanceActionApplyResult.BadRequest(
+                        string.IsNullOrWhiteSpace(transferResult.Message)
+                            ? "Khong the ghi nhan manual payout."
+                            : transferResult.Message);
+                }
+
                 payout.Status = "paid";
                 payout.PaidAt = DateTime.UtcNow;
                 break;
@@ -558,23 +610,42 @@ public sealed class FinanceAdminController : ControllerBase
                 payout.Status = "failed";
                 break;
             default:
-                return false;
+                return FinanceActionApplyResult.BadRequest("Action payout khong hop le.");
         }
 
+        var auditActionName = actionName == "release" ? "manual_payout_recorded" : $"payout_{actionName}";
+        var auditNote = actionName == "release"
+            ? AppendAuditMarker(note, "manual_payout_recorded")
+            : note;
+        var amountForAudit = payout.AmountNet ?? (payout.AmountGross - payout.FeeAmount);
         var actorUserId = TryGetSellerIdFromToken();
         var actionLog = AdminAuditLogger.AddAction(
             _db,
             "finance_console",
-            $"payout_{actionName}",
+            auditActionName,
             "payout",
             payoutId,
-            $"Admin {GetFinanceActionLabel(actionName)} payout #{payoutId}.",
+            actionName == "release"
+                ? $"Admin ghi nhan manual payout cho payout #{payoutId}."
+                : $"Admin {GetFinanceActionLabel(actionName)} payout #{payoutId}.",
             actorUserId,
-            new { section = "payouts", actionName, note, payout.SellerId, payout.AmountNet, payout.AmountGross });
-        AdminAuditLogger.AddSettlement(_db, actionLog, $"payout_{actionName}", "payout", payoutId, payout.SellerId, payout.AmountNet ?? (payout.AmountGross - payout.FeeAmount), note, actorUserId);
+            new
+            {
+                section = "payouts",
+                actionName,
+                auditActionName,
+                note = auditNote,
+                payout.SellerId,
+                amountNet = amountForAudit,
+                payout.AmountGross,
+                payout.FeeAmount,
+                transferMode = actionName == "release" ? "manual" : null
+            });
+        AdminAuditLogger.AddSettlement(_db, actionLog, auditActionName, "payout", payoutId, payout.SellerId, amountForAudit, auditNote, actorUserId);
 
         await _db.SaveChangesAsync(cancellationToken);
-        return true;
+        await transaction.CommitAsync(cancellationToken);
+        return FinanceActionApplyResult.Ok();
     }
 
     private async Task<IActionResult> HandleRefundActionAsync(int refundId, string actionName, string? note, CancellationToken cancellationToken)
@@ -1312,6 +1383,19 @@ public sealed class FinanceAdminController : ControllerBase
         return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
     }
 
+    private static string AppendAuditMarker(string? note, string marker)
+    {
+        var trimmed = TrimNote(note);
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return marker;
+        }
+
+        return trimmed.Contains(marker, StringComparison.OrdinalIgnoreCase)
+            ? trimmed
+            : $"{trimmed} | {marker}";
+    }
+
     private static string? TrimShortText(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1500,6 +1584,17 @@ public sealed class FinanceAdminController : ControllerBase
     }
 
     private sealed record SellerLookupRow(int? SellerId, string SellerLabel);
+
+    private sealed record FinanceActionApplyResult(bool Success, string Message, int StatusCode)
+    {
+        public static FinanceActionApplyResult Ok(string message = "") => new(true, message, 200);
+
+        public static FinanceActionApplyResult BadRequest(string message) => new(false, message, 400);
+
+        public static FinanceActionApplyResult NotFound(string message) => new(false, message, 404);
+
+        public static FinanceActionApplyResult Conflict(string message) => new(false, message, 409);
+    }
 
     public sealed class FinanceActionRequest
     {

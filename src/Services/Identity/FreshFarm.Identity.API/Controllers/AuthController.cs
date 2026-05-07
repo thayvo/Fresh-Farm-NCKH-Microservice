@@ -917,9 +917,8 @@ namespace FreshFarm.Identity.Api.Controllers
 
         private static bool RequiresTwoFactor(IEnumerable<string> roles)
         {
-            return roles.Any(role =>
-                string.Equals(role, "Seller", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase));
+            // 2FA is currently disabled for all roles by product decision.
+            return false;
         }
 
         private static string BuildTwoFactorAccountName(User user)

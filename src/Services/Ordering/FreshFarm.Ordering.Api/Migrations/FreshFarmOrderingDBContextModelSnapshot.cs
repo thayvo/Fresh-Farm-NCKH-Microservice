@@ -560,9 +560,7 @@ namespace FreshFarm.Ordering.Api.Migrations
                         .HasDefaultValue(1);
 
                     b.Property<int>("SellerId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("int")
-                        .HasDefaultValue(0)
                         .HasColumnName("SellerID");
 
                     b.Property<string>("SnapshotImageFileName")
@@ -590,7 +588,10 @@ namespace FreshFarm.Ordering.Api.Migrations
                     b.HasIndex(new[] { "CartId", "ProductId", "SellerId" }, "IX_CartItem_Cart_Product_Seller")
                         .IsUnique();
 
-                    b.ToTable("CartItem", (string)null);
+                    b.ToTable("CartItem", (string)null, tb =>
+                        {
+                            tb.HasCheckConstraint("CK_CartItem_SellerID_Positive", "[SellerID] > 0");
+                        });
                 });
 
             modelBuilder.Entity("FreshFarm.Ordering.Api.Models.CommunicationTemplate", b =>
@@ -1790,6 +1791,84 @@ namespace FreshFarm.Ordering.Api.Migrations
                     b.ToTable("ProductViewEvent", (string)null);
                 });
 
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationBasketAffinity", b =>
+                {
+                    b.Property<int>("RecommendationBasketAffinityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecommendationBasketAffinityId"));
+
+                    b.Property<double>("BasketScore")
+                        .HasColumnType("float");
+
+                    b.Property<int>("CandidateProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CoPurchaseOrderCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationBasketAffinity_ComputedAt");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RecommendationBasketAffinityId");
+
+                    b.HasIndex(new[] { "ProductId", "BasketScore" }, "IX_RecommendationBasketAffinity_Product_Score")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "ProductId", "CandidateProductId" }, "UQ_RecommendationBasketAffinity_Product_Candidate")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationBasketAffinity", (string)null);
+                });
+
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationClick", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                        SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                        b.Property<string>("ExperimentGroup")
+                            .HasMaxLength(10)
+                            .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Timestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationClick_Timestamp");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "ExperimentGroup", "Timestamp" }, "IX_RecommendationClick_Group_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "ProductId", "Timestamp" }, "IX_RecommendationClick_Product_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "Timestamp" }, "IX_RecommendationClick_User_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.ToTable("RecommendationClick", (string)null);
+                });
+
             modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationClickEvent", b =>
                 {
                     b.Property<int>("RecommendationClickEventId")
@@ -1962,6 +2041,55 @@ namespace FreshFarm.Ordering.Api.Migrations
                     b.ToTable("RecommendationHomePreferenceSeed", (string)null);
                 });
 
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationImpression", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                        SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                        b.Property<string>("ExperimentGroup")
+                            .HasMaxLength(10)
+                            .HasColumnType("nvarchar(10)");
+
+                    b.Property<int?>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RecommendationSource")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("Timestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationImpression_Timestamp");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "RecommendationSource", "ExperimentGroup", "Timestamp" }, "IX_RecommendationImpression_Source_Group_Timestamp")
+                        .IsDescending(false, false, true);
+
+                    b.HasIndex(new[] { "ProductId", "Timestamp" }, "IX_RecommendationImpression_Product_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "RecommendationSource", "Timestamp" }, "IX_RecommendationImpression_Source_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "Timestamp" }, "IX_RecommendationImpression_User_Timestamp")
+                        .IsDescending(false, true);
+
+                    b.ToTable("RecommendationImpression", (string)null);
+                });
+
             modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationImpressionEvent", b =>
                 {
                     b.Property<int>("RecommendationImpressionEventId")
@@ -2064,6 +2192,52 @@ namespace FreshFarm.Ordering.Api.Migrations
                     b.ToTable("RecommendationProductAffinity", (string)null);
                 });
 
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationReplenishmentProfile", b =>
+                {
+                    b.Property<int>("RecommendationReplenishmentProfileId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecommendationReplenishmentProfileId"));
+
+                    b.Property<double>("AverageRepurchaseDays")
+                        .HasColumnType("float");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationReplenishmentProfile_ComputedAt");
+
+                    b.Property<DateTime?>("ExpectedReorderAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<DateTime>("LastPurchasedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PurchaseCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("ReplenishmentScore")
+                        .HasColumnType("float");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RecommendationReplenishmentProfileId");
+
+                    b.HasIndex(new[] { "UserId", "ReplenishmentScore" }, "IX_RecommendationReplenishmentProfile_User_Score")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "ProductId" }, "UQ_RecommendationReplenishmentProfile_User_Product")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationReplenishmentProfile", (string)null);
+                });
+
             modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationSearchKeywordAffinity", b =>
                 {
                     b.Property<int>("RecommendationSearchKeywordAffinityId")
@@ -2113,6 +2287,155 @@ namespace FreshFarm.Ordering.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("RecommendationSearchKeywordAffinity", (string)null);
+                });
+
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationUserCategoryScore", b =>
+                {
+                    b.Property<int>("RecommendationUserCategoryScoreId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecommendationUserCategoryScoreId"));
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CategoryName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserCategoryScore_ComputedAt");
+
+                    b.Property<DateTime?>("LastInteractedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<int>("PurchaseCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RecommendationClickCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SearchClickCount")
+                        .HasColumnType("int");
+
+                    b.Property<double>("UserCategoryScore")
+                        .HasColumnType("float");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ViewCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("RecommendationUserCategoryScoreId");
+
+                    b.HasIndex(new[] { "UserId", "UserCategoryScore" }, "IX_RecommendationUserCategoryScore_User_Score")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "CategoryId" }, "UQ_RecommendationUserCategoryScore_User_Category")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationUserCategoryScore", (string)null);
+                });
+
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationUserProductScore", b =>
+                {
+                    b.Property<int>("RecommendationUserProductScoreId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecommendationUserProductScoreId"));
+
+                    b.Property<DateTime>("ComputedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserProductScore_ComputedAt");
+
+                    b.Property<DateTime?>("LastInteractedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PurchaseCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RecommendationClickCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SearchClickCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("UserProductScore")
+                        .HasColumnType("float");
+
+                    b.Property<int>("ViewCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("RecommendationUserProductScoreId");
+
+                    b.HasIndex(new[] { "UserId", "UserProductScore" }, "IX_RecommendationUserProductScore_User_Score")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "ProductId" }, "UQ_RecommendationUserProductScore_User_Product")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationUserProductScore", (string)null);
+                });
+
+            modelBuilder.Entity("FreshFarm.Ordering.Api.Models.RecommendationUserSellerScore", b =>
+                {
+                    b.Property<int>("RecommendationUserSellerScoreId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecommendationUserSellerScoreId"));
+
+                    b.Property<DateTime>("ComputedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getutcdate())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserSellerScore_ComputedAt");
+
+                    b.Property<DateTime?>("LastInteractedAtUtc")
+                        .HasColumnType("datetime");
+
+                    b.Property<int>("PurchaseCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SearchClickCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SellerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("UserSellerScore")
+                        .HasColumnType("float");
+
+                    b.Property<int>("ViewCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("RecommendationUserSellerScoreId");
+
+                    b.HasIndex(new[] { "UserId", "UserSellerScore" }, "IX_RecommendationUserSellerScore_User_Score")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "SellerId" }, "UQ_RecommendationUserSellerScore_User_Seller")
+                        .IsUnique();
+
+                    b.ToTable("RecommendationUserSellerScore", (string)null);
                 });
 
             modelBuilder.Entity("FreshFarm.Ordering.Api.Models.ReconciliationLog", b =>

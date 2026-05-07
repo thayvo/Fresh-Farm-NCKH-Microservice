@@ -1,8 +1,12 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using FreshFarm.Web.Bff.Services;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
@@ -16,10 +20,36 @@ public sealed class BffRecommendationEventsController : ControllerBase
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IRecommendationMetricsClient _recommendationMetricsClient;
+    private readonly IRecommendationExperimentService _recommendationExperimentService;
 
     public BffRecommendationEventsController(IHttpClientFactory httpClientFactory)
+        : this(
+            httpClientFactory,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    public BffRecommendationEventsController(
+        IHttpClientFactory httpClientFactory,
+        IRecommendationMetricsClient recommendationMetricsClient)
+        : this(
+            httpClientFactory,
+            recommendationMetricsClient,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    [ActivatorUtilitiesConstructor]
+    public BffRecommendationEventsController(
+        IHttpClientFactory httpClientFactory,
+        IRecommendationMetricsClient recommendationMetricsClient,
+        IRecommendationExperimentService recommendationExperimentService)
     {
         _httpClientFactory = httpClientFactory;
+        _recommendationMetricsClient = recommendationMetricsClient;
+        _recommendationExperimentService = recommendationExperimentService;
     }
 
     [HttpPost("product-view")]
@@ -94,6 +124,8 @@ public sealed class BffRecommendationEventsController : ControllerBase
     public async Task<IActionResult> TrackRecommendationClick([FromBody] TrackRecommendationClickRequest? request)
     {
         var sessionId = await EnsureStableSessionIdAsync();
+        TrackRecommendationMetricClickFireAndForget(request);
+
         return await ProxyTrackAsync(
             "/api/orders/recommendation-events/recommendation-click",
             new
@@ -105,6 +137,74 @@ public sealed class BffRecommendationEventsController : ControllerBase
                 algorithm = request?.Algorithm
             },
             "Không thể ghi nhận click recommendation.");
+    }
+
+    [HttpPost("recommendation-add-to-cart")]
+    public IActionResult TrackRecommendationAddToCart([FromBody] TrackRecommendationAddToCartRequest? request)
+    {
+        if (request is null || request.ProductId <= 0)
+        {
+            return BadRequest(new { ok = false, message = "ProductId không hợp lệ." });
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+        _ = _recommendationMetricsClient.TrackAddToCartAsync(
+            userId,
+            request.ProductId,
+            NormalizeRecommendationPosition(request.Position ?? request.Rank),
+            experimentGroup,
+            CancellationToken.None);
+
+        return Accepted(new { ok = true });
+    }
+
+    [HttpPost("recommendation-purchase")]
+    public IActionResult TrackRecommendationPurchase([FromBody] TrackRecommendationPurchaseRequest? request)
+    {
+        if (request is null || request.ProductId <= 0)
+        {
+            return BadRequest(new { ok = false, message = "ProductId không hợp lệ." });
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+        _ = _recommendationMetricsClient.TrackPurchaseAsync(
+            userId,
+            request.ProductId,
+            NormalizeRecommendationPosition(request.Position ?? request.Rank),
+            request.Revenue,
+            experimentGroup,
+            CancellationToken.None);
+
+        return Accepted(new { ok = true });
+    }
+
+    private void TrackRecommendationMetricClickFireAndForget(TrackRecommendationClickRequest? request)
+    {
+        if (request is null || request.ProductId <= 0)
+        {
+            return;
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+        _ = _recommendationMetricsClient.TrackClickAsync(
+            userId,
+            request.ProductId,
+            NormalizeRecommendationPosition(request.Position ?? request.Rank),
+            experimentGroup,
+            CancellationToken.None);
+    }
+
+    private sealed class NoopRecommendationExperimentService : IRecommendationExperimentService
+    {
+        public static readonly NoopRecommendationExperimentService Instance = new();
+
+        public string ResolveGroup(HttpContext httpContext, int? userId)
+        {
+            return RecommendationExperimentGroups.SessionRerank;
+        }
     }
 
     private async Task<IActionResult> ProxyTrackAsync(string url, object payload, string fallbackMessage)
@@ -142,6 +242,53 @@ public sealed class BffRecommendationEventsController : ControllerBase
         }
 
         return client;
+    }
+
+    private int? ResolveRecommendationUserId()
+    {
+        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+            ?? User.FindFirstValue("sub")
+            ?? User.FindFirstValue("userId")
+            ?? User.FindFirstValue("uid");
+
+        if (int.TryParse(claimValue, out var userId) && userId > 0)
+        {
+            return userId;
+        }
+
+        return ResolveRecommendationUserIdFromJwt(HttpContext.Session.GetString(AccessTokenSessionKey));
+    }
+
+    private static int? ResolveRecommendationUserIdFromJwt(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        try
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            var claimValue = jwt.Subject
+                ?? jwt.Claims.FirstOrDefault(claim =>
+                    string.Equals(claim.Type, ClaimTypes.NameIdentifier, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, JwtRegisteredClaimNames.Sub, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "sub", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "userId", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "uid", StringComparison.OrdinalIgnoreCase))?.Value;
+
+            return int.TryParse(claimValue, out var userId) && userId > 0 ? userId : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static int? NormalizeRecommendationPosition(int? position)
+    {
+        return position is > 0 ? position.Value : null;
     }
 
     private async Task<string> EnsureStableSessionIdAsync()
@@ -234,8 +381,32 @@ public sealed class BffRecommendationEventsController : ControllerBase
 
         public int ProductId { get; set; }
 
+        public int? Position { get; set; }
+
+        public int? Rank { get; set; }
+
         public string? Placement { get; set; }
 
         public string? Algorithm { get; set; }
+    }
+
+    public sealed class TrackRecommendationAddToCartRequest
+    {
+        public int ProductId { get; set; }
+
+        public int? Position { get; set; }
+
+        public int? Rank { get; set; }
+    }
+
+    public sealed class TrackRecommendationPurchaseRequest
+    {
+        public int ProductId { get; set; }
+
+        public int? Position { get; set; }
+
+        public int? Rank { get; set; }
+
+        public decimal Revenue { get; set; }
     }
 }

@@ -14,6 +14,14 @@ public partial class FreshFarmOrderingDBContext
 
     public virtual DbSet<RecommendationClickEvent> RecommendationClickEvents { get; set; } = null!;
 
+    public virtual DbSet<RecommendationImpression> RecommendationImpressions { get; set; } = null!;
+
+    public virtual DbSet<RecommendationClick> RecommendationClicks { get; set; } = null!;
+
+    public virtual DbSet<RecommendationAddToCart> RecommendationAddToCarts { get; set; } = null!;
+
+    public virtual DbSet<RecommendationPurchase> RecommendationPurchases { get; set; } = null!;
+
     public virtual DbSet<RecommendationProductAffinity> RecommendationProductAffinities { get; set; } = null!;
 
     public virtual DbSet<RecommendationSearchKeywordAffinity> RecommendationSearchKeywordAffinities { get; set; } = null!;
@@ -22,8 +30,97 @@ public partial class FreshFarmOrderingDBContext
 
     public virtual DbSet<RecommendationHomeCollaborativeCandidate> RecommendationHomeCollaborativeCandidates { get; set; } = null!;
 
+    public virtual DbSet<RecommendationUserProductScore> RecommendationUserProductScores { get; set; } = null!;
+
+    public virtual DbSet<RecommendationUserCategoryScore> RecommendationUserCategoryScores { get; set; } = null!;
+
+    public virtual DbSet<RecommendationUserSellerScore> RecommendationUserSellerScores { get; set; } = null!;
+
+    public virtual DbSet<RecommendationBasketAffinity> RecommendationBasketAffinities { get; set; } = null!;
+
+    public virtual DbSet<RecommendationReplenishmentProfile> RecommendationReplenishmentProfiles { get; set; } = null!;
+
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<RecommendationImpression>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.ToTable("RecommendationImpression");
+
+            entity.HasIndex(e => new { e.ProductId, e.Timestamp }, "IX_RecommendationImpression_Product_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.RecommendationSource, e.ExperimentGroup, e.Timestamp }, "IX_RecommendationImpression_Source_Group_Timestamp").IsDescending(false, false, true);
+            entity.HasIndex(e => new { e.RecommendationSource, e.Timestamp }, "IX_RecommendationImpression_Source_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp }, "IX_RecommendationImpression_User_Timestamp").IsDescending(false, true);
+
+            entity.Property(e => e.ExperimentGroup)
+                .HasMaxLength(10);
+            entity.Property(e => e.RecommendationSource)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(e => e.Timestamp)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationImpression_Timestamp")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationClick>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.ToTable("RecommendationClick");
+
+            entity.HasIndex(e => new { e.ExperimentGroup, e.Timestamp }, "IX_RecommendationClick_Group_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.ProductId, e.Timestamp }, "IX_RecommendationClick_Product_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp }, "IX_RecommendationClick_User_Timestamp").IsDescending(false, true);
+
+            entity.Property(e => e.ExperimentGroup)
+                .HasMaxLength(10);
+            entity.Property(e => e.Timestamp)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationClick_Timestamp")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationAddToCart>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.ToTable("RecommendationAddToCart");
+
+            entity.HasIndex(e => new { e.ExperimentGroup, e.Timestamp }, "IX_RecommendationAddToCart_Group_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.ProductId, e.Timestamp }, "IX_RecommendationAddToCart_Product_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp }, "IX_RecommendationAddToCart_User_Timestamp").IsDescending(false, true);
+
+            entity.Property(e => e.ExperimentGroup)
+                .HasMaxLength(10);
+            entity.Property(e => e.Timestamp)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationAddToCart_Timestamp")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationPurchase>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.ToTable("RecommendationPurchase");
+
+            entity.HasIndex(e => new { e.ExperimentGroup, e.Timestamp }, "IX_RecommendationPurchase_Group_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.ProductId, e.Timestamp }, "IX_RecommendationPurchase_Product_Timestamp").IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.Timestamp }, "IX_RecommendationPurchase_User_Timestamp").IsDescending(false, true);
+
+            entity.Property(e => e.ExperimentGroup)
+                .HasMaxLength(10);
+            entity.Property(e => e.Revenue)
+                .HasDefaultValue(0m)
+                .HasColumnType("decimal(18,2)");
+            entity.Property(e => e.Timestamp)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationPurchase_Timestamp")
+                .HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<ProductViewEvent>(entity =>
         {
             entity.HasKey(e => e.ProductViewEventId);
@@ -242,6 +339,99 @@ public partial class FreshFarmOrderingDBContext
             entity.Property(e => e.ScopeType)
                 .IsRequired()
                 .HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<RecommendationUserProductScore>(entity =>
+        {
+            entity.HasKey(e => e.RecommendationUserProductScoreId);
+
+            entity.ToTable("RecommendationUserProductScore");
+
+            entity.HasIndex(e => new { e.UserId, e.UserProductScore }, "IX_RecommendationUserProductScore_User_Score")
+                .IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.ProductId }, "UQ_RecommendationUserProductScore_User_Product")
+                .IsUnique();
+
+            entity.Property(e => e.ComputedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserProductScore_ComputedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LastInteractedAtUtc).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationUserCategoryScore>(entity =>
+        {
+            entity.HasKey(e => e.RecommendationUserCategoryScoreId);
+
+            entity.ToTable("RecommendationUserCategoryScore");
+
+            entity.HasIndex(e => new { e.UserId, e.UserCategoryScore }, "IX_RecommendationUserCategoryScore_User_Score")
+                .IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.CategoryId }, "UQ_RecommendationUserCategoryScore_User_Category")
+                .IsUnique();
+
+            entity.Property(e => e.CategoryName)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(e => e.ComputedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserCategoryScore_ComputedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LastInteractedAtUtc).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationUserSellerScore>(entity =>
+        {
+            entity.HasKey(e => e.RecommendationUserSellerScoreId);
+
+            entity.ToTable("RecommendationUserSellerScore");
+
+            entity.HasIndex(e => new { e.UserId, e.UserSellerScore }, "IX_RecommendationUserSellerScore_User_Score")
+                .IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.SellerId }, "UQ_RecommendationUserSellerScore_User_Seller")
+                .IsUnique();
+
+            entity.Property(e => e.ComputedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationUserSellerScore_ComputedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LastInteractedAtUtc).HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationBasketAffinity>(entity =>
+        {
+            entity.HasKey(e => e.RecommendationBasketAffinityId);
+
+            entity.ToTable("RecommendationBasketAffinity");
+
+            entity.HasIndex(e => new { e.ProductId, e.BasketScore }, "IX_RecommendationBasketAffinity_Product_Score")
+                .IsDescending(false, true);
+            entity.HasIndex(e => new { e.ProductId, e.CandidateProductId }, "UQ_RecommendationBasketAffinity_Product_Candidate")
+                .IsUnique();
+
+            entity.Property(e => e.ComputedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationBasketAffinity_ComputedAt")
+                .HasColumnType("datetime");
+        });
+
+        modelBuilder.Entity<RecommendationReplenishmentProfile>(entity =>
+        {
+            entity.HasKey(e => e.RecommendationReplenishmentProfileId);
+
+            entity.ToTable("RecommendationReplenishmentProfile");
+
+            entity.HasIndex(e => new { e.UserId, e.ReplenishmentScore }, "IX_RecommendationReplenishmentProfile_User_Score")
+                .IsDescending(false, true);
+            entity.HasIndex(e => new { e.UserId, e.ProductId }, "UQ_RecommendationReplenishmentProfile_User_Product")
+                .IsUnique();
+
+            entity.Property(e => e.ComputedAt)
+                .HasDefaultValueSql("(getutcdate())")
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_RecommendationReplenishmentProfile_ComputedAt")
+                .HasColumnType("datetime");
+            entity.Property(e => e.LastPurchasedAtUtc).HasColumnType("datetime");
+            entity.Property(e => e.ExpectedReorderAtUtc).HasColumnType("datetime");
         });
     }
 }

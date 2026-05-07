@@ -39,7 +39,12 @@ public class SellerAccountController : LegacySellerControllerBase
 
         if (User.Identity?.IsAuthenticated == true)
         {
-            return RedirectToLocal(normalizedReturnUrl);
+            if (User.IsInRole("Seller") || User.IsInRole("Admin"))
+            {
+                return RedirectToLocal(normalizedReturnUrl);
+            }
+
+            ModelState.AddModelError(string.Empty, "Tài khoản hiện tại không có quyền Nhà bán. Vui lòng đăng nhập bằng tài khoản Seller.");
         }
 
         ViewBag.ReturnUrl = normalizedReturnUrl;

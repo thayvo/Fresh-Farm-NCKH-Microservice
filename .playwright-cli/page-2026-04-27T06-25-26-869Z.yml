@@ -1,0 +1,27 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - generic [ref=e9]: 
+        - generic [ref=e10]:
+          - generic [ref=e11]: FreshFarm Seller Center
+          - heading "Đăng nhập Nhà bán" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Quản lý gian hàng, đơn bán, vận hành giao hàng và theo dõi hiệu suất kinh doanh tại một nơi duy nhất.
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "Cổng Nhà bán FreshFarm" [level=2] [ref=e16]
+        - paragraph [ref=e17]: Chỉ tài khoản có quyền Nhà bán mới đăng nhập được tại màn hình này.
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Tên đăng nhập hoặc email
+          - textbox "Tên đăng nhập hoặc email" [ref=e21]:
+            - /placeholder: Tên đăng nhập hoặc email nhà bán
+        - generic [ref=e22]:
+          - generic [ref=e23]: Mật khẩu
+          - textbox "Mật khẩu" [ref=e24]:
+            - /placeholder: ••••••
+        - generic [ref=e25]:
+          - checkbox "Ghi nhớ tôi" [ref=e26]
+          - generic [ref=e27]: Ghi nhớ tôi
+        - button "Đăng nhập Nhà bán" [ref=e28] [cursor=pointer]
+  - paragraph [ref=e29]: © FreshFarm Seller Center

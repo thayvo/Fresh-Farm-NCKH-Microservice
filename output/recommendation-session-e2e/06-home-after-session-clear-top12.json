@@ -1,0 +1,134 @@
+[
+  {
+    "rank": 1,
+    "productId": 117,
+    "productName": "Ổi xá lị",
+    "categoryName": "Trái cây",
+    "sellerId": 4,
+    "recommendationScore": 494.23,
+    "final_score": 494.23,
+    "delta": 0.0,
+    "reason": "Bạn quay lại món này nhiều lần · Hợp nhóm Trái cây · Đúng vùng Long An bạn hay chọn"
+  },
+  {
+    "rank": 2,
+    "productId": 119,
+    "productName": "Thanh long ruột trắng",
+    "categoryName": "Trái cây",
+    "sellerId": 4,
+    "recommendationScore": 258.91,
+    "final_score": 258.91,
+    "delta": 0.0,
+    "reason": "Bạn từng mua món này · Hợp nhóm Trái cây · Từ Bình Thuận"
+  },
+  {
+    "rank": 3,
+    "productId": 1,
+    "productName": "Rau muống",
+    "categoryName": "Rau lá",
+    "sellerId": 2,
+    "recommendationScore": 144.66,
+    "final_score": 144.66,
+    "delta": 0.0,
+    "reason": "Đúng vùng Long An bạn hay chọn · Được chọn nhiều · Đánh giá tốt"
+  },
+  {
+    "rank": 4,
+    "productId": 8,
+    "productName": "Măng tây xanh",
+    "categoryName": "Rau ăn hoa / thân / mầm",
+    "sellerId": 47,
+    "recommendationScore": 131.98,
+    "final_score": 131.98,
+    "delta": 0.0,
+    "reason": "Đang đúng mùa · Được chọn nhiều · Đánh giá tốt"
+  },
+  {
+    "rank": 5,
+    "productId": 6,
+    "productName": "Bông cải xanh",
+    "categoryName": "Rau ăn hoa / thân / mầm",
+    "sellerId": 2,
+    "recommendationScore": 125.64,
+    "final_score": 125.64,
+    "delta": 0.0,
+    "reason": "Được chọn nhiều · Đánh giá tốt · Từ Lâm Đồng"
+  },
+  {
+    "rank": 6,
+    "productId": 29,
+    "productName": "Nấm mỡ",
+    "categoryName": "Nấm",
+    "sellerId": 4,
+    "recommendationScore": 121.23,
+    "final_score": 121.23,
+    "delta": 0.0,
+    "reason": "Được chọn nhiều · Đánh giá tốt · Từ Đà Lạt"
+  },
+  {
+    "rank": 7,
+    "productId": 12,
+    "productName": "Bí đỏ",
+    "categoryName": "Rau ăn quả",
+    "sellerId": 47,
+    "recommendationScore": 76.71,
+    "final_score": 76.71,
+    "delta": 0.0,
+    "reason": "Đang đúng mùa · Từ Bình Dương · Nổi bật trong Rau ăn quả"
+  },
+  {
+    "rank": 8,
+    "productId": 17,
+    "productName": "Rau diếp cá",
+    "categoryName": "Rau lá",
+    "sellerId": 51,
+    "recommendationScore": 59.5,
+    "final_score": 59.5,
+    "delta": 0.0,
+    "reason": "Từ Đồng Nai · Nổi bật trong Rau lá · Chuẩn OCOP 3 sao"
+  },
+  {
+    "rank": 9,
+    "productId": 115,
+    "productName": "Tỏi tây",
+    "categoryName": "Rau thơm & gia vị",
+    "sellerId": 4,
+    "recommendationScore": 97.91,
+    "final_score": 97.91,
+    "delta": 0.0,
+    "reason": "Đánh giá tốt · Từ Trung Quốc · Nổi bật trong Rau thơm & gia vị"
+  },
+  {
+    "rank": 10,
+    "productId": 60,
+    "productName": "Hành tỏi phi",
+    "categoryName": "Rau thơm & gia vị",
+    "sellerId": 4,
+    "recommendationScore": 59.5,
+    "final_score": 59.5,
+    "delta": 0.0,
+    "reason": "Từ TP.HCM · Nổi bật trong Rau thơm & gia vị · Chuẩn Chế biến sẵn"
+  },
+  {
+    "rank": 11,
+    "productId": 47,
+    "productName": "Sắn lùn",
+    "categoryName": "Củ & rễ",
+    "sellerId": 4,
+    "recommendationScore": 59.5,
+    "final_score": 59.5,
+    "delta": 0.0,
+    "reason": "Từ Tây Nguyên · Nổi bật trong Củ & rễ · Chuẩn OCOP 3 sao"
+  },
+  {
+    "rank": 12,
+    "productId": 46,
+    "productName": "Khoai lang Nhật",
+    "categoryName": "Củ & rễ",
+    "sellerId": 4,
+    "recommendationScore": 59.5,
+    "final_score": 59.5,
+    "delta": 0.0,
+    "reason": "Từ Nhật Bản (trồng VN) · Nổi bật trong Củ & rễ · Chuẩn GlobalGAP"
+  }
+]

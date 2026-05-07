@@ -1,0 +1,138 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Tài khoản của tôi" [level=1] [ref=e4]
+    - navigation "breadcrumb" [ref=e5]:
+      - list [ref=e6]:
+        - listitem [ref=e7]:
+          - link "Trang chủ" [ref=e8] [cursor=pointer]:
+            - /url: /
+        - listitem [ref=e9]:
+          - text: ">"
+          - link "Tài khoản" [ref=e10] [cursor=pointer]:
+            - /url: /account/orders
+        - listitem [ref=e11]: "> Chi tiết đơn hàng"
+  - generic [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e16]:
+        - link " Thông tin tài khoản" [ref=e17] [cursor=pointer]:
+          - /url: /account/profile
+          - generic [ref=e18]: 
+          - text: Thông tin tài khoản
+        - link " Lịch sử đơn hàng" [ref=e19] [cursor=pointer]:
+          - /url: /account/orders
+          - generic [ref=e20]: 
+          - text: Lịch sử đơn hàng
+        - link " Thông báo tài khoản" [ref=e23] [cursor=pointer]:
+          - /url: /account/notifications
+          - generic [ref=e24]: 
+          - text: Thông báo tài khoản
+        - link " Đăng ký người bán" [ref=e25] [cursor=pointer]:
+          - /url: /account/become-seller
+          - generic [ref=e26]: 
+          - text: Đăng ký người bán
+        - link " Trang chủ" [ref=e27] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e28]: 
+          - text: Trang chủ
+      - button " Đăng xuất" [ref=e31] [cursor=pointer]:
+        - generic [ref=e32]: 
+        - text: Đăng xuất
+    - generic [ref=e33]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - heading "Chi tiết đơn hàng" [level=4] [ref=e38]
+            - generic [ref=e39]:
+              - text: "Mã đơn:"
+              - strong [ref=e40]: "#172"
+          - link " Quay lại lịch sử đơn" [ref=e41] [cursor=pointer]:
+            - /url: /account/orders
+            - generic [ref=e42]: 
+            - text: Quay lại lịch sử đơn
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]: Ngày đặt
+            - generic [ref=e46]: 27/04/2026 11:11
+          - generic [ref=e47]:
+            - generic [ref=e48]: Trạng thái đơn
+            - generic [ref=e49]: Đang xử lý
+          - generic [ref=e50]:
+            - generic [ref=e51]: Thanh toán
+            - generic [ref=e52]: Chờ thanh toán
+      - generic [ref=e53]:
+        - generic [ref=e56]:
+          - heading "Thông tin người nhận" [level=5] [ref=e57]
+          - paragraph [ref=e58]:
+            - strong [ref=e59]: "Họ tên:"
+            - text: E2E Test FreshFarm
+          - paragraph [ref=e60]:
+            - strong [ref=e61]: "Số điện thoại:"
+            - text: "0900000000"
+          - paragraph [ref=e62]:
+            - strong [ref=e63]: "Email:"
+            - text: e2e-test@freshfarm.local
+          - paragraph [ref=e64]:
+            - strong [ref=e65]: "Địa chỉ:"
+            - text: E2E Test - 123 Nguyen Hue, Phường Bến Nghé, Quận 1, Hồ Chí Minh
+        - generic [ref=e68]:
+          - heading "Tổng quan thanh toán" [level=5] [ref=e69]
+          - generic [ref=e70]:
+            - generic [ref=e71]: Tổng tiền hàng + phí ship
+            - strong [ref=e72]: 70.500 ₫
+          - generic [ref=e73]:
+            - generic [ref=e74]: Phí vận chuyển
+            - strong [ref=e75]: 38.500 ₫
+          - generic [ref=e76]:
+            - generic [ref=e77]: Điểm đã dùng
+            - strong [ref=e78]: "0"
+          - generic [ref=e79]:
+            - generic [ref=e80]: Điểm tích lũy
+            - strong [ref=e81]: "0"
+      - generic [ref=e83]:
+        - heading "Sản phẩm trong đơn" [level=5] [ref=e84]
+        - table [ref=e86]:
+          - rowgroup [ref=e87]:
+            - row "Mã SP Số lượng Đơn vị Đơn giá Thành tiền" [ref=e88]:
+              - columnheader "Mã SP" [ref=e89]
+              - columnheader "Số lượng" [ref=e90]
+              - columnheader "Đơn vị" [ref=e91]
+              - columnheader "Đơn giá" [ref=e92]
+              - columnheader "Thành tiền" [ref=e93]
+              - columnheader [ref=e94]
+          - rowgroup [ref=e95]:
+            - row "104 1 kg 32.000 ₫ 32.000 ₫  Đánh giá" [ref=e96]:
+              - cell "104" [ref=e97]
+              - cell "1" [ref=e98]
+              - cell "kg" [ref=e99]
+              - cell "32.000 ₫" [ref=e100]
+              - cell "32.000 ₫" [ref=e101]
+              - cell " Đánh giá" [ref=e102]:
+                - link " Đánh giá" [ref=e103] [cursor=pointer]:
+                  - /url: /products/104#product-reviews
+                  - generic [ref=e104]: 
+                  - text: Đánh giá
+        - generic [ref=e105]: Bạn có thể mở từng sản phẩm để gửi hoặc cập nhật đánh giá nếu đây là đơn mua hợp lệ.
+      - generic [ref=e107]:
+        - heading "Lịch sử thanh toán" [level=5] [ref=e108]
+        - table [ref=e110]:
+          - rowgroup [ref=e111]:
+            - row "Phương thức Mã giao dịch Trạng thái Thời gian" [ref=e112]:
+              - columnheader "Phương thức" [ref=e113]
+              - columnheader "Mã giao dịch" [ref=e114]
+              - columnheader "Trạng thái" [ref=e115]
+              - columnheader "Thời gian" [ref=e116]
+          - rowgroup [ref=e117]:
+            - row "COD - Chờ thanh toán -" [ref=e118]:
+              - cell "COD" [ref=e119]
+              - cell "-" [ref=e120]
+              - cell "Chờ thanh toán" [ref=e121]:
+                - generic [ref=e122]: Chờ thanh toán
+              - cell "-" [ref=e123]
+        - generic [ref=e124]:
+          - generic [ref=e125]: Ghi chú đơn hàng
+          - generic [ref=e126]: E2E Test order - do not deliver
+        - generic [ref=e127]:
+          - link "Tiếp tục mua sắm" [ref=e128] [cursor=pointer]:
+            - /url: /
+          - link "Quay lại lịch sử đơn" [ref=e129] [cursor=pointer]:
+            - /url: /account/orders

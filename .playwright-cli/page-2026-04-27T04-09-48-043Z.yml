@@ -1,0 +1,216 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "Thanh toán" [level=2] [ref=e4]
+    - generic [ref=e5]:
+      - link " Danh sách sản phẩm" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: 
+        - text: Danh sách sản phẩm
+      - link " Quay lại giỏ hàng" [ref=e8] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e9]: 
+        - text: Quay lại giỏ hàng
+      - link " Đơn hàng của tôi" [ref=e10] [cursor=pointer]:
+        - /url: /account/orders
+        - generic [ref=e11]: 
+        - text: Đơn hàng của tôi
+  - generic [ref=e12]:
+    - generic [ref=e14]:
+      - generic [ref=e16]:
+        - heading "Sản phẩm thanh toán" [level=5] [ref=e17]
+        - generic [ref=e19]:
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - generic [ref=e22]: Bông cải xanh baby
+              - generic [ref=e23]: "Shop: FreshFarm Seller 4"
+              - text: "Đơn vị: kg"
+            - generic [ref=e24]:
+              - generic [ref=e25]: Đơn giá
+              - generic [ref=e26]: 32.000 ₫
+          - generic [ref=e27]:
+            - generic [ref=e28]:
+              - generic [ref=e29]: Số lượng
+              - generic [ref=e30]:
+                - button "-" [ref=e31] [cursor=pointer]
+                - spinbutton [ref=e32]: "1"
+                - button "+" [ref=e33] [cursor=pointer]
+            - generic [ref=e34]:
+              - generic [ref=e35]: Thành tiền
+              - generic [ref=e36]: 32.000 ₫
+      - generic [ref=e38]:
+        - heading "Thông tin giao hàng" [level=5] [ref=e39]
+        - generic:
+          - list
+        - generic [ref=e40]:
+          - generic [ref=e41]: Nguồn địa chỉ giao hàng
+          - generic [ref=e43]:
+            - radio "Nhập địa chỉ mới" [checked] [ref=e44]
+            - generic [ref=e45]: Nhập địa chỉ mới
+          - generic [ref=e46]:
+            - text: Bạn chưa có địa chỉ đã lưu. Hãy thêm trong
+            - link "Thông tin tài khoản" [ref=e47] [cursor=pointer]:
+              - /url: /account/profile
+            - text: để chọn nhanh ở bước thanh toán.
+        - generic [ref=e52]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: Chọn khu vực giao hàng
+            - generic [ref=e56]: Chọn tỉnh/thành, quận/huyện và phường/xã theo danh mục GHN trước khi đặt hàng.
+          - generic [ref=e57]:
+            - generic [ref=e58]:
+              - generic [ref=e59]: Tỉnh/Thành
+              - combobox [ref=e60]:
+                - option "Chọn tỉnh/thành"
+                - option "An Giang"
+                - option "Bà Rịa - Vũng Tàu"
+                - option "Bắc Giang"
+                - option "Bắc Kạn"
+                - option "Bạc Liêu"
+                - option "Bắc Ninh"
+                - option "Bến Tre"
+                - option "Bình Định"
+                - option "Bình Dương"
+                - option "Bình Phước"
+                - option "Bình Thuận"
+                - option "Cà Mau"
+                - option "Cần Thơ"
+                - option "Cao Bằng"
+                - option "Đà Nẵng"
+                - option "Đắk Lắk"
+                - option "Đắk Nông"
+                - option "Điện Biên"
+                - option "Đồng Nai"
+                - option "Đồng Tháp"
+                - option "Gia Lai"
+                - option "Hà Giang"
+                - option "Hà Nam"
+                - option "Hà Nội"
+                - option "Hà Nội 02"
+                - option "Hà Tĩnh"
+                - option "Hải Dương"
+                - option "Hải Phòng"
+                - option "Hậu Giang"
+                - option "Hồ Chí Minh" [selected]
+                - option "Hòa Bình"
+                - option "Hưng Yên"
+                - option "Khánh Hòa"
+                - option "Kiên Giang"
+                - option "Kon Tum"
+                - option "Lai Châu"
+                - option "Lâm Đồng"
+                - option "Lạng Sơn"
+                - option "Lào Cai"
+                - option "Long An"
+                - option "Nam Định"
+                - option "Nghệ An"
+                - option "Ninh Bình"
+                - option "Ninh Thuận"
+                - option "Phú Thọ"
+                - option "Phú Yên"
+                - option "Quảng Bình"
+                - option "Quảng Nam"
+                - option "Quảng Ngãi"
+                - option "Quảng Ninh"
+                - option "Quảng Trị"
+                - option "Sóc Trăng"
+                - option "Sơn La"
+                - option "Tây Ninh"
+                - option "Test - Alert - Tỉnh - 001"
+                - option "Thái Bình"
+                - option "Thái Nguyên"
+                - option "Thanh Hóa"
+                - option "Thừa Thiên Huế"
+                - option "Tiền Giang"
+                - option "Trà Vinh"
+                - option "Tuyên Quang"
+                - option "Vĩnh Long"
+                - option "Vĩnh Phúc"
+                - option "Yên Bái"
+            - generic [ref=e61]:
+              - generic [ref=e62]: Quận/Huyện
+              - combobox [ref=e63]:
+                - option "Chọn quận/huyện"
+                - option "Huyện Bình Chánh"
+                - option "Huyện Cần Giờ"
+                - option "Huyện Củ Chi"
+                - option "Huyện Hóc Môn"
+                - option "Huyện Nhà Bè"
+                - option "Quận 1" [selected]
+                - option "Quận 10"
+                - option "Quận 11"
+                - option "Quận 12"
+                - option "Quận 2"
+                - option "Quận 3"
+                - option "Quận 4"
+                - option "Quận 5"
+                - option "Quận 6"
+                - option "Quận 7"
+                - option "Quận 8"
+                - option "Quận 9"
+                - option "Quận Bình Tân"
+                - option "Quận Bình Thạnh"
+                - option "Quận Gò Vấp"
+                - option "Quận Phú Nhuận"
+                - option "Quận Tân Bình"
+                - option "Quận Tân Phú"
+                - option "Quận Thủ Đức"
+                - option "Thành Phố Thủ Đức"
+            - generic [ref=e64]:
+              - generic [ref=e65]: Phường/Xã
+              - combobox [ref=e66]:
+                - option "Chọn phường/xã sau khi chọn quận/huyện" [selected]
+        - generic [ref=e67]:
+          - switch "Lưu địa chỉ này làm địa chỉ mặc định" [ref=e68]
+          - generic [ref=e69]: Lưu địa chỉ này làm địa chỉ mặc định
+          - generic [ref=e70]: Địa chỉ mới nhập ở bước thanh toán sẽ được lưu luôn vào sổ địa chỉ. Bạn có thể bật công tắc này nếu muốn dùng nó làm mặc định cho lần sau.
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - generic [ref=e73]: Họ và tên
+            - textbox "Nguyễn Văn A" [ref=e74]
+          - generic [ref=e75]:
+            - generic [ref=e76]: Số điện thoại
+            - textbox "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0." [ref=e77]:
+              - /placeholder: 09xxxxxxxx
+          - generic [ref=e78]:
+            - generic [ref=e79]: Email
+            - textbox "you@example.com" [ref=e80]
+          - generic [ref=e81]:
+            - generic [ref=e82]: Số nhà, tên đường
+            - textbox "Số nhà, tên đường, tòa nhà..." [ref=e83]
+            - generic [ref=e84]: Hệ thống sẽ ghép địa chỉ chi tiết với phường/xã, quận/huyện và tỉnh/thành bạn đã chọn.
+          - generic [ref=e85]:
+            - generic [ref=e86]: Ghi chú đơn hàng
+            - 'textbox "Ví dụ: Giao giờ hành chính, gọi trước khi giao..." [ref=e87]'
+        - separator [ref=e88]
+        - heading "Phương thức thanh toán" [level=5] [ref=e89]
+        - generic [ref=e90]:
+          - generic [ref=e91] [cursor=pointer]:
+            - radio "Thanh toán khi nhận hàng (COD)" [checked] [ref=e92]
+            - text: Thanh toán khi nhận hàng (COD)
+          - generic [ref=e93] [cursor=pointer]:
+            - radio "Thanh toán qua VNPay" [ref=e94]
+            - text: Thanh toán qua VNPay
+    - generic [ref=e97]:
+      - heading "Tóm tắt đơn hàng" [level=5] [ref=e98]
+      - generic [ref=e99]:
+        - generic [ref=e100]: Số dòng sản phẩm
+        - strong [ref=e101]: "1"
+      - generic [ref=e102]:
+        - generic [ref=e103]: Tạm tính
+        - strong [ref=e104]: 32.000 ₫
+      - generic [ref=e105]:
+        - generic [ref=e106]: Phí vận chuyển
+        - generic [ref=e107]:
+          - generic [ref=e108]: 0 ₫
+          - generic [ref=e109]: Phí ship sẽ được tính tự động theo địa chỉ giao hàng.
+      - separator [ref=e110]
+      - generic [ref=e111]:
+        - generic [ref=e112]: Tổng cộng
+        - strong [ref=e113]: 32.000 ₫
+      - button " Đặt hàng" [ref=e114] [cursor=pointer]:
+        - generic [ref=e115]: 
+        - text: Đặt hàng
+      - link " Quay lại giỏ hàng" [ref=e116] [cursor=pointer]:
+        - /url: /cart
+        - generic [ref=e117]: 
+        - text: Quay lại giỏ hàng
+      - paragraph [ref=e118]: "Mẹo: bạn có thể chỉnh số lượng trực tiếp trong checkout trước khi đặt đơn."

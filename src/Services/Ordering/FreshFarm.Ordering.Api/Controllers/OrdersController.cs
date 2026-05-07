@@ -36,6 +36,7 @@ public sealed class OrdersController : ControllerBase
     private readonly CatalogInventoryClient _catalogInventoryClient;
     private readonly OrderReservationService _orderReservationService;
     private readonly CustomerNotificationService _customerNotificationService;
+    private readonly IFinanceCommissionService _commissionService;
     private readonly InternalServiceAuthOptions _internalServiceAuthOptions;
     private readonly ILogger<OrdersController> _logger;
 
@@ -44,6 +45,7 @@ public sealed class OrdersController : ControllerBase
         CatalogInventoryClient catalogInventoryClient,
         OrderReservationService orderReservationService,
         CustomerNotificationService customerNotificationService,
+        IFinanceCommissionService commissionService,
         IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
         ILogger<OrdersController> logger)
     {
@@ -51,6 +53,7 @@ public sealed class OrdersController : ControllerBase
         _catalogInventoryClient = catalogInventoryClient;
         _orderReservationService = orderReservationService;
         _customerNotificationService = customerNotificationService;
+        _commissionService = commissionService;
         _internalServiceAuthOptions = internalServiceAuthOptions.Value;
         _logger = logger;
     }
@@ -270,22 +273,29 @@ public sealed class OrdersController : ControllerBase
             var sellerGroups = indexedItems
                 .GroupBy(x => x.Item.SellerId)
                 .ToList();
+            var commissionRates = await _commissionService.GetCommissionRatesAsync(
+                sellerGroups.Select(x => x.Key),
+                cancellationToken);
 
             var sellerOrders = new List<SellerOrder>(sellerGroups.Count);
             foreach (var sellerGroup in sellerGroups)
             {
                 var sellerSubtotal = sellerGroup.Sum(x => x.Item.UnitPrice * x.Item.Quantity);
+                var commissionRate = commissionRates.TryGetValue(sellerGroup.Key, out var resolvedRate)
+                    ? resolvedRate
+                    : 0m;
+                var commissionAmount = _commissionService.CalculateCommissionAmount(sellerSubtotal, commissionRate);
                 sellerOrders.Add(new SellerOrder
                 {
                     OrderId = order.OrderId,
                     SellerId = sellerGroup.Key,
                     SellerStatus = orderStatus,
-                    CommissionRate = 0m,
-                    CommissionAmount = 0m,
+                    CommissionRate = commissionRate,
+                    CommissionAmount = commissionAmount,
                     ShippingFee = sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShippingFee)
                         ? sellerShippingFee
                         : 0m,
-                    SellerEarning = sellerSubtotal,
+                    SellerEarning = sellerSubtotal - commissionAmount,
                     CancelledBy = string.Empty,
                     CancelReasonId = null,
                     CreatedAt = DateTime.UtcNow,
@@ -1145,6 +1155,7 @@ public sealed class OrdersController : ControllerBase
 
         var order = await _db.Orders
             .Include(o => o.SellerOrders)
+                .ThenInclude(so => so.SellerOrderItems)
             .Include(o => o.InventoryReservations)
             .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
@@ -1253,6 +1264,7 @@ public sealed class OrdersController : ControllerBase
             .Include(o => o.PaymentTransactions)
             .Include(o => o.ReconciliationLogs)
             .Include(o => o.SellerOrders)
+                .ThenInclude(so => so.SellerOrderItems)
             .FirstOrDefaultAsync(o => o.OrderId == orderId);
 
         if (order is null)

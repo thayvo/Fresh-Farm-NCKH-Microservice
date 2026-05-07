@@ -129,11 +129,13 @@ public sealed class AuthControllerTests
         Assert.True(userAuth.LockedUntil > DateTime.UtcNow);
     }
 
-    [Fact]
-    public async Task Login_ReturnsTwoFactorChallenge_WhenSellerRequiresTwoFactorSetup()
+    [Theory]
+    [InlineData("Seller")]
+    [InlineData("Admin")]
+    public async Task Login_ReturnsToken_WhenTwoFactorDisabledForPrivilegedLane(string roleName)
     {
         await using var db = CreateDbContext();
-        await SeedUserAsync(db, userId: 5, roleName: "Seller", password: "Secret123!", emailConfirmed: true);
+        await SeedUserAsync(db, userId: 5, roleName: roleName, password: "Secret123!", emailConfirmed: true);
         var twoFactorTickets = new FakeTwoFactorLoginTicketService();
         var totpService = new FakeTotpService();
         var controller = CreateController(db, totpService: totpService, twoFactorLoginTicketService: twoFactorTickets);
@@ -142,19 +144,18 @@ public sealed class AuthControllerTests
         {
             Identifier = "customer5",
             Password = "Secret123!",
-            ClientLane = "Seller"
+            ClientLane = roleName
         });
 
         var ok = Assert.IsType<OkObjectResult>(result);
         var response = Assert.IsType<AuthResponse>(ok.Value);
 
-        Assert.True(response.RequiresTwoFactor);
-        Assert.True(response.RequiresTwoFactorSetup);
-        Assert.Equal("ticket", response.TwoFactorTicket);
-        Assert.Equal("MANUAL-SECRET", response.ManualEntryKey);
-        Assert.Equal("otpauth://FreshFarm/customer5@example.com", response.OtpAuthUri);
-        Assert.Equal("FreshFarm", response.AuthenticatorIssuer);
-        Assert.Equal("customer5@example.com", response.AuthenticatorAccountName);
+        Assert.False(response.RequiresTwoFactor);
+        Assert.False(response.RequiresTwoFactorSetup);
+        Assert.Null(response.TwoFactorTicket);
+        Assert.Null(response.ManualEntryKey);
+        Assert.Null(response.OtpAuthUri);
+        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
     }
 
     [Fact]
@@ -199,7 +200,7 @@ public sealed class AuthControllerTests
     }
 
     [Fact]
-    public async Task VerifyTwoFactorLogin_ReturnsUnauthorized_WhenOtpInvalid()
+    public async Task VerifyTwoFactorLogin_ReturnsToken_WhenTwoFactorDisabledForSeller()
     {
         await using var db = CreateDbContext();
         await SeedUserAsync(db, userId: 7, roleName: "Seller", password: "Secret123!", emailConfirmed: true, mfaSecret: "SELLER-SECRET");
@@ -222,8 +223,10 @@ public sealed class AuthControllerTests
             Code = "000000"
         });
 
-        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
-        Assert.Equal("Mã xác thực hai bước không đúng hoặc đã hết hạn.", unauthorized.Value);
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthResponse>(ok.Value);
+        Assert.False(response.RequiresTwoFactor);
+        Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
     }
 
     [Fact]
