@@ -117,10 +117,10 @@ public sealed class AdminMerchantsController : ControllerBase
                     .OrderByDescending(s => s.CreatedAt)
                     .Select(s => (DateTime?)s.CreatedAt)
                     .FirstOrDefault(),
-                AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
-                Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
-                District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
-                Ward = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Ward : null,
+                AddressDetail = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.AddressDetail).FirstOrDefault(),
+                Province = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Province).FirstOrDefault(),
+                District = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.District).FirstOrDefault(),
+                Ward = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Ward).FirstOrDefault(),
                 StoreName = sellerStoreSettings
                     .Where(s => s.UserId == u.UserId)
                     .OrderByDescending(s => s.UpdatedAt)
@@ -233,12 +233,12 @@ public sealed class AdminMerchantsController : ControllerBase
                 ],
                 QueueOptions =
                 [
-                    new MerchantOptionDto("all", "Tất cả queue"),
+                    new MerchantOptionDto("all", "Tất cả hàng xử lý"),
                     new MerchantOptionDto("approval", "Chờ duyệt"),
                     new MerchantOptionDto("profile_fix", "Bổ sung hồ sơ"),
-                    new MerchantOptionDto("dormant", "Ngủ đông"),
+                    new MerchantOptionDto("dormant", "Ít hoạt động"),
                     new MerchantOptionDto("suspended", "Đang khóa"),
-                    new MerchantOptionDto("review", "Rà soát tay")
+                    new MerchantOptionDto("review", "Rà soát thủ công")
                 ],
                 ReviewStatusOptions =
                 [
@@ -250,7 +250,7 @@ public sealed class AdminMerchantsController : ControllerBase
                 ReviewWindowOptions =
                 [
                     new MerchantOptionDto("all", "Mọi lúc"),
-                    new MerchantOptionDto("unreviewed", "Chưa review"),
+                    new MerchantOptionDto("unreviewed", "Chưa thẩm định"),
                     new MerchantOptionDto("today", "Hôm nay"),
                     new MerchantOptionDto("7d", "7 ngày"),
                     new MerchantOptionDto("30d", "30 ngày")
@@ -307,10 +307,10 @@ public sealed class AdminMerchantsController : ControllerBase
                     .OrderByDescending(s => s.CreatedAt)
                     .Select(s => (DateTime?)s.CreatedAt)
                     .FirstOrDefault(),
-                AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
-                Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
-                District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
-                Ward = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Ward : null,
+                AddressDetail = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.AddressDetail).FirstOrDefault(),
+                Province = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Province).FirstOrDefault(),
+                District = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.District).FirstOrDefault(),
+                Ward = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Ward).FirstOrDefault(),
                 StoreName = sellerStoreSettings
                     .Where(s => s.UserId == u.UserId)
                     .OrderByDescending(s => s.UpdatedAt)
@@ -472,7 +472,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (!HasCompleteSellerKyc(sellerStoreSetting, user.SellerKycProfile))
         {
-            return BadRequest("Hồ sơ KYC chưa đầy đủ. Cần đủ thông tin CCCD và ảnh CCCD hai mặt trước khi duyệt người bán.");
+            return BadRequest("Hồ sơ người bán chưa đầy đủ. Cần đủ thông tin cửa hàng, thông tin CCCD và ảnh CCCD hai mặt trước khi duyệt người bán.");
         }
 
         if (!user.UserRoles.Any(ur => ur.RoleId == sellerRole.RoleId))
@@ -744,12 +744,12 @@ public sealed class AdminMerchantsController : ControllerBase
         var reviewStatus = NormalizeReviewStatus(row.ReviewStatus, row.IsSellerApproved);
         if (!row.IsSellerApproved && reviewStatus == "rejected")
         {
-            return "Bổ sung lại hồ sơ KYC và thông tin cửa hàng theo lý do từ chối trước khi gửi lại cho admin.";
+            return "Bổ sung lại hồ sơ pháp lý và thông tin cửa hàng theo lý do từ chối trước khi gửi lại cho quản trị viên.";
         }
 
         if (!row.IsSellerApproved)
         {
-            return "Rà soát hồ sơ cửa hàng và KYC, chỉ cấp quyền người bán khi CCCD cùng thông tin vận hành đã đủ.";
+            return "Rà soát hồ sơ cửa hàng và hồ sơ pháp lý, chỉ cấp quyền người bán khi CCCD cùng thông tin vận hành đã đủ.";
         }
 
         if (!row.IsActive)
@@ -759,17 +759,17 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (flags.Any(f => f.Code is "missing-phone" or "missing-email" or "missing-address" or "missing-store-name" or "missing-store-email" or "missing-store-phone"))
         {
-            return "Yêu cầu nhà bán hàng bổ sung hồ sơ liên hệ và địa chỉ hoạt động trước khi đẩy quyền tăng trưởng.";
+            return "Yêu cầu nhà bán hàng bổ sung thông tin liên hệ và địa chỉ hoạt động trước khi đưa vào chương trình tăng trưởng.";
         }
 
         if (flags.Any(f => f.Code == "stale-login"))
         {
-            return "Liên hệ nhà bán hàng để xác nhận shop còn hoạt động trước khi duyệt chiến dịch hoặc traffic.";
+            return "Liên hệ nhà bán hàng để xác nhận cửa hàng còn hoạt động trước khi duyệt chiến dịch hoặc phân bổ lượt truy cập.";
         }
 
         if (profileScore >= 80)
         {
-            return "Có thể đưa vào queue chờ duyệt/whitelist cho campaign nội bộ ở mức MVP.";
+            return "Có thể đưa vào nhóm ưu tiên cho chương trình tăng trưởng hoặc chiến dịch nội bộ.";
         }
 
         return "Rà soát thủ công hồ sơ nhà bán hàng trước khi mở rộng quyền hoặc chiến dịch.";
@@ -1061,10 +1061,10 @@ public sealed class AdminMerchantsController : ControllerBase
         {
             if (!string.IsNullOrWhiteSpace(card.ReviewNote))
             {
-                return $"Hồ sơ seller đã bị từ chối. Nhà bán hàng cần bổ sung trước khi gửi lại: {card.ReviewNote.Trim()}";
+                return $"Hồ sơ người bán đã bị từ chối. Nhà bán hàng cần bổ sung trước khi gửi lại: {card.ReviewNote.Trim()}";
             }
 
-            return "Hồ sơ seller đã bị từ chối và cần bổ sung trước khi gửi lại.";
+            return "Hồ sơ người bán đã bị từ chối và cần bổ sung trước khi gửi lại.";
         }
 
         if (!card.IsSellerApproved)
@@ -1079,7 +1079,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (string.Equals(card.ComplianceStatus, "ready", StringComparison.OrdinalIgnoreCase))
         {
-            return "Hồ sơ nhà bán hàng đã đủ thông tin nền tảng để vận hành ở mức MVP.";
+            return "Hồ sơ nhà bán hàng đã đủ thông tin nền tảng để vận hành.";
         }
 
         if (card.Flags.Count == 0)
@@ -1096,8 +1096,8 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (!card.IsSellerApproved && string.Equals(card.ReviewStatus, "rejected", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("Đọc kỹ lý do từ chối và đối chiếu lại bộ hồ sơ KYC.");
-            steps.Add("Yêu cầu applicant cập nhật lại hồ sơ rồi gửi lại để chuyển về trạng thái chờ duyệt.");
+            steps.Add("Đọc kỹ lý do từ chối và đối chiếu lại bộ hồ sơ pháp lý.");
+            steps.Add("Yêu cầu nhà bán hàng cập nhật lại hồ sơ rồi gửi lại để chuyển về trạng thái chờ duyệt.");
             if (!string.IsNullOrWhiteSpace(card.ReviewNote))
             {
                 steps.Add("Lý do từ chối hiện tại: " + card.ReviewNote.Trim());
@@ -1106,8 +1106,8 @@ public sealed class AdminMerchantsController : ControllerBase
         else if (!card.IsSellerApproved)
         {
             steps.Add("Rà soát tên cửa hàng, địa chỉ hoạt động và thông tin liên hệ trước khi duyệt.");
-            steps.Add("Xác nhận hồ sơ KYC có đủ họ tên pháp lý, số CCCD, ngày/nơi cấp và ảnh CCCD hai mặt.");
-            steps.Add("Cấp role Seller sau khi xác nhận hồ sơ phù hợp.");
+            steps.Add("Xác nhận hồ sơ pháp lý có đủ họ tên pháp lý, số CCCD, ngày/nơi cấp và ảnh CCCD hai mặt.");
+            steps.Add("Cấp quyền người bán sau khi xác nhận hồ sơ phù hợp.");
         }
 
         if (!card.IsActive)
@@ -1133,7 +1133,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (steps.Count == 0 && string.Equals(card.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("Có thể đưa nhà bán hàng vào hàng chờ ưu tiên cho chiến dịch hoặc onboarding nâng cao.");
+            steps.Add("Có thể đưa nhà bán hàng vào nhóm ưu tiên cho chiến dịch hoặc quy trình hướng dẫn nâng cao.");
         }
 
         if (steps.Count == 0)

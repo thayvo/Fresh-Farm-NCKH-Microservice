@@ -23,6 +23,23 @@ desktop.ini
 
 # ===== Logs =====
 *.log
+*.err
+
+# ===== Codex / local automation artifacts =====
+.codex-*/
+.codex-*
+.playwright-cli/
+artifacts/
+output/
+tmp/
+bff-*.log
+bff-*.err.log
+ordering-*.log
+ordering-*.err.log
+.detach-test.txt
+.job-test.txt
+.wmic-test.txt
+starttest.txt
 
 # ===== App settings / secrets =====
 # Commit appsettings.json, ignore environment overrides (Development/Staging/Production)
@@ -42,4 +59,3 @@ DuAnCu/
 
 #docs
 docs/
-

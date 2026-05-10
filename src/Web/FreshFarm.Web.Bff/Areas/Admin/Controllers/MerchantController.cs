@@ -55,7 +55,7 @@ public sealed class MerchantController : LegacySellerControllerBase
             var response = await client.GetAsync(BuildListEndpoint(model));
             if (!response.IsSuccessStatusCode)
             {
-                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải lane nhà bán hàng.");
+                ViewBag.Error = await ReadApiErrorAsync(response, "Không thể tải danh sách nhà bán hàng.");
                 return View(model);
             }
 

@@ -81,7 +81,7 @@ public sealed class UserController : LegacySellerControllerBase
         return Json(new
         {
             success = true,
-            data = MapUser(payload)
+            data = ToUserJson(MapUser(payload))
         });
     }
 
@@ -298,6 +298,32 @@ public sealed class UserController : LegacySellerControllerBase
             LastLogin = dto.lastLogin,
             CreatedDate = dto.created,
             UpdatedDate = dto.updated
+        };
+    }
+
+    private static object ToUserJson(AdminUserViewModel user)
+    {
+        return new
+        {
+            userId = user.AdminID,
+            userName = user.UserName,
+            fullName = user.FullName,
+            email = user.Email,
+            phone = user.Phone,
+            avatar = user.Avatar,
+            roleId = user.RoleID,
+            role = user.Role is null
+                ? null
+                : new
+                {
+                    roleId = user.Role.RoleID,
+                    roleName = user.Role.RoleName,
+                    isActive = user.Role.IsActive
+                },
+            isActive = user.IsActive,
+            lastLogin = user.LastLogin,
+            created = user.CreatedDate,
+            updated = user.UpdatedDate
         };
     }
 

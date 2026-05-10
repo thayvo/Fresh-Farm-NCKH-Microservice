@@ -334,10 +334,10 @@
         </div>
 
         <div class="col-xl-4">
-            <div class="panel-card ff-admin-card mb-4 sticky-panel">
+            <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">@(Model.SelectedCampaign is null ? "Tạo chiến dịch mới" : "Cập nhật chiến dịch")</h2>
-                    <p class="text-muted mb-0">MVP tập trung vào voucher sàn, flash sale và đã nối thêm tổng quan ví quảng cáo cơ bản.</p>
+                    <p class="text-muted mb-0">Voucher sàn, flash sale, tổng quan ví quảng cáo cơ bản.</p>
                 </div>
 
                 <form method="post" asp-action="Save" asp-controller="Campaign" asp-area="Admin" class="row g-3">
@@ -700,14 +700,15 @@
         background: rgba(37,99,235,.05);
     }
 
-    .campaign-console .sticky-panel {
-        position: sticky;
-        top: 1rem;
-    }
+    @@media (max-width: 575.98px) {
+        .campaign-console .page-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
 
-    @@media (max-width: 1199.98px) {
-        .campaign-console .sticky-panel {
-            position: static;
+        .campaign-console .panel-card,
+        .campaign-console .metric-card {
+            border-radius: 1rem;
         }
     }
 </style>

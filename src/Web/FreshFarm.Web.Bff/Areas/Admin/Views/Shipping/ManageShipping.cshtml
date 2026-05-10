@@ -14,8 +14,6 @@
     int pageSize = ViewBag.PageSize is int ps ? ps : 10;
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
     int totalItems = ViewBag.TotalItems is int ti ? ti : 0;
-    bool ghnSandboxConfigured = ViewBag.GhnSandboxConfigured is bool ghnConfigured && ghnConfigured;
-    string ghnShopId = ViewBag.GhnSandboxShopId?.ToString() ?? "Chưa có";
     var shippingRows = Model?.ToList() ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Shipping>();
 
     var staffsSrc = ViewBag.DeliveryStaffs as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>();
@@ -252,41 +250,6 @@
         animation: fadeInUp .6s ease-out .1s backwards;
     }
 
-    .ghn-panel {
-        border: 1px solid var(--ff-border);
-        animation: fadeInUp .6s ease-out .15s backwards;
-    }
-
-    .ghn-result-box {
-        border: 1px dashed #93c5fd;
-        border-radius: 1rem;
-        background: linear-gradient(135deg, rgba(219, 234, 254, 0.45) 0%, rgba(239, 246, 255, 0.9) 100%);
-        min-height: 132px;
-    }
-
-    .ghn-result-box pre {
-        white-space: pre-wrap;
-        word-break: break-word;
-        margin: 0;
-        font-size: .875rem;
-        color: #1e3a8a;
-    }
-
-    .ghn-field-note {
-        font-size: .8rem;
-        color: #64748b;
-    }
-
-    .ghn-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: .35rem;
-        padding: .4rem .75rem;
-        border-radius: 999px;
-        font-size: .82rem;
-        font-weight: 600;
-    }
-
     .order-code {
         background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
         -webkit-background-clip: text;
@@ -451,7 +414,7 @@
             </div>
         }
 
-        <div class="ghn-panel ff-admin-card p-4 mb-4">
+        @*<div class="ghn-panel ff-admin-card p-4 mb-4">
             <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4">
                 <div class="d-flex align-items-center gap-3">
                     <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #0ea5e9 100%);">
@@ -641,6 +604,8 @@
                 </div>
             </div>
         </div>
+
+        *@
 
         <div class="filter-card ff-admin-card p-4 mb-4">
             <div class="d-flex align-items-center gap-3 mb-4">
@@ -832,12 +797,6 @@
                                         </td>
                                         <td class="text-center px-4">
                                             <div class="btn-group" role="group">
-                                                <button type="button"
-                                                        class="btn btn-sm btn-outline-info btn-action btn-use-ghn"
-                                                        data-orderid="@item.OrderID"
-                                                        title="Đổ thông tin dòng này sang bảng điều khiển GHN">
-                                                    <i class="bi bi-truck-front"></i>
-                                                </button>
                                                 <button type="button" class="btn btn-sm btn-outline-primary btn-action btn-edit" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#editShippingModal" title="Sửa"><i class="bi bi-pencil-square"></i></button>
                                                 <button type="button" class="btn btn-sm btn-outline-danger btn-action btn-delete" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#deleteModal" title="Xóa"><i class="bi bi-trash3"></i></button>
                                                 @{ var cod = item.Order?.Payments?.FirstOrDefault(p => p.PaymentMethod == "COD"); bool codDone = cod == null ? true : (cod.PaymentDate.HasValue || (!string.IsNullOrWhiteSpace(cod.PaymentStatus) && paidStatuses.Any(s => string.Equals(s, cod.PaymentStatus, System.StringComparison.OrdinalIgnoreCase)))); }
@@ -1763,59 +1722,6 @@
                 loadCommunes('EditProvinceId', 'EditCommuneId');
             });
         }
-
-        loadGhnProvinces().catch(() => {
-            setResult('ghnShopProfileResult', 'Không tải được danh sách tỉnh/thành GHN.');
-        });
-        updateCreateButtonState();
-
-        document.getElementById('btnGhnLoadShopProfile')?.addEventListener('click', function () {
-            loadShopProfile();
-        });
-
-        document.getElementById('btnGhnPreviewFee')?.addEventListener('click', function () {
-            previewGhnFee();
-        });
-
-        document.getElementById('btnGhnPreviewLeadTime')?.addEventListener('click', function () {
-            previewGhnLeadTime();
-        });
-
-        document.getElementById('btnGhnCreateOrder')?.addEventListener('click', function () {
-            createGhnOrder();
-        });
-
-        document.getElementById('btnGhnTrackOrder')?.addEventListener('click', function () {
-            trackGhnOrder();
-        });
-        document.getElementById('btnGhnSyncMetadata')?.addEventListener('click', function () {
-            trackGhnOrder({ persist: true, reloadOnSuccess: true });
-        });
-        document.getElementById('btnGhnSyncVisibleRows')?.addEventListener('click', function () {
-            syncVisibleGhnRows();
-        });
-        window.setTimeout(function () {
-            void autoSyncStaleGhnRows();
-        }, 1200);
-
-        document.getElementById('btnUseCreatedOrderForTracking')?.addEventListener('click', function () {
-            const text = document.getElementById('ghnCreateResult')?.textContent || '';
-            try {
-                const payload = JSON.parse(text);
-                if (payload?.orderCode) {
-                    document.getElementById('ghnTrackingOrderCode').value = payload.orderCode;
-                    trackGhnOrder();
-                    return;
-                }
-            } catch {
-                // ignore parse failure
-            }
-            showNotification('Chưa có mã GHN vừa tạo để tra cứu.', 'warning');
-        });
-
-        document.querySelectorAll('.btn-use-ghn').forEach(button => button.addEventListener('click', function () {
-            void fillGhnFormFromRow(this);
-        }));
 
         document.getElementById('status').addEventListener('change', function () {
           const wrap = document.getElementById('deliveredStateWrap');

@@ -1,3 +1,0 @@
-OrderId|GhnOrderCode|GhnClientOrderCode|GhnStatus|GhnTotalFee|GhnCreatedAt|GhnExpectedDeliveryTime|GhnLastSyncedAt
--------|------------|------------------|---------|-----------|------------|-----------------------|---------------
-161|NULL|NULL|NULL|NULL|NULL|NULL|NULL

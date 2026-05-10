@@ -1,31 +1,66 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Tao mot file Word moi trong `D:\NCKH\DOAN\NCKH-FRESH-FARM\BaoCao` viet ve du an Fresh Farm, dua tren cac file Word mau trong thu muc `BaoCao`.
-  - Success criteria: doc/nam duoc cau truc du an va tai lieu mau, tao bao cao `.docx` tieng Viet co noi dung phu hop ve du an, chen anh chup man hinh neu chay/test app duoc, va kiem tra file Word hop le/render neu moi truong ho tro.
+  - Huong dan cach don Git repo FreshFarm dang lon do artifact/build outputs bi track.
+  - Success criteria: dua quy trinh an toan de bo track artifact, commit thay doi, gom rac Git, va neu can thi don history.
 - **Constraints/Assumptions**:
   - Tra loi bang tieng Viet.
   - Workspace: `D:\NCKH\DOAN\NCKH-FRESH-FARM`.
-  - Khong lam hong cac file Word mau hien co trong `BaoCao`.
-  - Tai khoan test: admin `a`/`a`; nguoi ban `tho`/`123456`; nguoi mua co the tao moi neu can.
-  - Co the tao tai khoan moi neu admin/nguoi ban khong dang nhap duoc.
-  - `rg` bi loi Access denied trong workspace; dung PowerShell/Git/Python fallback.
+  - Khong revert thay doi khong phai cua minh.
+  - Khong xoa file/untrack file khi user chua yeu cau ro.
+  - Artifact root cho output tam: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM`.
+  - Khong tao artifact tam trong repo root.
+  - `rg.exe` bi Windows chan quyen chay; dung PowerShell `Get-ChildItem`/`Select-String` thay the.
 - **Key decisions**:
-  - Dung skill Documents de tao va kiem tra `.docx`.
-  - Dung Playwright/browser local de chup anh that neu ung dung chay duoc.
-  - Bao cao moi se dat trong `BaoCao`, khong ghi de hai file mau.
+  - Viet tai lieu moi trong `HocGoiY/` vi day la khu vuc tai lieu rieng cho phan goi y va khong bi `.gitignore` ignore.
+  - Tai lieu tap trung vao "da xay dung/da lam gi" theo source hien co, khong sua code runtime.
+  - Chia docs theo module nho: event tracking, Product Insights, materialized affinity, ML.NET, home recommendation, similar products, search ranking, session rerank, A/B metrics, rollout/tuning, UI integration, DI/config, tests.
+  - Bo sung phan "Lo trinh doc theo cap do" vao dau docs thay vi tach file moi.
+  - Khong dọn/xoa/untrack artifact neu user chua yeu cau ro; chi bao cao so lieu.
+  - User hoi "chi cach don di"; tra loi bang huong dan truoc, chua tu dong chay lenh.
 - **State**:
   - *Done*:
-    - Da nhan yeu cau va thong tin dang nhap test.
-    - Da phat hien `BaoCao` co 2 file Word mau.
-    - Da cap nhat ledger theo muc tieu moi.
+    - Da doc ledger hien co.
+    - Da inspect repo va thay source chinh la ASP.NET Core/.NET 8 BFF + Ordering/Catalog services.
+    - Da dung skill `aspnet-core`.
+    - Da tim cac file recommendation trong `src\Services\Ordering\FreshFarm.Ordering.Api` va `src\Web\FreshFarm.Web.Bff`.
+    - Da doc cac controller/service chinh: `ProductInsightsController`, `RecommendationEventsController`, `RecommendationMetricsController`, `RecommendationMlController`, `RecommendationAffinityService`, `RecommendationMlTrainingService`, `BffCatalogController`, `BffRecommendationEventsController`, `SessionAwareRecommendationReranker`, `SessionSignalService`, `IRecommendationExperimentService`, `MultiObjectiveRecommendationRolloutService`.
+    - Da doc cac file UI chinh: `home-page.js`, `product-page.js`, `search-page.js`.
+    - Da tham chieu roadmap cu `docs\RECOMMENDATION_ML_ROADMAP_2026-03-29.md` de doi chieu tien do.
+    - Da tao docs moi ban dau trong `docs\RECOMMENDATION_IMPLEMENTATION_NOTES_2026-05-10.md` nhung phat hien `docs/` bi `.gitignore` ignore.
+    - Da chuyen noi dung docs sang `HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.md` va xoa file docs bi ignore do minh tao.
+    - Da doc lai file docs moi sau khi tao.
+    - Da bo sung lo trinh doc 7 cap do: tong quan, luong du lieu, API serving, materialized scoring, ML/session rerank, A/B rollout, config/test.
+    - Da do repo: `.git` ~814.72 MiB, tong repo ~1678.61 MiB.
+    - `git ls-files` co 67409 file tracked.
+    - `git count-objects -vH`: 9563 loose objects, size ~804.49 MiB, chua co pack.
+    - Nhom tracked lon nhat: `.codex-build` 65364 file; artifact dirs `.codex-build`/`output`/`tmp`/`artifacts`/`.playwright-cli` tong 66459 file tracked.
+    - File source lon nhat hien tai chi khoang 1.73 MiB, nen van de chinh la artifact/build outputs bi track, khong phai source/app assets lon.
   - *Now*:
-    - Doc cau truc repo, trich xuat noi dung Word mau, xac dinh cach chay ung dung va cac man hinh can chup.
+    - Huong dan user cac buoc dọn repo an toan.
   - *Next*:
-    - Chay app/test login neu kha thi, chup anh, tao bao cao `.docx`, render/kiem tra.
+    - Neu user yeu cau lam luon, thuc hien `git rm --cached` cho artifact dirs va commit; chi rewrite history khi user dong y ro.
 - **Open questions** (UNCONFIRMED if needed):
   - Chua co.
 - **Working set** (files/ids/commands):
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\BaoCao`
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\CONTINUITY.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\docs\RECOMMENDATION_ML_ROADMAP_2026-03-29.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ProductInsightsController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationEventsController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationMetricsController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationMlController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityService.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationMlTrainingService.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Controllers\BffCatalogController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Controllers\BffRecommendationEventsController.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\SessionAwareRecommendationReranker.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\SessionSignalService.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\IRecommendationExperimentService.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\MultiObjectiveRecommendationRolloutService.cs`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\home-page.js`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\product-page.js`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\search-page.js`
+  - Command: `git count-objects -vH`
+  - Command: `git ls-files | Measure-Object`
+  - Command: do dung luong `.git` va repo bang PowerShell `Get-ChildItem`.

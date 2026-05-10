@@ -84,6 +84,31 @@ a[data-bs-toggle="collapse"][aria-expanded="true"]::after {
     transition: all 0.3s;
 }
 
+@media (max-width: 991.98px) {
+    .wrapper {
+        display: block;
+    }
+
+    #sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 1040;
+        margin-left: -260px;
+        overflow-y: auto;
+    }
+
+    #sidebar.collapsed {
+        margin-left: 0;
+    }
+
+    #content {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
 .topbar {
     padding: 1rem 1.5rem;
     background-color: #fff;

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json;
 using FreshFarm.Web.Bff.Areas.Admin.Controllers;
 using FreshFarm.Web.Bff.Areas.Admin.Models;
 using Microsoft.AspNetCore.Http;
@@ -85,6 +86,52 @@ public sealed class UserControllerTests
         Assert.Equal(2, role.RoleID);
         Assert.Equal("Seller", role.RoleName);
         Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task GetUserById_ReturnsUserIdAndRoleId_ForEditForm()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""
+                    {
+                      "userId": 72,
+                      "userName": "buyer72",
+                      "fullName": "Buyer 72",
+                      "email": "buyer72@example.com",
+                      "phone": "0900000072",
+                      "roleId": 3,
+                      "role": {
+                        "roleId": 3,
+                        "roleName": "Customer",
+                        "isActive": true
+                      },
+                      "isActive": true,
+                      "created": "2026-03-24T00:00:00Z"
+                    }
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.GetUserById(72);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var document = JsonDocument.Parse(serialized);
+        var data = document.RootElement.GetProperty("data");
+
+        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(72, data.GetProperty("userId").GetInt32());
+        Assert.Equal(3, data.GetProperty("roleId").GetInt32());
+        Assert.Equal("buyer72", data.GetProperty("userName").GetString());
     }
 
     private static UserController CreateController(RecordingHttpMessageHandler handler)

@@ -29,7 +29,7 @@ public partial class User
 
     public string Avatar { get; set; }
 
-    public virtual AddressBook AddressBook { get; set; }
+    public virtual ICollection<AddressBook> AddressBooks { get; set; } = new List<AddressBook>();
 
     public virtual SellerStoreSetting SellerStoreSetting { get; set; }
 

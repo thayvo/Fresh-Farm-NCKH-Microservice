@@ -7834,6 +7834,43 @@ public sealed class BffCatalogControllerTests
         Assert.Contains("40 lượt bán gần đây", items[0].GetProperty("recommendationReason").GetString(), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task GetBestSellersProducts_RelaxesExcludedIds_WhenAllBestSellersWereAlreadyShownElsewhere()
+    {
+        var catalogHandler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                [
+                  { "productId": 20, "productName": "Sold 20", "sku": "B20", "price": 10000, "status": true, "stockQuantity": 20, "reservedStock": 0, "availableStock": 20, "onHandStock": 20, "imageFileName": "no-image.png", "createdDate": "2026-04-03T00:00:00Z", "isManuallyDisabled": false, "categoryId": 1, "categoryName": "Rau", "unitId": 1, "unitName": "kg", "unitSymbol": "kg" },
+                  { "productId": 21, "productName": "Sold 21", "sku": "B21", "price": 10000, "status": true, "stockQuantity": 20, "reservedStock": 0, "availableStock": 20, "onHandStock": 20, "imageFileName": "no-image.png", "createdDate": "2026-04-02T00:00:00Z", "isManuallyDisabled": false, "categoryId": 1, "categoryName": "Rau", "unitId": 1, "unitName": "kg", "unitSymbol": "kg" }
+                ]
+                """)
+            });
+        var identityHandler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]")
+            });
+        var orderingHandler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("""
+                [
+                  { "productId": 20, "averageRating": 4.2, "reviewCount": 8, "recentSoldCount": 20, "soldCount": 100 },
+                  { "productId": 21, "averageRating": 4.9, "reviewCount": 20, "recentSoldCount": 90, "soldCount": 90 }
+                ]
+                """)
+            });
+        var controller = CreateController(catalogHandler, identityHandler, orderingHandler);
+
+        var result = await controller.GetBestSellersProducts(limit: 12, excludeProductIds: [20, 21]);
+
+        var root = ReadOkJson(result);
+        var items = root.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal([21, 20], items.Select(item => item.GetProperty("productId").GetInt32()).ToArray());
+    }
+
     private static JsonElement ReadOkJson(IActionResult result)
     {
         var ok = Assert.IsType<OkObjectResult>(result);

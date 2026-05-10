@@ -867,7 +867,7 @@ namespace FreshFarm.Identity.Api.Migrations
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.AddressBook", b =>
                 {
                     b.HasOne("FreshFarm.Identity.Api.Models.User", "User")
-                        .WithOne("AddressBook")
+                        .WithMany("AddressBooks")
                         .HasForeignKey("FreshFarm.Identity.Api.Models.AddressBook", "UserId")
                         .IsRequired()
                         .HasConstraintName("FK_AddressBook_Users");
@@ -987,7 +987,7 @@ namespace FreshFarm.Identity.Api.Migrations
 
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.User", b =>
                 {
-                    b.Navigation("AddressBook");
+                    b.Navigation("AddressBooks");
 
                     b.Navigation("SellerKycProfile");
 

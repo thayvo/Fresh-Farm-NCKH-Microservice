@@ -38,7 +38,7 @@ public sealed class SellerApplicationController : ControllerBase
             .AsNoTracking()
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
-            .Include(u => u.AddressBook)
+            .Include(u => u.AddressBooks)
             .Include(u => u.SellerKycProfile)
             .SingleOrDefaultAsync(u => u.UserId == userId, cancellationToken);
 
@@ -269,18 +269,29 @@ public sealed class SellerApplicationController : ControllerBase
 
     private static string BuildFallbackAddress(User user)
     {
+        var address = GetPreferredAddress(user);
         var parts = new[]
         {
-            user.AddressBook?.AddressDetail,
-            user.AddressBook?.Ward,
-            user.AddressBook?.District,
-            user.AddressBook?.Province
+            address?.AddressDetail,
+            address?.Ward,
+            address?.District,
+            address?.Province
         }
         .Where(x => !string.IsNullOrWhiteSpace(x))
         .Select(x => x!.Trim())
         .ToArray();
 
         return parts.Length == 0 ? string.Empty : string.Join(", ", parts);
+    }
+
+    private static AddressBook? GetPreferredAddress(User user)
+    {
+        return user.AddressBooks
+            .Where(x => x.IsActive)
+            .OrderByDescending(x => x.IsDefault)
+            .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+            .ThenByDescending(x => x.AddressId)
+            .FirstOrDefault();
     }
 
     private static string ResolveSellerReviewStatus(bool isSellerApproved, bool hasApplication, SellerKycProfile? kyc)

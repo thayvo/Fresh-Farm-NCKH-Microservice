@@ -69,8 +69,8 @@ public partial class FreshFarmIdentityDBContext : DbContext
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
             entity.Property(e => e.Ward).HasMaxLength(100);
 
-            entity.HasOne(d => d.User).WithOne(p => p.AddressBook)
-                .HasForeignKey<AddressBook>(d => d.UserId)
+            entity.HasOne(d => d.User).WithMany(p => p.AddressBooks)
+                .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_AddressBook_Users");
         });

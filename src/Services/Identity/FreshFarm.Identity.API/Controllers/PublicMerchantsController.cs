@@ -68,12 +68,12 @@ public sealed class PublicMerchantsController : ControllerBase
                 sellerStoreSettings.Any(s => s.UserId == u.UserId && s.StoreName != null && s.StoreName.ToLower().Contains(term)) ||
                 u.UserName.ToLower().Contains(term) ||
                 u.FullName.ToLower().Contains(term) ||
-                (u.AddressBook != null && u.AddressBook.IsActive &&
+                (u.AddressBooks.Any(a => a.IsActive &&
                  (
-                    (u.AddressBook.Province != null && u.AddressBook.Province.ToLower().Contains(term)) ||
-                    (u.AddressBook.District != null && u.AddressBook.District.ToLower().Contains(term)) ||
-                    (u.AddressBook.Ward != null && u.AddressBook.Ward.ToLower().Contains(term))
-                 )));
+                    (a.Province != null && a.Province.ToLower().Contains(term)) ||
+                    (a.District != null && a.District.ToLower().Contains(term)) ||
+                    (a.Ward != null && a.Ward.ToLower().Contains(term))
+                 ))));
         }
 
         var merchants = await query
@@ -90,10 +90,10 @@ public sealed class PublicMerchantsController : ControllerBase
                     .ThenByDescending(s => s.SellerStoreSettingId)
                     .Select(s => s.StoreName)
                     .FirstOrDefault(),
-                AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
-                Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
-                District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
-                Ward = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Ward : null
+                AddressDetail = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.AddressDetail).FirstOrDefault(),
+                Province = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Province).FirstOrDefault(),
+                District = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.District).FirstOrDefault(),
+                Ward = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Ward).FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 
@@ -171,10 +171,10 @@ public sealed class PublicMerchantsController : ControllerBase
                     .ThenByDescending(s => s.SellerStoreSettingId)
                     .Select(s => s.StoreName)
                     .FirstOrDefault(),
-                AddressDetail = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.AddressDetail : null,
-                Province = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Province : null,
-                District = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.District : null,
-                Ward = u.AddressBook != null && u.AddressBook.IsActive ? u.AddressBook.Ward : null
+                AddressDetail = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.AddressDetail).FirstOrDefault(),
+                Province = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Province).FirstOrDefault(),
+                District = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.District).FirstOrDefault(),
+                Ward = u.AddressBooks.Where(a => a.IsActive).OrderByDescending(a => a.IsDefault).ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt).ThenByDescending(a => a.AddressId).Select(a => a.Ward).FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
 

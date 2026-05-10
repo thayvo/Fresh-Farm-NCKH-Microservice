@@ -1032,18 +1032,15 @@ public sealed class BffCatalogController : ControllerBase
             return loadResult.ErrorResult;
         }
 
-        var candidates = loadResult.Items
+        var recommendationCandidates = loadResult.Items
             .Where(IsRecommendationCandidate)
-            .Where(item => !excludedIds.Contains(item.ProductId))
-            .Where(item => CalculateBestSellerRankingScore(item) > 0d)
-            .OrderByDescending(CalculateBestSellerRankingScore)
-            .ThenByDescending(item => item.RecentSoldCount)
-            .ThenByDescending(item => item.SoldCount)
-            .ThenByDescending(item => item.AverageRating)
-            .ThenByDescending(item => item.ReviewCount)
-            .ThenByDescending(item => item.ProductId)
-            .Take(normalizedLimit)
             .ToList();
+        var candidates = BuildBestSellerCandidates(recommendationCandidates, normalizedLimit, excludedIds);
+        if (candidates.Count == 0 && excludedIds.Count > 0)
+        {
+            candidates = BuildBestSellerCandidates(recommendationCandidates, normalizedLimit, new HashSet<int>());
+        }
+
         await EnrichCatalogProductsWithMerchantDataAsync(candidates);
 
         var bestSellerItems = candidates
@@ -1063,6 +1060,24 @@ public sealed class BffCatalogController : ControllerBase
         };
 
         return Ok(responsePayload);
+    }
+
+    private static List<CatalogProductApiDto> BuildBestSellerCandidates(
+        IEnumerable<CatalogProductApiDto> source,
+        int limit,
+        IReadOnlySet<int> excludedProductIds)
+    {
+        return source
+            .Where(item => !excludedProductIds.Contains(item.ProductId))
+            .Where(item => CalculateBestSellerRankingScore(item) > 0d)
+            .OrderByDescending(CalculateBestSellerRankingScore)
+            .ThenByDescending(item => item.RecentSoldCount)
+            .ThenByDescending(item => item.SoldCount)
+            .ThenByDescending(item => item.AverageRating)
+            .ThenByDescending(item => item.ReviewCount)
+            .ThenByDescending(item => item.ProductId)
+            .Take(limit)
+            .ToList();
     }
 
     private bool HasAuthenticatedRecommendationContext()
