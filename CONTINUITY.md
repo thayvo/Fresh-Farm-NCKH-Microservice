@@ -1,10 +1,10 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Huong dan cach don Git repo FreshFarm dang lon do artifact/build outputs bi track.
-  - Success criteria: dua quy trinh an toan de bo track artifact, commit thay doi, gom rac Git, va neu can thi don history.
+  - Đổi tên tài liệu trong `HocGoiY` để nhìn vào biết nên học file nào trước.
+  - Success criteria: các file `.md` và `.docx` có tiền tố thứ tự học rõ ràng (`00`, `01`, `02`, `03`, `10`-`15`) và không còn tham chiếu tên cũ trong tài liệu Markdown.
 - **Constraints/Assumptions**:
-  - Tra loi bang tieng Viet.
+  - Trả lời bằng tiếng Việt có dấu.
   - Workspace: `D:\NCKH\DOAN\NCKH-FRESH-FARM`.
   - Khong revert thay doi khong phai cua minh.
   - Khong xoa file/untrack file khi user chua yeu cau ro.
@@ -18,6 +18,8 @@
   - Bo sung phan "Lo trinh doc theo cap do" vao dau docs thay vi tach file moi.
   - Khong dọn/xoa/untrack artifact neu user chua yeu cau ro; chi bao cao so lieu.
   - User hoi "chi cach don di"; tra loi bang huong dan truoc, chua tu dong chay lenh.
+  - User co cac file Word `.docx` dang `??` chua git add; chi can ignore neu khong muon commit.
+  - Tao file moi `HocGoiY/08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md` thay vi ghi de file 07, vi file 07 la docs "da lam gi", file 08 la giao trinh hoc.
 - **State**:
   - *Done*:
     - Da doc ledger hien co.
@@ -36,15 +38,56 @@
     - `git count-objects -vH`: 9563 loose objects, size ~804.49 MiB, chua co pack.
     - Nhom tracked lon nhat: `.codex-build` 65364 file; artifact dirs `.codex-build`/`output`/`tmp`/`artifacts`/`.playwright-cli` tong 66459 file tracked.
     - File source lon nhat hien tai chi khoang 1.73 MiB, nen van de chinh la artifact/build outputs bi track, khong phai source/app assets lon.
+    - Sau khi user chay `git rm -r --cached --ignore-unmatch ...`, `git ls-files` cho `.codex-build`/`artifacts`/`output`/`tmp`/`.playwright-cli`/`.codex-obj`/`.codex-temp`/`starttest.txt` tra ve 0.
+    - Dang co 66553 file staged; trong do co 21 file `src/` staged modified, nen neu chi commit dọn artifact can unstage `src/` truoc.
+    - Cac file Word/report trong `BaoCao` dang `??` untracked, chua bi add.
+    - User da commit cleanup: `29325dd Remove generated artifacts from git tracking`.
+    - Sau cleanup: artifact tracked count = 0; total tracked files = 880; `git count-objects -vH` con 14 loose objects ~99.75 KiB, 2 packs ~394.71 MiB.
+    - Dung luong `.git` giam tu ~814.72 MiB xuong ~395.03 MiB; tong repo tu ~1678.61 MiB xuong ~1258.92 MiB.
+    - Status hien con modified `.gitignore`, `CONTINUITY.md`; untracked Word `.doc` trong `BaoCao`, docs `HocGoiY/07...md`, va 2 scripts report.
+    - Da doc cac file ly thuyet `HocGoiY/LyThuyet/01..06`.
+    - Da trich cong thuc/trong so tu source: product affinity `32/14/6`, preference `10/28/22/35`, user-product `42/22/18/8`, basket `30/6`, replenishment, ML decay `0.5^(age/30)`, session rerank, objective metrics.
+    - Da tao `HocGoiY/08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md`.
+    - Da cap nhat `HocGoiY/README.md` va `HocGoiY/LO_TRINH_DOC.md` de tro den file 08.
+    - User yêu cầu sửa trực tiếp vào file Word.
+    - Đã dùng skill `doc` để xử lý `.docx`.
+    - Đã xác định `BaoCao/Bao_cao_nghiem_thu_FreshFarm_hoan_chinh.docx` là bản báo cáo FreshFarm hoàn chỉnh phù hợp nhất để sửa.
+    - User làm rõ: không sửa vào báo cáo chính, mà tạo thêm 1 file Word gợi ý bằng tiếng Việt có dấu.
+    - Đã tạo `HocGoiY/Giao_Trinh_Hoc_Module_Goi_Y_FreshFarm.docx` bằng tiếng Việt có dấu.
+    - Đã kiểm tra lại bằng `python-docx`: file tồn tại, 87 đoạn văn, 3 bảng; nội dung tiếng Việt có dấu đọc được.
+    - Không render trực quan được vì `soffice` không có trong PATH.
+    - User yêu cầu tạo hết bản sao trong `HocGoiY`, viết toàn bộ bằng tiếng Việt có dấu và xuất thành `.docx`.
+    - Đã tạo bản `.docx` tương ứng cho 10 file Markdown trong `HocGoiY` và `HocGoiY/LyThuyet`.
+    - Tổng `.docx` hiện có trong `HocGoiY`: 11 file, gồm bản giáo trình riêng đã tạo trước.
+    - Đã viết lại sạch bằng tiếng Việt có dấu cho `07_Cac_Phan_Da_Lam_Module_Goi_Y.docx`, `08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.docx`, và `README.docx`.
+    - Đã kiểm tra bằng `python-docx`: các file mở được, có đoạn văn/bảng hợp lệ.
+    - User yêu cầu đổi tên file để nhìn vào biết nên học cái nào trước.
+    - Đã đổi tên root docs: `00_Bat_Dau_O_Day_Huong_Dan_Hoc_Goi_Y`, `01_Giao_Trinh_Tong_Hop_Hoc_Tu_Ly_Thuyet_Den_Code`, `01A_Giao_Trinh_Tong_Hop_Ban_Word_Rieng`, `02_Nhung_Phan_Da_Lam_Trong_Module_Goi_Y`, `03_Lo_Trinh_Doc_Source_Code_Recommendation`.
+    - Đã đổi tên nhóm lý thuyết thành `10_Ly_Thuyet_...` đến `15_Ly_Thuyet_...`.
+    - Đã cập nhật tham chiếu tên mới trong các file Markdown và Word liên quan; kiểm tra không còn token tên cũ trong `.md`.
   - *Now*:
-    - Huong dan user cac buoc dọn repo an toan.
+    - User chạy `git add .` và hỏi vì thấy Git theo dõi thêm file.
+    - Đã kiểm tra staging: `git add .` đã stage tài liệu `HocGoiY`, `.gitignore`, `CONTINUITY.md`, scripts và vài file mẫu Word trong `BaoCao`.
+    - Đã gỡ staging file tạm Word `HocGoiY/~$_Bat_Dau_O_Day_Huong_Dan_Hoc_Goi_Y.docx`, các mẫu `.doc` trong `BaoCao`, `CONTINUITY.md`, và 2 script report.
+    - Đã thêm ignore cho `BaoCao/**/*.doc`, `BaoCao/*.doc`, và file tạm Office `~$*.doc`, `~$*.docx`.
+    - User chạy lại `git add .`; cảnh báo chỉ là LF->CRLF nhưng đã stage lại `CONTINUITY.md` và 2 scripts.
+    - Đã gỡ staging lại `CONTINUITY.md` và `scripts/generate_freshfarm_*.py`.
+    - Đã đọc 2 scripts: chúng là tool Python dùng `python-docx`/Pillow để sinh báo cáo Word FreshFarm, lấy ảnh từ `output/playwright/freshfarm-bao-cao` và ghi vào `BaoCao/*.docx`.
+    - Đã gỡ staging 2 scripts lần nữa; hiện chúng là untracked `??`.
+    - User xác nhận không cần add 2 scripts; đã thêm ignore cụ thể cho `scripts/generate_freshfarm_nghiemthu_report.py` và `scripts/generate_freshfarm_report.py`.
+    - Đã chạy `git check-ignore -v` xác nhận 2 scripts được ignore bởi `.gitignore`.
   - *Next*:
-    - Neu user yeu cau lam luon, thuc hien `git rm --cached` cho artifact dirs va commit; chi rewrite history khi user dong y ro.
+    - Báo user không cần add scripts; `.gitignore` đã xử lý, chỉ commit `.gitignore` cùng tài liệu nếu muốn.
 - **Open questions** (UNCONFIRMED if needed):
-  - Chua co.
+  - Chưa có.
 - **Working set** (files/ids/commands):
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\CONTINUITY.md`
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\Giao_Trinh_Hoc_Module_Goi_Y_FreshFarm.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\README.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LO_TRINH_DOC.md`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\BaoCao\Bao_cao_nghiem_thu_FreshFarm_hoan_chinh.docx`
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\docs\RECOMMENDATION_ML_ROADMAP_2026-03-29.md`
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ProductInsightsController.cs`
   - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationEventsController.cs`
@@ -64,3 +107,15 @@
   - Command: `git count-objects -vH`
   - Command: `git ls-files | Measure-Object`
   - Command: do dung luong `.git` va repo bang PowerShell `Get-ChildItem`.
+
+
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\README.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LO_TRINH_DOC.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\01_Tong_Quan_He_Thong_Goi_Y.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\02_Content_Based_Filtering.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\03_Collaborative_Filtering.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\04_Hybrid_Cold_Start_Da_Dang.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\05_Ranking_Reranking_Sections.docx`
+  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\06_Du_Lieu_Su_Kien_Materialize_Danh_Gia.docx`

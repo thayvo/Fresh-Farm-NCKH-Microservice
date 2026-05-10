@@ -180,3 +180,4 @@ Nó còn gồm:
 
 - [Google Developers - Recommendation Systems](https://developers.google.com/machine-learning/recommendation)
 - [Recommendation Systems at Scale](https://engineersofai.com/docs/ai-systems/case-studies/Recommendation-Systems)
+

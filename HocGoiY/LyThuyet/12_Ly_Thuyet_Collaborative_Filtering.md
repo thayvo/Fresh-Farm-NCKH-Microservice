@@ -175,3 +175,4 @@ Score(u, i) \propto \sum_{v \in N(u)} sim(u,v)\cdot r_{v,i}
 
 - [Google Developers - Recommendation Systems](https://developers.google.com/machine-learning/recommendation)
 - [Krython - Collaborative Filtering tutorial](https://krython.com/tutorial/python/recommendation-systems-collaborative-filtering/)
+

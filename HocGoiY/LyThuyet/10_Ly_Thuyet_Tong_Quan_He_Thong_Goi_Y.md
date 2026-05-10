@@ -184,3 +184,4 @@ Một hệ thống gợi ý tốt phải cân bằng:
 
 - [Google Developers - Recommendation Systems](https://developers.google.com/machine-learning/recommendation)
 - [Machine Learning Cơ Bản](https://machinelearningcoban.com/)
+

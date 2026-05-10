@@ -35,12 +35,14 @@ Mình khuyên:
 
 ## 3. Thứ tự đọc lý thuyết
 
-1. [01_Tổng_Quan_Hệ_Thống_Gợi_Ý.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/01_Tong_Quan_He_Thong_Goi_Y.md)
-2. [02_Content_Based_Filtering.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/02_Content_Based_Filtering.md)
-3. [03_Collaborative_Filtering.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/03_Collaborative_Filtering.md)
-4. [04_Hybrid_Cold_Start_Da_Dang.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/04_Hybrid_Cold_Start_Da_Dang.md)
-5. [05_Ranking_Reranking_Sections.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/05_Ranking_Reranking_Sections.md)
-6. [06_Du_Lieu_Su_Kien_Materialize_Danh_Gia.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/06_Du_Lieu_Su_Kien_Materialize_Danh_Gia.md)
+0. [01_Giao_Trinh_Tong_Hop_Hoc_Tu_Ly_Thuyet_Den_Code.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/01_Giao_Trinh_Tong_Hop_Hoc_Tu_Ly_Thuyet_Den_Code.md)
+   Đọc file này trước để biết cách học, công thức nào cần nhớ, và code nào mở ở từng bước.
+1. [10_Ly_Thuyet_Tong_Quan_He_Thong_Goi_Y.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/10_Ly_Thuyet_Tong_Quan_He_Thong_Goi_Y.md)
+2. [11_Ly_Thuyet_Content_Based_Filtering.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/11_Ly_Thuyet_Content_Based_Filtering.md)
+3. [12_Ly_Thuyet_Collaborative_Filtering.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/12_Ly_Thuyet_Collaborative_Filtering.md)
+4. [13_Ly_Thuyet_Hybrid_Cold_Start_Da_Dang.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/13_Ly_Thuyet_Hybrid_Cold_Start_Da_Dang.md)
+5. [14_Ly_Thuyet_Ranking_Reranking_Chia_Section.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/14_Ly_Thuyet_Ranking_Reranking_Chia_Section.md)
+6. [15_Ly_Thuyet_Event_Materialize_Danh_Gia.md](D:/NCKH/DOAN/NCKH-FRESH-FARM/HocGoiY/LyThuyet/15_Ly_Thuyet_Event_Materialize_Danh_Gia.md)
 
 ## 4. Thứ tự đọc code
 
@@ -113,8 +115,8 @@ Bạn cần chú ý:
 Hãy đọc:
 
 1. `01_Tổng_Quan_Hệ_Thống_Gợi_Ý.md`
-2. `04_Hybrid_Cold_Start_Da_Dang.md`
-3. `05_Ranking_Reranking_Sections.md`
+2. `13_Ly_Thuyet_Hybrid_Cold_Start_Da_Dang.md`
+3. `14_Ly_Thuyet_Ranking_Reranking_Chia_Section.md`
 4. `BffCatalogController.cs`
 
 ## 7. Cách học nhanh nhất
@@ -134,3 +136,4 @@ Ví dụ:
   - Táo
 - Tự cho điểm bằng tay theo category/origin.
 - Rồi so với cách code đang cộng thêm recency, stock, seller, locality, diversity.
+

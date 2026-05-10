@@ -59,3 +59,18 @@ DuAnCu/
 
 #docs
 docs/
+
+BaoCao/**/*.docx
+BaoCao/*.docx
+BaoCao/**/*.doc
+BaoCao/*.doc
+
+# Microsoft Office temporary lock files
+~$*.doc
+~$*.docx
+**/~$*.doc
+**/~$*.docx
+
+# Local report generation helpers
+scripts/generate_freshfarm_nghiemthu_report.py
+scripts/generate_freshfarm_report.py
