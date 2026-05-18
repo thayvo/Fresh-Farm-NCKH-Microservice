@@ -83,6 +83,13 @@
         letter-spacing: .04em;
     }
 
+    .finance-stat-hint {
+        color: #64748b;
+        font-size: .78rem;
+        margin-top: .35rem;
+        line-height: 1.35;
+    }
+
     .finance-section-link {
         display: block;
         text-decoration: none;
@@ -194,15 +201,25 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">GMV theo đơn của người bán</div>
+                    <div class="finance-stat-label">GMV toàn bộ đơn</div>
                     <div class="fs-3 fw-bold">@FormatMoney(Model.Stats.GrossMerchandiseValue)</div>
+                    <div class="finance-stat-hint">Gồm cả đơn chờ xử lý, đã hủy hoặc chưa đủ điều kiện đối soát.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Thanh toán đã ghi nhận</div>
+                    <div class="finance-stat-label">GMV đủ điều kiện đối soát</div>
+                    <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.ReconciliationGrossMerchandiseValue)</div>
+                    <div class="finance-stat-hint">Chỉ tính đơn hoàn tất, đã ghi nhận thanh toán online và không bị hoàn/hủy.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Giá trị thanh toán thành công</div>
                     <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.CapturedPayments)</div>
                 </div>
             </div>
@@ -210,23 +227,52 @@
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Hoa hồng nền tảng</div>
+                    <div class="finance-stat-label">Phí nền tảng tạm tính</div>
                     <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.PlatformCommission)</div>
+                    <div class="finance-stat-hint">Phí nền tảng tạm tính trên toàn bộ đơn của người bán.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Thu nhập người bán</div>
+                    <div class="finance-stat-label">Phí nền tảng đủ điều kiện đối soát</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.ReconciliationPlatformCommission)</div>
+                    <div class="finance-stat-hint">Phí nền tảng từ các đơn đủ điều kiện chốt kỳ tài chính.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Số tiền người bán tạm tính</div>
                     <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.SellerEarning)</div>
+                    <div class="finance-stat-hint">Tổng tiền hàng tạm tính sau khi trừ phí nền tảng trên toàn bộ đơn.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
             <div class="card finance-card">
                 <div class="card-body">
-                    <div class="finance-stat-label">Chi trả chờ xử lý</div>
+                    <div class="finance-stat-label">Số tiền đủ điều kiện đối soát</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.ReconciliationSellerEarning)</div>
+                    <div class="finance-stat-hint">Khoản có thể đưa vào quy trình chi trả/đối soát.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Số tiền có thể rút</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.WithdrawableAmount)</div>
+                    <div class="finance-stat-hint">Phần đủ điều kiện đối soát chưa nằm trong lệnh chi trả.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card">
+                <div class="card-body">
+                    <div class="finance-stat-label">Chờ chi trả</div>
                     <div class="fs-3 fw-bold text-warning">@FormatMoney(Model.Stats.PendingPayoutAmount)</div>
                 </div>
             </div>
@@ -290,47 +336,47 @@
                     </select>
                 </div>
                 <div class="col-md-4 col-lg-3">
-                    <label class="form-label fw-semibold">Nhóm theo dõi</label>
+                    <label class="form-label fw-semibold">Trạng thái xử lý</label>
                     <select class="form-select" name="followUpBucket">
                         @if (Model.FollowUpBucket == "all")
                         {
-                            <option value="all" selected>Tất cả mốc theo dõi</option>
+                            <option value="all" selected>Tất cả trạng thái xử lý</option>
                         }
                         else
                         {
-                            <option value="all">Tất cả mốc theo dõi</option>
+                            <option value="all">Tất cả trạng thái xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "overdue")
                         {
-                            <option value="overdue" selected>Quá hạn</option>
+                            <option value="overdue" selected>Cần xử lý quá hạn</option>
                         }
                         else
                         {
-                            <option value="overdue">Quá hạn</option>
+                            <option value="overdue">Cần xử lý quá hạn</option>
                         }
                         @if (Model.FollowUpBucket == "due-soon")
                         {
-                            <option value="due-soon" selected>Sắp đến hạn 48h</option>
+                            <option value="due-soon" selected>Sắp đến hạn xử lý</option>
                         }
                         else
                         {
-                            <option value="due-soon">Sắp đến hạn 48h</option>
+                            <option value="due-soon">Sắp đến hạn xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "no-follow-up")
                         {
-                            <option value="no-follow-up" selected>Chưa đặt mốc theo dõi</option>
+                            <option value="no-follow-up" selected>Chưa đặt lịch xử lý</option>
                         }
                         else
                         {
-                            <option value="no-follow-up">Chưa đặt mốc theo dõi</option>
+                            <option value="no-follow-up">Chưa đặt lịch xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "scheduled")
                         {
-                            <option value="scheduled" selected>Đã có lịch theo dõi</option>
+                            <option value="scheduled" selected>Đã có lịch xử lý</option>
                         }
                         else
                         {
-                            <option value="scheduled">Đã có lịch theo dõi</option>
+                            <option value="scheduled">Đã có lịch xử lý</option>
                         }
                     </select>
                 </div>
@@ -379,9 +425,9 @@
             <a class="finance-section-link @(Model.Section == "payouts" ? "active" : string.Empty)" href="@BuildSectionLink("payouts")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Chi trả</div>
+                        <div class="finance-pill mb-3">Chi trả cho người bán</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Payouts</div>
-                        <div class="text-muted">Các đợt đối soát hoặc chi trả người bán đang được theo dõi</div>
+                        <div class="text-muted">Các khoản sàn cần chi trả cho người bán sau khi đủ điều kiện đối soát</div>
                     </div>
                 </div>
             </a>
@@ -390,9 +436,9 @@
             <a class="finance-section-link @(Model.Section == "refunds" ? "active" : string.Empty)" href="@BuildSectionLink("refunds")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Hoàn tiền</div>
+                        <div class="finance-pill mb-3">Hoàn tiền cho khách</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Refunds</div>
-                        <div class="text-muted">Các giao dịch hoàn tiền cần đối chiếu với đơn hàng và thanh toán</div>
+                        <div class="text-muted">Các khoản cần hoàn tiền cho khách sau khi đối chiếu đơn hàng và thanh toán</div>
                     </div>
                 </div>
             </a>
@@ -401,9 +447,9 @@
             <a class="finance-section-link @(Model.Section == "returns" ? "active" : string.Empty)" href="@BuildSectionLink("returns")">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Đổi trả</div>
+                        <div class="finance-pill mb-3">Đổi trả ảnh hưởng đối soát</div>
                         <div class="display-6 fw-bold">@Model.SectionCounts.Returns</div>
-                        <div class="text-muted">Các yêu cầu đổi trả liên quan tới hoàn tiền và hậu mãi</div>
+                        <div class="text-muted">Các yêu cầu đổi/trả có thể làm giữ hoặc điều chỉnh tiền đối soát</div>
                     </div>
                 </div>
             </a>
@@ -415,9 +461,9 @@
             <a class="finance-section-link @(Model.FollowUpBucket == "overdue" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "overdue", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Quá hạn</div>
+                        <div class="finance-pill mb-3">Cần xử lý quá hạn</div>
                         <div class="display-6 fw-bold text-danger">@Model.Stats.OverdueFollowUps</div>
-                        <div class="text-muted">Các bản ghi đã quá mốc theo dõi, nên ưu tiên xử lý ngay.</div>
+                        <div class="text-muted">Các bản ghi đã quá hạn xử lý, nên ưu tiên kiểm tra ngay.</div>
                     </div>
                 </div>
             </a>
@@ -426,9 +472,9 @@
             <a class="finance-section-link @(Model.FollowUpBucket == "due-soon" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "due-soon", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">48h tới</div>
+                        <div class="finance-pill mb-3">Sắp đến hạn xử lý</div>
                         <div class="display-6 fw-bold text-warning">@Model.Stats.DueSoonFollowUps</div>
-                        <div class="text-muted">Các trường hợp sắp tới hạn theo dõi, phù hợp để chủ động chốt đối soát.</div>
+                        <div class="text-muted">Các trường hợp sắp tới hạn, phù hợp để chủ động chốt đối soát.</div>
                     </div>
                 </div>
             </a>
@@ -437,9 +483,9 @@
             <a class="finance-section-link @(Model.FollowUpBucket == "no-follow-up" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "no-follow-up", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
                 <div class="card finance-section-card h-100">
                     <div class="card-body">
-                        <div class="finance-pill mb-3">Chưa đặt mốc</div>
+                        <div class="finance-pill mb-3">Chưa đặt lịch xử lý</div>
                         <div class="display-6 fw-bold">@Model.Stats.NoFollowUpCount</div>
-                        <div class="text-muted">Các bản ghi chưa có mốc theo dõi để phụ trách viên lên lịch đối soát tiếp theo.</div>
+                        <div class="text-muted">Các bản ghi chưa có lịch xử lý để phụ trách viên lên kế hoạch đối soát tiếp theo.</div>
                     </div>
                 </div>
             </a>
@@ -455,7 +501,7 @@
                         <div class="finance-stat-label">Bảng theo dõi phụ trách</div>
                         <div class="h5 mb-0">Phân bổ hàng chờ theo người phụ trách trong phạm vi lọc hiện tại</div>
                     </div>
-                    <div class="small text-muted">Top 6 người phụ trách theo mức độ quá hạn</div>
+                    <div class="small text-muted">Top 6 người phụ trách theo mức độ trễ xử lý</div>
                 </div>
                 <div class="row g-3">
                     @foreach (var owner in Model.OwnerSummary)
@@ -468,9 +514,9 @@
                                         <span class="finance-pill">@owner.ItemCount việc</span>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>@owner.OverdueCount quá hạn</span>
-                                        <span class="finance-ops-chip text-warning"><i class="bi bi-hourglass-split"></i>@owner.DueSoonCount 48h tới</span>
-                                        <span class="finance-ops-chip"><i class="bi bi-calendar-x"></i>@owner.NoFollowUpCount chưa đặt mốc</span>
+                                        <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>@owner.OverdueCount quá hạn xử lý</span>
+                                        <span class="finance-ops-chip text-warning"><i class="bi bi-hourglass-split"></i>@owner.DueSoonCount sắp đến hạn</span>
+                                        <span class="finance-ops-chip"><i class="bi bi-calendar-x"></i>@owner.NoFollowUpCount chưa đặt lịch</span>
                                     </div>
                                 </div>
                             </div>
@@ -488,15 +534,15 @@
                     <h5 class="mb-1">
                         @if (Model.Section == "refunds")
                         {
-                            <span>Danh sách hoàn tiền</span>
+                            <span>Danh sách hoàn tiền cho khách</span>
                         }
                         else if (Model.Section == "returns")
                         {
-                            <span>Danh sách đổi trả</span>
+                            <span>Danh sách đổi trả ảnh hưởng đối soát</span>
                         }
                         else
                         {
-                            <span>Danh sách chi trả</span>
+                            <span>Danh sách chi trả cho người bán</span>
                         }
                     </h5>
                     <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total bản ghi theo phạm vi hiện tại</div>
@@ -514,14 +560,14 @@
                                 <input type="hidden" name="sellerId" value="@Model.SellerId" />
                                 <input type="hidden" name="page" value="@Model.Page" />
                                 <button type="submit" class="btn btn-primary rounded-pill px-3">
-                                    <i class="bi bi-plus-circle me-2"></i>Tạo payout chờ chi trả
+                                    <i class="bi bi-plus-circle me-2"></i>Tạo lệnh chi trả chờ xử lý
                                 </button>
                             </form>
                         }
                         <a class="btn btn-outline-primary rounded-pill px-3" href="@Url.Action("Export", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = Model.FollowUpBucket, sellerId = Model.SellerId })">
                             <i class="bi bi-download me-2"></i>Xuất CSV
                         </a>
-                        <div class="small text-muted">Quản trị viên có thể thao tác trực tiếp trên chi trả, hoàn tiền và đổi trả ngay tại đây.</div>
+                        <div class="small text-muted">Quản trị viên có thể xử lý chi trả cho người bán, hoàn tiền cho khách và đổi trả ảnh hưởng đối soát ngay tại đây.</div>
                     </div>
                 }
             </div>

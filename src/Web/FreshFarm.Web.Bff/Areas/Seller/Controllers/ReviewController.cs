@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -330,7 +331,11 @@ public class ReviewController : LegacySellerControllerBase
             var payload = await response.Content.ReadFromJsonAsync<List<ReviewApiDto>>(JsonOptions)
                 ?? new List<ReviewApiDto>();
 
-            return payload.Select(MapReview).ToList();
+            var reviews = payload.Select(MapReview).ToList();
+            await HydrateProductImagesAsync(reviews);
+            await HydrateUserAvatarsAsync(reviews);
+
+            return reviews;
         }
         catch
         {
@@ -350,6 +355,134 @@ public class ReviewController : LegacySellerControllerBase
         }
 
         return client;
+    }
+
+    private async Task HydrateProductImagesAsync(List<SellerReviewViewModel> reviews)
+    {
+        var productIds = reviews
+            .Select(review => review.ProductID)
+            .Where(productId => productId > 0)
+            .Distinct()
+            .Take(200)
+            .ToList();
+
+        if (productIds.Count == 0)
+        {
+            return;
+        }
+
+        var imagesByProductId = await GetProductImageFileNamesAsync(productIds);
+        if (imagesByProductId.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var review in reviews)
+        {
+            if (review.Product is not null &&
+                imagesByProductId.TryGetValue(review.ProductID, out var imageFileName) &&
+                !string.IsNullOrWhiteSpace(imageFileName))
+            {
+                review.Product.ImageFileName = imageFileName;
+            }
+        }
+    }
+
+    private async Task<Dictionary<int, string>> GetProductImageFileNamesAsync(IReadOnlyCollection<int> productIds)
+    {
+        try
+        {
+            var client = CreateAuthorizedClient("Catalog");
+            var query = string.Join("&", productIds.Select(productId => $"productIds={productId}"));
+            var response = await client.GetAsync($"/api/products?{query}&limit={Math.Min(productIds.Count, 200)}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            var products = await response.Content.ReadFromJsonAsync<List<CatalogProductImageApiDto>>(JsonOptions)
+                ?? new List<CatalogProductImageApiDto>();
+
+            return products
+                .Where(product => product.ProductId > 0)
+                .Select(product => new
+                {
+                    product.ProductId,
+                    ImageFileName = ProductImagePaths.NormalizeStoredFileName(product.ImageFileName)
+                })
+                .Where(product => !string.IsNullOrWhiteSpace(product.ImageFileName))
+                .GroupBy(product => product.ProductId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().ImageFileName!);
+        }
+        catch
+        {
+            return new Dictionary<int, string>();
+        }
+    }
+
+    private async Task HydrateUserAvatarsAsync(List<SellerReviewViewModel> reviews)
+    {
+        var userIds = reviews
+            .Select(review => review.UserID)
+            .Where(userId => userId > 0)
+            .Distinct()
+            .ToHashSet();
+
+        if (userIds.Count == 0)
+        {
+            return;
+        }
+
+        var avatarsByUserId = await GetCustomerAvatarUrlsAsync(userIds);
+        if (avatarsByUserId.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var review in reviews)
+        {
+            if (review.User is not null &&
+                avatarsByUserId.TryGetValue(review.UserID, out var avatarUrl))
+            {
+                review.User.AvatarUrl = avatarUrl;
+            }
+        }
+    }
+
+    private async Task<Dictionary<int, string>> GetCustomerAvatarUrlsAsync(IReadOnlySet<int> userIds)
+    {
+        try
+        {
+            var client = CreateAuthorizedClient("Identity");
+            var query = string.Join("&", userIds.Select(userId => $"userIds={userId}"));
+            var response = await client.GetAsync($"/auth/admin/customers?{query}&take={Math.Min(userIds.Count, 5000)}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            var customers = await response.Content.ReadFromJsonAsync<List<CustomerAvatarApiDto>>(JsonOptions)
+                ?? new List<CustomerAvatarApiDto>();
+
+            return customers
+                .Where(customer => userIds.Contains(customer.userId))
+                .Select(customer => new
+                {
+                    customer.userId,
+                    AvatarUrl = AvatarImagePaths.ResolveRequestPath(customer.avatar)
+                })
+                .Where(customer => !string.IsNullOrWhiteSpace(customer.AvatarUrl))
+                .GroupBy(customer => customer.userId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().AvatarUrl!);
+        }
+        catch
+        {
+            return new Dictionary<int, string>();
+        }
     }
 
     private static SellerReviewViewModel MapReview(ReviewApiDto dto)
@@ -372,7 +505,8 @@ public class ReviewController : LegacySellerControllerBase
                 {
                     UserID = dto.user.userID,
                     UserName = dto.user.userName ?? string.Empty,
-                    FullName = dto.user.fullName
+                    FullName = dto.user.fullName,
+                    AvatarUrl = AvatarImagePaths.ResolveRequestPath(dto.user.avatar)
                 },
             Product = dto.product is null
                 ? null
@@ -470,6 +604,8 @@ public class ReviewController : LegacySellerControllerBase
         public string? userName { get; set; }
 
         public string? fullName { get; set; }
+
+        public string? avatar { get; set; }
     }
 
     private sealed class ReviewProductApiDto
@@ -479,6 +615,20 @@ public class ReviewController : LegacySellerControllerBase
         public string? productName { get; set; }
 
         public string? imageFileName { get; set; }
+    }
+
+    private sealed class CatalogProductImageApiDto
+    {
+        public int ProductId { get; set; }
+
+        public string? ImageFileName { get; set; }
+    }
+
+    private sealed class CustomerAvatarApiDto
+    {
+        public int userId { get; set; }
+
+        public string? avatar { get; set; }
     }
 
     private sealed class ReviewReportApiDto

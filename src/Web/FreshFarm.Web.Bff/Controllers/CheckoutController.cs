@@ -527,7 +527,14 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                     SellerName = x.SellerName,
                     ShippingFee = x.ShippingFee,
                     ServiceName = x.ServiceName,
-                    ShippingOriginLabel = x.ShippingOriginLabel
+                    ShippingOriginLabel = x.ShippingOriginLabel,
+                    PackageWeight = x.PackageWeight,
+                    PackageLength = x.PackageLength,
+                    PackageWidth = x.PackageWidth,
+                    PackageHeight = x.PackageHeight,
+                    PackageInsuranceValue = x.PackageInsuranceValue,
+                    PackageItemName = x.PackageItemName,
+                    PackageItemQuantity = x.PackageItemQuantity
                 })
                 .ToList();
         }
@@ -679,7 +686,14 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 SellerName = string.IsNullOrWhiteSpace(x.SellerName) ? string.Empty : x.SellerName.Trim(),
                 ShippingFee = x.ShippingFee < 0m ? 0m : x.ShippingFee,
                 ServiceName = string.IsNullOrWhiteSpace(x.ServiceName) ? null : x.ServiceName.Trim(),
-                ShippingOriginLabel = string.IsNullOrWhiteSpace(x.ShippingOriginLabel) ? null : x.ShippingOriginLabel.Trim()
+                ShippingOriginLabel = string.IsNullOrWhiteSpace(x.ShippingOriginLabel) ? null : x.ShippingOriginLabel.Trim(),
+                PackageWeight = NormalizeOptionalPositiveInt(x.PackageWeight),
+                PackageLength = NormalizeOptionalPositiveInt(x.PackageLength),
+                PackageWidth = NormalizeOptionalPositiveInt(x.PackageWidth),
+                PackageHeight = NormalizeOptionalPositiveInt(x.PackageHeight),
+                PackageInsuranceValue = x.PackageInsuranceValue is < 0 ? 0 : x.PackageInsuranceValue,
+                PackageItemName = string.IsNullOrWhiteSpace(x.PackageItemName) ? null : x.PackageItemName.Trim(),
+                PackageItemQuantity = NormalizeOptionalPositiveInt(x.PackageItemQuantity)
             })
             .GroupBy(x => x.SellerId)
             .Select(g => g.OrderByDescending(x => x.ShippingFee).First())
@@ -1245,7 +1259,14 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
                 ProductCount = groupItems.Count,
                 ShippingFee = feeResult.TotalFee,
                 ServiceName = feeResult.ServiceName,
-                ShippingOriginLabel = origin?.PickupAddressSummary ?? "FreshFarm"
+                ShippingOriginLabel = origin?.PickupAddressSummary ?? "FreshFarm",
+                PackageWeight = package.Weight,
+                PackageLength = package.Length,
+                PackageWidth = package.Width,
+                PackageHeight = package.Height,
+                PackageInsuranceValue = package.InsuranceValue,
+                PackageItemName = package.ItemName,
+                PackageItemQuantity = package.ItemQuantity
             });
         }
 
@@ -1689,6 +1710,11 @@ public sealed class CheckoutController : Controller // MVC controller cho checko
     private static int? NormalizeRecommendationPosition(int? position)
     {
         return position is > 0 ? position.Value : null;
+    }
+
+    private static int? NormalizeOptionalPositiveInt(int? value)
+    {
+        return value is > 0 ? value.Value : null;
     }
 
     private sealed class NoopRecommendationExperimentService : IRecommendationExperimentService

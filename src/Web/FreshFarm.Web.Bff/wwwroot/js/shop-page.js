@@ -125,7 +125,7 @@
 
                 rootNode.innerHTML = `
                     <section class="shop-hero">
-                        ${avatar ? `<img src="${avatar}" alt="${escapeHtml(shopName)}" class="shop-avatar" />` : `<div class="shop-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
+                        ${avatar ? `<img src="${avatar}" alt="${escapeHtml(shopName)}" class="shop-avatar" loading="lazy" decoding="async" />` : `<div class="shop-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
                         <div>
                             <div class="shop-name">${escapeHtml(shopName)}</div>
                             <div class="shop-meta">
@@ -155,7 +155,7 @@
                         ${products.length === 0 ? `<div class="state-box">Shop này chưa có sản phẩm công khai.</div>` : `<div class="product-grid">
                             ${products.map((product) => `
                                 <article class="product-card">
-                                    <img src="${resolveImage(product.imageFileName ?? product.ImageFileName)}" alt="${escapeHtml(product.productName ?? product.ProductName ?? "")}" class="product-thumb" />
+                                    <img src="${resolveImage(product.imageFileName ?? product.ImageFileName)}" alt="${escapeHtml(product.productName ?? product.ProductName ?? "")}" class="product-thumb" loading="lazy" decoding="async" />
                                     <div class="product-body">
                                         <a class="product-name" href="/products/${Number(product.productId ?? product.ProductId ?? 0)}">${escapeHtml(product.productName ?? product.ProductName ?? "Sản phẩm")}</a>
                                         <div class="product-meta">${escapeHtml(product.categoryName ?? product.CategoryName ?? "Chưa phân loại")} · ${escapeHtml(product.unitName ?? product.UnitName ?? "đơn vị")}</div>

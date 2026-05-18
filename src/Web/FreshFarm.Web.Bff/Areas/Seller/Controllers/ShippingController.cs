@@ -22,7 +22,7 @@ public class ShippingController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
 
     private static readonly string[] PaidStatuses = { "Đã thanh toán", "Da thanh toan", "Hoàn tất", "Hoan tat" };
-    private static readonly Regex VietnamPhoneRegex = new(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", RegexOptions.Compiled);
+    private static readonly Regex GhnPhoneLikeRegex = new(@"^(0\d{9}|\+84\d{9})$", RegexOptions.Compiled);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGhnSandboxService _ghnSandboxService;
@@ -45,7 +45,6 @@ public class ShippingController : LegacySellerControllerBase
 
     public async Task<IActionResult> ManageShipping(
         string status = "",
-        int? staffId = null,
         string q = "",
         string sort = "date_desc",
         int page = 1,
@@ -57,12 +56,10 @@ public class ShippingController : LegacySellerControllerBase
         ViewBag.TotalItems = 0;
         ViewBag.PageSize = pageSize;
         ViewBag.CurrentStatus = status;
-        ViewBag.CurrentStaffId = staffId;
         ViewBag.CurrentQuery = q;
         ViewBag.CurrentSort = sort;
         ViewBag.DeliveredState = deliveredState;
         ViewBag.PaidStatuses = PaidStatuses;
-        ViewBag.DeliveryStaffs = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Orders = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Provinces = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
@@ -74,7 +71,7 @@ public class ShippingController : LegacySellerControllerBase
         {
             var currentStoreSettings = await GetCurrentStoreSettingsAsync(CancellationToken.None);
             ViewBag.SellerGhnStoreName = currentStoreSettings?.StoreName ?? string.Empty;
-            ViewBag.SellerGhnHasOrigin = currentStoreSettings?.HasGhnOrigin ?? false;
+            ViewBag.SellerGhnHasOrigin = BuildOriginOverride(currentStoreSettings) is not null;
 
             var client = CreateAuthorizedClient("Ordering");
 
@@ -87,11 +84,6 @@ public class ShippingController : LegacySellerControllerBase
                 $"pageSize={pageSize}",
                 $"deliveredState={Uri.EscapeDataString(deliveredState ?? string.Empty)}"
             };
-
-            if (staffId.HasValue)
-            {
-                query.Add($"staffId={staffId.Value}");
-            }
 
             var response = await client.GetAsync($"/api/orders/admin/shippings?{string.Join("&", query)}");
             if (!response.IsSuccessStatusCode)
@@ -110,22 +102,12 @@ public class ShippingController : LegacySellerControllerBase
             ViewBag.TotalItems = data?.totalItems ?? items.Count;
             ViewBag.PageSize = data?.pageSize ?? pageSize;
             ViewBag.CurrentStatus = data?.currentStatus ?? status;
-            ViewBag.CurrentStaffId = data?.currentStaffId;
             ViewBag.CurrentQuery = data?.currentQuery ?? q;
             ViewBag.CurrentSort = data?.currentSort ?? sort;
             ViewBag.DeliveredState = data?.deliveredState ?? deliveredState;
             ViewBag.PaidStatuses = PaidStatuses;
             ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
             ViewBag.GhnSandboxShopId = _ghnSandboxService.ShopId;
-
-            var staffs = (data?.deliveryStaffs ?? new List<DeliveryStaffDto>())
-                .Select(s => new SelectListItem
-                {
-                    Value = s.adminID.ToString(),
-                    Text = string.IsNullOrWhiteSpace(s.name) ? $"NV #{s.adminID:D4}" : s.name
-                })
-                .ToList();
-            ViewBag.DeliveryStaffs = new SelectList(staffs, "Value", "Text", (data?.currentStaffId)?.ToString());
 
             var orders = (data?.orders ?? new List<OrderOptionDto>())
                 .Select(o => new
@@ -161,6 +143,7 @@ public class ShippingController : LegacySellerControllerBase
     {
         var settings = await GetCurrentStoreSettingsAsync(cancellationToken);
         var origin = BuildOriginOverride(settings);
+        var originMessage = GetOriginValidationMessage(settings);
 
         return Json(new
         {
@@ -177,9 +160,9 @@ public class ShippingController : LegacySellerControllerBase
             districtName = settings?.GhnDistrictName ?? string.Empty,
             wardCode = settings?.GhnWardCode ?? string.Empty,
             wardName = settings?.GhnWardName ?? string.Empty,
-            hasGhnOrigin = settings?.HasGhnOrigin ?? false,
+            hasGhnOrigin = origin is not null,
             message = origin is null
-                ? "Bạn chưa lưu đủ địa chỉ lấy hàng. Hãy vào Cài đặt cửa hàng để cập nhật trước."
+                ? originMessage ?? "Bạn chưa lưu đủ địa chỉ lấy hàng. Hãy vào Cài đặt cửa hàng để cập nhật trước."
                 : "Địa chỉ lấy hàng đã sẵn sàng để dùng."
         });
     }
@@ -481,6 +464,224 @@ public class ShippingController : LegacySellerControllerBase
         });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> MarkReadyForPickup([FromBody] MarkReadyForPickupRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null || request.OrderId <= 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Không xác định được đơn hàng cần chuẩn bị."
+            });
+        }
+
+        var currentStatus = NormalizeStatus(request.CurrentStatus);
+        if (currentStatus == "Ready")
+        {
+            var readyGhnHandoff = await EnsureGhnOrderForReadyHandoffAsync(request, cancellationToken);
+            if (!readyGhnHandoff.Success)
+            {
+                return Json(new
+                {
+                    success = false,
+                    message = readyGhnHandoff.Message
+                });
+            }
+
+            return Json(new
+            {
+                success = true,
+                status = "Ready",
+                orderCode = readyGhnHandoff.OrderCode,
+                clientOrderCode = readyGhnHandoff.ClientOrderCode,
+                ghnCreated = readyGhnHandoff.CreatedNewOrder,
+                message = readyGhnHandoff.CreatedNewOrder
+                    ? "Đã tạo vận đơn GHN sandbox và xác nhận đơn đang chờ shipper đến lấy."
+                    : "Đơn này đã ở trạng thái shop chuẩn bị xong, chờ shipper đến lấy."
+            });
+        }
+
+        var nextStatuses = currentStatus switch
+        {
+            "Pending" => new[] { "Processing", "Ready" },
+            "Processing" => new[] { "Ready" },
+            _ => Array.Empty<string>()
+        };
+
+        if (nextStatuses.Length == 0)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Chỉ có thể xác nhận chuẩn bị hàng cho đơn đang chờ xử lý hoặc đang xử lý."
+            });
+        }
+
+        var ghnHandoff = await EnsureGhnOrderForReadyHandoffAsync(request, cancellationToken);
+        if (!ghnHandoff.Success)
+        {
+            return Json(new
+            {
+                success = false,
+                message = ghnHandoff.Message
+            });
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Ordering");
+            foreach (var nextStatus in nextStatuses)
+            {
+                using var response = await client.PostAsJsonAsync(
+                    $"/api/orders/admin/{request.OrderId}/status",
+                    new { newStatus = nextStatus },
+                    cancellationToken);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = await ReadApiErrorAsync(response, "Không thể cập nhật trạng thái đơn hàng.")
+                    });
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                status = "Ready",
+                orderCode = ghnHandoff.OrderCode,
+                clientOrderCode = ghnHandoff.ClientOrderCode,
+                ghnCreated = ghnHandoff.CreatedNewOrder,
+                message = "Shop đã chuẩn bị hàng xong. Đơn đang chờ shipper đến lấy."
+            });
+        }
+        catch (Exception ex)
+        {
+            return Json(new
+            {
+                success = false,
+                message = "Lỗi khi cập nhật trạng thái chuẩn bị hàng: " + ex.Message
+            });
+        }
+    }
+
+    private async Task<GhnReadyHandoffResult> EnsureGhnOrderForReadyHandoffAsync(MarkReadyForPickupRequest request, CancellationToken cancellationToken)
+    {
+        var orderInfo = await GetOrderInfoPayloadAsync(request.OrderId, cancellationToken);
+        if (orderInfo is null || !orderInfo.success)
+        {
+            return GhnReadyHandoffResult.Fail("Không tìm thấy đơn hàng hợp lệ để tạo vận đơn GHN trước khi bàn giao.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(orderInfo.ghnOrderCode) || !string.IsNullOrWhiteSpace(orderInfo.ghnClientOrderCode))
+        {
+            return GhnReadyHandoffResult.Ok(orderInfo.ghnOrderCode, orderInfo.ghnClientOrderCode, createdNewOrder: false);
+        }
+
+        if (string.IsNullOrWhiteSpace(orderInfo.fullName)
+            || string.IsNullOrWhiteSpace(orderInfo.phone)
+            || string.IsNullOrWhiteSpace(orderInfo.address))
+        {
+            return GhnReadyHandoffResult.Fail("Đơn hàng chưa có đủ thông tin người nhận để tạo vận đơn GHN.");
+        }
+
+        if (request.ToDistrictId <= 0 || string.IsNullOrWhiteSpace(request.ToWardCode))
+        {
+            return GhnReadyHandoffResult.Fail("Địa chỉ giao hàng chưa hợp lệ theo GHN. Vui lòng kiểm tra/cập nhật địa chỉ đơn hàng, hệ thống không tự sửa địa chỉ khách.");
+        }
+
+        if (!TryResolveRequiredPositiveInt(request.Weight, orderInfo.packageWeight, out var packageWeight)
+            || !TryResolveRequiredPositiveInt(request.Length, orderInfo.packageLength, out var packageLength)
+            || !TryResolveRequiredPositiveInt(request.Width, orderInfo.packageWidth, out var packageWidth)
+            || !TryResolveRequiredPositiveInt(request.Height, orderInfo.packageHeight, out var packageHeight))
+        {
+            return GhnReadyHandoffResult.Fail("Thiếu cân nặng hoặc kích thước kiện hàng để tạo vận đơn GHN. Vui lòng kiểm tra lại dữ liệu kiện hàng đã dùng khi tính phí ship.");
+        }
+
+        var storeSettings = await GetCurrentStoreSettingsAsync(cancellationToken);
+        var originOverride = BuildOriginOverride(storeSettings);
+        if (originOverride is null)
+        {
+            return GhnReadyHandoffResult.Fail(GetOriginValidationMessage(storeSettings)
+                ?? "Bạn chưa lưu đủ thông tin lấy hàng hợp lệ. Hãy cập nhật địa chỉ và số điện thoại trong Cài đặt cửa hàng trước.");
+        }
+
+        var boundedQuantity = NormalizePositiveInt(orderInfo.totalQuantity, fallback: 1);
+        var boundedItemPrice = ConvertCurrencyAmountToInt(orderInfo.itemsAmount);
+        var boundedInsuranceValue = ConvertCurrencyAmountToInt(orderInfo.totalAmount);
+        var boundedCodAmount = orderInfo.isCod
+            ? ConvertCurrencyAmountToInt(orderInfo.codAmount ?? orderInfo.totalAmount)
+            : 0;
+
+        var result = await _ghnSandboxService.CreateOrderAsync(new GhnSandboxCreateOrderRequest
+        {
+            ToName = orderInfo.fullName.Trim(),
+            ToPhone = orderInfo.phone.Trim(),
+            ToAddress = orderInfo.address.Trim(),
+            ToDistrictId = request.ToDistrictId,
+            ToWardCode = request.ToWardCode.Trim(),
+            ServiceTypeId = request.ServiceTypeId,
+            ClientOrderCode = BuildBoundClientOrderCode(request.OrderId),
+            Content = BuildBoundShipmentContent(request.OrderId),
+            RequiredNote = request.RequiredNote ?? string.Empty,
+            PaymentTypeId = request.PaymentTypeId,
+            CodAmount = boundedCodAmount,
+            InsuranceValue = boundedInsuranceValue,
+            Height = packageHeight,
+            Length = packageLength,
+            Width = packageWidth,
+            Weight = packageWeight,
+            OriginOverride = originOverride,
+            Items = new List<GhnSandboxOrderItemRequest>
+            {
+                new()
+                {
+                    Name = string.IsNullOrWhiteSpace(orderInfo.itemSummary) ? "Gói hàng tổng hợp" : orderInfo.itemSummary.Trim(),
+                    Code = BuildBoundItemCode(request.OrderId),
+                    Quantity = boundedQuantity,
+                    Price = boundedItemPrice,
+                    Height = packageHeight,
+                    Length = packageLength,
+                    Width = packageWidth,
+                    Weight = packageWeight
+                }
+            }
+        }, cancellationToken);
+
+        if (!result.Success)
+        {
+            return GhnReadyHandoffResult.Fail(string.IsNullOrWhiteSpace(result.Message)
+                ? "GHN sandbox chưa tạo được vận đơn. Đơn hàng chưa được chuyển sang trạng thái Ready."
+                : result.Message);
+        }
+
+        if (string.IsNullOrWhiteSpace(result.OrderCode))
+        {
+            return GhnReadyHandoffResult.Fail("GHN sandbox đã phản hồi thành công nhưng không trả mã vận đơn order_code. Đơn hàng chưa được chuyển sang trạng thái Ready.");
+        }
+
+        var metadataPersisted = await PersistGhnMetadataAsync(request.OrderId, new GhnMetadataUpsertRequest
+        {
+            OrderCode = result.OrderCode,
+            ClientOrderCode = result.ClientOrderCode,
+            TotalFee = result.TotalFee,
+            CreatedAt = DateTime.UtcNow,
+            ExpectedDeliveryTime = result.ExpectedDeliveryTime?.UtcDateTime,
+            LastSyncedAt = DateTime.UtcNow
+        }, cancellationToken);
+
+        if (!metadataPersisted)
+        {
+            return GhnReadyHandoffResult.Fail("GHN sandbox đã tạo vận đơn nhưng hệ thống chưa lưu được mã vận đơn vào Shipping. Đơn hàng chưa được chuyển sang Ready để tránh lệch dữ liệu.");
+        }
+
+        return GhnReadyHandoffResult.Ok(result.OrderCode, result.ClientOrderCode, createdNewOrder: true);
+    }
+
     [HttpGet]
     public async Task<JsonResult> GetGhnSandboxOrder([FromQuery] GetGhnSandboxOrderRequest? request, CancellationToken cancellationToken)
     {
@@ -524,9 +725,18 @@ public class ShippingController : LegacySellerControllerBase
             status = result.Status,
             statusLabel = result.StatusLabel,
             serviceName = result.ServiceName,
+            fromName = result.FromName,
+            fromPhone = result.FromPhone,
+            fromAddress = result.FromAddress,
             toName = result.ToName,
             toPhone = result.ToPhone,
             toAddress = result.ToAddress,
+            currentWarehouseId = result.CurrentWarehouseId,
+            currentWarehouseName = result.CurrentWarehouseName,
+            weight = result.Weight,
+            length = result.Length,
+            width = result.Width,
+            height = result.Height,
             codAmount = result.CodAmount,
             totalFee = result.TotalFee,
             createdDate = result.CreatedDate?.ToString("O"),
@@ -536,7 +746,9 @@ public class ShippingController : LegacySellerControllerBase
             {
                 status = log.Status,
                 statusLabel = log.StatusLabel,
-                updatedAt = log.UpdatedAt?.ToString("O")
+                updatedAt = log.UpdatedAt?.ToString("O"),
+                warehouseId = log.WarehouseId,
+                warehouseName = log.WarehouseName
             }),
             message = result.Message
         });
@@ -599,175 +811,34 @@ public class ShippingController : LegacySellerControllerBase
         return Json(new
         {
             success = false,
-            message = "Đơn hàng đã có dòng vận chuyển tự tạo từ lúc checkout. Seller không thể thêm vận chuyển thủ công nữa; hãy chỉnh sửa bản ghi hiện có hoặc tạo vận đơn GHN theo đơn đã chọn."
+            message = "Đơn hàng đã có dòng vận chuyển tự tạo từ lúc checkout. Seller không thể thêm vận chuyển thủ công; nếu địa chỉ khách hàng sai, hãy báo cần cập nhật địa chỉ đơn hàng trước khi tạo vận đơn GHN."
         });
-    }
-
-    [HttpGet]
-    public async Task<JsonResult> Edit(int id)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.GetAsync($"/api/orders/admin/shippings/{id}");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong tim thay thong tin van chuyen") });
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<ShippingEditApiResponse>(JsonOptions);
-            if (payload is null)
-            {
-                return Json(new { success = false, message = "Khong doc duoc du lieu" });
-            }
-
-            return Json(payload);
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = ex.Message });
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Edit(Shipping shipping)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PutAsJsonAsync($"/api/orders/admin/shippings/{shipping.ShippingID}", new
-            {
-                orderID = shipping.OrderID,
-                shippingType = shipping.ShippingType,
-                fullName = shipping.FullName,
-                phone = shipping.Phone,
-                email = shipping.Email,
-                addressDetail = shipping.AddressDetail,
-                provinceId = shipping.ProvinceId,
-                communeId = shipping.CommuneId,
-                isStorePickup = shipping.IsStorePickup,
-                storeAddress = shipping.StoreAddress,
-                deliveryStaffId = ParseNullableInt(Request.Form["DeliveryStaffId"].ToString())
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the cap nhat van chuyen") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Cap nhat van chuyen thanh cong"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Delete(int id)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.DeleteAsync($"/api/orders/admin/shippings/{id}");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the xoa thong tin van chuyen") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Xoa thong tin van chuyen thanh cong"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> ReconcileCod(int orderId)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PostAsJsonAsync("/api/orders/admin/shippings/reconcile-cod", new
-            {
-                orderId
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the doi soat COD") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Da doi soat COD"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> UnreconcileCod(int orderId)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PostAsJsonAsync("/api/orders/admin/shippings/unreconcile-cod", new
-            {
-                orderId
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the bo doi soat COD") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Da bo doi soat COD"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
     }
 
     private static int? ParseNullableInt(string? value)
     {
         return int.TryParse(value, out var result) && result > 0 ? result : null;
+    }
+
+    private static string NormalizeStatus(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "pending" => "Pending",
+            "processing" => "Processing",
+            "ready" => "Ready",
+            "shipped" => "Shipped",
+            "delivered" => "Delivered",
+            "canceled" or "cancelled" => "Canceled",
+            "expired" => "Expired",
+            "awaitingpayment" or "awaiting_payment" => "AwaitingPayment",
+            _ => value.Trim()
+        };
     }
 
     private HttpClient CreateAuthorizedClient(string clientName)
@@ -855,6 +926,16 @@ public class ShippingController : LegacySellerControllerBase
         return value.HasValue && value.Value > 0 ? value.Value : fallback;
     }
 
+    private static bool TryResolveRequiredPositiveInt(int? preferred, int? fallback, out int value)
+    {
+        value = preferred is > 0
+            ? preferred.Value
+            : fallback is > 0
+                ? fallback.Value
+                : 0;
+        return value > 0;
+    }
+
     private static int ConvertCurrencyAmountToInt(decimal? value)
     {
         if (!value.HasValue || value.Value <= 0)
@@ -902,35 +983,63 @@ public class ShippingController : LegacySellerControllerBase
 
     private static GhnSandboxOriginOverride? BuildOriginOverride(SellerSettingViewModel? settings)
     {
-        var pickupPhone = !string.IsNullOrWhiteSpace(settings?.GhnPickupPhone)
-            ? settings.GhnPickupPhone.Trim()
-            : settings?.StorePhone.Trim();
-
-        if (settings is null
-            || !settings.GhnDistrictId.HasValue
-            || settings.GhnDistrictId.Value <= 0
-            || string.IsNullOrWhiteSpace(settings.GhnWardCode)
-            || string.IsNullOrWhiteSpace(settings.GhnPickupAddress)
-            || !IsVietnamPhone(pickupPhone))
+        if (settings is null || GetOriginValidationMessage(settings) is not null)
         {
             return null;
         }
 
+        var pickupPhone = ResolvePickupPhone(settings)!;
+
         return new GhnSandboxOriginOverride
         {
             FromDistrictId = settings.GhnDistrictId,
-            FromWardCode = settings.GhnWardCode.Trim(),
-            ReturnAddress = settings.GhnPickupAddress.Trim(),
-            ReturnPhone = pickupPhone!,
+            FromWardCode = settings.GhnWardCode!.Trim(),
+            ReturnAddress = settings.GhnPickupAddress!.Trim(),
+            ReturnPhone = pickupPhone,
             PickupName = !string.IsNullOrWhiteSpace(settings.GhnPickupName)
                 ? settings.GhnPickupName.Trim()
                 : settings.StoreName.Trim()
         };
     }
 
-    private static bool IsVietnamPhone(string? value)
+    private static string? GetOriginValidationMessage(SellerSettingViewModel? settings)
     {
-        return !string.IsNullOrWhiteSpace(value) && VietnamPhoneRegex.IsMatch(value.Trim());
+        if (settings is null)
+        {
+            return "Không tải được cấu hình cửa hàng. Hãy đăng nhập lại hoặc kiểm tra Cài đặt cửa hàng.";
+        }
+
+        var pickupPhone = ResolvePickupPhone(settings);
+        if (!settings.GhnDistrictId.HasValue
+            || settings.GhnDistrictId.Value <= 0
+            || string.IsNullOrWhiteSpace(settings.GhnWardCode))
+        {
+            return "Thiếu quận/huyện hoặc phường/xã GHN của địa chỉ lấy hàng. Hãy cập nhật Cài đặt cửa hàng trước.";
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.GhnPickupAddress))
+        {
+            return "Thiếu địa chỉ lấy hàng GHN. Hãy cập nhật Cài đặt cửa hàng trước.";
+        }
+
+        if (!IsGhnPhoneLike(pickupPhone))
+        {
+            return "Số điện thoại lấy hàng chưa đúng định dạng gửi GHN. Vui lòng nhập 10 chữ số bắt đầu bằng 0 hoặc dạng +84xxxxxxxxx.";
+        }
+
+        return null;
+    }
+
+    private static string? ResolvePickupPhone(SellerSettingViewModel? settings)
+    {
+        return !string.IsNullOrWhiteSpace(settings?.GhnPickupPhone)
+            ? settings.GhnPickupPhone.Trim()
+            : settings?.StorePhone.Trim();
+    }
+
+    private static bool IsGhnPhoneLike(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) && GhnPhoneLikeRegex.IsMatch(value.Trim());
     }
 
     private static Shipping MapShipping(ShippingItemDto item)
@@ -981,6 +1090,10 @@ public class ShippingController : LegacySellerControllerBase
                     TotalAmount = item.order.totalAmount,
                     TotalQuantity = item.order.totalQuantity,
                     ItemSummary = item.order.itemSummary,
+                    PackageWeight = item.order.packageWeight,
+                    PackageLength = item.order.packageLength,
+                    PackageWidth = item.order.packageWidth,
+                    PackageHeight = item.order.packageHeight,
                     Payments = item.order.payments?.Select(p => new Payment
                     {
                         PaymentID = p.paymentID,
@@ -1050,8 +1163,6 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? currentStatus { get; set; }
 
-        public int? currentStaffId { get; set; }
-
         public string? currentQuery { get; set; }
 
         public string? currentSort { get; set; }
@@ -1059,8 +1170,6 @@ public class ShippingController : LegacySellerControllerBase
         public string? deliveredState { get; set; }
 
         public List<ProvinceDto>? provinces { get; set; }
-
-        public List<DeliveryStaffDto>? deliveryStaffs { get; set; }
 
         public List<OrderOptionDto>? orders { get; set; }
     }
@@ -1128,6 +1237,14 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? itemSummary { get; set; }
 
+        public int? packageWeight { get; set; }
+
+        public int? packageLength { get; set; }
+
+        public int? packageWidth { get; set; }
+
+        public int? packageHeight { get; set; }
+
         public List<ShippingPaymentDto>? payments { get; set; }
     }
 
@@ -1154,13 +1271,6 @@ public class ShippingController : LegacySellerControllerBase
         public int communeId { get; set; }
 
         public string? communeName { get; set; }
-    }
-
-    private sealed class DeliveryStaffDto
-    {
-        public int adminID { get; set; }
-
-        public string? name { get; set; }
     }
 
     private sealed class OrderOptionDto
@@ -1202,6 +1312,14 @@ public class ShippingController : LegacySellerControllerBase
         public int? totalQuantity { get; set; }
 
         public string? itemSummary { get; set; }
+
+        public int? packageWeight { get; set; }
+
+        public int? packageLength { get; set; }
+
+        public int? packageWidth { get; set; }
+
+        public int? packageHeight { get; set; }
 
         public string? ghnOrderCode { get; set; }
 
@@ -1252,7 +1370,6 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? storeAddress { get; set; }
 
-        public int? deliveryStaffId { get; set; }
     }
 
     public sealed class PreviewGhnFeeRequest
@@ -1352,6 +1469,64 @@ public class ShippingController : LegacySellerControllerBase
         public string? OrderCode { get; set; }
 
         public string? ClientOrderCode { get; set; }
+    }
+
+    public sealed class MarkReadyForPickupRequest
+    {
+        public int OrderId { get; set; }
+
+        public string? CurrentStatus { get; set; }
+
+        public int ToDistrictId { get; set; }
+
+        public string? ToWardCode { get; set; }
+
+        public int? ServiceTypeId { get; set; }
+
+        public string? RequiredNote { get; set; }
+
+        public int PaymentTypeId { get; set; } = 2;
+
+        public int? Height { get; set; }
+
+        public int? Length { get; set; }
+
+        public int? Width { get; set; }
+
+        public int? Weight { get; set; }
+    }
+
+    private sealed class GhnReadyHandoffResult
+    {
+        public bool Success { get; private init; }
+
+        public string Message { get; private init; } = string.Empty;
+
+        public string? OrderCode { get; private init; }
+
+        public string? ClientOrderCode { get; private init; }
+
+        public bool CreatedNewOrder { get; private init; }
+
+        public static GhnReadyHandoffResult Ok(string? orderCode, string? clientOrderCode, bool createdNewOrder)
+        {
+            return new GhnReadyHandoffResult
+            {
+                Success = true,
+                OrderCode = orderCode,
+                ClientOrderCode = clientOrderCode,
+                CreatedNewOrder = createdNewOrder
+            };
+        }
+
+        public static GhnReadyHandoffResult Fail(string message)
+        {
+            return new GhnReadyHandoffResult
+            {
+                Success = false,
+                Message = message
+            };
+        }
     }
 
     private sealed class GhnMetadataUpsertRequest

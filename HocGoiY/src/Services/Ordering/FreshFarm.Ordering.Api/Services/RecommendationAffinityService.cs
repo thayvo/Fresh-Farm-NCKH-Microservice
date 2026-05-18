@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityService.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityService.cs
-// Thu muc hoc tap: HocGoiY
-
 using FreshFarm.Ordering.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +9,7 @@ public sealed class RecommendationAffinityService
     private static readonly TimeSpan LookbackWindow = TimeSpan.FromDays(180);
     private static readonly TimeSpan HomePreferenceLookbackWindow = TimeSpan.FromDays(90);
     private static readonly TimeSpan ReplenishmentLookbackWindow = TimeSpan.FromDays(365);
+    private static readonly TimeSpan NegativeFeedbackLookbackWindow = TimeSpan.FromDays(30);
     private const int MaxAffinitiesPerSeed = 48;
     private const int MaxKeywordAffinitiesPerKeyword = 48;
     private const int MaxHomePreferenceSeedsPerScope = 48;
@@ -22,6 +19,7 @@ public sealed class RecommendationAffinityService
     private const int MaxUserSellerScoresPerUser = 32;
     private const int MaxBasketAffinitiesPerProduct = 48;
     private const int MaxReplenishmentProfilesPerUser = 48;
+    private const double NegativeFeedbackScoreScale = 10d;
 
     private readonly FreshFarmOrderingDBContext _db;
     private readonly CatalogInventoryClient _catalogInventoryClient;
@@ -193,9 +191,16 @@ public sealed class RecommendationAffinityService
             recommendationClickPairs,
             productViewPairs,
             computedAt);
+        var negativeFeedbackScores = await RecommendationNegativeFeedbackScoring.LoadUserProductScoreMapAsync(
+            _db,
+            computedAt.Subtract(NegativeFeedbackLookbackWindow),
+            computedAt,
+            computedAt,
+            cancellationToken);
         var userProductScores = await BuildUserProductScoresAsync(
             DateTime.UtcNow.Subtract(ReplenishmentLookbackWindow),
             computedAt,
+            negativeFeedbackScores,
             cancellationToken);
         var userCategoryScores = await BuildUserCategoryScoresAsync(
             userProductScores,
@@ -213,10 +218,12 @@ public sealed class RecommendationAffinityService
         var homePreferenceSeeds = await BuildHomePreferenceSeedsAsync(
             DateTime.UtcNow.Subtract(HomePreferenceLookbackWindow),
             computedAt,
+            negativeFeedbackScores,
             cancellationToken);
         var homeCollaborativeCandidates = BuildHomeCollaborativeCandidates(
             homePreferenceSeeds,
             materializedRows,
+            negativeFeedbackScores,
             computedAt);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
@@ -393,6 +400,7 @@ public sealed class RecommendationAffinityService
     private async Task<List<RecommendationHomePreferenceSeed>> BuildHomePreferenceSeedsAsync(
         DateTime lookbackFromUtc,
         DateTime computedAt,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         CancellationToken cancellationToken)
     {
         var seedsByScope = new Dictionary<(string ScopeType, string ScopeKey, int ProductId), RecommendationHomePreferenceSeed>();
@@ -587,6 +595,12 @@ public sealed class RecommendationAffinityService
                 + (seed.SearchClickCount * 28d)
                 + (seed.RecommendationClickCount * 22d)
                 + (seed.PurchaseCount * 35d);
+
+            if (seed.UserId.HasValue
+                && negativeFeedbackScores.TryGetValue((seed.UserId.Value, seed.ProductId), out var negativeFeedback))
+            {
+                seed.PreferenceScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
+            }
         }
 
         return seedsByScope.Values
@@ -607,6 +621,7 @@ public sealed class RecommendationAffinityService
     private static List<RecommendationHomeCollaborativeCandidate> BuildHomeCollaborativeCandidates(
         IReadOnlyCollection<RecommendationHomePreferenceSeed> homePreferenceSeeds,
         IReadOnlyCollection<RecommendationProductAffinity> productAffinities,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         DateTime computedAt)
     {
         if (homePreferenceSeeds.Count == 0 || productAffinities.Count == 0)
@@ -667,6 +682,15 @@ public sealed class RecommendationAffinityService
             }
         }
 
+        foreach (var candidate in candidatesByScope.Values)
+        {
+            if (candidate.UserId.HasValue
+                && negativeFeedbackScores.TryGetValue((candidate.UserId.Value, candidate.ProductId), out var negativeFeedback))
+            {
+                candidate.CollaborativeScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
+            }
+        }
+
         return candidatesByScope.Values
             .Where(item => item.CollaborativeScore > 0d)
             .GroupBy(item => (item.ScopeType, item.ScopeKey))
@@ -683,6 +707,7 @@ public sealed class RecommendationAffinityService
     private async Task<List<RecommendationUserProductScore>> BuildUserProductScoresAsync(
         DateTime lookbackFromUtc,
         DateTime computedAt,
+        IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         CancellationToken cancellationToken)
     {
         var scoresByUserProduct = new Dictionary<(int UserId, int ProductId), RecommendationUserProductScore>();
@@ -814,6 +839,11 @@ public sealed class RecommendationAffinityService
             {
                 var ageDays = Math.Max(0d, (computedAt - item.LastInteractedAtUtc.Value).TotalDays);
                 item.UserProductScore += Math.Max(0d, 18d - Math.Min(ageDays, 18d));
+            }
+
+            if (negativeFeedbackScores.TryGetValue((item.UserId, item.ProductId), out var negativeFeedback))
+            {
+                item.UserProductScore += negativeFeedback.PenaltyScore * NegativeFeedbackScoreScale;
             }
         }
 
@@ -1253,4 +1283,3 @@ public sealed class RecommendationAffinityRefreshResult
 
     public DateTime ComputedAtUtc { get; set; }
 }
-

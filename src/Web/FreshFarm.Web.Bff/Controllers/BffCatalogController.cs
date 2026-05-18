@@ -2940,7 +2940,7 @@ public sealed class BffCatalogController : ControllerBase
 
     private static RecommendationReasonDto BuildBestSellerReason(CatalogProductApiDto item)
     {
-        var tags = new List<string>(4) { "Best seller" };
+        var tags = new List<string>(4) { "Bán chạy" };
         if (item.RecentSoldCount > 0)
         {
             tags.Add($"{item.RecentSoldCount} lượt bán gần đây");
@@ -2974,7 +2974,7 @@ public sealed class BffCatalogController : ControllerBase
 
     private static RecommendationReasonDto BuildNewArrivalReason(CatalogProductApiDto item)
     {
-        var tags = new List<string>(4) { "New arrival" };
+        var tags = new List<string>(4) { "Hàng mới về" };
         var ageDays = Math.Max(0d, (DateTime.UtcNow - item.CreatedDate).TotalDays);
         if (ageDays < 1d)
         {
@@ -3022,24 +3022,24 @@ public sealed class BffCatalogController : ControllerBase
         switch (source)
         {
             case "top_sold":
-                tags.Add("Top sold");
+                tags.Add("Bán chạy");
                 if (item.SoldCount > 0)
                 {
                     tags.Add($"{item.SoldCount} lượt bán");
                 }
                 break;
             case "top_rated":
-                tags.Add("Top rated");
+                tags.Add("Đánh giá cao");
                 if (item.AverageRating > 0)
                 {
                     tags.Add($"{item.AverageRating:0.#}/5 sao");
                 }
                 break;
             case "recent_popular":
-                tags.Add("Recent popular");
+                tags.Add("Đang được quan tâm");
                 if (item.CreatedDate >= DateTime.UtcNow.AddDays(-30))
                 {
-                    tags.Add("Mới lên gần đây");
+                    tags.Add("Mới gần đây");
                 }
                 break;
         }
@@ -3056,7 +3056,7 @@ public sealed class BffCatalogController : ControllerBase
 
         if (tags.Count == 0)
         {
-            tags.Add("Global trend");
+            tags.Add("Xu hướng chung");
         }
 
         return new RecommendationReasonDto

@@ -33,6 +33,72 @@ public sealed class FinancePayoutTests
     }
 
     [Fact]
+    public async Task GetConsole_SeparatesAllOrdersFromReconciliationEligibleStats()
+    {
+        await using var db = CreateDbContext();
+        SeedPaidSellerOrder(db, orderId: 1, sellerId: 10, commissionAmount: 1_000m, sellerEarning: 9_000m);
+        SeedPaidSellerOrder(db, orderId: 2, sellerId: 10, commissionAmount: 2_000m, sellerEarning: 18_000m, orderStatus: "Pending", sellerStatus: "Pending");
+        SeedPaidSellerOrder(db, orderId: 3, sellerId: 10, commissionAmount: 3_000m, sellerEarning: 27_000m, orderStatus: "Canceled", sellerStatus: "Canceled");
+        SeedPaidSellerOrder(db, orderId: 4, sellerId: 10, commissionAmount: 4_000m, sellerEarning: 36_000m, orderPaymentStatus: "Pending", includeTransaction: false);
+        SeedPaidSellerOrder(db, orderId: 5, sellerId: 10, commissionAmount: 5_000m, sellerEarning: 45_000m, paymentMethod: "COD");
+        await db.SaveChangesAsync();
+
+        var controller = CreateFinanceController(db, isAdmin: true, subjectId: 1);
+        var result = await controller.GetConsole(cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var stats = json.RootElement.GetProperty("stats");
+        Assert.Equal(150_000m, stats.GetProperty("grossMerchandiseValue").GetDecimal());
+        Assert.Equal(15_000m, stats.GetProperty("platformCommission").GetDecimal());
+        Assert.Equal(135_000m, stats.GetProperty("sellerEarning").GetDecimal());
+        Assert.Equal(10_000m, stats.GetProperty("reconciliationGrossMerchandiseValue").GetDecimal());
+        Assert.Equal(1_000m, stats.GetProperty("reconciliationPlatformCommission").GetDecimal());
+        Assert.Equal(9_000m, stats.GetProperty("reconciliationSellerEarning").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetConsole_ComputesWithdrawableAmountFromEligibleOrdersNotAlreadyQueued()
+    {
+        await using var db = CreateDbContext();
+        var queuedTransaction = SeedPaidSellerOrder(db, orderId: 1, sellerId: 10, commissionAmount: 1_000m, sellerEarning: 9_000m);
+        SeedPaidSellerOrder(db, orderId: 2, sellerId: 10, commissionAmount: 2_000m, sellerEarning: 18_000m);
+        var queuedSellerOrder = queuedTransaction.Order.SellerOrders.Single();
+        db.Payouts.Add(new Payout
+        {
+            PayoutId = 100,
+            SellerId = 10,
+            AmountGross = 10_000m,
+            FeeAmount = 1_000m,
+            AmountNet = 9_000m,
+            Status = "pending",
+            CreatedAt = DateTime.UtcNow,
+            PayoutItems =
+            [
+                new PayoutItem
+                {
+                    PayoutItemId = 1000,
+                    SellerOrderId = queuedSellerOrder.SellerOrderId,
+                    SellerOrder = queuedSellerOrder,
+                    Amount = 9_000m,
+                    Note = "Queued for payout"
+                }
+            ]
+        });
+        await db.SaveChangesAsync();
+
+        var controller = CreateFinanceController(db, isAdmin: true, subjectId: 1);
+        var result = await controller.GetConsole(cancellationToken: CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        var stats = json.RootElement.GetProperty("stats");
+        Assert.Equal(27_000m, stats.GetProperty("reconciliationSellerEarning").GetDecimal());
+        Assert.Equal(9_000m, stats.GetProperty("pendingPayoutAmount").GetDecimal());
+        Assert.Equal(18_000m, stats.GetProperty("withdrawableAmount").GetDecimal());
+    }
+
+    [Fact]
     public async Task GeneratePendingPayouts_CreatesGrossFeeNetItems()
     {
         await using var db = CreateDbContext();

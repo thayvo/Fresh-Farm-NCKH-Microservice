@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityRefreshBackgroundService.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityRefreshBackgroundService.cs
-// Thu muc hoc tap: HocGoiY
-
 namespace FreshFarm.Ordering.Api.Services;
 
 public sealed class RecommendationAffinityRefreshBackgroundService : BackgroundService
@@ -44,4 +40,3 @@ public sealed class RecommendationAffinityRefreshBackgroundService : BackgroundS
         }
     }
 }
-

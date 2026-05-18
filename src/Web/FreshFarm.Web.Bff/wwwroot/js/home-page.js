@@ -312,7 +312,7 @@
             <div class="${sizeClass}">
                 <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
                     <div class="product-image-wrapper">
-                        <img src="${resolveProductImage(product.imageFileName)}" class="product-image" alt="${escapeHtml(product.productName)}" />
+                        <img src="${resolveProductImage(product.imageFileName)}" class="product-image" alt="${escapeHtml(product.productName)}" loading="lazy" decoding="async" />
                     </div>
                     <div class="product-overlay">
                         <h5 class="h6 mb-2">${escapeHtml(product.productName)}</h5>
@@ -377,7 +377,7 @@
                         <a href="#"
                            class="category-item d-flex align-items-end p-3 text-white text-decoration-none position-relative overflow-hidden rounded-4 shadow-sm"
                            data-category="${escapeHtml(name)}">
-                            <img class="position-absolute top-0 start-0 w-100 h-100" src="${image}" alt="${escapeHtml(name)}" />
+                            <img class="position-absolute top-0 start-0 w-100 h-100" src="${image}" alt="${escapeHtml(name)}" loading="lazy" decoding="async" />
                             <div class="category-name position-relative fw-semibold z-2">${escapeHtml(name)}</div>
                         </a>
                     `;
@@ -391,6 +391,71 @@
                     window.location.href = keyword ? `/search?q=${encodeURIComponent(keyword)}` : "/search";
                 });
             });
+        };
+
+        const buildProductSkeletonCard = (sizeClass = "col-6 col-md-4 col-lg-3") => `
+            <div class="${sizeClass}">
+                <div class="card product-card product-skeleton-card h-100 shadow-sm border-0 rounded-3">
+                    <div class="product-image-wrapper skeleton-box"></div>
+                    <div class="card-body text-center">
+                        <div class="skeleton-line skeleton-title mx-auto"></div>
+                        <div class="skeleton-line skeleton-price mx-auto"></div>
+                        <div class="skeleton-chip-row">
+                            <span class="skeleton-chip"></span>
+                            <span class="skeleton-chip"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const renderProductSkeletons = (container, count = 8, sizeClass = "col-6 col-md-4 col-lg-3") => {
+            if (!(container instanceof HTMLElement)) {
+                return;
+            }
+
+            container.innerHTML = Array.from({ length: count }, () => buildProductSkeletonCard(sizeClass)).join("");
+        };
+
+        const renderCategorySkeletons = () => {
+            categoryWrapper.innerHTML = Array.from({ length: 5 }, () => `
+                <div class="category-item category-skeleton rounded-4 shadow-sm">
+                    <div class="skeleton-line category-skeleton-title"></div>
+                </div>
+            `).join("");
+        };
+
+        const renderRecommendationSkeletons = () => {
+            homeRecommendationSections.innerHTML = `
+                <section class="recommendation-section-card recommendation-skeleton-card">
+                    <div class="recommendation-section-header">
+                        <div class="recommendation-skeleton-heading">
+                            <div class="skeleton-line skeleton-heading"></div>
+                            <div class="skeleton-line skeleton-subheading"></div>
+                        </div>
+                        <span class="skeleton-pill"></span>
+                    </div>
+                    <div class="recommendation-section-grid">
+                        ${Array.from({ length: 8 }, () => `
+                            <div>
+                                ${buildProductSkeletonCard("")}
+                            </div>
+                        `).join("")}
+                    </div>
+                </section>
+            `;
+        };
+
+        const showHomeSkeletons = () => {
+            suggestionEmpty.classList.add("d-none");
+            featuredEmpty.classList.add("d-none");
+            newArrivalsEmpty.classList.add("d-none");
+            bestSellersEmpty.classList.add("d-none");
+            renderCategorySkeletons();
+            renderRecommendationSkeletons();
+            renderProductSkeletons(featuredGrid);
+            renderProductSkeletons(newArrivalsGrid);
+            renderProductSkeletons(bestSellersGrid);
         };
 
         const buildRecommendationSection = (section, defaultPillLabel) => {
@@ -630,126 +695,140 @@
         });
 
         const loadHomeProducts = async (keyword = "") => {
-            try {
-                const url = keyword
-                    ? `${endpointBase}?name=${encodeURIComponent(keyword)}`
-                    : endpointBase;
+            const url = keyword
+                ? `${endpointBase}?name=${encodeURIComponent(keyword)}`
+                : endpointBase;
+            let productFallback = [];
 
-                const [productResponse, recommendationResult] = await Promise.all([
-                    fetch(url, {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    }),
-                    fetch(recommendationEndpoint, {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    }).catch(() => null)
-                ]);
+            showHomeSkeletons();
 
-                const { payload: productPayload } = appHelpers
-                    ? await appHelpers.tryParsePayload(productResponse)
-                    : { payload: await productResponse.json() };
-                if (!productResponse.ok) {
-                    throw (appHelpers?.createHttpError(productResponse, productPayload, "Không tải được sản phẩm.")
-                        ?? new Error(`Không tải được sản phẩm: ${productResponse.status}`));
-                }
+            const productPromise = fetch(url, {
+                method: "GET",
+                headers: { Accept: "application/json" }
+            })
+                .then(async (productResponse) => {
+                    const { payload: productPayload } = appHelpers
+                        ? await appHelpers.tryParsePayload(productResponse)
+                        : { payload: await productResponse.json() };
+                    if (!productResponse.ok) {
+                        throw (appHelpers?.createHttpError(productResponse, productPayload, "Không tải được sản phẩm.")
+                            ?? new Error(`Không tải được sản phẩm: ${productResponse.status}`));
+                    }
 
-                const products = Array.isArray(productPayload)
-                    ? productPayload.map(normalizeProduct)
-                    : [];
-                let recommendationData = null;
-                if (recommendationResult instanceof Response) {
+                    productFallback = Array.isArray(productPayload)
+                        ? productPayload.map(normalizeProduct)
+                        : [];
+                    renderCategories(productFallback);
+                    return productFallback;
+                })
+                .catch((error) => {
+                    productFallback = [];
+                    categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";
+                    console.error(error);
+                    return [];
+                });
+
+            const recommendationPromise = fetch(recommendationEndpoint, {
+                method: "GET",
+                headers: { Accept: "application/json" }
+            })
+                .then(async (recommendationResponse) => {
                     const { payload: recommendationPayload } = appHelpers
-                        ? await appHelpers.tryParsePayload(recommendationResult)
-                        : { payload: await recommendationResult.json() };
-                    recommendationData = recommendationResult.ok ? recommendationPayload : null;
-                }
+                        ? await appHelpers.tryParsePayload(recommendationResponse)
+                        : { payload: await recommendationResponse.json() };
+                    return recommendationResponse.ok ? recommendationPayload : null;
+                })
+                .catch((error) => {
+                    console.error(error);
+                    return null;
+                });
 
-                const personalizedProductIds = Array.isArray(recommendationData?.items)
-                    ? recommendationData.items
-                        .map((item) => toNumber(item.productId ?? item.ProductId, 0))
-                        .filter((id) => id > 0)
-                    : [];
-                let trendingProducts = [];
-                try {
-                    const trendingResponse = await fetch(buildTrendingEndpoint(personalizedProductIds), {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    });
-                    const { payload: trendingPayload } = appHelpers
-                        ? await appHelpers.tryParsePayload(trendingResponse)
-                        : { payload: await trendingResponse.json() };
-                    if (trendingResponse.ok && Array.isArray(trendingPayload?.items)) {
-                        trendingProducts = trendingPayload.items.map(normalizeProduct);
-                    }
-                } catch {
-                    trendingProducts = [];
-                }
+            const recommendationData = await recommendationPromise;
+            const personalizedProductIds = Array.isArray(recommendationData?.items)
+                ? recommendationData.items
+                    .map((item) => toNumber(item.productId ?? item.ProductId, 0))
+                    .filter((id) => id > 0)
+                : [];
 
-                const trendingProductIds = trendingProducts
-                    .map((item) => toNumber(item.productId, 0))
-                    .filter((id) => id > 0);
-                let newArrivalProducts = [];
-                try {
-                    const newArrivalsResponse = await fetch(buildNewArrivalsEndpoint([
-                        ...personalizedProductIds,
-                        ...trendingProductIds
-                    ]), {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    });
-                    const { payload: newArrivalsPayload } = appHelpers
-                        ? await appHelpers.tryParsePayload(newArrivalsResponse)
-                        : { payload: await newArrivalsResponse.json() };
-                    if (newArrivalsResponse.ok && Array.isArray(newArrivalsPayload?.items)) {
-                        newArrivalProducts = newArrivalsPayload.items.map(normalizeProduct);
-                    }
-                } catch {
-                    newArrivalProducts = [];
-                }
-                const newArrivalProductIds = newArrivalProducts
-                    .map((item) => toNumber(item.productId, 0))
-                    .filter((id) => id > 0);
-                let bestSellerProducts = [];
-                try {
-                    const bestSellersResponse = await fetch(buildBestSellersEndpoint([
-                        ...personalizedProductIds,
-                        ...trendingProductIds,
-                        ...newArrivalProductIds
-                    ]), {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    });
-                    const { payload: bestSellersPayload } = appHelpers
-                        ? await appHelpers.tryParsePayload(bestSellersResponse)
-                        : { payload: await bestSellersResponse.json() };
-                    if (bestSellersResponse.ok && Array.isArray(bestSellersPayload?.items)) {
-                        bestSellerProducts = bestSellersPayload.items.map(normalizeProduct);
-                    }
-                } catch {
-                    bestSellerProducts = [];
-                }
-
-                renderCategories(products);
-                renderSuggestions(recommendationData, products);
-                renderTrending(
-                    trendingProducts.length > 0 ? trendingProducts : products,
-                    personalizedProductIds,
-                    trendingProducts.length > 0);
-                renderNewArrivals(newArrivalProducts);
-                renderBestSellers(bestSellerProducts);
-            } catch (error) {
-                categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";
-                homeRecommendationSections.innerHTML = "";
-                featuredGrid.innerHTML = "";
-                newArrivalsGrid.innerHTML = "";
-                bestSellersGrid.innerHTML = "";
-                suggestionEmpty.classList.remove("d-none");
-                featuredEmpty.classList.remove("d-none");
-                newArrivalsEmpty.classList.remove("d-none");
-                bestSellersEmpty.classList.remove("d-none");
-                console.error(error);
+            if (Array.isArray(recommendationData?.items) && recommendationData.items.length > 0) {
+                renderSuggestions(recommendationData, []);
+            } else {
+                productPromise.then((products) => renderSuggestions(recommendationData, products));
             }
+
+            let trendingProducts = [];
+            try {
+                const trendingResponse = await fetch(buildTrendingEndpoint(personalizedProductIds), {
+                    method: "GET",
+                    headers: { Accept: "application/json" }
+                });
+                const { payload: trendingPayload } = appHelpers
+                    ? await appHelpers.tryParsePayload(trendingResponse)
+                    : { payload: await trendingResponse.json() };
+                if (trendingResponse.ok && Array.isArray(trendingPayload?.items)) {
+                    trendingProducts = trendingPayload.items.map(normalizeProduct);
+                }
+            } catch (error) {
+                console.error(error);
+                trendingProducts = [];
+            }
+
+            const products = productFallback.length > 0 ? productFallback : await productPromise;
+            renderTrending(
+                trendingProducts.length > 0 ? trendingProducts : products,
+                personalizedProductIds,
+                trendingProducts.length > 0);
+
+            const trendingProductIds = trendingProducts
+                .map((item) => toNumber(item.productId, 0))
+                .filter((id) => id > 0);
+            let newArrivalProducts = [];
+            try {
+                const newArrivalsResponse = await fetch(buildNewArrivalsEndpoint([
+                    ...personalizedProductIds,
+                    ...trendingProductIds
+                ]), {
+                    method: "GET",
+                    headers: { Accept: "application/json" }
+                });
+                const { payload: newArrivalsPayload } = appHelpers
+                    ? await appHelpers.tryParsePayload(newArrivalsResponse)
+                    : { payload: await newArrivalsResponse.json() };
+                if (newArrivalsResponse.ok && Array.isArray(newArrivalsPayload?.items)) {
+                    newArrivalProducts = newArrivalsPayload.items.map(normalizeProduct);
+                }
+            } catch (error) {
+                console.error(error);
+                newArrivalProducts = [];
+            }
+
+            renderNewArrivals(newArrivalProducts);
+
+            const newArrivalProductIds = newArrivalProducts
+                .map((item) => toNumber(item.productId, 0))
+                .filter((id) => id > 0);
+            let bestSellerProducts = [];
+            try {
+                const bestSellersResponse = await fetch(buildBestSellersEndpoint([
+                    ...personalizedProductIds,
+                    ...trendingProductIds,
+                    ...newArrivalProductIds
+                ]), {
+                    method: "GET",
+                    headers: { Accept: "application/json" }
+                });
+                const { payload: bestSellersPayload } = appHelpers
+                    ? await appHelpers.tryParsePayload(bestSellersResponse)
+                    : { payload: await bestSellersResponse.json() };
+                if (bestSellersResponse.ok && Array.isArray(bestSellersPayload?.items)) {
+                    bestSellerProducts = bestSellersPayload.items.map(normalizeProduct);
+                }
+            } catch (error) {
+                console.error(error);
+                bestSellerProducts = [];
+            }
+
+            renderBestSellers(bestSellerProducts);
         };
 
         searchForm.addEventListener("submit", (event) => {

@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationHomePreferenceSeed.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationHomePreferenceSeed.cs
-// Thu muc hoc tap: HocGoiY
-
 namespace FreshFarm.Ordering.Api.Models;
 
 public partial class RecommendationHomePreferenceSeed
@@ -30,4 +26,3 @@ public partial class RecommendationHomePreferenceSeed
 
     public DateTime ComputedAt { get; set; }
 }
-

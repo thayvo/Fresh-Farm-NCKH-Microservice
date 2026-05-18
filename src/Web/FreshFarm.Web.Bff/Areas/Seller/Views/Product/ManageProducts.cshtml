@@ -869,6 +869,8 @@
                                         <img src="@ProductImagePaths.ResolveRequestPath(product.ImageFileName)"
                                                      alt="@product.ProductName"
                                                      class="product-thumb"
+                                                     loading="lazy"
+                                                     decoding="async"
                                              onclick="showImageModal('@ProductImagePaths.ResolveRequestPath(product.ImageFileName)', '@product.ProductName')" />
                                             </td>
                                             <td>
@@ -1244,6 +1246,8 @@
                                 <div class="col-md-5 mb-3 mb-md-0">
                                     <img src="${imagePath}" alt="${p.ProductName}"
                                          class="img-fluid rounded shadow-sm"
+                                         loading="lazy"
+                                         decoding="async"
                                          style="max-height: 400px; object-fit: cover; width: 100%;">
                                 </div>
                                 <div class="col-md-7">

@@ -13,6 +13,15 @@ public sealed class BffCatalogControllerTests
     private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
     private static string RecentInteractionUtc => DateTime.UtcNow.AddDays(-3).ToString("yyyy-MM-ddTHH:mm:ssZ");
     private static string RecentPurchaseUtc => DateTime.UtcNow.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ");
+    private static string CurrentSeasonalProductName => DateTime.UtcNow.AddHours(7).Month switch
+    {
+        1 or 2 => "Cam",
+        3 or 4 => "Dua leo",
+        5 or 6 => "Xoai",
+        7 or 8 => "Dua leo",
+        9 or 10 => "Buoi",
+        _ => "Cam"
+    };
 
     [Fact]
     public async Task GetProducts_ReturnsServiceUnavailablePayload_WhenCatalogThrowsHttpRequestException()
@@ -6725,6 +6734,7 @@ public sealed class BffCatalogControllerTests
     [Fact]
     public async Task GetSimilarProducts_PrioritizesSeasonalOriginReason_BeforeSellerLocality()
     {
+        var seasonalProductName = CurrentSeasonalProductName;
         var catalogHandler = new RecordingHttpMessageHandler(request =>
         {
             var path = request.RequestUri?.AbsolutePath;
@@ -6732,10 +6742,10 @@ public sealed class BffCatalogControllerTests
             {
                 return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                 {
-                    Content = new StringContent("""
+                    Content = new StringContent($$"""
                     {
                       "productId": 344,
-                      "productName": "Dua leo seed",
+                      "productName": "{{seasonalProductName}} seed",
                       "categoryName": "Rau quả",
                       "categoryId": 17,
                       "unitName": "kg",
@@ -6755,11 +6765,11 @@ public sealed class BffCatalogControllerTests
             Assert.Equal("/api/products", path);
             return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
-                Content = new StringContent("""
+                Content = new StringContent($$"""
                 [
                   {
                     "productId": 345,
-                    "productName": "Dua leo huu co",
+                    "productName": "{{seasonalProductName}} huu co",
                     "categoryName": "Rau quả",
                     "categoryId": 17,
                     "unitName": "kg",

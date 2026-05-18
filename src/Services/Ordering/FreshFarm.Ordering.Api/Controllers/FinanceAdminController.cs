@@ -27,6 +27,9 @@ public sealed class FinanceAdminController : ControllerBase
     private static readonly string[] ReturnApprovedStatuses = ["approved", "accepted", "shipping", "shipping_back"];
     private static readonly string[] ReturnClosedStatuses = ["completed", "resolved", "refunded", "done"];
     private static readonly string[] ReturnRejectedStatuses = ["rejected", "cancelled", "canceled", "denied"];
+    private static readonly string[] ReconciliationCompletedOrderStatuses = ["delivered", "completed", "complete", "finished"];
+    private static readonly string[] ReconciliationBlockedOrderStatuses = ["cancelled", "canceled", "expired", "refunded", "returned"];
+    private static readonly string[] ReconciliationPaidPaymentStatuses = ["paid", "captured", "succeeded", "success", "settled"];
 
     private readonly FreshFarmOrderingDBContext _db;
     private readonly PayoutGenerationService _payoutGenerationService;
@@ -88,6 +91,17 @@ public sealed class FinanceAdminController : ControllerBase
             cancellationToken) ?? 0m;
         var platformCommission = await sellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
         var sellerEarning = await sellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
+        var reconciliationSellerOrdersQuery = BuildReconciliationEligibleSellerOrdersQuery(sellerOrdersQuery);
+        var reconciliationGrossMerchandiseValue = await reconciliationSellerOrdersQuery.SumAsync(
+            x => (decimal?)((x.SellerEarning) + (x.CommissionAmount)),
+            cancellationToken) ?? 0m;
+        var reconciliationPlatformCommission = await reconciliationSellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
+        var reconciliationSellerEarning = await reconciliationSellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
+        var withdrawableAmount = await reconciliationSellerOrdersQuery
+            .Where(x => !x.PayoutItems.Any(item =>
+                item.Payout != null &&
+                !PayoutFailedStatuses.Contains((item.Payout.Status ?? string.Empty).ToLower())))
+            .SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
         var capturedPayments = await paymentTransactionsQuery
             .Where(x => x.PaidAt.HasValue || PayoutPaidStatuses.Contains((x.Status ?? string.Empty).ToLower()))
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
@@ -197,6 +211,10 @@ public sealed class FinanceAdminController : ControllerBase
                 capturedPayments,
                 platformCommission,
                 sellerEarning,
+                reconciliationGrossMerchandiseValue,
+                reconciliationPlatformCommission,
+                reconciliationSellerEarning,
+                withdrawableAmount,
                 pendingPayoutAmount,
                 refundedAmount,
                 openReturns,
@@ -485,6 +503,44 @@ public sealed class FinanceAdminController : ControllerBase
 
         var scopedSellerId = TryGetSellerIdFromToken();
         return scopedSellerId.HasValue ? query.Where(x => x.SellerId == scopedSellerId.Value) : null;
+    }
+
+    private IQueryable<SellerOrder> BuildReconciliationEligibleSellerOrdersQuery(IQueryable<SellerOrder> sellerOrdersQuery)
+    {
+        var refundedOrderIdsQuery = _db.RefundTransactions
+            .AsNoTracking()
+            .Where(x => !RefundFailedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.PaymentTxn.OrderId);
+        var returnBlockedSellerOrderIdsQuery = _db.ReturnRequests
+            .AsNoTracking()
+            .Where(x => !ReturnRejectedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.SellerOrderItem.SellerOrderId);
+
+        return sellerOrdersQuery.Where(x =>
+            x.Order != null &&
+            !ReconciliationBlockedOrderStatuses.Contains((x.Order.Status ?? string.Empty).ToLower()) &&
+            !ReconciliationBlockedOrderStatuses.Contains((x.SellerStatus ?? string.Empty).ToLower()) &&
+            (ReconciliationCompletedOrderStatuses.Contains((x.Order.Status ?? string.Empty).ToLower()) ||
+                ReconciliationCompletedOrderStatuses.Contains((x.SellerStatus ?? string.Empty).ToLower())) &&
+            !refundedOrderIdsQuery.Contains(x.OrderId) &&
+            !returnBlockedSellerOrderIdsQuery.Contains(x.SellerOrderId) &&
+            (x.Order.PaymentStatus ?? string.Empty).ToLower() != "cod" &&
+            (ReconciliationPaidPaymentStatuses.Contains((x.Order.PaymentStatus ?? string.Empty).ToLower()) ||
+                x.Order.Payments.Any(p =>
+                    (p.PaymentMethod ?? string.Empty).ToLower() != "cod" &&
+                    (ReconciliationPaidPaymentStatuses.Contains((p.PaymentStatus ?? string.Empty).ToLower()) || p.PaymentDate.HasValue)) ||
+                x.Order.PaymentTransactions.Any(t =>
+                    (t.Method ?? string.Empty).ToLower() != "cod" &&
+                    (t.Provider ?? string.Empty).ToLower() != "cod" &&
+                    (ReconciliationPaidPaymentStatuses.Contains((t.Status ?? string.Empty).ToLower()) || t.PaidAt.HasValue))) &&
+            !(x.Order.Payments.Any(p => (p.PaymentMethod ?? string.Empty).ToLower() == "cod") &&
+                !x.Order.Payments.Any(p =>
+                    (p.PaymentMethod ?? string.Empty).ToLower() != "cod" &&
+                    (ReconciliationPaidPaymentStatuses.Contains((p.PaymentStatus ?? string.Empty).ToLower()) || p.PaymentDate.HasValue)) &&
+                !x.Order.PaymentTransactions.Any(t =>
+                    (t.Method ?? string.Empty).ToLower() != "cod" &&
+                    (t.Provider ?? string.Empty).ToLower() != "cod" &&
+                    (ReconciliationPaidPaymentStatuses.Contains((t.Status ?? string.Empty).ToLower()) || t.PaidAt.HasValue))));
     }
 
     private IQueryable<Payout>? BuildScopedPayoutsQuery(int? sellerId)

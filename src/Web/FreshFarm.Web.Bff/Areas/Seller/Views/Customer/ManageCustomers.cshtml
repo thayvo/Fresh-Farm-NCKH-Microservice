@@ -746,12 +746,13 @@
                     return;
                 }
 
-                const avatarBase = '@Url.Action("AvatarById", "Account", new { area = "" })';
+                const fallbackAvatar = '@Url.Content("~/uploads/avatar/no-avatar.jpg")';
                 customers.forEach(customer => {
                     const userId = customer.UserID ?? customer.userID ?? customer.userId ?? customer.id;
                     const fullName = customer.FullName ?? customer.fullName ?? '';
                     const email = customer.Email ?? customer.email ?? '';
                     const phone = customer.Phone ?? customer.phone ?? '';
+                    const avatarUrl = customer.AvatarUrl ?? customer.avatarUrl ?? fallbackAvatar;
                     const totalSpent = Number(customer.TotalSpent ?? customer.totalSpent ?? 0);
                     const orderCount = Number(customer.OrderCount ?? customer.orderCount ?? 0);
                     const createdDateValue = customer.CreatedDate ?? customer.createdDate;
@@ -762,7 +763,7 @@
                     row.innerHTML = `
                         <td>
                             <div class="d-flex align-items-center">
-                                <img src="${avatarBase}/${userId}"
+                                <img src="${avatarUrl || fallbackAvatar}"
                                      class="customer-avatar rounded-circle me-3"
                                      alt="Avatar" />
                                 <div>

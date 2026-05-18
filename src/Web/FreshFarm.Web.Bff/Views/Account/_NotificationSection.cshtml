@@ -6,13 +6,13 @@
     var isExpanded = notificationSection.IsInitiallyExpanded;
 }
 
-<section class="border rounded-4 p-3 p-md-4 bg-white shadow-sm"
+<section class="bg-white"
          data-notification-section
          data-section-key="@notificationSection.SectionKey"
          data-notification-type="@notificationSection.NotificationType">
-    <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 mb-3">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-2 p-3 border-bottom">
         <div>
-            <div class="fw-semibold">@notificationSection.Label</div>
+            <div class="fw-bold">@notificationSection.Label</div>
             <div class="small text-muted">@notificationSection.SummaryText</div>
         </div>
         <div class="d-flex flex-wrap gap-2">
@@ -52,71 +52,132 @@
          class="collapse @(isExpanded ? "show" : null)"
          data-section-collapse
          data-section-key="@notificationSection.SectionKey">
-        <div class="d-flex flex-column gap-3">
+        <div>
             @foreach (var item in notificationSection.Notifications)
             {
-                var feedItemClass = $"feed-item {item.Tone}";
+                var feedItemClass = $"feed-item {(item.IsRead ? string.Empty : "unread")}";
+                var modalId = $"notification-detail-{item.NotificationId}";
+                var compactMessage = string.IsNullOrWhiteSpace(item.Message)
+                    ? "Không có nội dung chi tiết."
+                    : item.Message.Trim();
+                var iconClass = string.Equals(item.NotificationType, "order_status", StringComparison.OrdinalIgnoreCase)
+                    ? "bi-bag-check"
+                    : string.Equals(item.NotificationType, "location_update", StringComparison.OrdinalIgnoreCase)
+                        ? "bi-truck"
+                        : string.Equals(item.NotificationType, "seller_review_update", StringComparison.OrdinalIgnoreCase)
+                            ? "bi-shop-window"
+                            : "bi-bell";
 
                 <article class="@feedItemClass"
                          data-notification-item
                          data-is-read="@item.IsRead.ToString().ToLowerInvariant()"
                          data-is-recent="@item.IsRecentNotification.ToString().ToLowerInvariant()">
-                    <div class="border rounded-4 p-3 @(item.IsRead ? "bg-light" : "bg-white shadow-sm")">
-                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2 mb-2">
-                            <div class="fw-semibold d-flex align-items-center gap-2">
-                                <span>@item.Title</span>
-                                @if (!item.IsRead)
-                                {
-                                    <span class="badge text-bg-danger">Mới</span>
-                                }
+                    <div class="notification-card-compact p-3">
+                        <div class="d-flex gap-3">
+                            <div class="notification-icon @item.Tone">
+                                <i class="bi @iconClass"></i>
                             </div>
-                            <div class="small text-muted">@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "--")</div>
-                        </div>
-                        <div class="small mb-2 d-flex flex-wrap gap-2">
-                            <span class="badge text-bg-@item.Tone">@item.NotificationTypeLabel</span>
-                            <span class="badge text-bg-light border">@item.ContextLabel</span>
-                            @if (!string.IsNullOrWhiteSpace(item.RecencyLabel))
-                            {
-                                <span class="badge @(item.IsRecentNotification ? "text-bg-warning" : "text-bg-light border")">@item.RecencyLabel</span>
-                            }
-                            @if (item.IsRead)
-                            {
-                                <span class="text-muted">Đã đọc @(item.ReadAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty)</span>
-                            }
-                        </div>
-                        <div class="notification-preview p-3 mb-3">
-                            <div class="small text-uppercase text-muted fw-semibold mb-1">@item.PreviewCaption</div>
-                            <div class="fw-semibold">@item.PreviewValue</div>
-                            <div class="small text-muted mt-1">@item.PreviewHint</div>
-                        </div>
-                        <div>@item.Message</div>
-                        @if (item.OrderId > 0)
-                        {
-                            <div class="small text-muted mt-2">Đơn liên quan: #@item.OrderId</div>
-                        }
-                        <div class="mt-3 d-flex flex-wrap gap-2">
-                            <a href="@item.ActionUrl" class="btn btn-sm btn-success">
-                                <i class="bi bi-arrow-up-right-circle me-2"></i>@item.ActionLabel
-                            </a>
-                            @if (!item.IsRead)
-                            {
-                                <form method="post" action="/account/notifications/@item.NotificationId/mark-read">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="q" value="@vm.Query" />
-                                    <input type="hidden" name="type" value="@vm.Type" />
-                                    @if (vm.IsRead.HasValue)
+                            <div class="min-w-0 flex-grow-1">
+                                <div class="d-flex flex-column flex-lg-row justify-content-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (!item.IsRead)
+                                            {
+                                                <span class="badge rounded-pill text-bg-danger">Mới</span>
+                                            }
+                                            <div class="fw-semibold notification-title-line">@item.Title</div>
+                                        </div>
+                                        <div class="notification-message-clamp text-muted small mt-1">@compactMessage</div>
+                                    </div>
+                                    <div class="small text-muted flex-shrink-0">@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "--")</div>
+                                </div>
+                                <div class="small d-flex flex-wrap gap-2 mt-2">
+                                    <span class="badge text-bg-light border">@item.NotificationTypeLabel</span>
+                                    <span class="badge text-bg-light border">@item.ContextLabel</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.RecencyLabel))
                                     {
-                                        <input type="hidden" name="isRead" value="@vm.IsRead.Value.ToString().ToLowerInvariant()" />
+                                        <span class="badge @(item.IsRecentNotification ? "text-bg-warning" : "text-bg-light border")">@item.RecencyLabel</span>
                                     }
-                                    <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
-                                    <input type="hidden" name="focusType" value="@vm.FocusType" />
-                                    <input type="hidden" name="page" value="@vm.Page" />
-                                    <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
-                                    <button type="submit" class="btn btn-sm btn-outline-dark">
-                                        <i class="bi bi-check2 me-2"></i>Đánh dấu đã đọc
+                                    @if (item.OrderId > 0)
+                                    {
+                                        <span class="badge text-bg-light border">Đơn #@item.OrderId</span>
+                                    }
+                                    @if (item.IsRead)
+                                    {
+                                        <span class="badge text-bg-light border">Đã đọc</span>
+                                    }
+                                </div>
+                                <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-success"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#@modalId">
+                                        <i class="bi bi-card-text me-2"></i>Xem chi tiết
                                     </button>
-                                </form>
-                            }
+                                    <a href="@item.ActionUrl" class="btn btn-sm btn-success">
+                                        <i class="bi bi-arrow-up-right-circle me-2"></i>@item.ActionLabel
+                                    </a>
+                                    @if (!item.IsRead)
+                                    {
+                                        <form method="post" action="/account/notifications/@item.NotificationId/mark-read">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="q" value="@vm.Query" />
+                                            <input type="hidden" name="type" value="@vm.Type" />
+                                            @if (vm.IsRead.HasValue)
+                                            {
+                                                <input type="hidden" name="isRead" value="@vm.IsRead.Value.ToString().ToLowerInvariant()" />
+                                            }
+                                            <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
+                                            <input type="hidden" name="focusType" value="@vm.FocusType" />
+                                            <input type="hidden" name="page" value="@vm.Page" />
+                                            <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
+                                            <button type="submit" class="btn btn-sm btn-outline-dark">
+                                                <i class="bi bi-check2 me-2"></i>Đã đọc
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="@modalId" tabindex="-1" aria-labelledby="@($"{modalId}-title")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content border-0 rounded-4 shadow">
+                                <div class="modal-header border-0 pb-0">
+                                    <div>
+                                        <div class="d-flex flex-wrap gap-2 mb-2">
+                                            <span class="badge text-bg-@item.Tone">@item.NotificationTypeLabel</span>
+                                            <span class="badge text-bg-light border">@item.ContextLabel</span>
+                                            @if (!item.IsRead)
+                                            {
+                                                <span class="badge text-bg-danger">Chưa đọc</span>
+                                            }
+                                        </div>
+                                        <h5 class="modal-title fw-bold" id="@($"{modalId}-title")">@item.Title</h5>
+                                        <div class="small text-muted mt-1">@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "--")</div>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="notification-preview p-3 mb-3">
+                                        <div class="small text-uppercase text-muted fw-semibold mb-1">@item.PreviewCaption</div>
+                                        <div class="fw-semibold">@item.PreviewValue</div>
+                                        <div class="small text-muted mt-1">@item.PreviewHint</div>
+                                    </div>
+                                    <div class="notification-detail-body">@compactMessage</div>
+                                    @if (item.OrderId > 0)
+                                    {
+                                        <div class="small text-muted mt-3">Đơn liên quan: #@item.OrderId</div>
+                                    }
+                                </div>
+                                <div class="modal-footer border-0 pt-0">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+                                    <a href="@item.ActionUrl" class="btn btn-success">
+                                        <i class="bi bi-arrow-up-right-circle me-2"></i>@item.ActionLabel
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </article>

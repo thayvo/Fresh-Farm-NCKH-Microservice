@@ -147,27 +147,6 @@ public sealed class FreshOpsController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateLot(FreshLotEditorInput input, string? q = null, int? sellerId = null, string? status = null)
-    {
-        try
-        {
-            var client = CreateCatalogClient();
-            var response = await client.PostAsJsonAsync("/api/catalog/admin/fresh-ops/lots", input);
-            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
-                response.IsSuccessStatusCode
-                    ? "Đã tạo lô hàng tươi."
-                    : await ReadApiErrorAsync(response, "Không thể tạo lô hàng tươi.");
-        }
-        catch (Exception ex)
-        {
-            TempData["ErrorMessage"] = "Lỗi khi tạo lô hàng: " + ex.Message;
-        }
-
-        return RedirectToAction(nameof(Index), new { q, sellerId = sellerId > 0 ? sellerId : input.SellerId, status = NormalizeStatus(status) });
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateRecall(FreshRecallEditorInput input, string? q = null, int? sellerId = null, string? status = null)
     {
         try

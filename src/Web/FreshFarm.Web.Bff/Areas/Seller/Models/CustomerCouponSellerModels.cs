@@ -108,6 +108,8 @@ public sealed class CustomerSearchResultDto
     public decimal TotalSpent { get; set; }
 
     public int OrderCount { get; set; }
+
+    public string AvatarUrl { get; set; } = string.Empty;
 }
 
 public sealed class Coupon

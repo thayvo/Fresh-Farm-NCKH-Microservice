@@ -27,7 +27,10 @@ public sealed class AdminCustomersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? keyword = null, [FromQuery] int take = 1000)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? keyword = null,
+        [FromQuery] int take = 1000,
+        [FromQuery] int[]? userIds = null)
     {
         if (take <= 0)
         {
@@ -42,6 +45,17 @@ public sealed class AdminCustomersController : ControllerBase
         var query = _db.Users
             .AsNoTracking()
             .Where(u => u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
+
+        var normalizedUserIds = (userIds ?? Array.Empty<int>())
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(5000)
+            .ToArray();
+
+        if (normalizedUserIds.Length > 0)
+        {
+            query = query.Where(u => normalizedUserIds.Contains(u.UserId));
+        }
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -62,6 +76,7 @@ public sealed class AdminCustomersController : ControllerBase
                 fullName = u.FullName,
                 email = u.Email,
                 phone = u.Phone,
+                avatar = u.Avatar,
                 createdAt = u.CreatedAt,
                 address = u.AddressBooks
                     .Where(a => a.IsActive)
@@ -90,6 +105,7 @@ public sealed class AdminCustomersController : ControllerBase
                 fullName = u.FullName,
                 email = u.Email,
                 phone = u.Phone,
+                avatar = u.Avatar,
                 createdAt = u.CreatedAt,
                 address = u.AddressBooks
                     .Where(a => a.IsActive)

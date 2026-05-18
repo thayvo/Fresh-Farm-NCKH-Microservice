@@ -372,7 +372,6 @@ public class ShippingController : LegacySellerControllerBase
 
     public async Task<IActionResult> ManageShipping(
         string status = "",
-        int? staffId = null,
         string q = "",
         string sort = "date_desc",
         int page = 1,
@@ -384,12 +383,10 @@ public class ShippingController : LegacySellerControllerBase
         ViewBag.TotalItems = 0;
         ViewBag.PageSize = pageSize;
         ViewBag.CurrentStatus = status;
-        ViewBag.CurrentStaffId = staffId;
         ViewBag.CurrentQuery = q;
         ViewBag.CurrentSort = sort;
         ViewBag.DeliveredState = deliveredState;
         ViewBag.PaidStatuses = PaidStatuses;
-        ViewBag.DeliveryStaffs = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Orders = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.Provinces = new SelectList(Enumerable.Empty<SelectListItem>(), "Value", "Text");
         ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
@@ -409,11 +406,6 @@ public class ShippingController : LegacySellerControllerBase
                 $"deliveredState={Uri.EscapeDataString(deliveredState ?? string.Empty)}"
             };
 
-            if (staffId.HasValue)
-            {
-                query.Add($"staffId={staffId.Value}");
-            }
-
             var response = await client.GetAsync($"/api/orders/admin/shippings?{string.Join("&", query)}");
             if (!response.IsSuccessStatusCode)
             {
@@ -431,22 +423,12 @@ public class ShippingController : LegacySellerControllerBase
             ViewBag.TotalItems = data?.totalItems ?? items.Count;
             ViewBag.PageSize = data?.pageSize ?? pageSize;
             ViewBag.CurrentStatus = data?.currentStatus ?? status;
-            ViewBag.CurrentStaffId = data?.currentStaffId;
             ViewBag.CurrentQuery = data?.currentQuery ?? q;
             ViewBag.CurrentSort = data?.currentSort ?? sort;
             ViewBag.DeliveredState = data?.deliveredState ?? deliveredState;
             ViewBag.PaidStatuses = PaidStatuses;
             ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
             ViewBag.GhnSandboxShopId = _ghnSandboxService.ShopId;
-
-            var staffs = (data?.deliveryStaffs ?? new List<DeliveryStaffDto>())
-                .Select(s => new SelectListItem
-                {
-                    Value = s.adminID.ToString(),
-                    Text = string.IsNullOrWhiteSpace(s.name) ? $"NV #{s.adminID:D4}" : s.name
-                })
-                .ToList();
-            ViewBag.DeliveryStaffs = new SelectList(staffs, "Value", "Text", (data?.currentStaffId)?.ToString());
 
             var orders = (data?.orders ?? new List<OrderOptionDto>())
                 .Select(o => new
@@ -545,9 +527,8 @@ public class ShippingController : LegacySellerControllerBase
                 addressDetail = shipping.AddressDetail,
                 provinceId = shipping.ProvinceId,
                 communeId = shipping.CommuneId,
-                isStorePickup = shipping.IsStorePickup,
-                storeAddress = shipping.StoreAddress,
-                deliveryStaffId = ParseNullableInt(Request.Form["DeliveryStaffId"].ToString())
+                isStorePickup = false,
+                storeAddress = (string?)null
             });
 
             if (!response.IsSuccessStatusCode)
@@ -614,9 +595,8 @@ public class ShippingController : LegacySellerControllerBase
                 addressDetail = shipping.AddressDetail,
                 provinceId = shipping.ProvinceId,
                 communeId = shipping.CommuneId,
-                isStorePickup = shipping.IsStorePickup,
-                storeAddress = shipping.StoreAddress,
-                deliveryStaffId = ParseNullableInt(Request.Form["DeliveryStaffId"].ToString())
+                isStorePickup = false,
+                storeAddress = (string?)null
             });
 
             if (!response.IsSuccessStatusCode)
@@ -631,35 +611,6 @@ public class ShippingController : LegacySellerControllerBase
             {
                 success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
                 message = root.TryGetProperty("message", out var message) ? message.GetString() : "Cap nhat van chuyen thanh cong"
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Delete(int id)
-    {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.DeleteAsync($"/api/orders/admin/shippings/{id}");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the xoa thong tin van chuyen") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = root.TryGetProperty("success", out var success) && success.GetBoolean(),
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Xoa thong tin van chuyen thanh cong"
             });
         }
         catch (Exception ex)
@@ -912,8 +863,6 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? currentStatus { get; set; }
 
-        public int? currentStaffId { get; set; }
-
         public string? currentQuery { get; set; }
 
         public string? currentSort { get; set; }
@@ -921,8 +870,6 @@ public class ShippingController : LegacySellerControllerBase
         public string? deliveredState { get; set; }
 
         public List<ProvinceDto>? provinces { get; set; }
-
-        public List<DeliveryStaffDto>? deliveryStaffs { get; set; }
 
         public List<OrderOptionDto>? orders { get; set; }
     }
@@ -1006,13 +953,6 @@ public class ShippingController : LegacySellerControllerBase
         public int communeId { get; set; }
 
         public string? communeName { get; set; }
-    }
-
-    private sealed class DeliveryStaffDto
-    {
-        public int adminID { get; set; }
-
-        public string? name { get; set; }
     }
 
     private sealed class OrderOptionDto
@@ -1104,7 +1044,6 @@ public class ShippingController : LegacySellerControllerBase
 
         public string? storeAddress { get; set; }
 
-    public int? deliveryStaffId { get; set; }
     }
 
     public sealed class PreviewGhnFeeRequest

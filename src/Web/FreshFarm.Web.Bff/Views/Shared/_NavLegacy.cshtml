@@ -10,6 +10,12 @@
     var featuredUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
         ? "#section-featured"
         : "/#section-featured";
+    var newArrivalsUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
+        ? "#section-new-arrivals"
+        : "/#section-new-arrivals";
+    var bestSellersUrl = string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase)
+        ? "#section-best-sellers"
+        : "/#section-best-sellers";
 }
 <nav class="navbar navbar-expand-lg navbar-main">
     <div class="container">
@@ -22,8 +28,8 @@
                 <li class="nav-item"><a class="nav-link" href="@categoryUrl">Danh mục</a></li>
                 <li class="nav-item"><a class="nav-link" href="@suggestUrl">Gợi Ý Hôm Nay</a></li>
                 <li class="nav-item"><a class="nav-link" href="@featuredUrl">Sản phẩm xu hướng</a></li>
-                <li class="nav-item"><a class="nav-link" href="@featuredUrl">Hàng mới về</a></li>
-                <li class="nav-item"><a class="nav-link" href="@featuredUrl">Sản phẩm bán chạy</a></li>
+                <li class="nav-item"><a class="nav-link" href="@newArrivalsUrl">Hàng mới về</a></li>
+                <li class="nav-item"><a class="nav-link" href="@bestSellersUrl">Sản phẩm bán chạy</a></li>
                 <li class="nav-item"><a class="nav-link" href="/account/orders">Lịch sử đơn</a></li>
             </ul>
         </div>

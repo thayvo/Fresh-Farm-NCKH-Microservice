@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -61,7 +62,7 @@ public class CustomerController : LegacySellerControllerBase
                     CreatedDate = c.createdAt,
                     TotalSpent = metric?.totalSpent ?? 0,
                     OrderCount = metric?.orderCount ?? 0,
-                    AvatarUrl = Url.Action("AvatarById", "Account", new { area = "", id = c.userId }) ?? string.Empty
+                    AvatarUrl = AvatarImagePaths.ResolveRequestPath(c.avatar) ?? AvatarImagePaths.FallbackImageRequestPath
                 };
             });
 
@@ -308,7 +309,8 @@ public class CustomerController : LegacySellerControllerBase
                         Phone = c.phone,
                         CreatedDate = c.createdAt,
                         TotalSpent = metric?.totalSpent ?? 0,
-                        OrderCount = metric?.orderCount ?? 0
+                        OrderCount = metric?.orderCount ?? 0,
+                        AvatarUrl = AvatarImagePaths.ResolveRequestPath(c.avatar) ?? AvatarImagePaths.FallbackImageRequestPath
                     };
                 })
                 .OrderByDescending(x => x.CreatedDate)
@@ -510,6 +512,8 @@ public class CustomerController : LegacySellerControllerBase
         public string? email { get; set; }
 
         public string? phone { get; set; }
+
+        public string? avatar { get; set; }
 
         public DateTime createdAt { get; set; }
 

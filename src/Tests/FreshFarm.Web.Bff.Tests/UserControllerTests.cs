@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text.Json;
 using FreshFarm.Web.Bff.Areas.Admin.Controllers;
@@ -12,6 +13,48 @@ namespace FreshFarm.Web.Bff.Tests;
 
 public sealed class UserControllerTests
 {
+    [Fact]
+    public void AdminSidebar_ExposesOnlyUnifiedUserManagementMenu()
+    {
+        var sidebar = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "Shared",
+            "_SideBar.cshtml"));
+
+        Assert.Contains("Quản lý người dùng", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageAdmins", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageSellers", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageBuyers", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageCustomers", sidebar, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminManageUsers_ExposesViewDetailsAction()
+    {
+        var view = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "User",
+            "ManageUsers.cshtml"));
+
+        Assert.Contains("js-view", view, StringComparison.Ordinal);
+        Assert.Contains("bi bi-eye", view, StringComparison.Ordinal);
+        Assert.Contains("viewUserModal", view, StringComparison.Ordinal);
+        Assert.Contains("Chi tiết tài khoản", view, StringComparison.Ordinal);
+        Assert.Contains("GetUserById", view, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ManageUsers_DedupesDuplicateUsersAndRoles_FromIdentity()
     {
@@ -173,6 +216,27 @@ public sealed class UserControllerTests
             ]);
 
         return new JwtSecurityTokenHandler().WriteToken(jwt);
+    }
+
+    private static string WorkspaceRoot { get; } = FindWorkspaceRoot(SourceFilePath());
+
+    private static string SourceFilePath([CallerFilePath] string path = "") => path;
+
+    private static string FindWorkspaceRoot(string startPath)
+    {
+        var current = new FileInfo(startPath).Directory;
+        while (current is not null)
+        {
+            var candidate = Path.Combine(current.FullName, "src", "Web", "FreshFarm.Web.Bff", "FreshFarm.Web.Bff.csproj");
+            if (File.Exists(candidate))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate FreshFarm workspace root.");
     }
 
     private sealed class StaticHttpClientFactory(HttpClient client) : IHttpClientFactory

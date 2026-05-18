@@ -30,7 +30,7 @@
             <h1 class="fw-bold mb-2">Trung tâm vận hành hàng tươi</h1>
             <p class="mb-0 opacity-75">Theo dõi lô hàng, hạn sử dụng, mã truy xuất, hàng đợi FEFO và ca thu hồi chất lượng cho nông sản, thực phẩm tươi.</p>
         </div>
-        <div class="hero-chip ff-admin-chip">Lô hàng + Thu hồi</div>
+        <div class="hero-chip ff-admin-chip">Theo dõi + Thu hồi</div>
     </div>
 
     @if (ViewBag.Error is string pageError && !string.IsNullOrWhiteSpace(pageError))
@@ -240,53 +240,7 @@
         </div>
 
         <div class="col-xl-5">
-            <div class="panel-card ff-admin-card mb-4 sticky-panel">
-                <div class="panel-head">
-                    <h2 class="h5 mb-1">Tạo lô hàng tươi</h2>
-                    <p class="text-muted mb-0">Nhập lô có hạn sử dụng, mã truy xuất và tồn kho để bắt đầu theo dõi FEFO.</p>
-                </div>
-                <form method="post" asp-action="CreateLot" asp-controller="FreshOps" asp-area="Admin" class="row g-3">
-                    @Html.AntiForgeryToken()
-                    <input type="hidden" name="q" value="@Model.Query" />
-                    <input type="hidden" name="status" value="@Model.Status" />
-                    <input type="hidden" name="sellerId" value="@Model.SellerId" />
-                    <div class="col-md-6"><label class="form-label">Mã sản phẩm</label><input class="form-control" type="number" name="ProductId" min="1" required /></div>
-                    <div class="col-md-6"><label class="form-label">Mã người bán</label><input class="form-control" type="number" name="SellerId" min="1" value="@Model.NewLot.SellerId" required /></div>
-                    <div class="col-md-6"><label class="form-label">Mã lô</label><input class="form-control" type="text" name="LotCode" required /></div>
-                    <div class="col-md-6"><label class="form-label">Mã truy xuất</label><input class="form-control" type="text" name="TraceCode" /></div>
-                    <div class="col-md-6"><label class="form-label">Nông trại</label><input class="form-control" type="text" name="FarmName" /></div>
-                    <div class="col-md-6"><label class="form-label">Xuất xứ</label><input class="form-control" type="text" name="OriginRegion" /></div>
-                    <div class="col-md-6"><label class="form-label">Ngày thu hoạch</label><input class="form-control" type="datetime-local" name="HarvestedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Ngày đóng gói</label><input class="form-control" type="datetime-local" name="PackedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Ngày nhập kho</label><input class="form-control" type="datetime-local" name="ReceivedAt" /></div>
-                    <div class="col-md-6"><label class="form-label">Hạn sử dụng</label><input class="form-control" type="datetime-local" name="ExpiresAt" /></div>
-                    <div class="col-md-4"><label class="form-label">Số lượng đầu kỳ</label><input class="form-control" type="number" name="InitialQuantity" min="1" required /></div>
-                    <div class="col-md-4"><label class="form-label">Số lượng còn lại</label><input class="form-control" type="number" name="RemainingQuantity" min="0" /></div>
-                    <div class="col-md-4"><label class="form-label">Giá vốn đơn vị</label><input class="form-control" type="number" step="0.01" name="UnitCost" min="0" /></div>
-                    <div class="col-md-6">
-                        <label class="form-label">Trạng thái</label>
-                        <select class="form-select" name="Status">
-                            <option value="active">Đang hoạt động</option>
-                            <option value="held">Đang giữ</option>
-                            <option value="expired">Hết hạn</option>
-                            <option value="recalled">Bị thu hồi</option>
-                            <option value="depleted">Đã hết hàng</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Tình trạng chất lượng</label>
-                        <select class="form-select" name="QualityStatus">
-                            <option value="ok">Ổn</option>
-                            <option value="watch">Cần theo dõi</option>
-                            <option value="blocked">Đang chặn</option>
-                        </select>
-                    </div>
-                    <div class="col-12"><label class="form-label">Ghi chú</label><textarea class="form-control" rows="3" name="Notes"></textarea></div>
-                    <div class="col-12 d-grid"><button class="btn btn-primary" type="submit">Tạo lô hàng</button></div>
-                </form>
-            </div>
-
-            <div class="panel-card ff-admin-card">
+            <div class="panel-card ff-admin-card sticky-panel">
                 <div class="panel-head">
                     <h2 class="h5 mb-1">Tạo ca thu hồi</h2>
                     <p class="text-muted mb-0">Mở ca thu hồi theo sản phẩm hoặc lô hàng khi cần thu hồi hoặc giữ hàng để điều tra.</p>

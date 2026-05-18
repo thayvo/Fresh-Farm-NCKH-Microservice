@@ -33,6 +33,13 @@ public sealed class CheckoutSellerShippingInputDto
     public decimal ShippingFee { get; set; }
     public string? ServiceName { get; set; }
     public string? ShippingOriginLabel { get; set; }
+    public int? PackageWeight { get; set; }
+    public int? PackageLength { get; set; }
+    public int? PackageWidth { get; set; }
+    public int? PackageHeight { get; set; }
+    public int? PackageInsuranceValue { get; set; }
+    public string? PackageItemName { get; set; }
+    public int? PackageItemQuantity { get; set; }
 }
 
 public sealed class CheckoutShippingFeePreviewRequestDto
@@ -62,6 +69,13 @@ public sealed class CheckoutSellerShippingFeeBreakdownDto
     public decimal ShippingFee { get; set; }
     public string ServiceName { get; set; } = string.Empty;
     public string ShippingOriginLabel { get; set; } = string.Empty;
+    public int PackageWeight { get; set; }
+    public int PackageLength { get; set; }
+    public int PackageWidth { get; set; }
+    public int PackageHeight { get; set; }
+    public int PackageInsuranceValue { get; set; }
+    public string PackageItemName { get; set; } = string.Empty;
+    public int PackageItemQuantity { get; set; }
 }
 
 public sealed class CheckoutShippingInputDto

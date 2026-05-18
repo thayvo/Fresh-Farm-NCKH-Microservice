@@ -82,28 +82,34 @@
         .detail-shell {
             background: rgba(255, 255, 255, .94);
             border: 1px solid rgba(226, 232, 240, .95);
-            border-radius: 24px;
-            box-shadow: 0 24px 60px rgba(15, 23, 42, .08);
+            border-radius: 18px;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, .07);
             overflow: hidden;
+            max-width: 1360px;
+            margin: 0 auto;
         }
 
         .detail-grid {
             display: grid;
-            grid-template-columns: minmax(320px, 1.05fr) minmax(0, 1.15fr);
+            grid-template-columns: minmax(320px, .86fr) minmax(0, 1.14fr);
         }
 
         .detail-media {
             background: linear-gradient(160deg, rgba(22, 163, 74, .12), rgba(255, 255, 255, .96) 45%, rgba(249, 115, 22, .08));
-            padding: 28px;
+            padding: 24px;
             border-right: 1px solid rgba(226, 232, 240, .95);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
         }
 
         .detail-image-frame {
             background: #fff;
-            border-radius: 20px;
+            border-radius: 16px;
             overflow: hidden;
             border: 1px solid rgba(226, 232, 240, .95);
-            box-shadow: 0 20px 50px rgba(15, 23, 42, .08);
+            box-shadow: 0 16px 38px rgba(15, 23, 42, .075);
+            width: min(100%, 560px);
         }
 
         .detail-image {
@@ -114,7 +120,8 @@
         }
 
         .detail-panel {
-            padding: 28px;
+            padding: 24px;
+            max-width: 760px;
         }
 
         .eyebrow {
@@ -124,24 +131,24 @@
             color: var(--brand-primary);
             background: rgba(22, 163, 74, .08);
             border-radius: 999px;
-            padding: 6px 12px;
-            font-size: .84rem;
+            padding: 5px 11px;
+            font-size: .8rem;
             font-weight: 700;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .product-title {
-            font-size: clamp(1.8rem, 2.8vw, 2.5rem);
+            font-size: clamp(1.65rem, 2.2vw, 2.2rem);
             line-height: 1.12;
             font-weight: 800;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .meta-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 14px;
+            gap: 8px;
+            margin-bottom: 12px;
         }
 
         .meta-chip {
@@ -151,8 +158,8 @@
             background: var(--surface-soft);
             border: 1px solid var(--border-soft);
             border-radius: 999px;
-            padding: 7px 12px;
-            font-size: .9rem;
+            padding: 6px 10px;
+            font-size: .86rem;
             color: #334155;
         }
 
@@ -164,7 +171,7 @@
         }
 
         .price-main {
-            font-size: clamp(2rem, 3vw, 2.8rem);
+            font-size: clamp(1.95rem, 2.6vw, 2.45rem);
             line-height: 1;
             font-weight: 900;
             color: #ef4444;
@@ -178,8 +185,8 @@
         .status-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 18px;
+            gap: 8px;
+            margin-bottom: 14px;
             color: #475569;
         }
 
@@ -187,10 +194,10 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 7px 12px;
+            padding: 6px 10px;
             border-radius: 999px;
             font-weight: 700;
-            font-size: .9rem;
+            font-size: .86rem;
         }
 
         .status-pill.ok {
@@ -211,11 +218,11 @@
         .stock-panel {
             display: grid;
             gap: 6px;
-            padding: 14px 16px;
-            border-radius: 16px;
+            padding: 12px 14px;
+            border-radius: 14px;
             border: 1px solid rgba(22, 163, 74, .18);
             background: linear-gradient(135deg, rgba(34, 197, 94, .08), rgba(255, 255, 255, .96));
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .stock-panel.low-stock {
@@ -232,7 +239,7 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            font-size: .98rem;
+            font-size: .94rem;
             font-weight: 800;
             color: #166534;
         }
@@ -247,18 +254,18 @@
 
         .stock-panel-detail {
             color: #475569;
-            font-size: .95rem;
-            line-height: 1.6;
+            font-size: .91rem;
+            line-height: 1.55;
         }
 
         .freshness-panel {
             display: grid;
-            gap: 10px;
-            padding: 14px 16px;
-            border-radius: 16px;
+            gap: 8px;
+            padding: 12px 14px;
+            border-radius: 14px;
             border: 1px solid rgba(13, 148, 136, .18);
             background: linear-gradient(135deg, rgba(204, 251, 241, .72), rgba(255, 255, 255, .96));
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .freshness-panel-title {
@@ -266,14 +273,14 @@
             align-items: center;
             gap: 8px;
             color: #0f766e;
-            font-size: .98rem;
+            font-size: .94rem;
             font-weight: 800;
         }
 
         .freshness-panel-text {
             color: #475569;
-            font-size: .94rem;
-            line-height: 1.65;
+            font-size: .9rem;
+            line-height: 1.55;
         }
 
         .freshness-panel-badges {
@@ -304,9 +311,9 @@
 
         .summary-text {
             color: #334155;
-            font-size: 1rem;
-            line-height: 1.7;
-            margin-bottom: 20px;
+            font-size: .94rem;
+            line-height: 1.6;
+            margin-bottom: 16px;
         }
 
         .review-shell {
@@ -509,10 +516,10 @@
 
         .purchase-box {
             display: grid;
-            gap: 14px;
-            margin-bottom: 22px;
-            padding: 18px;
-            border-radius: 18px;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding: 14px;
+            border-radius: 14px;
             border: 1px solid rgba(22, 163, 74, .18);
             background: linear-gradient(135deg, rgba(220, 252, 231, .88), rgba(255, 255, 255, .98));
         }
@@ -526,7 +533,7 @@
         }
 
         .purchase-box-title {
-            font-size: 1rem;
+            font-size: .96rem;
             font-weight: 800;
             color: #166534;
             margin-bottom: 4px;
@@ -534,8 +541,8 @@
 
         .purchase-box-text {
             color: #475569;
-            font-size: .93rem;
-            line-height: 1.6;
+            font-size: .9rem;
+            line-height: 1.5;
         }
 
         .purchase-box-store {
@@ -543,10 +550,11 @@
             align-items: center;
             gap: 8px;
             border-radius: 999px;
-            padding: 8px 12px;
+            padding: 7px 10px;
             background: rgba(255, 255, 255, .92);
             border: 1px solid rgba(226, 232, 240, .96);
             color: #0f172a;
+            font-size: .9rem;
             font-weight: 700;
         }
 
@@ -691,9 +699,9 @@
         .section-card {
             background: #fff;
             border: 1px solid var(--border-soft);
-            border-radius: 18px;
-            padding: 22px;
-            margin-top: 18px;
+            border-radius: 16px;
+            padding: 18px;
+            margin-top: 16px;
         }
 
         .section-card h2 {
@@ -1160,6 +1168,18 @@
         @@media (max-width: 767.98px) {
             .header-main-wrap {
                 gap: 14px;
+            }
+
+            .crumb-row {
+                display: grid;
+                grid-template-columns: 1fr;
+                align-items: flex-start;
+                justify-content: flex-start;
+                gap: 6px;
+            }
+
+            .crumb-row .text-muted {
+                flex-basis: 100%;
             }
 
             .header-brand-wrap {
@@ -1978,7 +1998,7 @@
                         return `
                             <article class="offer-card${isPrimarySeller ? " is-primary" : ""}">
                                 ${avatarUrl
-                                    ? `<img src="${avatarUrl}" alt="${escapeHtml(shopName)}" class="offer-avatar" />`
+                                    ? `<img src="${avatarUrl}" alt="${escapeHtml(shopName)}" class="offer-avatar" loading="lazy" decoding="async" />`
                                     : `<div class="offer-avatar-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
                                 <div>
                                     <div class="offer-shop-line">
@@ -2042,7 +2062,7 @@
                         <div class="detail-grid">
                             <div class="detail-media">
                                 <div class="detail-image-frame">
-                                    <img src="${product.image}" alt="${escapeHtml(product.productName)}" class="detail-image" />
+                                    <img src="${product.image}" alt="${escapeHtml(product.productName)}" class="detail-image" decoding="async" />
                                 </div>
                             </div>
                             <div class="detail-panel">

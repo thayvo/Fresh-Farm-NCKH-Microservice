@@ -373,6 +373,106 @@
             text-align: center;
         }
 
+        .product-skeleton-card {
+            pointer-events: none;
+        }
+
+        .product-skeleton-card:hover .card-body {
+            opacity: 1;
+        }
+
+        .skeleton-box,
+        .skeleton-line,
+        .skeleton-chip,
+        .skeleton-pill,
+        .category-skeleton {
+            position: relative;
+            overflow: hidden;
+            background: #e5e7eb;
+        }
+
+        .skeleton-box::after,
+        .skeleton-line::after,
+        .skeleton-chip::after,
+        .skeleton-pill::after,
+        .category-skeleton::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .7), transparent);
+            animation: skeletonShimmer 1.35s ease-in-out infinite;
+        }
+
+        @@keyframes skeletonShimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .skeleton-line {
+            height: 12px;
+            border-radius: 999px;
+        }
+
+        .skeleton-title {
+            width: 76%;
+        }
+
+        .skeleton-price {
+            width: 44%;
+        }
+
+        .skeleton-chip-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .skeleton-chip {
+            width: 64px;
+            height: 22px;
+            border-radius: 999px;
+        }
+
+        .category-skeleton {
+            display: flex;
+            align-items: flex-end;
+            padding: 18px;
+        }
+
+        .category-skeleton-title {
+            width: 70%;
+            background: rgba(255, 255, 255, .62);
+        }
+
+        .recommendation-skeleton-card {
+            pointer-events: none;
+        }
+
+        .recommendation-skeleton-heading {
+            display: grid;
+            gap: 10px;
+            width: min(460px, 70vw);
+        }
+
+        .skeleton-heading {
+            width: 54%;
+            height: 20px;
+        }
+
+        .skeleton-subheading {
+            width: 100%;
+        }
+
+        .skeleton-pill {
+            display: inline-flex;
+            width: 118px;
+            height: 34px;
+            border-radius: 999px;
+        }
+
         .popup-overlay {
             position: fixed;
             top: 0;
@@ -775,6 +875,174 @@
                 padding: 6px 12px;
             }
         }
+
+        .broadcast-home-popup {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, .55);
+            backdrop-filter: blur(2px);
+        }
+
+        .broadcast-home-popup.show {
+            display: flex;
+            animation: fadeIn .2s ease-out forwards;
+        }
+
+        .broadcast-home-popup__dialog {
+            position: relative;
+            width: min(520px, 92vw);
+            max-height: 86vh;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 28px 90px rgba(15, 23, 42, .35);
+            overflow: visible;
+            transform: translateY(10px) scale(.98);
+            animation: popupEnter .24s ease-out forwards;
+        }
+
+        .broadcast-home-popup__close {
+            position: absolute;
+            top: -18px;
+            right: -18px;
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 50%;
+            background: #fff;
+            color: #334155;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .22);
+            z-index: 2;
+        }
+
+        .broadcast-home-popup__image {
+            display: block;
+            width: 100%;
+            max-height: 78vh;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .broadcast-home-popup__text {
+            padding: 32px;
+            text-align: center;
+            background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%);
+            border-radius: 10px;
+        }
+
+        .broadcast-home-popup__label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #15803d;
+            font-weight: 700;
+            padding: 6px 12px;
+            margin-bottom: 14px;
+        }
+
+        .broadcast-home-popup__title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #102a43;
+            margin: 0 0 12px;
+        }
+
+        .broadcast-home-popup__message {
+            color: #475569;
+            font-size: 17px;
+            line-height: 1.6;
+            margin: 0 0 24px;
+            white-space: pre-line;
+        }
+
+        .broadcast-home-popup__link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            background: #16a34a;
+            color: #fff;
+            font-weight: 700;
+            padding: 12px 20px;
+            text-decoration: none;
+        }
+
+        .broadcast-home-popup__link:hover {
+            color: #fff;
+            background: #15803d;
+        }
+
+        .back-to-top-btn {
+            position: fixed;
+            right: 28px;
+            bottom: 112px;
+            width: 46px;
+            height: 46px;
+            border: 0;
+            border-radius: 50%;
+            background: #16a34a;
+            color: #fff;
+            box-shadow: 0 14px 32px rgba(22, 163, 74, .28);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: opacity .2s ease, transform .2s ease, visibility .2s ease, background-color .2s ease;
+            z-index: 1040;
+        }
+
+        .back-to-top-btn.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top-btn:hover {
+            background: #15803d;
+        }
+
+        .back-to-top-btn:focus-visible {
+            outline: 3px solid rgba(34, 197, 94, .34);
+            outline-offset: 3px;
+        }
+
+        @@media (max-width: 576px) {
+            .broadcast-home-popup {
+                padding: 18px;
+            }
+
+            .broadcast-home-popup__close {
+                top: -14px;
+                right: -10px;
+            }
+
+            .broadcast-home-popup__text {
+                padding: 26px 20px;
+            }
+
+            .broadcast-home-popup__title {
+                font-size: 23px;
+            }
+
+            .back-to-top-btn {
+                right: 18px;
+                bottom: 96px;
+                width: 42px;
+                height: 42px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -789,9 +1057,9 @@
             <button type="button" data-bs-target="#bannerCarousel" data-bs-slide-to="2"></button>
         </div>
         <div class="carousel-inner">
-            <div class="carousel-item active"><img src="https://images.pexels.com/photos/2252584/pexels-photo-2252584.jpeg" class="d-block w-100" alt="Banner 1" /></div>
-            <div class="carousel-item"><img src="https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg" class="d-block w-100" alt="Banner 2" /></div>
-            <div class="carousel-item"><img src="https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg" class="d-block w-100" alt="Banner 3" /></div>
+            <div class="carousel-item active"><img src="https://images.pexels.com/photos/2252584/pexels-photo-2252584.jpeg" class="d-block w-100" alt="Banner 1" decoding="async" /></div>
+            <div class="carousel-item"><img src="https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg" class="d-block w-100" alt="Banner 2" loading="lazy" decoding="async" /></div>
+            <div class="carousel-item"><img src="https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg" class="d-block w-100" alt="Banner 3" loading="lazy" decoding="async" /></div>
         </div>
         <button class="carousel-control-prev" type="button" data-bs-target="#bannerCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
         <button class="carousel-control-next" type="button" data-bs-target="#bannerCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
@@ -911,6 +1179,26 @@
         </div>
     </div>
 
+    <div class="broadcast-home-popup" id="broadcastHomePopup" aria-hidden="true">
+        <div class="broadcast-home-popup__dialog" role="dialog" aria-modal="true" aria-labelledby="broadcastPopupTitle">
+            <button class="broadcast-home-popup__close" type="button" data-broadcast-popup-close aria-label="Đóng popup">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <div class="broadcast-home-popup__image-wrap d-none" data-broadcast-popup-image-wrap>
+                <img class="broadcast-home-popup__image" data-broadcast-popup-image alt="" />
+            </div>
+            <div class="broadcast-home-popup__text d-none" data-broadcast-popup-text-wrap>
+                <div class="broadcast-home-popup__label" data-broadcast-popup-type>Thông báo mới</div>
+                <h2 class="broadcast-home-popup__title" id="broadcastPopupTitle" data-broadcast-popup-title></h2>
+                <p class="broadcast-home-popup__message" data-broadcast-popup-message></p>
+                <a class="broadcast-home-popup__link" href="/account/notifications">
+                    Xem thông báo
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
     @await Html.PartialAsync("_FooterLegacy")
     @await Html.PartialAsync("_ToastLegacy")
     <form id="homeAntiForgeryForm" class="d-none" method="post">
@@ -921,11 +1209,17 @@
          data-fallback-image="@ProductImagePaths.FallbackImageRequestPath"
          data-upload-folder="@ProductImagePaths.UploadFolderRequestPath"></div>
 
+    <button class="back-to-top-btn" type="button" data-back-to-top aria-label="Trở về đầu trang">
+        <i class="bi bi-arrow-up"></i>
+    </button>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/home-page.js" asp-append-version="true"></script>
     <script src="~/js/home-welcome-popup.js" asp-append-version="true"></script>
+    <script src="~/js/home-broadcast-popup.js" asp-append-version="true"></script>
+    <script src="~/js/home-back-to-top.js" asp-append-version="true"></script>
     <script src="~/js/csp-phase2.js" asp-append-version="true"></script>
 </body>
 </html>

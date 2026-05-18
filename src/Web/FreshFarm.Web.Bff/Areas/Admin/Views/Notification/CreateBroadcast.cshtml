@@ -1,0 +1,306 @@
+@model NotificationBroadcastEditorInput
+@{
+    ViewBag.Title = "Tạo thông báo broadcast";
+}
+
+<style>
+    .broadcast-shell {
+        color: #0f172a;
+    }
+
+    .broadcast-hero {
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 55%, #7dd3fc 100%);
+        border-radius: 28px;
+        color: #fff;
+        padding: 2.4rem;
+        box-shadow: 0 18px 48px rgba(37, 99, 235, .22);
+    }
+
+    .broadcast-card {
+        border: 0;
+        border-radius: 22px;
+        box-shadow: 0 18px 46px rgba(15, 23, 42, .08);
+    }
+
+    .broadcast-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .45rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, .18);
+        color: #fff;
+        font-weight: 700;
+        padding: .45rem .9rem;
+    }
+
+    .broadcast-option {
+        border: 1px solid #dbeafe;
+        border-radius: 16px;
+        padding: .9rem 1rem;
+        background: #f8fbff;
+    }
+
+    .broadcast-option .form-check-input:checked {
+        background-color: #2563eb;
+        border-color: #2563eb;
+    }
+
+    .broadcast-preview {
+        background: linear-gradient(180deg, #eff6ff 0%, #fff 100%);
+        border: 1px solid #dbeafe;
+        border-radius: 20px;
+        padding: 1.25rem;
+    }
+
+    .broadcast-preview-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-weight: 700;
+        padding: .35rem .75rem;
+        font-size: .82rem;
+    }
+
+    .broadcast-popup-kind {
+        border: 1px solid #bfdbfe;
+        border-radius: 18px;
+        background: #f8fbff;
+        padding: 1rem;
+    }
+
+    .broadcast-popup-image-preview {
+        display: block;
+        width: 100%;
+        max-height: 280px;
+        object-fit: contain;
+        border-radius: 16px;
+        background: #e0f2fe;
+    }
+</style>
+
+<main class="broadcast-shell ff-admin-shell">
+    <div class="broadcast-hero mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4">
+            <div>
+                <div class="broadcast-chip mb-3">
+                    <i class="bi bi-megaphone"></i>
+                    Toàn sàn
+                </div>
+                <h1 class="fw-bold mb-2">Tạo thông báo broadcast</h1>
+                <p class="mb-0 opacity-75">Gửi thông báo đến tất cả người dùng, từng nhóm buyer/seller hoặc một User ID cụ thể.</p>
+            </div>
+            <a class="btn btn-light rounded-pill px-4" href="@Url.Action("Index", "Notification", new { area = "Admin" })">
+                <i class="bi bi-bell me-2"></i>Trung tâm thông báo
+            </a>
+        </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success border-0 shadow-sm">@TempData["SuccessMessage"]</div>
+    }
+
+    <form method="post" action="@Url.Action("CreateBroadcast", "Notification", new { area = "Admin" })">
+        @Html.AntiForgeryToken()
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger border-0 shadow-sm"></div>
+
+        <div class="row g-4">
+            <div class="col-xl-8">
+                <div class="card broadcast-card">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Thông tin gửi</h5>
+
+                        <label class="form-label fw-semibold">Đối tượng</label>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="broadcast-option d-flex gap-3 h-100">
+                                    <input class="form-check-input mt-1 js-target-option" type="radio" asp-for="TargetAudience" value="all" />
+                                    <span>
+                                        <span class="d-block fw-bold">Tất cả</span>
+                                        <span class="text-muted small">Gửi đến mọi buyer và seller đang hoạt động.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="broadcast-option d-flex gap-3 h-100">
+                                    <input class="form-check-input mt-1 js-target-option" type="radio" asp-for="TargetAudience" value="buyer" />
+                                    <span>
+                                        <span class="d-block fw-bold">Buyer</span>
+                                        <span class="text-muted small">Chỉ gửi cho người mua.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="broadcast-option d-flex gap-3 h-100">
+                                    <input class="form-check-input mt-1 js-target-option" type="radio" asp-for="TargetAudience" value="seller" />
+                                    <span>
+                                        <span class="d-block fw-bold">Seller</span>
+                                        <span class="text-muted small">Chỉ gửi cho nhà bán hàng.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="broadcast-option d-flex gap-3 h-100">
+                                    <input class="form-check-input mt-1 js-target-option" type="radio" asp-for="TargetAudience" value="user" />
+                                    <span>
+                                        <span class="d-block fw-bold">User ID cụ thể</span>
+                                        <span class="text-muted small">Gửi cho một tài khoản được chỉ định.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <span asp-validation-for="TargetAudience" class="text-danger small"></span>
+
+                        <div class="mb-4" id="targetUserBlock">
+                            <label asp-for="TargetUserId" class="form-label fw-semibold">User ID</label>
+                            <input asp-for="TargetUserId" class="form-control form-control-lg" min="1" placeholder="Ví dụ: 51" />
+                            <span asp-validation-for="TargetUserId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label asp-for="NotificationType" class="form-label fw-semibold">Loại thông báo</label>
+                                <select asp-for="NotificationType" class="form-select form-select-lg">
+                                    <option value="admin_broadcast">Thông báo hệ thống</option>
+                                    <option value="campaign_live">Chiến dịch quảng bá</option>
+                                    <option value="order_update">Đơn hàng</option>
+                                    <option value="seller_review_update">Kiểm duyệt seller</option>
+                                    <option value="promotion">Khuyến mãi</option>
+                                </select>
+                                <span asp-validation-for="NotificationType" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="ExpiresAt" class="form-label fw-semibold">Thời gian hết hạn</label>
+                                <input asp-for="ExpiresAt" class="form-control form-control-lg" type="datetime-local" />
+                                <span asp-validation-for="ExpiresAt" class="text-danger small"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Title" class="form-label fw-semibold">Tiêu đề</label>
+                            <input asp-for="Title" class="form-control form-control-lg" placeholder="Nhập tiêu đề thông báo" />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+
+                        <div class="mb-4">
+                            <label asp-for="Message" class="form-label fw-semibold">Nội dung</label>
+                            <textarea asp-for="Message" class="form-control" rows="6" placeholder="Nhập nội dung gửi đến người nhận"></textarea>
+                            <span asp-validation-for="Message" class="text-danger small"></span>
+                        </div>
+
+                        <div class="broadcast-popup-kind mb-4">
+                            <div class="row g-3">
+                                <div class="col-md-5">
+                                    <div class="form-check form-switch">
+                                        <input asp-for="ShowPopup" class="form-check-input" role="switch" id="showPopupSwitch" />
+                                        <label asp-for="ShowPopup" class="form-check-label fw-semibold">Hiện popup trang chủ</label>
+                                    </div>
+                                    <div class="text-muted small">Bật để người nhận thấy popup khi vào trang chủ.</div>
+                                </div>
+                                <div class="col-md-7" id="popupTypeBlock">
+                                    <label class="form-label fw-semibold">Kiểu popup</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <label class="form-check">
+                                            <input class="form-check-input js-popup-type" type="radio" asp-for="PopupType" value="text" />
+                                            <span class="form-check-label">Nội dung chữ</span>
+                                        </label>
+                                        <label class="form-check">
+                                            <input class="form-check-input js-popup-type" type="radio" asp-for="PopupType" value="image" />
+                                            <span class="form-check-label">Ảnh banner</span>
+                                        </label>
+                                    </div>
+                                    <span asp-validation-for="PopupType" class="text-danger small"></span>
+                                </div>
+                                <div class="col-12" id="popupImageBlock">
+                                    <label asp-for="PopupImageUrl" class="form-label fw-semibold">URL ảnh popup</label>
+                                    <input asp-for="PopupImageUrl" class="form-control form-control-lg" placeholder="https://..." />
+                                    <span asp-validation-for="PopupImageUrl" class="text-danger small"></span>
+                                    <div class="text-muted small mt-1">Nên dùng ảnh dọc hoặc vuông, dung lượng nhẹ để popup hiện nhanh.</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="rounded-4 bg-white border p-3">
+                                        <div class="fw-semibold text-primary">Gửi ngay sau khi lưu</div>
+                                        <div class="text-muted small">Thông báo được tạo ngay cho người nhận đã chọn. Nếu tắt popup thì vẫn nằm trong trang thông báo.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="submit" class="btn btn-primary rounded-pill px-4">
+                                <i class="bi bi-send me-2"></i>Gửi broadcast
+                            </button>
+                            <a class="btn btn-outline-secondary rounded-pill px-4" href="@Url.Action("Index", "Notification", new { area = "Admin" })">
+                                Hủy
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4">
+                <div class="card broadcast-card">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-3">Xem trước</h5>
+                        <div class="broadcast-preview">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="broadcast-preview-badge">@Model.TargetAudienceLabel</span>
+                                <span class="text-primary small fw-semibold">@Model.PopupTypeLabel</span>
+                            </div>
+                            @if (Model.ShowPopup && string.Equals(Model.PopupType, "image", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(Model.PopupImageUrl))
+                            {
+                                <img class="broadcast-popup-image-preview mb-3" src="@Model.PopupImageUrl" alt="Ảnh popup xem trước" />
+                            }
+                            <h5 class="fw-bold mb-2">@(string.IsNullOrWhiteSpace(Model.Title) ? "Tiêu đề thông báo" : Model.Title)</h5>
+                            <p class="text-muted mb-3">@(string.IsNullOrWhiteSpace(Model.Message) ? "Nội dung thông báo sẽ hiển thị tại đây." : Model.Message)</p>
+                            <div class="small text-muted">
+                                Loại: <span class="fw-semibold">@Model.NotificationType</span>
+                            </div>
+                            <div class="small text-muted">
+                                Hết hạn: <span class="fw-semibold">@(Model.ExpiresAt?.ToString("dd/MM/yyyy HH:mm") ?? "Không đặt")</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</main>
+
+<script>
+    (() => {
+        const userBlock = document.getElementById('targetUserBlock');
+        const options = document.querySelectorAll('.js-target-option');
+        const showPopupSwitch = document.getElementById('showPopupSwitch');
+        const popupTypeBlock = document.getElementById('popupTypeBlock');
+        const popupImageBlock = document.getElementById('popupImageBlock');
+        const popupTypeOptions = document.querySelectorAll('.js-popup-type');
+
+        const syncUserBlock = () => {
+            const selected = document.querySelector('.js-target-option:checked');
+            userBlock.classList.toggle('d-none', !selected || selected.value !== 'user');
+        };
+
+        const syncPopupBlock = () => {
+            const popupEnabled = showPopupSwitch instanceof HTMLInputElement && showPopupSwitch.checked;
+            const selectedType = document.querySelector('.js-popup-type:checked');
+            const isImage = popupEnabled && selectedType instanceof HTMLInputElement && selectedType.value === 'image';
+
+            popupTypeBlock.classList.toggle('opacity-50', !popupEnabled);
+            popupTypeOptions.forEach(option => {
+                if (option instanceof HTMLInputElement) {
+                    option.disabled = !popupEnabled;
+                }
+            });
+            popupImageBlock.classList.toggle('d-none', !isImage);
+        };
+
+        options.forEach(option => option.addEventListener('change', syncUserBlock));
+        showPopupSwitch?.addEventListener('change', syncPopupBlock);
+        popupTypeOptions.forEach(option => option.addEventListener('change', syncPopupBlock));
+        syncUserBlock();
+        syncPopupBlock();
+    })();
+</script>

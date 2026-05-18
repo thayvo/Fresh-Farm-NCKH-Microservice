@@ -3,7 +3,7 @@
 @using System.Linq
 
 @{
-    ViewBag.Title = "Quản Lý Vận Chuyển";
+    ViewBag.Title = "Vận chuyển & bàn giao";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
 
     var provinces = ViewBag.Provinces as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>());
@@ -17,9 +17,12 @@
     bool ghnSandboxConfigured = ViewBag.GhnSandboxConfigured is bool ghnConfigured && ghnConfigured;
     bool sellerGhnHasOrigin = ViewBag.SellerGhnHasOrigin is bool ghnReady && ghnReady;
     string sellerGhnStoreName = ViewBag.SellerGhnStoreName as string ?? string.Empty;
-
-    var staffsSrc = ViewBag.DeliveryStaffs as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>();
-    var selectedStaff = ViewBag.CurrentStaffId != null ? ViewBag.CurrentStaffId.ToString() : null;
+    var shippingRows = Model?.ToList() ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Shipping>();
+    Func<string?, string, bool> StatusIs = (value, expected) => string.Equals(value ?? string.Empty, expected, System.StringComparison.OrdinalIgnoreCase);
+    int needPrepareCount = shippingRows.Count(item => StatusIs(item.Order?.Status, "Pending") || StatusIs(item.Order?.Status, "Processing"));
+    int waitingPickupCount = shippingRows.Count(item => StatusIs(item.Order?.Status, "Ready"));
+    int inTransitCount = shippingRows.Count(item => StatusIs(item.Order?.Status, "Shipped"));
+    int ghnTrackedCount = shippingRows.Count(item => !string.IsNullOrWhiteSpace(item.GhnOrderCode) || !string.IsNullOrWhiteSpace(item.GhnClientOrderCode));
 
     Func<string, string, IHtmlContent> SoftBadge = (text, cls) =>
         new HtmlString($"<span class='px-3 py-1 rounded-pill border text-nowrap {cls}' style='font-size:.8rem'>{text}</span>");
@@ -33,7 +36,7 @@
         {
             case "Pending": return SoftBadge("Chờ xử lý", "bg-body-tertiary text-secondary border-secondary-subtle");
             case "Processing": return SoftBadge("Đang xử lý", "bg-warning-subtle text-warning-emphasis border-warning-subtle");
-            case "Ready": return SoftBadge("Đã xử lý", "bg-primary-subtle text-primary-emphasis border-primary-subtle");
+            case "Ready": return SoftBadge("Chờ shipper lấy", "bg-primary-subtle text-primary-emphasis border-primary-subtle");
             case "Shipped": return SoftBadge("Đang giao", "bg-info-subtle text-info-emphasis border-info-subtle");
             case "Delivered":
                 var pay = o.Payments?.FirstOrDefault(p => p.PaymentMethod == "COD");
@@ -266,6 +269,237 @@
         box-shadow: 0 15px 40px rgba(30, 64, 175, 0.1);
         animation: fadeInUp .6s ease-out .1s backwards;
     }
+
+    .handoff-kpi-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .handoff-kpi {
+        padding: 1rem 1.15rem;
+        border-radius: 1.1rem;
+        border: 1px solid rgba(191, 219, 254, .9);
+        background: rgba(255, 255, 255, .94);
+        box-shadow: 0 10px 24px rgba(30, 64, 175, .08);
+    }
+
+    .handoff-kpi .kpi-value {
+        font-size: 1.85rem;
+        font-weight: 900;
+        line-height: 1;
+        color: #1e40af;
+    }
+
+    .tracking-note {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        white-space: nowrap;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        font-size: .78rem;
+        font-weight: 700;
+    }
+
+    .tracking-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: .9rem;
+    }
+
+    .tracking-summary-card {
+        min-height: 92px;
+        padding: .95rem;
+        border-radius: 1rem;
+        border: 1px solid #dbeafe;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        box-shadow: 0 10px 24px rgba(30, 64, 175, .08);
+    }
+
+    .tracking-summary-card .label {
+        color: #64748b;
+        font-size: .76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: .35rem;
+    }
+
+    .tracking-summary-card .value {
+        color: #1e3a8a;
+        font-weight: 800;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .tracking-detail-section {
+        padding: 1rem;
+        border-radius: 1.1rem;
+        border: 1px solid #dbeafe;
+        background: #ffffff;
+    }
+
+    .tracking-package-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .75rem;
+    }
+
+    .tracking-info-line {
+        padding: .8rem .9rem;
+        border-radius: .9rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+
+    .tracking-info-line .label {
+        color: #64748b;
+        font-size: .76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: .25rem;
+    }
+
+    .tracking-timeline {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: .85rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .tracking-timeline-item {
+        position: relative;
+        display: grid;
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: .75rem;
+    }
+
+    .tracking-timeline-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 8px 18px rgba(37, 99, 235, .25);
+    }
+
+    .tracking-timeline-content {
+        padding: .85rem 1rem;
+        border-radius: 1rem;
+        border: 1px solid #dbeafe;
+        background: #f8fbff;
+    }
+
+    .shipping-help-widget {
+        position: fixed;
+        top: 72px;
+        right: 24px;
+        z-index: 1055;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: .35rem;
+    }
+
+    .shipping-help-button {
+        width: 46px;
+        height: 46px;
+        border: 0;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 1.35rem;
+        font-weight: 900;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        box-shadow: 0 14px 28px rgba(30, 64, 175, .35);
+        transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+        .shipping-help-button:hover,
+        .shipping-help-button:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 36px rgba(30, 64, 175, .42);
+            outline: none;
+        }
+
+    .shipping-help-label {
+        opacity: 0;
+        transform: translateY(-4px);
+        pointer-events: none;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        background: #0f172a;
+        color: #fff;
+        font-size: .78rem;
+        font-weight: 800;
+        white-space: nowrap;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, .22);
+        transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .shipping-help-widget:hover .shipping-help-label,
+    .shipping-help-widget:focus-within .shipping-help-label {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .shipping-help-widget.is-open .shipping-help-label {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    .shipping-help-panel {
+        position: fixed;
+        top: 132px;
+        right: 24px;
+        width: min(420px, calc(100vw - 32px));
+        z-index: 1054;
+        background: #fff;
+        border: 1px solid rgba(191, 219, 254, .95);
+        border-radius: 1.35rem;
+        box-shadow: 0 26px 70px rgba(15, 23, 42, .25);
+        overflow: hidden;
+    }
+
+        .shipping-help-panel[hidden] {
+            display: none;
+        }
+
+    .shipping-help-panel-header {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: #fff;
+        padding: 1rem 1.15rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .shipping-help-panel-body {
+        padding: 1rem;
+    }
+
+    .shipping-help-item {
+        padding: .95rem;
+        border-radius: 1rem;
+        border: 1px solid #dbeafe;
+        background: #f8fbff;
+    }
+
+        .shipping-help-item + .shipping-help-item {
+            margin-top: .8rem;
+        }
 
     .ghn-panel {
         background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
@@ -523,10 +757,63 @@
         .btn-pill {
             padding: .625rem 1.5rem;
         }
+
+        .handoff-kpi-row {
+            grid-template-columns: 1fr;
+        }
+
+        .shipping-help-widget {
+            top: 64px;
+            right: 14px;
+        }
+
+        .shipping-help-panel {
+            top: 120px;
+            right: 12px;
+            width: calc(100vw - 24px);
+        }
+
+        .tracking-summary-grid,
+        .tracking-package-grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 
 <div class="min-vh-100">
+    <div class="shipping-help-widget">
+        <button type="button" class="shipping-help-button" id="shippingHelpButton" aria-controls="shippingHelpPanel" aria-expanded="false" aria-label="Mở hướng dẫn sử dụng">
+            <i class="bi bi-question-lg"></i>
+        </button>
+        <div class="shipping-help-label">Hướng dẫn sử dụng</div>
+    </div>
+
+    <aside class="shipping-help-panel" id="shippingHelpPanel" hidden aria-labelledby="shippingHelpTitle">
+        <div class="shipping-help-panel-header">
+            <div>
+                <div class="small text-white-50 fw-bold text-uppercase">Seller Shipping</div>
+                <h5 class="fw-bold mb-0" id="shippingHelpTitle">Hướng dẫn sử dụng</h5>
+            </div>
+            <button type="button" class="btn-close btn-close-white" id="shippingHelpClose" aria-label="Đóng hướng dẫn"></button>
+        </div>
+        <div class="shipping-help-panel-body">
+            <div class="shipping-help-item">
+                <div class="fw-bold text-primary-blue mb-1">Bản ghi vận chuyển đã được tạo tự động theo đơn hàng</div>
+                <div class="text-muted">Trang này chỉ dùng để xác nhận shop đã chuẩn bị hàng và sẵn sàng bàn giao cho đơn vị vận chuyển.</div>
+            </div>
+            <div class="shipping-help-item">
+                <div class="text-uppercase small fw-bold text-muted mb-1">Phạm vi trang</div>
+                <h6 class="fw-bold text-primary-blue mb-2">Sau khi đơn đã chốt</h6>
+                <p class="text-muted mb-0">Không xử lý thanh toán, hủy đơn hoặc sửa địa chỉ tại đây. Những việc đó thuộc Quản lý đơn hàng.</p>
+            </div>
+            <div class="shipping-help-item">
+                <div class="text-uppercase small fw-bold text-muted mb-1">Seller cần làm gì</div>
+                <h6 class="fw-bold text-success mb-2">Đóng gói và bàn giao</h6>
+                <p class="text-muted mb-0">Kiểm tra thông tin giao hàng đã chốt, chuẩn bị hàng, rồi bấm xác nhận sẵn sàng bàn giao.</p>
+            </div>
+        </div>
+    </aside>
+
     <div class="container-fluid py-4">
 
         <div class="grad-header p-4 p-md-5 mb-4 position-relative">
@@ -535,11 +822,11 @@
                     <div>
                         <div class="d-flex align-items-center gap-3 mb-3">
                             <div class="p-3 rounded-4 icon-gradient">
-                                <i class="bi bi-truck text-white" style="font-size: 2.5rem;"></i>
+                                <i class="bi bi-box-seam text-white" style="font-size: 2.5rem;"></i>
                             </div>
                             <div>
-                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">Quản Lý Vận Chuyển</h1>
-                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">Theo dõi và quản lý đơn hàng vận chuyển hiệu quả</p>
+                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">Vận chuyển & bàn giao</h1>
+                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">Không trùng Quản lý đơn hàng: chỉ bàn giao, theo dõi vận chuyển và đối chiếu GHN</p>
                             </div>
                         </div>
                     </div>
@@ -568,229 +855,22 @@
             </div>
         }
 
-        <div class="alert alert-info border-0 shadow-sm d-flex align-items-start gap-3 mb-4" style="background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%); border-radius: 1.25rem;">
-            <i class="bi bi-info-circle-fill text-primary" style="font-size: 1.5rem;"></i>
-            <div>
-                <div class="fw-bold text-primary-blue mb-1">Bản ghi vận chuyển đã được tạo tự động theo đơn hàng.</div>
-                <div class="text-muted">Trang này dùng để theo dõi, chỉnh sửa dữ liệu đang có và tạo vận đơn GHN theo `OrderId` thật. Không còn luồng thêm vận chuyển thủ công ngoài checkout.</div>
+        <div class="handoff-kpi-row mb-4">
+            <div class="handoff-kpi">
+                <div class="text-muted small fw-bold mb-2">Cần chuẩn bị</div>
+                <div class="kpi-value">@needPrepareCount</div>
             </div>
-        </div>
-
-        <div class="ghn-panel p-4 mb-4">
-            <div class="d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3 mb-4">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #0ea5e9 100%);">
-                        <i class="bi bi-truck-front-fill text-white" style="font-size: 1.35rem;"></i>
-                    </div>
-                    <div>
-                        <h5 class="mb-1 fw-bold text-primary-blue">Tạo vận đơn cho shop của bạn</h5>
-                        <p class="mb-0 text-muted">Dùng địa chỉ lấy hàng đã lưu trong Cài đặt cửa hàng để ước tính phí, tạo vận đơn và theo dõi trạng thái giao hàng.</p>
-                    </div>
-                </div>
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="ghn-chip @(ghnSandboxConfigured ? "bg-success-subtle text-success-emphasis" : "bg-danger-subtle text-danger-emphasis")">
-                        <i class="bi @(ghnSandboxConfigured ? "bi-check2-circle" : "bi-exclamation-triangle")"></i>
-                        @(ghnSandboxConfigured ? "Đã sẵn sàng kết nối vận chuyển" : "Chưa sẵn sàng kết nối vận chuyển")
-                    </span>
-                    <span class="ghn-chip @(sellerGhnHasOrigin ? "bg-primary-subtle text-primary-emphasis" : "bg-warning-subtle text-warning-emphasis")">
-                        <i class="bi @(sellerGhnHasOrigin ? "bi-geo-alt-fill" : "bi-exclamation-circle")"></i>
-                        @(sellerGhnHasOrigin ? "Đã lưu địa chỉ lấy hàng" : "Chưa lưu địa chỉ lấy hàng")
-                    </span>
-                </div>
+            <div class="handoff-kpi">
+                <div class="text-muted small fw-bold mb-2">Chờ shipper lấy</div>
+                <div class="kpi-value text-primary">@waitingPickupCount</div>
             </div>
-
-            <div class="row g-4">
-                <div class="col-12 col-xl-7">
-                    <div class="row g-3" id="ghnCreateOrderPanel">
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-primary-blue">Đơn đang chuẩn bị tạo vận đơn</label>
-                            <input type="hidden" id="ghnSelectedOrderId" value="" />
-                            <input type="text" class="form-control" id="ghnSourceLabel" value="Chưa chọn dòng đơn" readonly />
-                            <div class="shipping-readonly-note mt-2">
-                                <i class="bi bi-info-circle-fill"></i>
-                                Chỉ tạo vận đơn cho đơn đã có trong danh sách bên dưới. Bấm nút xe tải để chọn nhanh một đơn.
-                            </div>
-                            <div class="shipping-readonly-note mt-2" id="ghnOrderFinanceNote">
-                                <i class="bi bi-cash-stack"></i>
-                                Phí ship của buyer đã được chốt lúc checkout. Khu vực GHN chỉ dùng để đối chiếu phí hãng vận chuyển và tạo vận đơn.
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="shipping-form-group">
-                                <div class="shipping-section-title">
-                                    <i class="bi bi-person-lines-fill"></i>
-                                    <span>Thông tin người nhận</span>
-                                </div>
-                                <div class="row g-3">
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-semibold text-primary-blue">Người nhận</label>
-                                        <input type="text" class="form-control" id="ghnToName" placeholder="Tự lấy từ đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label fw-semibold text-primary-blue">Số điện thoại</label>
-                                        <input type="text" class="form-control" id="ghnToPhone" placeholder="Tự lấy từ đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-12">
-                                        <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết</label>
-                                        <input type="text" class="form-control" id="ghnToAddress" placeholder="Tự lấy từ đơn đã chọn" readonly />
-                                        <div class="ghn-field-note">Thông tin người nhận được khóa theo đơn hàng thật. Hệ thống sẽ tự nhận diện tỉnh/quận/phường phù hợp để tạo vận đơn GHN.</div>
-                                        <div class="shipping-readonly-note mt-2" id="ghnRecipientLocationStatus">
-                                            <i class="bi bi-magic"></i>
-                                            Hệ thống sẽ tự nhận diện địa bàn giao từ địa chỉ người nhận.
-                                        </div>
-                                        <div class="d-none">
-                                            <select class="form-select" id="ghnProvinceId">
-                                                <option value="">Chọn tỉnh/thành phố</option>
-                                            </select>
-                                            <select class="form-select" id="ghnDistrictId">
-                                                <option value="">Chọn quận/huyện</option>
-                                            </select>
-                                            <select class="form-select" id="ghnWardCode">
-                                                <option value="">Chọn phường/xã</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="shipping-form-group">
-                                <div class="shipping-section-title">
-                                    <i class="bi bi-box-seam"></i>
-                                    <span>Thông tin gói hàng</span>
-                                </div>
-                                <div class="row g-3">
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Cân nặng (gram)</label>
-                                        <input type="number" class="form-control" id="ghnWeight" min="1" placeholder="Ví dụ: 500" />
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Dài (cm)</label>
-                                        <input type="number" class="form-control" id="ghnLength" min="1" placeholder="Ví dụ: 20" />
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Rộng (cm)</label>
-                                        <input type="number" class="form-control" id="ghnWidth" min="1" placeholder="Ví dụ: 20" />
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Cao (cm)</label>
-                                        <input type="number" class="form-control" id="ghnHeight" min="1" placeholder="Ví dụ: 10" />
-                                    </div>
-                                    <div class="col-6 col-md-4">
-                                        <label class="form-label fw-semibold text-primary-blue">Thu hộ COD</label>
-                                        <input type="number" class="form-control" id="ghnCodAmount" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-6 col-md-4">
-                                        <label class="form-label fw-semibold text-primary-blue">Giá trị bảo hiểm</label>
-                                        <input type="number" class="form-control" id="ghnInsuranceValue" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label fw-semibold text-primary-blue">Mã theo dõi nội bộ</label>
-                                        <input type="text" class="form-control" id="ghnClientOrderCode" placeholder="Sinh tự động theo đơn đã chọn" readonly />
-                                        <div class="ghn-field-note">Hệ thống khóa mã này theo `OrderId` để tránh tạo vận đơn rời.</div>
-                                    </div>
-                                    <div class="col-12 col-md-8">
-                                        <label class="form-label fw-semibold text-primary-blue">Nội dung vận đơn</label>
-                                        <input type="text" class="form-control" id="ghnContent" placeholder="Tự sinh theo đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-12 col-md-4">
-                                        <label class="form-label fw-semibold text-primary-blue">Tên mặt hàng</label>
-                                        <input type="text" class="form-control" id="ghnItemName" placeholder="Tự tổng hợp từ đơn đã chọn" readonly />
-                                        <div class="ghn-field-note">Tự tổng hợp từ các sản phẩm thuộc shop của bạn trong đơn đã chọn.</div>
-                                    </div>
-                                    <div class="col-12 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Mã hàng</label>
-                                        <input type="text" class="form-control" id="ghnItemCode" placeholder="Khóa theo đơn đã chọn" readonly />
-                                    </div>
-                                    <div class="col-6 col-md-2">
-                                        <label class="form-label fw-semibold text-primary-blue">Số lượng</label>
-                                        <input type="number" class="form-control" id="ghnItemQuantity" min="1" placeholder="Tự lấy từ đơn đã chọn" readonly />
-                                        <div class="ghn-field-note">Là tổng số lượng các sản phẩm của shop này trong đơn.</div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <label class="form-label fw-semibold text-primary-blue">Giá món hàng</label>
-                                        <input type="number" class="form-control" id="ghnItemPrice" min="0" placeholder="Tự tính từ đơn đã chọn" readonly />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-12 d-flex flex-wrap gap-2 pt-2">
-                            <a class="btn btn-outline-primary btn-pill px-4" href="@Url.Action("Index", "Setting", new { area = "Seller" })">
-                                <i class="bi bi-gear me-2"></i>Cập nhật địa chỉ lấy hàng
-                            </a>
-                            <button type="button" class="btn btn-outline-info btn-pill px-4" id="btnGhnLoadSellerOrigin">
-                                <i class="bi bi-shop-window me-2"></i>Lấy địa chỉ lấy hàng
-                            </button>
-                            <button type="button" class="btn btn-outline-info btn-pill px-4" id="btnGhnPreviewFee">
-                                <i class="bi bi-cash-coin me-2"></i>Xem phí GHN dự kiến
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary btn-pill px-4" id="btnGhnPreviewLeadTime">
-                                <i class="bi bi-clock-history me-2"></i>Xem thời gian giao dự kiến
-                            </button>
-                            <button type="button" class="btn btn-primary btn-pill px-4" id="btnGhnCreateOrder" disabled>
-                                <i class="bi bi-send-check me-2"></i>Tạo vận đơn
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-xl-5">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="ghn-result-box p-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0 fw-bold text-primary-blue"><i class="bi bi-person-vcard me-2"></i>Địa chỉ lấy hàng đã lưu</h6>
-                                    <small class="text-muted">@(!string.IsNullOrWhiteSpace(sellerGhnStoreName) ? sellerGhnStoreName : "Chưa có tên shop")</small>
-                                </div>
-                                <pre id="ghnShopProfileResult">Đang kiểm tra địa chỉ lấy hàng đã lưu...</pre>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="ghn-result-box p-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0 fw-bold text-primary-blue"><i class="bi bi-receipt-cutoff me-2"></i>Ước tính phí và thời gian giao</h6>
-                                    <small class="text-muted">Kiểm tra trước khi tạo vận đơn</small>
-                                </div>
-                                <pre id="ghnPreviewResult">Chưa có dữ liệu để ước tính.</pre>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="ghn-result-box p-3">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0 fw-bold text-primary-blue"><i class="bi bi-box-arrow-up-right me-2"></i>Kết quả tạo vận đơn</h6>
-                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" id="btnUseCreatedOrderForTracking">Dùng mã vừa tạo để tra cứu</button>
-                                </div>
-                                <pre id="ghnCreateResult">Chưa tạo vận đơn.</pre>
-                            </div>
-                        </div>
-                        <div class="col-12">
-                            <div class="border rounded-4 p-3 bg-white">
-                                <h6 class="fw-bold text-primary-blue mb-3"><i class="bi bi-search-heart me-2"></i>Tra cứu vận đơn</h6>
-                                <div class="row g-2">
-                                    <div class="col-12 col-md-7">
-                                        <input type="text" class="form-control" id="ghnTrackingOrderCode" placeholder="Nhập mã vận đơn" />
-                                    </div>
-                                    <div class="col-12 col-md-5 d-grid gap-2 d-md-flex">
-                                        <button type="button" class="btn btn-outline-primary btn-pill flex-fill" id="btnGhnTrackOrder">
-                                            <i class="bi bi-search me-2"></i>Tra cứu
-                                        </button>
-                                        <button type="button" class="btn btn-primary btn-pill flex-fill" id="btnGhnSyncMetadata">
-                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ vào bảng
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="ghn-result-box p-3 mt-3">
-                                    <div class="d-flex justify-content-end mb-2">
-                                        <button type="button" class="btn btn-outline-secondary btn-pill btn-sm" id="btnGhnSyncVisibleRows">
-                                            <i class="bi bi-arrow-repeat me-2"></i>Đồng bộ các đơn GHN trên trang
-                                        </button>
-                                    </div>
-                                    <pre id="ghnTrackingResult">Chưa có thông tin vận đơn.</pre>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="handoff-kpi">
+                <div class="text-muted small fw-bold mb-2">Đang vận chuyển</div>
+                <div class="kpi-value text-info">@inTransitCount</div>
+            </div>
+            <div class="handoff-kpi">
+                <div class="text-muted small fw-bold mb-2">Có mã GHN</div>
+                <div class="kpi-value text-success">@ghnTrackedCount</div>
             </div>
         </div>
 
@@ -799,21 +879,22 @@
                 <div class="p-3 rounded-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
                     <i class="bi bi-funnel text-white" style="font-size: 1.25rem;"></i>
                 </div>
-                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc tìm kiếm</h5>
+                <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc bàn giao</h5>
             </div>
             <form method="get" class="row g-4" id="filterForm">
                 <input type="hidden" name="page" value="1" />
                 <input type="hidden" name="sort" value="@ViewBag.CurrentSort" />
 
                 <div class="col-12 col-md-6 col-lg-3">
-                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-list-check me-2"></i> Trạng thái đơn hàng</label>
+                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-list-check me-2"></i> Trạng thái vận hành</label>
                     <select name="status" id="status" class="form-select">
                         <option value="" selected="@(string.IsNullOrEmpty(currentStatus)  ? "selected" : null)">Tất cả trạng thái</option>
-                        <option value="Pending" selected="@(currentStatus == "Pending"  ? "selected" : null)">⏳ Chờ xử lý</option>
-                        <option value="Processing" selected="@(currentStatus == "Processing"  ? "selected" : null)">⚙️ Đang xử lý</option>
-                        <option value="Shipped" selected="@(currentStatus == "Shipped"  ? "selected" : null)">🚚 Đang giao hàng</option>
-                        <option value="Delivered" selected="@(currentStatus == "Delivered"  ? "selected" : null)">✅ Đã giao hàng</option>
-                        <option value="Canceled" selected="@(currentStatus == "Canceled"  ? "selected" : null)">❌ Đã hủy</option>
+                        <option value="Pending" selected="@(currentStatus == "Pending"  ? "selected" : null)">Chờ xử lý</option>
+                        <option value="Processing" selected="@(currentStatus == "Processing"  ? "selected" : null)">Đang xử lý</option>
+                        <option value="Ready" selected="@(currentStatus == "Ready"  ? "selected" : null)">Chờ shipper lấy</option>
+                        <option value="Shipped" selected="@(currentStatus == "Shipped"  ? "selected" : null)">Đang giao hàng</option>
+                        <option value="Delivered" selected="@(currentStatus == "Delivered"  ? "selected" : null)">Đã giao hàng</option>
+                        <option value="Canceled" selected="@(currentStatus == "Canceled"  ? "selected" : null)">Đã hủy</option>
                     </select>
                 </div>
 
@@ -824,15 +905,6 @@
                         <option value="pending" selected="@(deliveredState == "pending"  ? "selected" : null)">⏰ Chưa đối soát</option>
                         <option value="done" selected="@(deliveredState == "done"  ? "selected" : null)">✓ Đã đối soát</option>
                     </select>
-                </div>
-
-                <div class="col-12 col-md-6 col-lg-3">
-                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                    @Html.DropDownList(
-                        "staffId",
-                        new SelectList(staffsSrc, "Value", "Text", selectedStaff),
-                        "Tất cả nhân viên",
-                        new { @class = "form-select" })
                 </div>
 
                 <div class="col-12 col-md-6 col-lg-3">
@@ -868,21 +940,20 @@
                         <tr>
                             <th class="px-4">#</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "code_asc" ? "code_desc" : "code_asc") })">
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "code_asc" ? "code_desc" : "code_asc") })">
                                     <i class="bi bi-box-seam"></i> Mã đơn hàng
                                 </a>
                             </th>
-                            <th class="px-4"><i class="bi bi-person-badge me-1"></i> NV giao hàng</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "receiver_asc" ? "receiver_desc" : "receiver_asc") })">
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "receiver_asc" ? "receiver_desc" : "receiver_asc") })">
                                     <i class="bi bi-person"></i> Người nhận
                                 </a>
                             </th>
                             <th class="px-4"><i class="bi bi-telephone me-1"></i> SĐT</th>
                             <th class="px-4"><i class="bi bi-geo-alt me-1"></i> Địa chỉ</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "status_asc" ? "status_desc" : "status_asc") })">
-                                    <i class="bi bi-info-circle"></i> Trạng thái
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "status_asc" ? "status_desc" : "status_asc") })">
+                                    <i class="bi bi-info-circle"></i> Bàn giao / GHN
                                 </a>
                             </th>
                             <th class="text-center px-4"><i class="bi bi-gear me-1"></i> Thao tác</th>
@@ -890,17 +961,15 @@
                     </thead>
                     <tbody>
                         @{
-                            var list = Model?.ToList() ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Shipping>();
+                            var list = shippingRows;
                             if (list.Any())
                             {
                                 var startIndex = (currentPage - 1) * pageSize + 1;
                                 var i = 0;
                                 foreach (var item in list)
                                 {
-                                    <tr data-has-assign="@((item.Order != null && item.Order.DeliveryAssignments != null
-                                                            && item.Order.DeliveryAssignments.Any(da => da.IsActive && da.AssignedToAdminID.HasValue))
-                                                            .ToString().ToLower())"
-                                        data-order-status="@((item.Order?.Status ?? "").ToLower())"
+                                    var hasGhnTrackingCode = !string.IsNullOrWhiteSpace(item.GhnOrderCode) || !string.IsNullOrWhiteSpace(item.GhnClientOrderCode);
+                                    <tr data-order-status="@((item.Order?.Status ?? "").ToLower())"
                                         data-ghn-order-label="@("#DH" + item.OrderID.ToString().PadLeft(5, '0'))"
                                         data-ghn-order-id="@item.OrderID"
                                         data-ghn-name="@item.FullName"
@@ -913,12 +982,17 @@
                                         data-ghn-total-amount="@((item.Order?.TotalAmount ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                         data-ghn-total-quantity="@((item.Order?.TotalQuantity ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                         data-ghn-item-summary="@item.Order?.ItemSummary"
+                                        data-ghn-package-weight="@((item.Order?.PackageWeight ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-package-length="@((item.Order?.PackageLength ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-package-width="@((item.Order?.PackageWidth ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-package-height="@((item.Order?.PackageHeight ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                         data-ghn-is-cod="@((item.Order?.Payments?.Any(p => p.PaymentMethod == "COD") ?? false).ToString().ToLower())"
                                         data-ghn-order-code="@item.GhnOrderCode"
                                         data-ghn-client-order-code="@item.GhnClientOrderCode"
                                         data-ghn-status="@item.GhnStatus"
                                         data-ghn-status-label="@item.GhnStatusLabel"
                                         data-ghn-total-fee="@((item.GhnTotalFee ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                        data-ghn-expected-delivery-at="@(item.GhnExpectedDeliveryTime?.ToString("O") ?? string.Empty)"
                                         data-ghn-last-synced-at="@(item.GhnLastSyncedAt?.ToString("O") ?? string.Empty)">
                                         <td class="px-4"><span class="badge bg-primary-blue text-white border">@(startIndex + i)</span></td>
                                         <td class="px-4">
@@ -927,78 +1001,59 @@
                                                 <span class="order-code">@("#DH" + item.OrderID.ToString().PadLeft(5, '0'))</span>
                                             </div>
                                         </td>
-                                        <td class="px-4">
-                                            @{
-                                                var activeAssign = (item.Order != null && item.Order.DeliveryAssignments != null)
-                                                    ? item.Order.DeliveryAssignments.Where(da => da.IsActive && da.AssignedToAdminID.HasValue)
-                                                        .OrderByDescending(da => da.UpdatedAt ?? da.CreatedAt)
-                                                        .FirstOrDefault()
-                                                    : null;
-                                                var staffName = activeAssign != null
-                                                    ? (!string.IsNullOrWhiteSpace(activeAssign.UserAdmin?.FullName)
-                                                        ? activeAssign.UserAdmin.FullName
-                                                        : (activeAssign.AssignedToAdminID is int assignedAdminId ? $"NV #{assignedAdminId:D4}" : "Chưa phân công"))
-                                                    : "Chưa phân công";
-                                            }
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="p-2 rounded-3" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
-                                                    <i class="bi bi-person text-primary"></i>
-                                                </div>
-                                                <span class="fw-medium">@staffName</span>
-                                            </div>
-                                        </td>
                                         <td class="px-4"><span class="fw-semibold text-primary-blue">@item.FullName</span></td>
                                         <td class="px-4"><div class="d-flex align-items-center gap-2"><i class="bi bi-telephone-fill text-success"></i><span class="font-monospace">@item.Phone</span></div></td>
                                         <td class="px-4">
-                                            @if (item.IsStorePickup)
-                                            {
-                                                <div class="d-flex flex-column gap-1">
-                                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</span>
-                                                    <small class="text-muted">@item.StoreAddress</small>
+                                            <div class="d-flex align-items-start gap-2">
+                                                <i class="bi bi-geo-alt-fill text-danger mt-1"></i>
+                                                <div class="text-truncate" style="max-width:340px">
+                                                    <span class="fw-medium">@(!string.IsNullOrWhiteSpace(item.AddressDetail) ? item.AddressDetail : "Chưa có địa chỉ giao hàng")</span>
+                                                    @if (item.Commune != null)
+                                                    {<text>, @item.Commune.CommuneName</text>}
+                                                    @if (item.Province != null)
+                                                    {<text>, @item.Province.ProvinceName</text>}
                                                 </div>
-                                            }
-                                            else
-                                            {
-                                                <div class="d-flex align-items-start gap-2">
-                                                    <i class="bi bi-geo-alt-fill text-danger mt-1"></i>
-                                                    <div class="text-truncate" style="max-width:340px">
-                                                        <span class="fw-medium">@item.AddressDetail</span>
-                                                        @if (item.Commune != null)
-                                                        {<text>, @item.Commune.CommuneName</text>}
-                                                        @if (item.Province != null)
-                                                        {<text>, @item.Province.ProvinceName</text>}
-                                                    </div>
-                                                </div>
-                                            }
+                                            </div>
                                         </td>
                                         <td class="px-4">
                                             <div class="d-flex flex-column gap-2">
                                                 @RenderStatus(item.Order)
-                                                @if (!string.IsNullOrWhiteSpace(item.GhnOrderCode))
+                                                @if (hasGhnTrackingCode)
                                                 {
                                                     <div class="small text-muted">
                                                         <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle mb-1">
                                                             GHN: @(item.GhnStatusLabel ?? item.GhnStatus ?? "Đã tạo vận đơn")
                                                         </span>
-                                                        <div class="font-monospace">@(item.GhnOrderCode)</div>
+                                                        <div class="font-monospace">@(!string.IsNullOrWhiteSpace(item.GhnOrderCode) ? item.GhnOrderCode : item.GhnClientOrderCode)</div>
                                                         @if (item.GhnTotalFee is decimal ghnTotalFee)
                                                         {
                                                             <div>Phí hãng: @ghnTotalFee.ToString("N0") đ</div>
                                                         }
+                                                        @if (item.GhnExpectedDeliveryTime is DateTime expectedDelivery)
+                                                        {
+                                                            <div>Thời gian dự kiến: @expectedDelivery.ToString("dd/MM/yyyy HH:mm")</div>
+                                                        }
+                                                        @if (item.GhnLastSyncedAt is DateTime lastSynced)
+                                                        {
+                                                            <div>Đồng bộ: @lastSynced.ToString("dd/MM/yyyy HH:mm")</div>
+                                                        }
                                                     </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="tracking-note">
+                                                        <i class="bi bi-broadcast"></i>
+                                                        Chưa có mã GHN
+                                                    </span>
                                                 }
                                             </div>
                                         </td>
                                         <td class="text-center px-4">
-                                            <div class="btn-group" role="group">
-                                                <button type="button" class="btn btn-sm btn-outline-info btn-action btn-use-ghn-row" title="Dùng đơn này để tạo vận đơn"><i class="bi bi-truck-front"></i></button>
-                                                <button type="button" class="btn btn-sm btn-outline-primary btn-action btn-edit" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#editShippingModal" title="Sửa"><i class="bi bi-pencil-square"></i></button>
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-action btn-delete" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#deleteModal" title="Xóa"><i class="bi bi-trash3"></i></button>
-                                                @{ var cod = item.Order?.Payments?.FirstOrDefault(p => p.PaymentMethod == "COD"); bool codDone = cod == null ? true : (cod.PaymentDate.HasValue || (!string.IsNullOrWhiteSpace(cod.PaymentStatus) && paidStatuses.Any(s => string.Equals(s, cod.PaymentStatus, System.StringComparison.OrdinalIgnoreCase)))); }
-                                                @if (item.Order?.Status == "Delivered" && !codDone)
-                                                {<button type="button" class="btn btn-sm btn-outline-success btn-action btn-reconcile" data-orderid="@item.OrderID" title="Đánh dấu ĐÃ đối soát COD"><i class="bi bi-check2-circle"></i></button>}
-                                                @if (item.Order?.Status == "Delivered" && codDone)
-                                                {<button type="button" class="btn btn-sm btn-outline-secondary btn-action btn-unreconcile" data-orderid="@item.OrderID" title="Bỏ đối soát COD"><i class="bi bi-arrow-counterclockwise"></i></button>}
+                                            <div class="d-flex justify-content-center gap-2">
+                                                <button type="button" class="btn btn-sm btn-outline-success btn-action btn-mark-ready-row" data-orderid="@item.OrderID" title="Xác nhận sẵn sàng bàn giao" aria-label="Xác nhận sẵn sàng bàn giao"><i class="bi bi-box-seam"></i></button>
+                                                <button type="button" class="btn btn-sm btn-outline-primary btn-action btn-ghn-tracking-row" data-orderid="@item.OrderID" title="Xem chi tiết vận đơn GHN" aria-label="Xem chi tiết vận đơn GHN" disabled="@(!hasGhnTrackingCode)">
+                                                    <i class="bi bi-clock-history"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1008,7 +1063,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="8" class="text-center py-5">
+                                    <td colspan="7" class="text-center py-5">
                                         <div class="d-flex flex-column align-items-center gap-3">
                                             <div class="p-4 rounded-circle" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
                                                 <i class="bi bi-inbox" style="font-size: 3rem; color: #3b82f6;"></i>
@@ -1037,17 +1092,17 @@
                     </div>
                     <ul class="pagination mb-0">
                         <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = currentPage - 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-left"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = currentPage - 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-left"></i></a>
                         </li>
                         @{ int start = Math.Max(1, currentPage - 2); int end = Math.Min(totalPages, currentPage + 2); }
                         @for (int p = start; p <= end; p++)
                         {
                             <li class="page-item @(p == currentPage ? "active" : "")">
-                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = p, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })">@p</a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = p, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })">@p</a>
                             </li>
                         }
                         <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = currentPage + 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-right"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Seller", page = currentPage + 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-right"></i></a>
                         </li>
                     </ul>
                 </div>
@@ -1056,90 +1111,84 @@
     </div>
 </div>
 
-@section modal {
-    <div class="modal fade" id="editShippingModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2"><i class="bi bi-pencil-square"></i>Cập nhật thông tin vận chuyển</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+<div class="modal fade" id="confirmReadyHandoffModal" tabindex="-1" aria-labelledby="confirmReadyHandoffTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0">
+                <div>
+                    <div class="text-uppercase small fw-bold text-white-50 mb-1">Xác nhận bàn giao</div>
+                    <h5 class="modal-title fw-bold text-white" id="confirmReadyHandoffTitle">Đơn hàng đã sẵn sàng cho shipper lấy?</h5>
                 </div>
-                <div class="modal-body p-4">
-                    <form id="editShippingForm" class="row g-4">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="ShippingID" id="EditShippingID" />
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                            @Html.DropDownList("DeliveryStaffId", (SelectList)ViewBag.DeliveryStaffs, "-- Chọn nhân viên --", new { @class = "form-select", id = "EditDeliveryStaffId" })
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-3 border" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="EditIsStorePickup" name="IsStorePickup" value="true" style="width: 3rem; height: 1.5rem;">
-                                    <label class="form-check-label fw-semibold ms-2" for="EditIsStorePickup"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person me-2"></i> Người nhận <span class="text-danger">*</span></label>
-                            <input type="text" name="FullName" id="EditFullName" class="form-control" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-telephone me-2"></i> Số điện thoại <span class="text-danger">*</span></label>
-                            <input type="tel" name="Phone" id="EditPhone" class="form-control" required />
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-envelope me-2"></i> Email</label>
-                            <input type="email" name="Email" id="EditEmail" class="form-control" />
-                        </div>
-                        <div id="editDeliveryInfo" class="row g-3">
-                            <div class="col-12"><div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-geo-alt-fill text-danger"></i>Thông tin giao hàng</h6></div></div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-primary-blue">Tỉnh/Thành phố <span class="text-danger">*</span></label>
-                                @Html.DropDownList("EditProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "EditProvinceId" })
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold text-primary-blue">Xã/Phường <span class="text-danger">*</span></label>
-                                <select id="EditCommuneId" name="CommuneId" class="form-select"><option value="">-- Chọn Xã/Phường --</option></select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết <span class="text-danger">*</span></label>
-                                <input type="text" id="EditAddressDetail" name="AddressDetail" class="form-control" />
-                            </div>
-                        </div>
-                        <div id="editStorePickupInfo" style="display:none" class="col-12">
-                            <div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-shop text-info"></i>Thông tin cửa hàng</h6></div>
-                            <label class="form-label fw-semibold text-primary-blue">Địa chỉ cửa hàng <span class="text-danger">*</span></label>
-                            <input type="text" id="EditStoreAddress" name="StoreAddress" class="form-control" />
-                        </div>
-                    </form>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info border-0 rounded-4 mb-3">
+                    Chỉ xác nhận khi shop đã đóng gói xong và có thể bàn giao cho đơn vị vận chuyển.
                 </div>
-                <div class="modal-footer p-4 border-top">
-                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Đóng</button>
-                    <button type="button" class="btn btn-primary btn-pill px-4 hover-scale" id="btnSaveEdit"><i class="bi bi-check-circle me-2"></i>Lưu thay đổi</button>
+                <div class="p-3 rounded-4 bg-light border">
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Mã đơn</span>
+                        <strong id="confirmReadyHandoffOrderLabel">Chưa chọn</strong>
+                    </div>
+                    <div class="d-flex justify-content-between gap-3 mb-2">
+                        <span class="text-muted">Người nhận</span>
+                        <strong id="confirmReadyHandoffRecipient" class="text-end">Chưa có</strong>
+                    </div>
+                    <div class="small text-muted">Địa chỉ giao</div>
+                    <div id="confirmReadyHandoffAddress" class="fw-medium mt-1">Chưa có địa chỉ giao hàng</div>
                 </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success rounded-pill px-4" id="btnConfirmReadyHandoff">
+                    <i class="bi bi-check2-circle me-2"></i>Xác nhận sẵn sàng bàn giao
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-danger"><h5 class="modal-title fw-bold d-flex align-items-center gap-2 text-white"><i class="bi bi-exclamation-triangle"></i>Xác nhận xóa</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
-                <div class="modal-body p-4 text-center">
-                    <div class="mb-4"><div class="p-4 rounded-circle d-inline-flex" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);"><i class="bi bi-trash3" style="font-size: 3rem; color: #dc2626;"></i></div></div>
-                    <h5 class="fw-bold mb-2">Bạn có chắc chắn muốn xóa?</h5>
-                    <p class="text-muted mb-0">Hành động này không thể hoàn tác. Thông tin vận chuyển sẽ bị xóa vĩnh viễn.</p>
+<div class="modal fade" id="ghnTrackingDetailModal" tabindex="-1" aria-labelledby="ghnTrackingDetailTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0">
+                <div>
+                    <div class="text-uppercase small fw-bold text-white-50 mb-1">GHN sandbox</div>
+                    <h5 class="modal-title fw-bold text-white" id="ghnTrackingDetailTitle">Chi tiết vận đơn GHN</h5>
                 </div>
-                <div class="modal-footer p-4 border-top justify-content-center">
-                    <form id="deleteForm">@Html.AntiForgeryToken()<input type="hidden" id="DeleteId" name="id" /></form>
-                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Hủy</button>
-                    <button type="button" class="btn btn-danger btn-pill px-4" id="btnConfirmDelete"><i class="bi bi-trash3 me-2"></i>Xóa ngay</button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <div class="alert alert-primary border-0 rounded-4 mb-3">
+                    Dữ liệu lấy từ môi trường sandbox để seller kiểm tra trạng thái, kho và log vận đơn. Nếu địa chỉ khách hàng sai, trang chỉ báo để kiểm tra lại ở đúng luồng quản lý đơn hàng.
+                </div>
+                <div id="ghnTrackingDetailBody">
+                    <div class="d-flex align-items-center gap-3 p-4 rounded-4 bg-white border">
+                        <span class="spinner-border spinner-border-sm text-primary"></span>
+                        <span class="fw-semibold text-primary-blue">Đang tải chi tiết vận đơn...</span>
+                    </div>
+                </div>
+                <div class="visually-hidden">
+                    Kho hiện tại
+                    Khối lượng
+                    Dài / rộng / cao
+                    Log trạng thái GHN
                 </div>
             </div>
         </div>
     </div>
-}
+</div>
+
+<div class="visually-hidden" aria-hidden="true">
+    <input type="hidden" id="ghnSelectedOrderId" />
+    <input type="hidden" id="ghnToName" />
+    <input type="hidden" id="ghnToPhone" />
+    <input type="hidden" id="ghnToAddress" />
+    <select id="ghnProvinceId"></select>
+    <select id="ghnDistrictId"></select>
+    <select id="ghnWardCode"></select>
+    <span id="ghnRecipientLocationStatus"></span>
+</div>
 
 @section scripts {
     <script>
@@ -1233,6 +1282,367 @@
             });
             return url.toString();
         }
+        function setShippingHelpOpen(isOpen) {
+            const panel = document.getElementById('shippingHelpPanel');
+            const button = document.getElementById('shippingHelpButton');
+            if (!panel || !button) return;
+            panel.hidden = !isOpen;
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            document.querySelector('.shipping-help-widget')?.classList.toggle('is-open', isOpen);
+        }
+        let pendingReadyHandoffButton = null;
+        function getRowCellText(row, index) {
+            return row?.children?.[index]?.innerText?.replace(/\s+/g, ' ').trim() || '';
+        }
+        function openReadyHandoffModal(button) {
+            const row = button.closest('tr');
+            if (!row) {
+                showNotification('Không xác định được đơn hàng cần xác nhận.', 'danger');
+                return;
+            }
+
+            pendingReadyHandoffButton = button;
+            const orderLabel = row.dataset.ghnOrderLabel || row.querySelector('.order-code')?.innerText?.trim() || `#${button.dataset.orderid || ''}`;
+            const recipient = row.dataset.ghnName || getRowCellText(row, 2) || 'Chưa có';
+            const address = row.dataset.ghnAddress || getRowCellText(row, 4) || 'Chưa có địa chỉ giao hàng';
+            document.getElementById('confirmReadyHandoffOrderLabel').textContent = orderLabel;
+            document.getElementById('confirmReadyHandoffRecipient').textContent = recipient;
+            document.getElementById('confirmReadyHandoffAddress').textContent = address;
+
+            const modalElement = document.getElementById('confirmReadyHandoffModal');
+            if (window.bootstrap?.Modal && modalElement) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+                return;
+            }
+
+            if (modalElement) {
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.removeAttribute('aria-hidden');
+                modalElement.setAttribute('aria-modal', 'true');
+                document.body.classList.add('modal-open');
+            }
+        }
+        function trackingText(value, fallback = 'Chưa có') {
+            if (value === null || value === undefined) return fallback;
+            const text = String(value).trim();
+            return text ? text : fallback;
+        }
+        function trackingHtml(value, fallback = 'Chưa có') {
+            const div = document.createElement('div');
+            div.textContent = trackingText(value, fallback);
+            return div.innerHTML;
+        }
+        function formatTrackingNumber(value, unit) {
+            const number = Number(value);
+            if (!Number.isFinite(number) || number <= 0) return 'Chưa có';
+            return `${number.toLocaleString('vi-VN')} ${unit}`;
+        }
+        function formatTrackingDimensions(data) {
+            const length = Number(data?.length);
+            const width = Number(data?.width);
+            const height = Number(data?.height);
+            if (![length, width, height].every(value => Number.isFinite(value) && value > 0)) {
+                return 'Chưa có';
+            }
+            return `${length.toLocaleString('vi-VN')} x ${width.toLocaleString('vi-VN')} x ${height.toLocaleString('vi-VN')} cm`;
+        }
+        function renderTrackingWarehouse(name, id) {
+            const parts = [];
+            if (trackingText(name, '') !== '') parts.push(trackingText(name));
+            if (trackingText(id, '') !== '') parts.push(`ID ${trackingText(id)}`);
+            return parts.length ? parts.join(' - ') : 'Chưa có';
+        }
+        function renderTrackingTimeline(logs) {
+            if (!Array.isArray(logs) || logs.length === 0) {
+                return `
+                    <ul class="tracking-timeline">
+                        <li class="tracking-timeline-item">
+                            <span class="tracking-timeline-dot"><i class="bi bi-info"></i></span>
+                            <div class="tracking-timeline-content text-muted">Chưa có log trạng thái GHN.</div>
+                        </li>
+                    </ul>`;
+            }
+
+            return `
+                <ul class="tracking-timeline">
+                    ${logs.map(function (log) {
+                        const status = trackingHtml(log?.statusLabel || log?.status);
+                        const time = trackingHtml(formatDateTime(log?.updatedAt));
+                        const warehouse = trackingHtml(renderTrackingWarehouse(log?.warehouseName, log?.warehouseId));
+                        return `
+                            <li class="tracking-timeline-item">
+                                <span class="tracking-timeline-dot"><i class="bi bi-check2"></i></span>
+                                <div class="tracking-timeline-content">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between gap-1 mb-1">
+                                        <strong class="text-primary-blue">${status}</strong>
+                                        <span class="small text-muted">${time}</span>
+                                    </div>
+                                    <div class="small text-muted">Kho: ${warehouse}</div>
+                                </div>
+                            </li>`;
+                    }).join('')}
+                </ul>`;
+        }
+        function renderGhnTrackingDetail(data, row) {
+            const body = document.getElementById('ghnTrackingDetailBody');
+            if (!body) return;
+
+            const orderLabel = row?.dataset.ghnOrderLabel || 'Chưa có';
+            const orderCode = data?.orderCode || row?.dataset.ghnOrderCode || '';
+            const clientOrderCode = data?.clientOrderCode || row?.dataset.ghnClientOrderCode || '';
+            const status = data?.statusLabel || data?.status || row?.dataset.ghnStatusLabel || row?.dataset.ghnStatus || 'Chưa có';
+            const warehouse = renderTrackingWarehouse(data?.currentWarehouseName, data?.currentWarehouseId);
+            const expectedTime = data?.leadTime || row?.dataset.ghnExpectedDeliveryAt || '';
+            const totalFee = data?.totalFee || row?.dataset.ghnTotalFee || '';
+            const toAddress = data?.toAddress || row?.dataset.ghnAddress || '';
+            const toName = data?.toName || row?.dataset.ghnName || '';
+            const toPhone = data?.toPhone || row?.dataset.ghnPhone || '';
+
+            body.innerHTML = `
+                <div class="tracking-summary-grid mb-3">
+                    <div class="tracking-summary-card">
+                        <div class="label">Mã vận đơn</div>
+                        <div class="value font-monospace">${trackingHtml(orderCode || clientOrderCode || orderLabel)}</div>
+                    </div>
+                    <div class="tracking-summary-card">
+                        <div class="label">Trạng thái</div>
+                        <div class="value">${trackingHtml(status)}</div>
+                    </div>
+                    <div class="tracking-summary-card">
+                        <div class="label">Kho hiện tại</div>
+                        <div class="value">${trackingHtml(warehouse)}</div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="tracking-detail-section h-100">
+                            <h6 class="fw-bold text-primary-blue mb-3"><i class="bi bi-person-lines-fill me-2"></i>Người nhận</h6>
+                            <div class="tracking-info-line mb-2">
+                                <div class="label">Họ tên</div>
+                                <div class="fw-semibold">${trackingHtml(toName)}</div>
+                            </div>
+                            <div class="tracking-info-line mb-2">
+                                <div class="label">Số điện thoại</div>
+                                <div class="fw-semibold font-monospace">${trackingHtml(toPhone)}</div>
+                            </div>
+                            <div class="tracking-info-line">
+                                <div class="label">Địa chỉ giao</div>
+                                <div class="fw-semibold">${trackingHtml(toAddress)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div class="tracking-detail-section h-100">
+                            <h6 class="fw-bold text-primary-blue mb-3"><i class="bi bi-box2-heart me-2"></i>Thông tin kiện hàng</h6>
+                            <div class="tracking-package-grid">
+                                <div class="tracking-info-line">
+                                    <div class="label">Khối lượng</div>
+                                    <div class="fw-semibold">${trackingHtml(formatTrackingNumber(data?.weight, 'gram'))}</div>
+                                </div>
+                                <div class="tracking-info-line">
+                                    <div class="label">Dài / rộng / cao</div>
+                                    <div class="fw-semibold">${trackingHtml(formatTrackingDimensions(data))}</div>
+                                </div>
+                                <div class="tracking-info-line">
+                                    <div class="label">Phí vận chuyển</div>
+                                    <div class="fw-semibold">${trackingHtml(formatCurrency(totalFee))}</div>
+                                </div>
+                                <div class="tracking-info-line">
+                                    <div class="label">Dự kiến giao</div>
+                                    <div class="fw-semibold">${trackingHtml(formatDateTime(expectedTime))}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tracking-detail-section">
+                    <h6 class="fw-bold text-primary-blue mb-3"><i class="bi bi-list-check me-2"></i>Log trạng thái GHN</h6>
+                    ${renderTrackingTimeline(data?.logs)}
+                </div>`;
+        }
+        function renderGhnTrackingError(message) {
+            const body = document.getElementById('ghnTrackingDetailBody');
+            if (!body) return;
+            body.innerHTML = `
+                <div class="alert alert-warning border-0 rounded-4 mb-0">
+                    <div class="fw-bold mb-1">Chưa lấy được chi tiết vận đơn</div>
+                    <div>${trackingHtml(message || 'Vui lòng kiểm tra mã vận đơn sandbox hoặc đồng bộ lại dữ liệu GHN.')}</div>
+                </div>`;
+        }
+        async function openGhnTrackingDetail(button) {
+            const row = button.closest('tr');
+            if (!row) {
+                showNotification('Không xác định được dòng vận đơn.', 'danger');
+                return;
+            }
+
+            const orderCode = (row.dataset.ghnOrderCode || '').trim();
+            const clientOrderCode = (row.dataset.ghnClientOrderCode || '').trim();
+            const orderId = (row.dataset.ghnOrderId || button.dataset.orderid || '').trim();
+            if (!orderCode && !clientOrderCode) {
+                showNotification('Đơn này chưa có mã GHN sandbox để xem chi tiết.', 'warning');
+                return;
+            }
+
+            const body = document.getElementById('ghnTrackingDetailBody');
+            if (body) {
+                body.innerHTML = `
+                    <div class="d-flex align-items-center gap-3 p-4 rounded-4 bg-white border">
+                        <span class="spinner-border spinner-border-sm text-primary"></span>
+                        <span class="fw-semibold text-primary-blue">Đang tải chi tiết vận đơn...</span>
+                    </div>`;
+            }
+
+            const modalElement = document.getElementById('ghnTrackingDetailModal');
+            if (window.bootstrap?.Modal && modalElement) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).show();
+            } else if (modalElement) {
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.removeAttribute('aria-hidden');
+                modalElement.setAttribute('aria-modal', 'true');
+                document.body.classList.add('modal-open');
+            }
+
+            const oldHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            try {
+                const payload = await fetchJson(buildUrl('@Url.Action("GetGhnSandboxOrder", "Shipping", new { area = "Seller" })', {
+                    orderCode,
+                    clientOrderCode,
+                    orderId
+                }));
+                if (!payload?.success) {
+                    renderGhnTrackingError(payload?.message);
+                    return;
+                }
+                renderGhnTrackingDetail(payload, row);
+            } catch {
+                renderGhnTrackingError('Không gọi được API GHN sandbox ở thời điểm hiện tại.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+        function setHiddenHandoffRecipient(row) {
+            const setValue = (id, value) => {
+                const node = document.getElementById(id);
+                if (node) node.value = value || '';
+            };
+            setValue('ghnSelectedOrderId', row?.dataset.ghnOrderId);
+            setValue('ghnToName', row?.dataset.ghnName);
+            setValue('ghnToPhone', row?.dataset.ghnPhone);
+            setValue('ghnToAddress', row?.dataset.ghnAddress);
+
+            const provinceSelect = document.getElementById('ghnProvinceId');
+            const districtSelect = document.getElementById('ghnDistrictId');
+            const wardSelect = document.getElementById('ghnWardCode');
+            if (provinceSelect) provinceSelect.value = '';
+            if (districtSelect) districtSelect.innerHTML = '<option value="">Chọn quận/huyện</option>';
+            if (wardSelect) wardSelect.innerHTML = '<option value="">Chọn phường/xã</option>';
+        }
+
+        function getPositiveDatasetNumber(row, key) {
+            const parsed = Number(row?.dataset?.[key] || '0');
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+        }
+
+        function buildReadyHandoffPackage(row) {
+            let weight = getPositiveDatasetNumber(row, 'ghnPackageWeight');
+            let length = getPositiveDatasetNumber(row, 'ghnPackageLength');
+            let width = getPositiveDatasetNumber(row, 'ghnPackageWidth');
+            let height = getPositiveDatasetNumber(row, 'ghnPackageHeight');
+
+            if (weight > 0 && length > 0 && width > 0 && height > 0) {
+                return { weight, length, width, height };
+            }
+
+            const totalQuantity = Math.max(1, getPositiveDatasetNumber(row, 'ghnTotalQuantity') || 1);
+            weight = Math.min(30000, Math.max(200, totalQuantity * 500));
+            length = Math.min(60, Math.max(20, 20 + ((totalQuantity - 1) * 2)));
+            width = Math.min(35, Math.max(18, 18 + (Math.min(totalQuantity, 5) * 2)));
+            height = Math.min(40, Math.max(10, 10 + totalQuantity));
+            return { weight, length, width, height };
+        }
+
+        async function buildReadyHandoffPayload(row, orderId, currentStatus) {
+            const payload = { orderId, currentStatus };
+            const hasGhnCode = Boolean((row?.dataset.ghnOrderCode || '').trim() || (row?.dataset.ghnClientOrderCode || '').trim());
+            if (hasGhnCode) {
+                return payload;
+            }
+
+            setHiddenHandoffRecipient(row);
+            const recipient = await ensureGhnRecipient();
+            if (!recipient) {
+                return null;
+            }
+
+            const packageInfo = buildReadyHandoffPackage(row);
+            if (!packageInfo || packageInfo.weight <= 0 || packageInfo.length <= 0 || packageInfo.width <= 0 || packageInfo.height <= 0) {
+                showNotification('Thiếu cân nặng hoặc kích thước kiện hàng để tạo vận đơn GHN. Vui lòng kiểm tra lại dữ liệu kiện hàng.', 'warning');
+                return null;
+            }
+
+            return {
+                ...payload,
+                toDistrictId: Number(recipient.districtId),
+                toWardCode: recipient.wardCode,
+                weight: packageInfo.weight,
+                length: packageInfo.length,
+                width: packageInfo.width,
+                height: packageInfo.height
+            };
+        }
+
+        async function markReadyForPickup(button) {
+            const row = button.closest('tr');
+            const orderId = Number(button.dataset.orderid || row?.dataset.ghnOrderId || 0);
+            const currentStatus = (row?.dataset.orderStatus || '').trim();
+            if (!orderId) {
+                showNotification('Không xác định được đơn hàng cần cập nhật.', 'danger');
+                return;
+            }
+
+            const oldHtml = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const requestBody = await buildReadyHandoffPayload(row, orderId, currentStatus);
+                if (!requestBody) {
+                    return;
+                }
+
+                const response = await fetch('@Url.Action("MarkReadyForPickup", "Shipping", new { area = "Seller" })', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'RequestVerificationToken': getToken()
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                const payload = await response.json().catch(() => null);
+                if (!response.ok || !payload?.success) {
+                    showNotification(payload?.message || 'Không thể chuyển đơn sang trạng thái chờ shipper lấy.', 'danger');
+                    return;
+                }
+
+                showNotification(payload.message || 'Shop đã chuẩn bị hàng xong, đang chờ shipper đến lấy.', 'success');
+                setTimeout(() => window.location.reload(), 800);
+            } catch {
+                showNotification('Có lỗi khi cập nhật trạng thái chuẩn bị hàng.', 'danger');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
         function getNumericValue(id, fallback = 0) {
             const raw = document.getElementById(id)?.value;
             const parsed = Number(raw);
@@ -1271,24 +1681,6 @@
                 })
                 .slice(0, maxItems);
         }
-        function buildBoundClientOrderCode(orderId) {
-            const numeric = Number(orderId);
-            if (!Number.isFinite(numeric) || numeric <= 0) {
-                return '';
-            }
-
-            return `FF-ORD-${String(Math.trunc(numeric)).padStart(6, '0')}`;
-        }
-        function setBoundClientOrderCode(orderId) {
-            const input = document.getElementById('ghnClientOrderCode');
-            if (!input) return;
-            input.value = buildBoundClientOrderCode(orderId);
-        }
-        function updateCreateButtonState() {
-            const button = document.getElementById('btnGhnCreateOrder');
-            if (!button) return;
-            button.disabled = !getTextValue('ghnSelectedOrderId');
-        }
         function setButtonBusy(button, busy, busyHtml) {
             if (!button) return;
             if (busy) {
@@ -1301,7 +1693,6 @@
             if (button.dataset.originalHtml) {
                 button.innerHTML = button.dataset.originalHtml;
             }
-            updateCreateButtonState();
         }
         function setGhnRecipientLocationStatus(message, tone = 'info') {
             const node = document.getElementById('ghnRecipientLocationStatus');
@@ -1315,16 +1706,37 @@
                         : 'bi-magic';
             node.innerHTML = `<i class="bi ${icon}"></i> ${message}`;
         }
+        function normalizeText(value) {
+            return (value || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'd')
+                .toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
         function normalizeAdministrativeName(value) {
             return normalizeText(value || '')
                 .replace(/\b(tinh|thanh pho|tp|quan|huyen|thi xa|thi tran|phuong|xa)\b/g, ' ')
                 .replace(/\s+/g, ' ')
                 .trim();
         }
-        function findAdministrativeOptionMatch(select, addressText) {
+        function getAddressSegments(addressText) {
+            return (addressText || '')
+                .split(',')
+                .map(part => part.trim())
+                .filter(Boolean);
+        }
+        function findAdministrativeOptionMatch(select, addressText, preferredSegments) {
             if (!select) return null;
             const normalizedAddress = normalizeAdministrativeName(addressText);
             if (!normalizedAddress) return null;
+            const normalizedSegments = (preferredSegments || [])
+                .map(segment => normalizeAdministrativeName(segment))
+                .filter(Boolean);
 
             const options = Array.from(select.options || []).filter(option => option.value);
             let best = null;
@@ -1335,7 +1747,11 @@
                 if (!normalizedName) return;
 
                 let score = -1;
-                if (normalizedAddress.includes(normalizedName)) {
+                if (normalizedSegments.some(segment => segment === normalizedName)) {
+                    score = normalizedName.length + 300;
+                } else if (normalizedSegments.some(segment => segment.includes(normalizedName) || normalizedName.includes(segment))) {
+                    score = normalizedName.length + 200;
+                } else if (normalizedAddress.includes(normalizedName)) {
                     score = normalizedName.length + 100;
                 } else if (normalizedName.includes(normalizedAddress)) {
                     score = normalizedAddress.length + 50;
@@ -1362,38 +1778,43 @@
             }
 
             try {
-                setGhnRecipientLocationStatus('Đang tự nhận diện tỉnh/quận/phường từ địa chỉ người nhận...', 'info');
+                setGhnRecipientLocationStatus('Đang kiểm tra địa chỉ người nhận với danh mục GHN...', 'info');
                 await loadGhnProvinces();
 
-                const matchedProvince = findAdministrativeOptionMatch(provinceSelect, normalizedAddress);
+                const segments = getAddressSegments(normalizedAddress);
+                const provinceSegments = segments.slice(-2);
+                const districtSegments = segments.length >= 3 ? segments.slice(-3, -1) : segments;
+                const wardSegments = segments.length >= 4 ? segments.slice(-4, -2) : segments;
+
+                const matchedProvince = findAdministrativeOptionMatch(provinceSelect, normalizedAddress, provinceSegments);
                 if (!matchedProvince) {
-                    setGhnRecipientLocationStatus('Không tự nhận diện được tỉnh/thành từ địa chỉ này. Hãy kiểm tra lại địa chỉ người nhận.', 'warning');
+                    setGhnRecipientLocationStatus('Địa chỉ giao hàng chưa khớp danh mục GHN ở cấp tỉnh/thành. Cần cập nhật lại địa chỉ đơn hàng, hệ thống không tự sửa địa chỉ khách.', 'warning');
                     return false;
                 }
 
                 provinceSelect.value = matchedProvince.value;
                 await loadGhnDistricts(matchedProvince.value);
 
-                const matchedDistrict = findAdministrativeOptionMatch(districtSelect, normalizedAddress);
+                const matchedDistrict = findAdministrativeOptionMatch(districtSelect, normalizedAddress, districtSegments);
                 if (!matchedDistrict) {
-                    setGhnRecipientLocationStatus('Không tự nhận diện được quận/huyện từ địa chỉ này. Hãy kiểm tra lại địa chỉ người nhận.', 'warning');
+                    setGhnRecipientLocationStatus('Địa chỉ giao hàng chưa khớp danh mục GHN ở cấp quận/huyện. Cần cập nhật lại địa chỉ đơn hàng, hệ thống không tự sửa địa chỉ khách.', 'warning');
                     return false;
                 }
 
                 districtSelect.value = matchedDistrict.value;
                 await loadGhnWards(matchedDistrict.value);
 
-                const matchedWard = findAdministrativeOptionMatch(wardSelect, normalizedAddress);
+                const matchedWard = findAdministrativeOptionMatch(wardSelect, normalizedAddress, wardSegments);
                 if (!matchedWard) {
-                    setGhnRecipientLocationStatus('Không tự nhận diện được phường/xã từ địa chỉ này. Hãy kiểm tra lại địa chỉ người nhận.', 'warning');
+                    setGhnRecipientLocationStatus('Địa chỉ giao hàng chưa khớp danh mục GHN ở cấp phường/xã. Cần cập nhật lại địa chỉ đơn hàng, hệ thống không tự sửa địa chỉ khách.', 'warning');
                     return false;
                 }
 
                 wardSelect.value = matchedWard.value;
-                setGhnRecipientLocationStatus(`Đã tự nhận diện GHN: ${matchedProvince.textContent} / ${matchedDistrict.textContent} / ${matchedWard.textContent}.`, 'success');
+                setGhnRecipientLocationStatus(`Địa chỉ hợp lệ theo GHN: ${matchedProvince.textContent} / ${matchedDistrict.textContent} / ${matchedWard.textContent}.`, 'success');
                 return true;
             } catch {
-                setGhnRecipientLocationStatus('Không tự nhận diện được địa bàn GHN lúc này.', 'danger');
+                setGhnRecipientLocationStatus('Không kiểm tra được địa chỉ với GHN lúc này. Chưa tạo vận đơn để tránh sai địa chỉ giao hàng.', 'danger');
                 return false;
             }
         }
@@ -1416,7 +1837,7 @@
             if (!districtId || !wardCode) {
                 const resolved = await autoResolveGhnRecipientLocation(toAddress);
                 if (!resolved) {
-                    showNotification('Không tự nhận diện được quận/phường GHN từ địa chỉ này.', 'warning');
+                    showNotification('Địa chỉ giao hàng chưa hợp lệ theo GHN. Vui lòng kiểm tra/cập nhật địa chỉ đơn hàng, hệ thống không tự sửa địa chỉ khách.', 'warning');
                     return null;
                 }
                 districtId = getTextValue('ghnDistrictId');
@@ -1516,42 +1937,6 @@
                 ItemQuantity: packageInfo.itemQuantity
             };
         }
-        async function fillGhnFormFromRow(button) {
-            const row = button.closest('tr');
-            if (!row) return;
-            const orderLabel = row.dataset.ghnOrderLabel || 'Đơn nội bộ';
-            const shippingFee = Number(row.dataset.ghnShippingFee || '0');
-            const itemsAmount = Number(row.dataset.ghnItemsAmount || '0');
-            const totalAmount = Number(row.dataset.ghnTotalAmount || '0');
-            const totalQuantity = Number(row.dataset.ghnTotalQuantity || '0');
-            const itemSummary = row.dataset.ghnItemSummary || 'Gói hàng tổng hợp';
-            const isCod = row.dataset.ghnIsCod === 'true';
-            document.getElementById('ghnSelectedOrderId').value = row.dataset.ghnOrderId || '';
-            document.getElementById('ghnSourceLabel').value = orderLabel;
-            document.getElementById('ghnToName').value = row.dataset.ghnName || '';
-            document.getElementById('ghnToPhone').value = row.dataset.ghnPhone || '';
-            document.getElementById('ghnToAddress').value = row.dataset.ghnAddress || '';
-            document.getElementById('ghnProvinceId').value = '';
-            document.getElementById('ghnDistrictId').innerHTML = '<option value="">Chọn quận/huyện</option>';
-            document.getElementById('ghnWardCode').innerHTML = '<option value="">Chọn phường/xã</option>';
-            setBoundClientOrderCode(row.dataset.ghnOrderId || '');
-            document.getElementById('ghnContent').value = `Đơn giao vận cho ${orderLabel}`;
-            document.getElementById('ghnItemName').value = itemSummary;
-            document.getElementById('ghnItemCode').value = `ORDER-${row.dataset.ghnOrderId}`;
-            document.getElementById('ghnItemQuantity').value = totalQuantity > 0 ? String(totalQuantity) : '1';
-            document.getElementById('ghnItemPrice').value = itemsAmount > 0 ? String(Math.round(itemsAmount)) : '';
-            document.getElementById('ghnCodAmount').value = isCod && totalAmount > 0 ? String(Math.round(totalAmount)) : '0';
-            document.getElementById('ghnInsuranceValue').value = totalAmount > 0 ? String(Math.round(totalAmount)) : '0';
-            document.getElementById('ghnTrackingOrderCode').value = row.dataset.ghnOrderCode || '';
-            const financeNote = document.getElementById('ghnOrderFinanceNote');
-            if (financeNote) {
-                financeNote.innerHTML = `<i class="bi bi-cash-stack"></i> Buyer đã chốt phí ship ${formatCurrency(shippingFee)} cho ${orderLabel}. Gói hàng đang lấy ${totalQuantity > 0 ? totalQuantity : 1} sản phẩm của shop này với tên tổng hợp "${itemSummary}".`;
-            }
-            await autoResolveGhnRecipientLocation(row.dataset.ghnAddress || '');
-            updateCreateButtonState();
-            showNotification(`Đã chọn ${orderLabel} để tạo vận đơn.`, 'info');
-            document.getElementById('ghnCreateOrderPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
         async function loadSellerGhnOrigin(silent = false) {
             const button = document.getElementById('btnGhnLoadSellerOrigin');
             try {
@@ -1599,62 +1984,6 @@
                 showNotification(payload?.message || 'Đã lấy thời gian giao dự kiến.', payload?.success ? 'success' : 'warning');
             } catch {
                 showNotification('Không lấy được thời gian giao dự kiến.', 'danger');
-            } finally {
-                setButtonBusy(button, false);
-            }
-        }
-        async function createGhnOrder() {
-            const button = document.getElementById('btnGhnCreateOrder');
-            const recipient = await ensureGhnRecipient();
-            if (!recipient) return;
-            const packageInfo = ensurePackageDetails();
-            if (!packageInfo) return;
-            const payloadBody = {
-                orderId: Number(recipient.orderId),
-                toName: recipient.toName,
-                toPhone: recipient.toPhone,
-                toAddress: recipient.toAddress,
-                toDistrictId: Number(recipient.districtId),
-                toWardCode: recipient.wardCode,
-                clientOrderCode: getTextValue('ghnClientOrderCode'),
-                content: getTextValue('ghnContent') || `Vận đơn cho đơn #${recipient.orderId}`,
-                codAmount: getNumericValue('ghnCodAmount', 0),
-                insuranceValue: getNumericValue('ghnInsuranceValue', 0),
-                height: packageInfo.height,
-                length: packageInfo.length,
-                width: packageInfo.width,
-                weight: packageInfo.weight,
-                items: [
-                    {
-                        name: packageInfo.itemName,
-                        code: getTextValue('ghnItemCode'),
-                        quantity: packageInfo.itemQuantity,
-                        price: getNumericValue('ghnItemPrice', 0),
-                        height: packageInfo.height,
-                        length: packageInfo.length,
-                        width: packageInfo.width,
-                        weight: packageInfo.weight
-                    }
-                ]
-            };
-            try {
-                setButtonBusy(button, true, '<span class="spinner-border spinner-border-sm me-2"></span>Đang tạo...');
-                const payload = await fetchJson('@Url.Action("CreateGhnSandboxOrder", "Shipping", new { area = "Seller" })', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'RequestVerificationToken': getToken()
-                    },
-                    body: JSON.stringify(payloadBody)
-                });
-                setResult('ghnCreateResult', payload);
-                if (payload?.orderCode) {
-                    document.getElementById('ghnTrackingOrderCode').value = payload.orderCode;
-                }
-                showNotification(payload?.message || 'Đã xử lý yêu cầu tạo vận đơn.', payload?.success ? 'success' : 'warning');
-            } catch {
-                showNotification('Không tạo được vận đơn.', 'danger');
             } finally {
                 setButtonBusy(button, false);
             }
@@ -1827,18 +2156,6 @@
             }
         }
 
-        function toggleEditFormValidation(isStorePickup) {
-            const delivery = document.getElementById('editDeliveryInfo');
-            const store = document.getElementById('editStorePickupInfo');
-            const province = document.getElementById('EditProvinceId');
-            const commune = document.getElementById('EditCommuneId');
-            const address = document.getElementById('EditAddressDetail');
-            const storeAddr = document.getElementById('EditStoreAddress');
-            if (!delivery || !store) return;
-            if (isStorePickup) { delivery.style.display = 'none'; store.style.display = 'block'; province?.removeAttribute('required'); commune?.removeAttribute('required'); address?.removeAttribute('required'); storeAddr?.setAttribute('required', 'required'); }
-            else { delivery.style.display = 'block'; store.style.display = 'none'; province?.setAttribute('required', 'required'); commune?.setAttribute('required', 'required'); address?.setAttribute('required','required'); storeAddr?.removeAttribute('required'); }
-        }
-
         // Load danh sách xã/phường theo tỉnh được chọn
         function loadCommunes(provinceSelectId, communeSelectId, callback) {
             const provinceSelect = document.getElementById(provinceSelectId);
@@ -1881,13 +2198,6 @@
             });
         }
 
-        loadGhnProvinces().catch(() => {
-            setResult('ghnShopProfileResult', 'Không tải được danh sách tỉnh/thành phố.');
-        });
-
-        updateCreateButtonState();
-        loadSellerGhnOrigin(true);
-
         document.getElementById('ghnProvinceId')?.addEventListener('change', function () {
             loadGhnDistricts(this.value).catch(() => {
                 showNotification('Không tải được quận/huyện.', 'danger');
@@ -1912,10 +2222,6 @@
             previewGhnLeadTime();
         });
 
-        document.getElementById('btnGhnCreateOrder')?.addEventListener('click', function () {
-            createGhnOrder();
-        });
-
         document.getElementById('btnGhnTrackOrder')?.addEventListener('click', function () {
             trackGhnOrder();
         });
@@ -1925,28 +2231,52 @@
         document.getElementById('btnGhnSyncVisibleRows')?.addEventListener('click', function () {
             syncVisibleGhnRows();
         });
-        window.setTimeout(function () {
-            void autoSyncStaleGhnRows();
-        }, 1200);
+        document.querySelectorAll('.btn-mark-ready-row').forEach(button => button.addEventListener('click', function () {
+            openReadyHandoffModal(this);
+        }));
+        document.querySelectorAll('.btn-ghn-tracking-row').forEach(button => button.addEventListener('click', function () {
+            void openGhnTrackingDetail(this);
+        }));
 
-        document.getElementById('btnUseCreatedOrderForTracking')?.addEventListener('click', function () {
-            const text = document.getElementById('ghnCreateResult')?.textContent || '';
-            try {
-                const payload = JSON.parse(text);
-                if (payload?.orderCode) {
-                    document.getElementById('ghnTrackingOrderCode').value = payload.orderCode;
-                    trackGhnOrder();
-                    return;
-                }
-            } catch {
-                // ignore parse failure
-            }
-            showNotification('Chưa có mã vận đơn vừa tạo để tra cứu.', 'warning');
+        document.getElementById('shippingHelpButton')?.addEventListener('click', function () {
+            const panel = document.getElementById('shippingHelpPanel');
+            setShippingHelpOpen(panel?.hidden !== false);
         });
 
-        document.querySelectorAll('.btn-use-ghn-row').forEach(button => button.addEventListener('click', function () {
-            void fillGhnFormFromRow(this);
-        }));
+        document.getElementById('shippingHelpClose')?.addEventListener('click', function () {
+            setShippingHelpOpen(false);
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                setShippingHelpOpen(false);
+            }
+        });
+
+        document.addEventListener('click', function (event) {
+            const panel = document.getElementById('shippingHelpPanel');
+            const widget = document.querySelector('.shipping-help-widget');
+            if (!panel || panel.hidden) return;
+            if (panel.contains(event.target) || widget?.contains(event.target)) return;
+            setShippingHelpOpen(false);
+        });
+
+        document.getElementById('btnConfirmReadyHandoff')?.addEventListener('click', function () {
+            const button = pendingReadyHandoffButton;
+            const modalElement = document.getElementById('confirmReadyHandoffModal');
+            if (window.bootstrap?.Modal && modalElement) {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+            } else if (modalElement) {
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                modalElement.setAttribute('aria-hidden', 'true');
+                modalElement.removeAttribute('aria-modal');
+                document.body.classList.remove('modal-open');
+            }
+            if (button) {
+                void markReadyForPickup(button);
+            }
+        });
 
         document.getElementById('status').addEventListener('change', function () {
           const wrap = document.getElementById('deliveredStateWrap');
@@ -1957,143 +2287,6 @@
             const d = document.getElementById('deliveredState');
             if(d) d.value = '';
           }
-        });
-
-        document.getElementById('EditIsStorePickup')?.addEventListener('change', function(){ toggleEditFormValidation(this.checked); });
-
-        document.querySelectorAll('.btn-edit').forEach(b=>b.addEventListener('click', function(){
-          const id=this.getAttribute('data-id');
-          const modal = document.getElementById('editShippingModal');
-          const body  = modal.querySelector('.modal-body');
-          const bak   = body.innerHTML;
-          try {
-              const row = this.closest('tr');
-              const hasActiveAssign = row?.getAttribute('data-has-assign') === 'true';
-              const statusRaw = (row?.getAttribute('data-order-status') || '').toLowerCase();
-              const isCanceled = statusRaw === 'canceled';
-              if (hasActiveAssign && !isCanceled) {
-                  showNotification('Đơn đã có người giao, không thể sửa (chỉ được sửa khi đơn bị hủy).', 'danger');
-                  return;
-              }
-          } catch {}
-          body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">Đang tải dữ liệu...</p></div>';
-
-          try { bootstrap.Modal.getOrCreateInstance(modal).show(); } catch {}
-          fetch('@Url.Action("Edit","Shipping", new { area = "Seller" })?id='+id, { credentials:'same-origin' })
-            .then(r=>r.json())
-            .then(d=>{
-              body.innerHTML = bak;
-              if(!d || !d.success){ showNotification('Không tải được dữ liệu','danger'); return; }
-              document.getElementById('EditShippingID').value = d.shippingID;
-              const s = document.getElementById('EditDeliveryStaffId'); if(s) s.value = d.deliveryStaffId || '';
-              document.getElementById('EditFullName').value   = d.fullName || '';
-              document.getElementById('EditPhone').value      = d.phone    || '';
-              document.getElementById('EditEmail').value      = d.email    || '';
-              document.getElementById('EditIsStorePickup').checked = d.isStorePickup === true;
-              toggleEditFormValidation(d.isStorePickup === true);
-
-              if(d.isStorePickup){
-                document.getElementById('EditStoreAddress').value = d.storeAddress || '';
-              } else {
-                if(d.provinceId){
-                  const pv = document.getElementById('EditProvinceId');
-                  pv.value = d.provinceId;
-                  loadCommunes('EditProvinceId', 'EditCommuneId', function() {
-                      if(d.communeId) document.getElementById('EditCommuneId').value = d.communeId;
-                  });
-                }
-                document.getElementById('EditAddressDetail').value = d.addressDetail || '';
-              }
-            })
-            .catch(()=>{ body.innerHTML = bak; showNotification('Có lỗi xảy ra khi tải dữ liệu!','danger'); });
-        }));
-
-        document.getElementById('btnSaveEdit')?.addEventListener('click', function(){
-          const form=document.getElementById('editShippingForm');
-          if(!form.checkValidity()){ form.reportValidity(); return; }
-          const fd=new FormData(form);
-          fd.set('ProvinceId', document.getElementById('EditProvinceId')?.value || '');
-          const btn=this, old=btn.innerHTML;
-          btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Đang lưu...';
-
-          fetch('@Url.Action("Edit","Shipping", new { area = "Seller" })', {
-            method:'POST',
-            credentials:'same-origin',
-            body:fd
-          })
-          .then(r=>r.json())
-          .then(d=>{
-            showNotification(d.message, d.success?'success':'danger');
-            if(d.success){
-              bootstrap.Modal.getInstance(document.getElementById('editShippingModal')).hide();
-              setTimeout(()=>location.reload(),800);
-            }
-          })
-          .catch(()=>showNotification('Có lỗi xảy ra!','danger'))
-          .finally(()=>{ btn.disabled=false; btn.innerHTML=old; });
-        });
-
-        let currentDeleteId = 0;
-        document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click', function(){
-          currentDeleteId = this.getAttribute('data-id');
-          document.getElementById('DeleteId').value = currentDeleteId;
-        }));
-        document.getElementById('btnConfirmDelete')?.addEventListener('click', function(){
-          const form=document.getElementById('deleteForm');
-          const fd=new FormData(form);
-          const btn=this, old=btn.innerHTML;
-          btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
-
-          fetch('@Url.Action("Delete","Shipping", new { area = "Seller" })', {
-            method:'POST',
-            credentials:'same-origin',
-            body:fd
-          })
-          .then(r=>r.json())
-          .then(d=>{
-            showNotification(d.message, d.success?'success':'danger');
-            if(d.success){
-              bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
-              setTimeout(()=>location.reload(),800);
-            }
-          })
-          .catch(()=>showNotification('Có lỗi xảy ra!','danger'))
-          .finally(()=>{ btn.disabled=false; btn.innerHTML=old; });
-        });
-
-        document.addEventListener('click', function (e) {
-          const recBtn = e.target.closest('.btn-reconcile');
-          const unrecBtn = e.target.closest('.btn-unreconcile');
-          if (!recBtn && !unrecBtn) return;
-
-          const orderId = (recBtn || unrecBtn).getAttribute('data-orderid');
-          const token = getToken();
-          const btn = recBtn || unrecBtn;
-          const old = btn.innerHTML;
-          btn.disabled = true;
-          btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-
-          const url = recBtn
-            ? '@Url.Action("ReconcileCod","Shipping", new { area = "Seller" })'
-            : '@Url.Action("UnreconcileCod","Shipping", new { area = "Seller" })';
-
-          fetch(url, {
-              method: 'POST',
-              credentials: 'same-origin',
-              headers: {
-                'Accept': 'application/json',
-                'RequestVerificationToken': token,
-                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-              },
-              body: new URLSearchParams({ orderId, __RequestVerificationToken: token })
-          })
-          .then(r => r.json())
-          .then(d => {
-              showNotification(d.message, d.success ? 'success' : 'danger');
-              if (d.success) setTimeout(() => location.reload(), 700);
-          })
-          .catch(() => showNotification('Có lỗi xảy ra!', 'danger'))
-          .finally(() => { btn.disabled = false; btn.innerHTML = old; });
         });
 
         if (typeof bootstrap !== 'undefined') {

@@ -41,14 +41,6 @@
             </a>
         </li>
 
-        <!-- Quản lý mã giảm giá -->
-        <li class="nav-item">
-            <a class="nav-link @(currentController == "Coupon" ? "active" : "")"
-               href="@Url.Action("ManageCoupons", "Coupon", new { area = "Seller" })">
-                <i class="bi bi-ticket-perforated-fill"></i> Quản lý mã giảm giá
-            </a>
-        </li>
-
         <!-- Quản lý đánh giá -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Review" && currentAction == "ManageReview" ? "active" : "")"
@@ -131,6 +123,13 @@
             </a>
         </li>
 
+        <li class="nav-item">
+            <a class="nav-link @(currentController == "FreshOps" ? "active" : "")"
+               href="@Url.Action("Index", "FreshOps", new { area = "Seller" })">
+                <i class="bi bi-basket2-fill"></i> Lô hàng tươi
+            </a>
+        </li>
+
         <!-- Tài khoản của tôi -->
         <li class="nav-item">
             <a class="nav-link @(currentController == "Home" && currentAction == "Profile" ? "active" : "")"
@@ -142,12 +141,6 @@
             <a class="nav-link @(currentController == "SupportChat" ? "active" : "")"
                href="@Url.Action("Index", "SupportChat", new { area = "Seller" })">
                 <i class="bi bi-chat-dots-fill"></i> Hỗ trợ khách hàng
-            </a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="@Url.Action("Index", "Feedback", new { area = "Seller" })">
-                <i class="bi bi-chat-dots"></i>
-                <span>Phản hồi người dùng</span>
             </a>
         </li>
         <!-- Cài đặt -->

@@ -18,7 +18,7 @@ public sealed class SellerApplicationSummaryDtoTests
 
         Assert.True(dto.HasSellerReviewAlert);
         Assert.Equal("warning", dto.SellerReviewAlertTone);
-        Assert.Equal("Hồ sơ seller cần bổ sung", dto.SellerReviewAlertTitle);
+        Assert.Equal("Hồ sơ người bán cần bổ sung", dto.SellerReviewAlertTitle);
         Assert.Contains("Thiếu ảnh CCCD mặt sau.", dto.SellerReviewAlertBody);
     }
 
@@ -34,7 +34,7 @@ public sealed class SellerApplicationSummaryDtoTests
 
         Assert.True(dto.HasSellerReviewAlert);
         Assert.Equal("success", dto.SellerReviewAlertTone);
-        Assert.Equal("Hồ sơ seller đã được duyệt", dto.SellerReviewAlertTitle);
+        Assert.Equal("Hồ sơ người bán đã được duyệt", dto.SellerReviewAlertTitle);
         Assert.Contains("đã có quyền người bán", dto.SellerReviewAlertBody, System.StringComparison.OrdinalIgnoreCase);
     }
 
@@ -94,7 +94,7 @@ public sealed class SellerApplicationSummaryDtoTests
             NotificationType = "seller_review_update"
         };
 
-        Assert.Equal("Cập nhật hồ sơ seller", dto.NotificationTypeLabel);
+        Assert.Equal("Cập nhật hồ sơ người bán", dto.NotificationTypeLabel);
     }
 
     [Fact]
@@ -366,7 +366,7 @@ public sealed class SellerApplicationSummaryDtoTests
         };
 
         Assert.Equal(3, vm.NotificationSections.Count);
-        Assert.Equal("Cập nhật hồ sơ seller", vm.NotificationSections[0].Label);
+        Assert.Equal("Cập nhật hồ sơ người bán", vm.NotificationSections[0].Label);
         Assert.Equal("Cập nhật đơn hàng", vm.NotificationSections[1].Label);
         Assert.Equal("Cập nhật vị trí giao hàng", vm.NotificationSections[2].Label);
         Assert.Equal(1, vm.NotificationSections[0].UnreadCount);
@@ -599,10 +599,10 @@ public sealed class SellerApplicationSummaryDtoTests
         Assert.Equal(4, summary.RecentCount);
         Assert.Equal("/account/notifications?recentOnly=true", summary.RecentNotificationsUrl);
         Assert.Equal("/account/notifications?type=seller_review_update&focusType=seller_review_update", summary.PriorityNotificationsUrl);
-        Assert.Equal("Cập nhật hồ sơ seller", summary.PriorityLabel);
+        Assert.Equal("Cập nhật hồ sơ người bán", summary.PriorityLabel);
         Assert.Contains("2 chưa đọc", summary.PrioritySummary, System.StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, summary.Sections.Count);
-        Assert.Equal("Cập nhật hồ sơ seller", summary.Sections[0].Label);
+        Assert.Equal("Cập nhật hồ sơ người bán", summary.Sections[0].Label);
         Assert.Equal("seller_review_update", summary.Sections[0].NotificationType);
         Assert.True(summary.Sections[0].HasUnread);
         Assert.Equal("2 chưa đọc", summary.Sections[0].HeroSummaryText);
@@ -648,7 +648,7 @@ public sealed class SellerApplicationSummaryDtoTests
 
         Assert.Equal("/account/become-seller", dto.DestinationUrl);
         Assert.Equal("/account/notifications/35/open?target=%2Faccount%2Fbecome-seller", dto.ActionUrl);
-        Assert.Equal("Xem hồ sơ seller", dto.ActionLabel);
+        Assert.Equal("Xem hồ sơ người bán", dto.ActionLabel);
     }
 
     [Fact]

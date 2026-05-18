@@ -1168,7 +1168,7 @@
                                data-action="related-recommendation-click"
                                data-product-id="${product.productId}"
                                data-rank="${index + 1}">
-                                <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" />
+                                <img src="${product.image}" class="shop-related-thumb" alt="${escapeHtml(product.productName)}" loading="lazy" decoding="async" />
                                     <div class="shop-related-meta">
                                         <div class="shop-related-name">${escapeHtml(product.productName)}</div>
                                         ${renderSeasonalityBadge(product)}
@@ -1230,7 +1230,7 @@
                                        data-product-id="${product.productId}"
                                        data-seller-id="${toNumber(product.primarySellerId, 0)}"
                                        data-rank="${resultRank}">
-                                        <img src="${product.image}" class="search-product-thumb" alt="${escapeHtml(product.productName)}" />
+                                        <img src="${product.image}" class="search-product-thumb" alt="${escapeHtml(product.productName)}" loading="lazy" decoding="async" />
                                     </a>
                                     <div class="search-product-body">
                                         <div class="search-product-top">

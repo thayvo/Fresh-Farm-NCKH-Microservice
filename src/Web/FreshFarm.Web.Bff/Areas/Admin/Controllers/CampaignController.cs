@@ -108,7 +108,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> TopupAdsWallet(AdsTopupInputModel input)
+    public async Task<IActionResult> TopupAdsWallet([Bind(Prefix = "AdsTopupEditor")] AdsTopupInputModel input)
     {
         try
         {
@@ -128,7 +128,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SpendAdsWallet(AdsSpendInputModel input)
+    public async Task<IActionResult> SpendAdsWallet([Bind(Prefix = "AdsSpendEditor")] AdsSpendInputModel input)
     {
         try
         {
@@ -148,7 +148,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateAdsCampaign(AdsCampaignInputModel input)
+    public async Task<IActionResult> CreateAdsCampaign([Bind(Prefix = "AdsCampaignEditor")] AdsCampaignInputModel input)
     {
         try
         {
@@ -168,7 +168,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(CampaignUpsertInputModel input)
+    public async Task<IActionResult> Save([Bind(Prefix = "Editor")] CampaignUpsertInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -196,13 +196,34 @@ public sealed class CampaignController : LegacySellerControllerBase
             }
 
             TempData["Success"] = input.CampaignId.HasValue ? "Cap nhat campaign thanh cong." : "Tao campaign thanh cong.";
-            return RedirectToAction(nameof(Index), new { campaignId = input.CampaignId });
+            var savedCampaignId = input.CampaignId ?? await TryReadCampaignIdAsync(response);
+            return RedirectToAction(nameof(Index), new { campaignId = savedCampaignId });
         }
         catch (Exception ex)
         {
             TempData["Error"] = "Loi khi luu campaign: " + ex.Message;
             return RedirectToAction(nameof(Index), new { campaignId = input.CampaignId });
         }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.DeleteAsync($"/api/orders/admin/campaigns/{id}");
+            TempData[response.IsSuccessStatusCode ? "Success" : "Error"] = response.IsSuccessStatusCode
+                ? "Xoa campaign thanh cong."
+                : await ReadApiErrorAsync(response, "Khong the xoa campaign.");
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = "Loi khi xoa campaign: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
@@ -726,6 +747,26 @@ public sealed class CampaignController : LegacySellerControllerBase
         => (item.Status?.Length ?? 0) + (item.PaymentMethod?.Length ?? 0) + (item.ReferenceCode?.Length ?? 0);
 
     private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
+
+    private static async Task<int?> TryReadCampaignIdAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            if (doc.RootElement.TryGetProperty("campaignId", out var campaignIdElement) &&
+                campaignIdElement.TryGetInt32(out var campaignId) &&
+                campaignId > 0)
+            {
+                return campaignId;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
+    }
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)
     {

@@ -222,7 +222,23 @@ public sealed class ShippingAdminController : ControllerBase
                 .Select(so => new ShippingScopeRow(
                     so.OrderId,
                     so.ShippingFee,
-                    so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m))
+                    so.SellerOrderItems.Sum(soi => (decimal?)(soi.FinalAmount ?? (soi.UnitPrice * soi.Quantity) - soi.DiscountAmount)) ?? 0m,
+                    so.Shipments
+                        .OrderByDescending(sh => sh.ShipmentId)
+                        .Select(sh => sh.WeightKg)
+                        .FirstOrDefault(),
+                    so.Shipments
+                        .OrderByDescending(sh => sh.ShipmentId)
+                        .Select(sh => sh.LengthCm)
+                        .FirstOrDefault(),
+                    so.Shipments
+                        .OrderByDescending(sh => sh.ShipmentId)
+                        .Select(sh => sh.WidthCm)
+                        .FirstOrDefault(),
+                    so.Shipments
+                        .OrderByDescending(sh => sh.ShipmentId)
+                        .Select(sh => sh.HeightCm)
+                        .FirstOrDefault()))
                 .ToListAsync(cancellationToken)
             : new List<ShippingScopeRow>();
 
@@ -233,7 +249,11 @@ public sealed class ShippingAdminController : ControllerBase
                 g => new
                 {
                     ShippingFee = g.Sum(x => (decimal)x.ShippingFee),
-                    ItemsAmount = g.Sum(x => (decimal)x.ItemsAmount)
+                    ItemsAmount = g.Sum(x => (decimal)x.ItemsAmount),
+                    PackageWeight = g.Select(x => x.PackageWeightKg).FirstOrDefault(x => x.HasValue && x.Value > 0m),
+                    PackageLength = g.Select(x => x.PackageLengthCm).FirstOrDefault(x => x.HasValue && x.Value > 0m),
+                    PackageWidth = g.Select(x => x.PackageWidthCm).FirstOrDefault(x => x.HasValue && x.Value > 0m),
+                    PackageHeight = g.Select(x => x.PackageHeightCm).FirstOrDefault(x => x.HasValue && x.Value > 0m)
                 });
 
         var scopedSellerItemRows = !isAdmin && sellerId.HasValue && orderIds.Count > 0
@@ -315,7 +335,19 @@ public sealed class ShippingAdminController : ControllerBase
                     itemsAmount = isAdmin ? (decimal?)null : itemsAmount,
                     totalAmount = isAdmin ? (decimal?)null : totalAmount,
                     totalQuantity = isAdmin ? (int?)null : scopedSellerItems?.TotalQuantity,
-                    itemSummary = isAdmin ? null : scopedSellerItems?.ItemSummary
+                    itemSummary = isAdmin ? null : scopedSellerItems?.ItemSummary,
+                    packageWeight = isAdmin || scopedSellerData?.PackageWeight is not > 0m
+                        ? null
+                        : (int?)decimal.ToInt32(decimal.Round(scopedSellerData.PackageWeight.Value * 1000m, 0, MidpointRounding.AwayFromZero)),
+                    packageLength = isAdmin || scopedSellerData?.PackageLength is not > 0m
+                        ? null
+                        : (int?)decimal.ToInt32(decimal.Round(scopedSellerData.PackageLength.Value, 0, MidpointRounding.AwayFromZero)),
+                    packageWidth = isAdmin || scopedSellerData?.PackageWidth is not > 0m
+                        ? null
+                        : (int?)decimal.ToInt32(decimal.Round(scopedSellerData.PackageWidth.Value, 0, MidpointRounding.AwayFromZero)),
+                    packageHeight = isAdmin || scopedSellerData?.PackageHeight is not > 0m
+                        ? null
+                        : (int?)decimal.ToInt32(decimal.Round(scopedSellerData.PackageHeight.Value, 0, MidpointRounding.AwayFromZero))
                 },
                 s.deliveryAssignments
             };
@@ -426,6 +458,8 @@ public sealed class ShippingAdminController : ControllerBase
             .AsNoTracking()
             .Include(o => o.SellerOrders)
                 .ThenInclude(so => so.SellerOrderItems)
+            .Include(o => o.SellerOrders)
+                .ThenInclude(so => so.Shipments)
             .Include(o => o.OrderDetails)
             .Include(o => o.Payments)
             .Include(o => o.Shippings)
@@ -453,6 +487,23 @@ public sealed class ShippingAdminController : ControllerBase
         var itemSummary = BuildItemSummary(itemNames);
         var shippingFee = scopedSellerOrder?.ShippingFee ?? order.ShippingFee;
         var payment = order.Payments.OrderByDescending(p => p.PaymentId).FirstOrDefault();
+        var scopedShipment = scopedSellerOrder?.Shipments.OrderByDescending(s => s.ShipmentId).FirstOrDefault()
+            ?? order.SellerOrders
+                .SelectMany(so => so.Shipments)
+                .OrderByDescending(s => s.ShipmentId)
+                .FirstOrDefault();
+        var packageWeight = scopedShipment?.WeightKg.HasValue == true && scopedShipment.WeightKg.Value > 0m
+            ? (int?)decimal.ToInt32(decimal.Round(scopedShipment.WeightKg.Value * 1000m, 0, MidpointRounding.AwayFromZero))
+            : null;
+        var packageLength = scopedShipment?.LengthCm.HasValue == true && scopedShipment.LengthCm.Value > 0m
+            ? (int?)decimal.ToInt32(decimal.Round(scopedShipment.LengthCm.Value, 0, MidpointRounding.AwayFromZero))
+            : null;
+        var packageWidth = scopedShipment?.WidthCm.HasValue == true && scopedShipment.WidthCm.Value > 0m
+            ? (int?)decimal.ToInt32(decimal.Round(scopedShipment.WidthCm.Value, 0, MidpointRounding.AwayFromZero))
+            : null;
+        var packageHeight = scopedShipment?.HeightCm.HasValue == true && scopedShipment.HeightCm.Value > 0m
+            ? (int?)decimal.ToInt32(decimal.Round(scopedShipment.HeightCm.Value, 0, MidpointRounding.AwayFromZero))
+            : null;
 
         return Ok(new
         {
@@ -468,6 +519,10 @@ public sealed class ShippingAdminController : ControllerBase
             totalAmount = itemsAmount + shippingFee,
             totalQuantity,
             itemSummary,
+            packageWeight,
+            packageLength,
+            packageWidth,
+            packageHeight,
             ghnOrderCode = shipping?.GhnOrderCode,
             ghnClientOrderCode = shipping?.GhnClientOrderCode,
             ghnStatus = shipping?.GhnStatus,
@@ -1065,7 +1120,14 @@ public sealed class ShippingAdminController : ControllerBase
         public DateTime? LastSyncedAt { get; set; }
     }
 
-    private sealed record ShippingScopeRow(int OrderId, decimal ShippingFee, decimal ItemsAmount);
+    private sealed record ShippingScopeRow(
+        int OrderId,
+        decimal ShippingFee,
+        decimal ItemsAmount,
+        decimal? PackageWeightKg,
+        decimal? PackageLengthCm,
+        decimal? PackageWidthCm,
+        decimal? PackageHeightCm);
 
     private sealed record ShippingItemScopeRow(int OrderId, int Quantity, string? SnapshotName);
 

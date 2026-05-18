@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationBasketAffinity.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationBasketAffinity.cs
-// Thu muc hoc tap: HocGoiY
-
 namespace FreshFarm.Ordering.Api.Models;
 
 public sealed class RecommendationBasketAffinity
@@ -18,4 +14,3 @@ public sealed class RecommendationBasketAffinity
 
     public DateTime ComputedAt { get; set; }
 }
-

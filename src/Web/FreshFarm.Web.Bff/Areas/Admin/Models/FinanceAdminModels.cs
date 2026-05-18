@@ -49,6 +49,14 @@ public sealed class FinanceConsoleStatsViewModel
 
     public decimal SellerEarning { get; set; }
 
+    public decimal ReconciliationGrossMerchandiseValue { get; set; }
+
+    public decimal ReconciliationPlatformCommission { get; set; }
+
+    public decimal ReconciliationSellerEarning { get; set; }
+
+    public decimal WithdrawableAmount { get; set; }
+
     public decimal PendingPayoutAmount { get; set; }
 
     public decimal RefundedAmount { get; set; }
@@ -196,6 +204,14 @@ internal sealed class FinanceConsoleStatsApiDto
     public decimal PlatformCommission { get; set; }
 
     public decimal SellerEarning { get; set; }
+
+    public decimal ReconciliationGrossMerchandiseValue { get; set; }
+
+    public decimal ReconciliationPlatformCommission { get; set; }
+
+    public decimal ReconciliationSellerEarning { get; set; }
+
+    public decimal WithdrawableAmount { get; set; }
 
     public decimal PendingPayoutAmount { get; set; }
 

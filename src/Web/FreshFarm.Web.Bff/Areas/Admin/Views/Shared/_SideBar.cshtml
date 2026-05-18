@@ -24,30 +24,9 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link @(currentController == "User" && currentAction == "ManageAdmins" ? "active" : "")"
-               href="@Url.Action("ManageAdmins", "User", new { area = "Admin" })">
-                <i class="bi bi-shield-lock-fill"></i> Admin
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link @(currentController == "User" && currentAction == "ManageSellers" ? "active" : "")"
-               href="@Url.Action("ManageSellers", "User", new { area = "Admin" })">
-                <i class="bi bi-shop"></i> Seller
-            </a>
-        </li>
-
-        <li class="nav-item">
             <a class="nav-link @(currentController == "Merchant" ? "active" : "")"
                href="@Url.Action("Index", "Merchant", new { area = "Admin" })">
-                <i class="bi bi-patch-check-fill"></i> Nhà bán hàng & tuân thủ
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link @(currentController == "User" && currentAction == "ManageBuyers" ? "active" : "")"
-               href="@Url.Action("ManageBuyers", "User", new { area = "Admin" })">
-                <i class="bi bi-person-badge-fill"></i> Buyer
+                <i class="bi bi-patch-check-fill"></i> Duyệt đơn đăng ký nhà bán
             </a>
         </li>
 
@@ -69,13 +48,6 @@
             <a class="nav-link @(currentController == "Finance" ? "active" : "")"
                href="@Url.Action("Index", "Finance", new { area = "Admin" })">
                 <i class="bi bi-cash-stack"></i> Tài chính & đối soát
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link @(currentController == "Delivery" ? "active" : "")"
-               href="@Url.Action("Index", "Delivery", new { area = "Admin" })">
-                <i class="bi bi-truck-flatbed"></i> Điều phối giao hàng
             </a>
         </li>
 
@@ -110,7 +82,7 @@
         <li class="nav-item">
             <a class="nav-link @(currentController == "Audit" ? "active" : "")"
                href="@Url.Action("Index", "Audit", new { area = "Admin" })">
-                <i class="bi bi-journal-text"></i> Trung tâm kiểm toán
+                <i class="bi bi-journal-text"></i> Nhật ký hệ thống
             </a>
         </li>
 
@@ -138,7 +110,7 @@
         <li class="nav-item">
             <a class="nav-link @(currentController == "CatalogReadiness" ? "active" : "")"
                href="@Url.Action("Index", "CatalogReadiness", new { area = "Admin" })">
-                <i class="bi bi-search-heart"></i> Sẵn sàng danh mục
+                <i class="bi bi-search-heart"></i> Quản lí danh mục
             </a>
         </li>
 
@@ -171,13 +143,6 @@
         </li>
 
         <li class="nav-item">
-            <a class="nav-link @(currentController == "Feedback" ? "active" : "")"
-               href="@Url.Action("Index", "Feedback", new { area = "Admin" })">
-                <i class="bi bi-chat-left-dots-fill"></i> Phản hồi khách hàng
-            </a>
-        </li>
-
-        <li class="nav-item">
             <a class="nav-link @(currentController == "SupportChat" ? "active" : "")"
                href="@Url.Action("Index", "SupportChat", new { area = "Admin" })">
                 <i class="bi bi-headset"></i> Hỗ trợ trực tuyến
@@ -202,13 +167,6 @@
             <a class="nav-link @(currentController == "Communication" ? "active" : "")"
                href="@Url.Action("Index", "Communication", new { area = "Admin" })">
                 <i class="bi bi-broadcast-pin"></i> Quản trị truyền thông
-            </a>
-        </li>
-
-        <li class="nav-item">
-            <a class="nav-link @(currentController == "Customer" ? "active" : "")"
-               href="@Url.Action("ManageCustomers", "Customer", new { area = "Admin" })">
-                <i class="bi bi-person-hearts"></i> Khách hàng
             </a>
         </li>
 

@@ -213,7 +213,7 @@ public sealed class OrdersController : ControllerBase
             .GroupBy(x => x.SellerId)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(x => x.ShippingFee).First().ShippingFee) ?? new Dictionary<int, decimal>();
+                g => g.OrderByDescending(x => x.ShippingFee).First()) ?? new Dictionary<int, CreateSellerShippingRequest>();
         var reservationItems = request.Items
             .Select(x => new CatalogInventoryMutationItem
             {
@@ -292,8 +292,8 @@ public sealed class OrdersController : ControllerBase
                     SellerStatus = orderStatus,
                     CommissionRate = commissionRate,
                     CommissionAmount = commissionAmount,
-                    ShippingFee = sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShippingFee)
-                        ? sellerShippingFee
+                    ShippingFee = sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShipping)
+                        ? sellerShipping.ShippingFee
                         : 0m,
                     SellerEarning = sellerSubtotal - commissionAmount,
                     CancelledBy = string.Empty,
@@ -313,6 +313,7 @@ public sealed class OrdersController : ControllerBase
             foreach (var sellerGroup in sellerGroups)
             {
                 var sellerOrder = sellerOrdersBySellerId[sellerGroup.Key];
+                sellerShippingLookup.TryGetValue(sellerGroup.Key, out var sellerShipping);
                 foreach (var entry in sellerGroup)
                 {
                     var detail = detailByIndex[entry.Index];
@@ -353,10 +354,12 @@ public sealed class OrdersController : ControllerBase
                     Codamount = string.Equals(paymentMethod, "COD", StringComparison.OrdinalIgnoreCase)
                         ? sellerGroup.Sum(x => x.Item.UnitPrice * x.Item.Quantity)
                         : null,
-                    WeightKg = null,
-                    LengthCm = null,
-                    WidthCm = null,
-                    HeightCm = null,
+                    WeightKg = sellerShipping?.PackageWeight is > 0
+                        ? Math.Round(sellerShipping.PackageWeight.Value / 1000m, 3)
+                        : null,
+                    LengthCm = sellerShipping?.PackageLength is > 0 ? (decimal?)sellerShipping.PackageLength.Value : null,
+                    WidthCm = sellerShipping?.PackageWidth is > 0 ? (decimal?)sellerShipping.PackageWidth.Value : null,
+                    HeightCm = sellerShipping?.PackageHeight is > 0 ? (decimal?)sellerShipping.PackageHeight.Value : null,
                     ShippedAt = null,
                     DeliveredAt = null,
                     CreatedAt = DateTime.UtcNow
@@ -1529,7 +1532,7 @@ public sealed class OrdersController : ControllerBase
             "AwaitingPayment" => "Chờ thanh toán",
             "Pending" => "Chờ xử lý",
             "Processing" => "Đang xử lý",
-            "Ready" => "Đã xử lý / Sẵn sàng giao",
+            "Ready" => "Shop đã chuẩn bị xong / Chờ shipper lấy",
             "Shipped" => "Đang giao hàng",
             "Delivered" => "Đã giao hàng",
             "Expired" => "Hết hạn thanh toán",

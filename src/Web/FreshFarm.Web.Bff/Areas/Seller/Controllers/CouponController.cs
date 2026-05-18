@@ -15,6 +15,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class CouponController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const string SellerCouponPolicyMessage = "Nguoi ban khong the tu tao, cap nhat, xoa hoac phan phoi ma giam gia. Vui long lien he admin va neu ro ly do de duoc cap ma.";
     private readonly IHttpClientFactory _httpClientFactory;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -27,223 +28,54 @@ public class CouponController : LegacySellerControllerBase
         _httpClientFactory = httpClientFactory;
     }
 
-    public async Task<IActionResult> ManageCoupons()
+    public IActionResult ManageCoupons()
     {
-        try
-        {
-            var sellerId = GetCurrentPrincipalUserId();
-            if (!sellerId.HasValue)
-            {
-                TempData["Error"] = "Khong xac dinh duoc seller hien tai.";
-                return View(new List<Coupon>());
-            }
-
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.GetAsync("/api/orders/admin/coupons");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                TempData["Error"] = "Co loi khi tai danh sach ma giam gia: " + await ReadApiErrorAsync(response, "Unknown error");
-                return View(new List<Coupon>());
-            }
-
-            var payload = await response.Content.ReadFromJsonAsync<List<CouponApiDto>>(JsonOptions) ?? new List<CouponApiDto>();
-            var coupons = payload
-                .Where(c => c.createdBy == sellerId.Value)
-                .Select(MapCoupon)
-                .ToList();
-
-            return View(coupons);
-        }
-        catch (Exception ex)
-        {
-            TempData["Error"] = "Co loi khi tai danh sach ma giam gia: " + ex.Message;
-            return View(new List<Coupon>());
-        }
+        ViewData["CouponTitle"] = "Mã giảm giá";
+        ViewData["CouponSubtitle"] = "Mã giảm giá do admin tạo và cấp theo chính sách của sàn.";
+        ViewData["CouponCanManage"] = false;
+        ViewData["CouponCanSend"] = false;
+        ViewData["CouponPolicyNotice"] = "Người bán không thể tự tạo mã giảm giá. Nếu cần chạy khuyến mãi, hãy liên hệ admin và nêu rõ lý do, thời gian áp dụng, mức giảm mong muốn và phạm vi sản phẩm.";
+        ViewData["CouponEmptyTitle"] = "Seller không tự quản lý mã giảm giá";
+        ViewData["CouponEmptySubtitle"] = "Chỉ admin có quyền tạo, chỉnh sửa, phân phối và thu hồi mã giảm giá.";
+        return View(new List<Coupon>());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Create(Coupon coupon)
+    public JsonResult Create(Coupon coupon)
     {
-        try
-        {
-            var validationError = ValidateCouponInput(coupon);
-            if (!string.IsNullOrWhiteSpace(validationError))
-            {
-                return Json(new { success = false, message = validationError });
-            }
-
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PostAsJsonAsync("/api/orders/admin/coupons", new
-            {
-                code = coupon.Code?.Trim().ToUpperInvariant(),
-                discountValue = coupon.DiscountValue,
-                discountType = coupon.DiscountType,
-                expiryDate = coupon.ExpiryDate,
-                minOrderValue = coupon.MinOrderValue,
-                usageLimit = coupon.UsageLimit,
-                description = coupon.Description,
-                maxDiscountAmount = coupon.MaxDiscountAmount,
-                isActive = coupon.IsActive
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the tao ma giam gia") });
-            }
-
-            return Json(new { success = true, message = "Tao ma giam gia thanh cong!" });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { success = false, message = SellerCouponPolicyMessage });
     }
 
-    public async Task<JsonResult> Edit(int? id)
+    public JsonResult Edit(int? id)
     {
-        try
-        {
-            var sellerId = GetCurrentPrincipalUserId();
-            if (!sellerId.HasValue)
-            {
-                return Json(new { error = "Khong xac dinh duoc seller hien tai" });
-            }
-
-            if (!id.HasValue)
-            {
-                return Json(new { error = "ID khong hop le" });
-            }
-
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.GetAsync($"/api/orders/admin/coupons/{id.Value}");
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { error = await ReadApiErrorAsync(response, "Khong tim thay ma giam gia") });
-            }
-
-            var dto = await response.Content.ReadFromJsonAsync<CouponApiDto>(JsonOptions);
-            if (dto is null)
-            {
-                return Json(new { error = "Khong doc duoc thong tin ma giam gia" });
-            }
-
-            if (dto.createdBy != sellerId.Value)
-            {
-                return Json(new { error = "Ban khong co quyen xem ma giam gia nay" });
-            }
-
-            return Json(new
-            {
-                couponID = dto.couponId,
-                code = dto.code,
-                discountValue = dto.discountValue,
-                discountType = dto.discountType,
-                expiryDate = dto.expiryDate.ToString("yyyy-MM-dd"),
-                minOrderValue = dto.minOrderValue,
-                usageLimit = dto.usageLimit,
-                usedCount = dto.usedCount,
-                description = dto.description,
-                maxDiscountAmount = dto.maxDiscountAmount,
-                isActive = dto.isActive
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { error = ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { error = SellerCouponPolicyMessage });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Edit(Coupon coupon)
+    public JsonResult Edit(Coupon coupon)
     {
-        try
-        {
-            var validationError = ValidateCouponInput(coupon);
-            if (!string.IsNullOrWhiteSpace(validationError))
-            {
-                return Json(new { success = false, message = validationError });
-            }
-
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PutAsJsonAsync($"/api/orders/admin/coupons/{coupon.CouponID}", new
-            {
-                code = coupon.Code?.Trim().ToUpperInvariant(),
-                discountValue = coupon.DiscountValue,
-                discountType = coupon.DiscountType,
-                expiryDate = coupon.ExpiryDate,
-                minOrderValue = coupon.MinOrderValue,
-                usageLimit = coupon.UsageLimit,
-                description = coupon.Description,
-                maxDiscountAmount = coupon.MaxDiscountAmount,
-                isActive = coupon.IsActive
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the cap nhat ma giam gia") });
-            }
-
-            return Json(new { success = true, message = "Cap nhat ma giam gia thanh cong!" });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { success = false, message = SellerCouponPolicyMessage });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> Delete(int id)
+    public JsonResult Delete(int id)
     {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.DeleteAsync($"/api/orders/admin/coupons/{id}");
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the xoa ma giam gia") });
-            }
-
-            return Json(new { success = true, message = "Xoa ma giam gia thanh cong!" });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { success = false, message = SellerCouponPolicyMessage });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> ToggleActive(int id)
+    public JsonResult ToggleActive(int id)
     {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.PostAsync($"/api/orders/admin/coupons/{id}/toggle-active", content: null);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the cap nhat trang thai") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = true,
-                message = root.TryGetProperty("message", out var message) ? message.GetString() : "Cap nhat thanh cong",
-                isActive = root.TryGetProperty("isActive", out var active) && active.GetBoolean()
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { success = false, message = SellerCouponPolicyMessage });
     }
 
     public async Task<JsonResult> GetCustomers(string search = "")
@@ -293,65 +125,10 @@ public class CouponController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<JsonResult> SendToCustomers(string couponCode, List<int>? customerIds, bool sendToAll = false)
+    public JsonResult SendToCustomers(string couponCode, List<int>? customerIds, bool sendToAll = false)
     {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(couponCode))
-            {
-                return Json(new { success = false, message = "Ma giam gia khong hop le!" });
-            }
-
-            var sellerCustomerIds = await GetSellerCustomerIdsAsync();
-            if (sellerCustomerIds.Count == 0)
-            {
-                return Json(new { success = false, message = "Khong co khach hang thuoc seller de gui!" });
-            }
-
-            var ids = customerIds?.Distinct().Where(x => x > 0).ToList() ?? new List<int>();
-
-            if (sendToAll || ids.Count == 0)
-            {
-                ids = sellerCustomerIds.ToList();
-            }
-            else
-            {
-                ids = ids.Where(sellerCustomerIds.Contains).Distinct().ToList();
-            }
-
-            if (ids.Count == 0)
-            {
-                return Json(new { success = false, message = "Khong co khach hang nao de gui!" });
-            }
-
-            var orderingClient = CreateAuthorizedClient("Ordering");
-            var response = await orderingClient.PostAsJsonAsync("/api/orders/admin/coupons/send", new
-            {
-                couponCode = couponCode.Trim().ToUpperInvariant(),
-                customerIds = ids,
-                sendToAll
-            });
-
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { success = false, message = await ReadApiErrorAsync(response, "Khong the gui ma giam gia") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-
-            return Json(new
-            {
-                success = true,
-                message = root.TryGetProperty("message", out var m) ? m.GetString() : "Gui ma thanh cong",
-                sent = root.TryGetProperty("sent", out var sent) ? sent.GetInt32() : 0,
-                skipped = root.TryGetProperty("skipped", out var skipped) ? skipped.GetInt32() : 0
-            });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { success = false, message = "Loi: " + ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { success = false, message = SellerCouponPolicyMessage });
     }
 
     private async Task<HashSet<int>> GetSellerCustomerIdsAsync()
@@ -414,25 +191,10 @@ public class CouponController : LegacySellerControllerBase
 
     private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
-    public async Task<JsonResult> GenerateCode()
+    public JsonResult GenerateCode()
     {
-        try
-        {
-            var client = CreateAuthorizedClient("Ordering");
-            var response = await client.GetAsync("/api/orders/admin/coupons/generate-code");
-            if (!response.IsSuccessStatusCode)
-            {
-                return Json(new { code = "ERROR", message = await ReadApiErrorAsync(response, "Khong the tao ma") });
-            }
-
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            var root = doc.RootElement;
-            return Json(new { code = root.TryGetProperty("code", out var code) ? code.GetString() : "ERROR" });
-        }
-        catch (Exception ex)
-        {
-            return Json(new { code = "ERROR", message = ex.Message });
-        }
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Json(new { code = "FORBIDDEN", message = SellerCouponPolicyMessage });
     }
 
     public async Task<IActionResult> ValidateCoupon(string code, decimal orderAmount)

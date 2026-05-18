@@ -437,7 +437,7 @@
             ChatUI.elements.typing.addClass('d-none');
 
             if (!realtimeConfigured) {
-                ChatUI.elements.input.attr('placeholder', 'Realtime chua san sang. Dang cap nhat o che do polling.');
+                ChatUI.elements.input.attr('placeholder', 'Realtime chưa sẵn sàng. Đang cập nhật ở chế độ polling.');
             }
         },
 
@@ -578,7 +578,7 @@
                 console.warn('[support-chat-admin] SignalR start failed, fallback to polling mode.', err);
                 ChatState.isRealtimeReady = false;
                 ChatController.setPollingEnabled(true);
-                ChatUI.elements.input.attr('placeholder', 'Realtime chua san sang. Dang cap nhat o che do polling.');
+                ChatUI.elements.input.attr('placeholder', 'Realtime chưa sẵn sàng. Đang cập nhật ở chế độ polling.');
             });
 
             return true;

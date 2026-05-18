@@ -64,7 +64,7 @@
                 return `
                     <article class="shop-card">
                         <div class="shop-head">
-                            ${avatar ? `<img src="${avatar}" alt="${escapeHtml(shopName)}" class="shop-avatar" />` : `<div class="shop-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
+                            ${avatar ? `<img src="${avatar}" alt="${escapeHtml(shopName)}" class="shop-avatar" loading="lazy" decoding="async" />` : `<div class="shop-fallback">${escapeHtml(shopName.slice(0, 1).toUpperCase())}</div>`}
                             <div>
                                 <div class="shop-name">${escapeHtml(shopName)}</div>
                                 <div class="shop-user">@@${escapeHtml(shop.userName ?? shop.UserName ?? "")}</div>

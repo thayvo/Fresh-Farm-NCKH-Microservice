@@ -3,7 +3,8 @@
 @{
     ViewBag.Title = "Quản lý đánh giá";
     Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
-Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
+    Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
+    var defaultAvatarUrl = Url.Content("~/uploads/avatar/no-avatar.jpg");
 }
 
 <style>
@@ -451,11 +452,14 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                     foreach (var review in Model.Where(r => r.ReplyTo == null))
                     {
                         var productImg = imgUrl(review.Product != null ? review.Product.ImageFileName : null);
+                        var customerAvatar = string.IsNullOrWhiteSpace(review.User?.AvatarUrl)
+                            ? defaultAvatarUrl
+                            : review.User.AvatarUrl;
 
                         <div class="review-card mb-3 review-item" data-review-id="@review.ReviewID">
                             <div class="review-card-header d-flex justify-content-between align-items-center">
                                 <div class="d-flex align-items-center">
-                                    <img src="@Url.Action("AvatarById","Account", new { area = "", id = review.UserID })"
+                                    <img src="@customerAvatar"
                                          class="customer-avatar rounded-circle me-2"
                                          alt="avatar" />
                                     <div>
@@ -552,8 +556,11 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                                         {
                                             var isAdminMirror = reply.User != null && reply.User.UserName != null && reply.User.UserName.StartsWith("ADMIN_");
                                             var displayName = reply.User != null ? (reply.User.FullName ?? reply.User.UserName) : (isAdminMirror ? (User?.Identity?.Name ?? "Admin") : "-");
+                                            var replyAvatar = string.IsNullOrWhiteSpace(reply.User?.AvatarUrl)
+                                                ? defaultAvatarUrl
+                                                : reply.User.AvatarUrl;
                                             <div class="reply-section">
-                                                <img src="@Url.Action("AvatarById","Account", new { area = "", id = reply.UserID })"
+                                                <img src="@replyAvatar"
                                                      class="customer-avatar rounded-circle me-2"
                                                      alt="avatar"
                                                      style="float:left;margin-right:.5rem;width:40px;height:40px;object-fit:cover" />

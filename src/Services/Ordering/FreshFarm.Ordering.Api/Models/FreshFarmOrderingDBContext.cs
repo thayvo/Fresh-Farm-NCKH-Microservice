@@ -609,6 +609,7 @@ public partial class FreshFarmOrderingDBContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+            entity.Property(e => e.ExpiresAt).HasColumnType("datetime");
             entity.Property(e => e.IsPushNotification).HasDefaultValue(false);
             entity.Property(e => e.IsRead).HasDefaultValue(false);
             entity.Property(e => e.Message).IsRequired();
@@ -617,6 +618,10 @@ public partial class FreshFarmOrderingDBContext : DbContext
                 .HasMaxLength(50)
                 .IsUnicode(false);
             entity.Property(e => e.OrderId).HasColumnName("OrderID");
+            entity.Property(e => e.PopupImageUrl).HasMaxLength(1000);
+            entity.Property(e => e.PopupType)
+                .HasMaxLength(20)
+                .IsUnicode(false);
             entity.Property(e => e.ReadAt).HasColumnType("datetime");
             entity.Property(e => e.Title)
                 .IsRequired()

@@ -84,6 +84,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Create([FromBody] CouponUpsertRequest request, CancellationToken cancellationToken)
     {
         var actorUserId = TryGetActorUserIdFromToken();
@@ -129,6 +130,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Update([FromRoute] int id, [FromBody] CouponUpsertRequest request, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         var actorUserId = TryGetActorUserIdFromToken();
@@ -178,6 +180,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Delete([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
@@ -212,6 +215,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPost("{id:int}/toggle-active")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> ToggleActive([FromRoute] int id, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         var coupon = await ApplyCouponScopeToQuery(_db.Coupons, scope)
@@ -234,6 +238,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpGet("generate-code")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> GenerateCode(CancellationToken cancellationToken)
     {
         var code = await GenerateRandomCodeAsync(cancellationToken);
@@ -381,6 +386,7 @@ public sealed class CouponsAdminController : ControllerBase
     }
 
     [HttpPost("send")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> SendToCustomers([FromBody] SendCouponRequest request, [FromQuery] string? scope = null, CancellationToken cancellationToken = default)
     {
         var actorUserId = TryGetActorUserIdFromToken();

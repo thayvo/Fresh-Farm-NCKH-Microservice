@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ProductInsightsController.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ProductInsightsController.cs
-// Thu muc hoc tap: HocGoiY
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -28,6 +24,7 @@ public sealed class ProductInsightsController : ControllerBase
     private const string RecommendationSignalSourceHeader = "X-Recommendation-Signal-Source";
     private const string RecommendationFallbackReasonHeader = "X-Recommendation-Fallback-Reason";
     private const string MaterializedCollaborativeSignalSource = "materialized_cf_v1";
+    private const string MlnetUserProductSignalSource = "mlnet_user_product_v1";
     private const string AdHocCollaborativeSignalSource = "ad_hoc_cf_v1";
     private const string MaterializedProfileSignalSource = "materialized_profile_v1";
     private const string AdHocProfileSignalSource = "ad_hoc_profile_v1";
@@ -40,11 +37,15 @@ public sealed class ProductInsightsController : ControllerBase
     private const string NoCollaborativeInteractionsForSeedProductFallbackReason = "no_collaborative_interactions_for_seed_product";
     private const string NoTrackedKeywordSessionsFallbackReason = "no_tracked_keyword_sessions";
     private const string NoBehavioralSignalForKeywordFallbackReason = "no_behavioral_signal_for_keyword";
+    private const double PersonalizedSeasonalityBoostMultiplier = 0.12d;
+    private const double FallbackSeasonalityBoostMultiplier = 0.24d;
+    private static readonly DateTime SqlServerDateTimeFloor = new(1753, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private readonly FreshFarmOrderingDBContext _db;
     private readonly RecommendationAffinityService? _recommendationAffinityService;
     private readonly RecommendationAffinityRefreshSignal? _recommendationAffinityRefreshSignal;
     private readonly InternalServiceAuthOptions? _internalServiceAuthOptions;
+    private readonly CatalogInventoryClient? _catalogInventoryClient;
 
     public ProductInsightsController(FreshFarmOrderingDBContext db)
     {
@@ -64,12 +65,14 @@ public sealed class ProductInsightsController : ControllerBase
         FreshFarmOrderingDBContext db,
         RecommendationAffinityService recommendationAffinityService,
         RecommendationAffinityRefreshSignal recommendationAffinityRefreshSignal,
-        IOptions<InternalServiceAuthOptions> internalServiceAuthOptions)
+        IOptions<InternalServiceAuthOptions> internalServiceAuthOptions,
+        CatalogInventoryClient catalogInventoryClient)
         : this(db)
     {
         _recommendationAffinityService = recommendationAffinityService;
         _recommendationAffinityRefreshSignal = recommendationAffinityRefreshSignal;
         _internalServiceAuthOptions = internalServiceAuthOptions.Value;
+        _catalogInventoryClient = catalogInventoryClient;
     }
 
     [HttpGet("home-profile")]
@@ -90,6 +93,11 @@ public sealed class ProductInsightsController : ControllerBase
         }
 
         var rankedSignals = await BuildHomePreferenceSeedsAsync(normalizedSessionId, userId, Math.Clamp(limit, 1, 48), cancellationToken);
+        rankedSignals = await ApplySeasonalityBoostAsync(
+            rankedSignals,
+            PersonalizedSeasonalityBoostMultiplier,
+            Math.Clamp(limit, 1, 48),
+            cancellationToken);
         return Ok(rankedSignals);
     }
 
@@ -110,6 +118,11 @@ public sealed class ProductInsightsController : ControllerBase
         }
 
         var seedSignals = await BuildHomePreferenceSeedsAsync(normalizedSessionId, userId, 8, cancellationToken);
+        seedSignals = await ApplySeasonalityBoostAsync(
+            seedSignals,
+            PersonalizedSeasonalityBoostMultiplier,
+            8,
+            cancellationToken);
         if (seedSignals.Length == 0)
         {
             SetRecommendationFallbackReason(NoPreferenceSeedForCollaborativeFallbackReason);
@@ -127,6 +140,11 @@ public sealed class ProductInsightsController : ControllerBase
         if (materializedCandidates.Length > 0)
         {
             SetRecommendationMetadata(MaterializedCollaborativeSignalSource);
+            materializedCandidates = await ApplySeasonalityBoostAsync(
+                materializedCandidates,
+                PersonalizedSeasonalityBoostMultiplier,
+                Math.Clamp(limit, 1, 48),
+                cancellationToken);
             return Ok(materializedCandidates);
         }
 
@@ -325,11 +343,19 @@ public sealed class ProductInsightsController : ControllerBase
 
         RequestRecommendationAffinityRefresh();
         SetRecommendationMetadata(AdHocCollaborativeSignalSource, NoMaterializedCollaborativeCandidatesFallbackReason);
+        rankedCandidates = await ApplySeasonalityBoostAsync(
+            rankedCandidates,
+            FallbackSeasonalityBoostMultiplier,
+            Math.Clamp(limit, 1, 48),
+            cancellationToken);
         return Ok(rankedCandidates);
     }
 
     [HttpGet("stats")]
-    public async Task<IActionResult> GetStats([FromQuery] int[]? productIds, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetStats(
+        [FromQuery] int[]? productIds,
+        [FromQuery] int recentWindowDays = 90,
+        CancellationToken cancellationToken = default)
     {
         var normalizedProductIds = (productIds ?? Array.Empty<int>())
             .Where(id => id > 0)
@@ -342,6 +368,8 @@ public sealed class ProductInsightsController : ControllerBase
             return Ok(Array.Empty<ProductStatsDto>());
         }
 
+        var normalizedRecentWindowDays = Math.Clamp(recentWindowDays, 30, 90);
+        var recentSalesFromUtc = DateTime.UtcNow.AddDays(-normalizedRecentWindowDays);
         var soldCounts = await (
             from detail in _db.OrderDetails.AsNoTracking()
             join order in _db.Orders.AsNoTracking() on detail.OrderId equals order.OrderId
@@ -352,6 +380,20 @@ public sealed class ProductInsightsController : ControllerBase
             {
                 ProductId = grouped.Key,
                 SoldCount = grouped.Sum(item => item.Quantity)
+            })
+            .ToListAsync(cancellationToken);
+
+        var recentSoldCounts = await (
+            from detail in _db.OrderDetails.AsNoTracking()
+            join order in _db.Orders.AsNoTracking() on detail.OrderId equals order.OrderId
+            where normalizedProductIds.Contains(detail.ProductId)
+                && order.OrderDate >= recentSalesFromUtc
+                && SuccessfulOrderStatuses.Contains((order.Status ?? string.Empty).Trim().ToLower())
+            group detail by detail.ProductId into grouped
+            select new
+            {
+                ProductId = grouped.Key,
+                RecentSoldCount = grouped.Sum(item => item.Quantity)
             })
             .ToListAsync(cancellationToken);
 
@@ -381,6 +423,11 @@ public sealed class ProductInsightsController : ControllerBase
         foreach (var sold in soldCounts)
         {
             statsByProductId[sold.ProductId].SoldCount = sold.SoldCount;
+        }
+
+        foreach (var sold in recentSoldCounts)
+        {
+            statsByProductId[sold.ProductId].RecentSoldCount = sold.RecentSoldCount;
         }
 
         foreach (var review in approvedReviewStats)
@@ -618,6 +665,11 @@ public sealed class ProductInsightsController : ControllerBase
         if (materializedSearchSignals.Length > 0)
         {
             SetRecommendationMetadata(MaterializedCollaborativeSignalSource);
+            materializedSearchSignals = await ApplySeasonalityBoostAsync(
+                materializedSearchSignals,
+                FallbackSeasonalityBoostMultiplier,
+                Math.Clamp(limit, 1, 96),
+                cancellationToken);
             return Ok(materializedSearchSignals);
         }
 
@@ -731,6 +783,11 @@ public sealed class ProductInsightsController : ControllerBase
 
         RequestRecommendationAffinityRefresh();
         SetRecommendationMetadata(AdHocCollaborativeSignalSource, NoMaterializedKeywordAffinityFallbackReason);
+        rankedSignals = await ApplySeasonalityBoostAsync(
+            rankedSignals,
+            FallbackSeasonalityBoostMultiplier,
+            Math.Clamp(limit, 1, 96),
+            cancellationToken);
         return Ok(rankedSignals);
     }
 
@@ -770,7 +827,7 @@ public sealed class ProductInsightsController : ControllerBase
             .ThenByDescending(item => item.SearchClickCount)
             .ThenByDescending(item => item.RecommendationClickCount)
             .ThenByDescending(item => item.ViewCount)
-            .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+            .ThenByDescending(item => item.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
             .ThenBy(item => item.ProductId)
             .Take(Math.Clamp(limit, 1, 96))
             .Select(item => new UserProductScoreDto
@@ -782,9 +839,15 @@ public sealed class ProductInsightsController : ControllerBase
                 RecommendationClickCount = item.RecommendationClickCount,
                 PurchaseCount = item.PurchaseCount,
                 UserProductScore = item.UserProductScore,
-                LastInteractedAtUtc = item.LastInteractedAtUtc
+                LastInteractedAtUtc = item.LastInteractedAtUtc,
+                ComputedAtUtc = item.ComputedAt
             })
             .ToArrayAsync(cancellationToken);
+
+        if (rows.Length > 0)
+        {
+            SetRecommendationMetadata(MlnetUserProductSignalSource);
+        }
 
         return Ok(rows);
     }
@@ -824,7 +887,7 @@ public sealed class ProductInsightsController : ControllerBase
             .ThenByDescending(item => item.PurchaseCount)
             .ThenByDescending(item => item.SearchClickCount)
             .ThenByDescending(item => item.ViewCount)
-            .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+            .ThenByDescending(item => item.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
             .ThenBy(item => item.SellerId)
             .Take(Math.Clamp(limit, 1, 96))
             .Select(item => new UserSellerScoreDto
@@ -878,7 +941,7 @@ public sealed class ProductInsightsController : ControllerBase
             .ThenByDescending(item => item.SearchClickCount)
             .ThenByDescending(item => item.RecommendationClickCount)
             .ThenByDescending(item => item.ViewCount)
-            .ThenByDescending(item => item.LastInteractedAtUtc ?? DateTime.MinValue)
+            .ThenByDescending(item => item.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
             .ThenBy(item => item.CategoryId)
             .Take(Math.Clamp(limit, 1, 96))
             .Select(item => new UserCategoryScoreDto
@@ -1018,6 +1081,8 @@ public sealed class ProductInsightsController : ControllerBase
 
         public int ReviewCount { get; set; }
 
+        public int RecentSoldCount { get; set; }
+
         public int SoldCount { get; set; }
     }
 
@@ -1032,6 +1097,12 @@ public sealed class ProductInsightsController : ControllerBase
         public int CoClickSessionCount { get; set; }
 
         public double CollaborativeScore { get; set; }
+
+        public double SeasonalityScore { get; set; }
+
+        public string? SeasonalityLabel { get; set; }
+
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     public sealed class HomePreferenceSeedDto
@@ -1049,6 +1120,12 @@ public sealed class ProductInsightsController : ControllerBase
         public double PreferenceScore { get; set; }
 
         public DateTime? LastInteractedAtUtc { get; set; }
+
+        public double SeasonalityScore { get; set; }
+
+        public string? SeasonalityLabel { get; set; }
+
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     public sealed class HomeCollaborativeCandidateDto
@@ -1062,6 +1139,12 @@ public sealed class ProductInsightsController : ControllerBase
         public int CoClickSessionCount { get; set; }
 
         public double CollaborativeScore { get; set; }
+
+        public double SeasonalityScore { get; set; }
+
+        public string? SeasonalityLabel { get; set; }
+
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     public sealed class SearchRankingSignalDto
@@ -1077,6 +1160,12 @@ public sealed class ProductInsightsController : ControllerBase
         public int SearchRecommendationClickCount { get; set; }
 
         public double HybridSearchScore { get; set; }
+
+        public double SeasonalityScore { get; set; }
+
+        public string? SeasonalityLabel { get; set; }
+
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     public sealed class UserProductScoreDto
@@ -1096,6 +1185,8 @@ public sealed class ProductInsightsController : ControllerBase
         public double UserProductScore { get; set; }
 
         public DateTime? LastInteractedAtUtc { get; set; }
+
+        public DateTime ComputedAtUtc { get; set; }
     }
 
     public sealed class BasketAffinityDto
@@ -1389,7 +1480,7 @@ public sealed class ProductInsightsController : ControllerBase
             .ThenByDescending(signal => signal.SearchClickCount)
             .ThenByDescending(signal => signal.RecommendationClickCount)
             .ThenByDescending(signal => signal.ViewCount)
-            .ThenByDescending(signal => signal.LastInteractedAtUtc ?? DateTime.MinValue)
+            .ThenByDescending(signal => signal.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
             .Take(Math.Clamp(limit, 1, 48))
             .ToArray();
 
@@ -1484,7 +1575,7 @@ public sealed class ProductInsightsController : ControllerBase
             .ThenByDescending(seed => seed.SearchClickCount)
             .ThenByDescending(seed => seed.RecommendationClickCount)
             .ThenByDescending(seed => seed.ViewCount)
-            .ThenByDescending(seed => seed.LastInteractedAtUtc ?? DateTime.MinValue)
+            .ThenByDescending(seed => seed.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
             .ThenBy(seed => seed.ProductId)
             .Take(normalizedLimit)
             .ToArray();
@@ -1630,6 +1721,142 @@ public sealed class ProductInsightsController : ControllerBase
             .ToArrayAsync(cancellationToken);
     }
 
+    private async Task<HomePreferenceSeedDto[]> ApplySeasonalityBoostAsync(
+        HomePreferenceSeedDto[] items,
+        double boostMultiplier,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var seasonalitySignals = await GetSeasonalitySignalsAsync(items.Select(item => item.ProductId), cancellationToken);
+        if (seasonalitySignals.Count == 0)
+        {
+            return items;
+        }
+
+        foreach (var item in items)
+        {
+            if (!seasonalitySignals.TryGetValue(item.ProductId, out var signal))
+            {
+                continue;
+            }
+
+            item.SeasonalityScore = signal.Score;
+            item.SeasonalityLabel = signal.SeasonLabel;
+            item.SeasonalityBadgeLabel = signal.BadgeLabel;
+            item.PreferenceScore += signal.Score * boostMultiplier;
+        }
+
+        return items
+            .OrderByDescending(item => item.PreferenceScore)
+            .ThenByDescending(item => item.PurchaseCount)
+            .ThenByDescending(item => item.SearchClickCount)
+            .ThenByDescending(item => item.RecommendationClickCount)
+            .ThenByDescending(item => item.ViewCount)
+            .ThenByDescending(item => item.LastInteractedAtUtc ?? SqlServerDateTimeFloor)
+            .ThenBy(item => item.ProductId)
+            .Take(Math.Clamp(limit, 1, 48))
+            .ToArray();
+    }
+
+    private async Task<HomeCollaborativeCandidateDto[]> ApplySeasonalityBoostAsync(
+        HomeCollaborativeCandidateDto[] items,
+        double boostMultiplier,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var seasonalitySignals = await GetSeasonalitySignalsAsync(items.Select(item => item.ProductId), cancellationToken);
+        if (seasonalitySignals.Count == 0)
+        {
+            return items;
+        }
+
+        foreach (var item in items)
+        {
+            if (!seasonalitySignals.TryGetValue(item.ProductId, out var signal))
+            {
+                continue;
+            }
+
+            item.SeasonalityScore = signal.Score;
+            item.SeasonalityLabel = signal.SeasonLabel;
+            item.SeasonalityBadgeLabel = signal.BadgeLabel;
+            item.CollaborativeScore += signal.Score * boostMultiplier;
+        }
+
+        return items
+            .OrderByDescending(item => item.CollaborativeScore)
+            .ThenByDescending(item => item.CoPurchaseOrderCount)
+            .ThenByDescending(item => item.CoClickSessionCount)
+            .ThenByDescending(item => item.CoViewSessionCount)
+            .ThenBy(item => item.ProductId)
+            .Take(Math.Clamp(limit, 1, 48))
+            .ToArray();
+    }
+
+    private async Task<SearchRankingSignalDto[]> ApplySeasonalityBoostAsync(
+        SearchRankingSignalDto[] items,
+        double boostMultiplier,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var seasonalitySignals = await GetSeasonalitySignalsAsync(items.Select(item => item.ProductId), cancellationToken);
+        if (seasonalitySignals.Count == 0)
+        {
+            return items;
+        }
+
+        foreach (var item in items)
+        {
+            if (!seasonalitySignals.TryGetValue(item.ProductId, out var signal))
+            {
+                continue;
+            }
+
+            item.SeasonalityScore = signal.Score;
+            item.SeasonalityLabel = signal.SeasonLabel;
+            item.SeasonalityBadgeLabel = signal.BadgeLabel;
+            item.HybridSearchScore += signal.Score * boostMultiplier;
+        }
+
+        return items
+            .OrderByDescending(item => item.HybridSearchScore)
+            .ThenByDescending(item => item.SearchClickCount)
+            .ThenByDescending(item => item.SearchRecommendationClickCount)
+            .ThenByDescending(item => item.SearchViewSessionCount)
+            .ThenBy(item => item.ProductId)
+            .Take(Math.Clamp(limit, 1, 96))
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyDictionary<int, ProductSeasonalitySignal>> GetSeasonalitySignalsAsync(
+        IEnumerable<int> productIds,
+        CancellationToken cancellationToken)
+    {
+        var normalizedProductIds = productIds
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(200)
+            .ToArray();
+
+        if (_catalogInventoryClient is null || normalizedProductIds.Length == 0)
+        {
+            return new Dictionary<int, ProductSeasonalitySignal>();
+        }
+
+        try
+        {
+            var rows = await _catalogInventoryClient.GetProductSeasonalityAsync(normalizedProductIds, cancellationToken);
+            return SeasonalityScoring.BuildBestSignals(
+                normalizedProductIds,
+                rows,
+                SeasonalityScoring.GetVietnamCurrentMonth());
+        }
+        catch
+        {
+            return new Dictionary<int, ProductSeasonalitySignal>();
+        }
+    }
+
     private bool IsValidInternalServiceRequest()
     {
         var configuredKey = _internalServiceAuthOptions?.InternalServiceKey?.Trim();
@@ -1684,4 +1911,3 @@ public sealed class ProductInsightsController : ControllerBase
         _recommendationAffinityRefreshSignal?.RequestRefresh();
     }
 }
-

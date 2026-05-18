@@ -85,12 +85,12 @@ public sealed class AccountNotificationsPageViewModel
                 return "Hãy nới bộ lọc hoặc chuyển sang xem tất cả để không bỏ lỡ cập nhật quan trọng.";
             }
 
-            return "Khi có cập nhật về đơn hàng, vận chuyển hoặc hồ sơ seller, bạn sẽ thấy tất cả tại đây.";
+            return "Khi có cập nhật về đơn hàng, vận chuyển hoặc hồ sơ người bán, bạn sẽ thấy tất cả tại đây.";
 
             string sellerPrompt() =>
                 SellerApplication.HasApplication
-                    ? "Khi hồ sơ seller hoặc đơn hàng có thay đổi, FreshFarm sẽ hiển thị tại trung tâm thông báo này."
-                    : "Khi đơn hàng, vận chuyển hoặc hồ sơ seller có cập nhật, FreshFarm sẽ hiển thị tại đây.";
+                    ? "Khi hồ sơ người bán hoặc đơn hàng có thay đổi, FreshFarm sẽ hiển thị tại trung tâm thông báo này."
+                    : "Khi đơn hàng, vận chuyển hoặc hồ sơ người bán có cập nhật, FreshFarm sẽ hiển thị tại đây.";
         }
     }
 
@@ -98,7 +98,7 @@ public sealed class AccountNotificationsPageViewModel
         HasActiveFilters
             ? "Xóa bộ lọc"
             : SellerApplication.HasApplication || SellerApplication.IsSellerApproved
-                ? "Xem hồ sơ seller"
+                ? "Xem hồ sơ người bán"
                 : "Đăng ký người bán";
 
     public string EmptyStatePrimaryActionUrl =>
@@ -402,10 +402,10 @@ public sealed class SellerApplicationSummaryDto
 
     public string SellerReviewAlertTitle =>
         string.Equals(Status, "approved", StringComparison.OrdinalIgnoreCase)
-            ? "Hồ sơ seller đã được duyệt"
+            ? "Hồ sơ người bán đã được duyệt"
             : string.Equals(ReviewStatus, "rejected", StringComparison.OrdinalIgnoreCase)
-                ? "Hồ sơ seller cần bổ sung"
-                : "Hồ sơ seller đang chờ duyệt";
+                ? "Hồ sơ người bán cần bổ sung"
+                : "Hồ sơ người bán đang chờ duyệt";
 
     public string SellerReviewAlertBody
     {
@@ -413,19 +413,19 @@ public sealed class SellerApplicationSummaryDto
         {
             if (string.Equals(Status, "approved", StringComparison.OrdinalIgnoreCase))
             {
-                return "Tài khoản của bạn đã có quyền người bán. Bạn có thể vào hồ sơ seller để hoàn tất vận hành gian hàng.";
+                return "Tài khoản của bạn đã có quyền người bán. Bạn có thể vào hồ sơ người bán để hoàn tất vận hành gian hàng.";
             }
 
             if (string.Equals(ReviewStatus, "rejected", StringComparison.OrdinalIgnoreCase))
             {
                 return string.IsNullOrWhiteSpace(ReviewNote)
-                    ? "Đội vận hành đã yêu cầu bạn cập nhật lại hồ sơ seller trước khi duyệt tiếp."
-                    : $"Đội vận hành đã yêu cầu bổ sung hồ sơ seller: {ReviewNote.Trim()}";
+                    ? "Đội vận hành đã yêu cầu bạn cập nhật lại hồ sơ người bán trước khi duyệt tiếp."
+                    : $"Đội vận hành đã yêu cầu bổ sung hồ sơ người bán: {ReviewNote.Trim()}";
             }
 
             return HasApplication
-                ? "Hồ sơ seller của bạn đang được FreshFarm rà soát. Bạn sẽ thấy cập nhật mới nhất ngay trong tài khoản."
-                : "Bạn có thể gửi hồ sơ seller để đội vận hành bắt đầu rà soát.";
+                ? "Hồ sơ người bán của bạn đang được FreshFarm rà soát. Bạn sẽ thấy cập nhật mới nhất ngay trong tài khoản."
+                : "Bạn có thể gửi hồ sơ người bán để đội vận hành bắt đầu rà soát.";
         }
     }
 
@@ -563,7 +563,7 @@ public sealed class AccountNotificationListItemDto
 
     public static string GetNotificationTypeLabel(string? notificationType) =>
         string.Equals(notificationType, "seller_review_update", StringComparison.OrdinalIgnoreCase)
-            ? "Cập nhật hồ sơ seller"
+            ? "Cập nhật hồ sơ người bán"
             : string.Equals(notificationType, "order_status", StringComparison.OrdinalIgnoreCase)
                 ? "Cập nhật đơn hàng"
                 : string.Equals(notificationType, "location_update", StringComparison.OrdinalIgnoreCase)
@@ -590,7 +590,7 @@ public sealed class AccountNotificationListItemDto
 
     public string ActionLabel =>
         string.Equals(NotificationType, "seller_review_update", StringComparison.OrdinalIgnoreCase)
-            ? "Xem hồ sơ seller"
+            ? "Xem hồ sơ người bán"
             : string.Equals(NotificationType, "order_status", StringComparison.OrdinalIgnoreCase) ||
               string.Equals(NotificationType, "location_update", StringComparison.OrdinalIgnoreCase)
                 ? "Xem đơn hàng"
@@ -600,7 +600,7 @@ public sealed class AccountNotificationListItemDto
 
     public string ContextLabel =>
         string.Equals(NotificationType, "seller_review_update", StringComparison.OrdinalIgnoreCase)
-            ? "Hồ sơ seller"
+            ? "Hồ sơ người bán"
             : OrderId > 0
                 ? $"Đơn #{OrderId:D6}"
                 : "Tài khoản FreshFarm";
@@ -658,9 +658,9 @@ public sealed class AccountNotificationListItemDto
     public string PreviewHint =>
         string.Equals(NotificationType, "seller_review_update", StringComparison.OrdinalIgnoreCase)
             ? IsSellerApprovalUpdate
-                ? "Mở hồ sơ seller để hoàn tất thiết lập và bắt đầu vận hành gian hàng."
+                ? "Mở hồ sơ người bán để hoàn tất thiết lập và bắt đầu vận hành gian hàng."
                 : IsSellerRejectUpdate
-                    ? "Mở hồ sơ seller để cập nhật giấy tờ và gửi lại hồ sơ."
+                    ? "Mở hồ sơ người bán để cập nhật giấy tờ và gửi lại hồ sơ."
                     : "Mở hồ sơ để xem yêu cầu mới nhất từ đội vận hành."
             : string.Equals(NotificationType, "order_status", StringComparison.OrdinalIgnoreCase)
                 ? "Mở chi tiết đơn để xem timeline và sản phẩm liên quan."
@@ -756,10 +756,15 @@ public sealed class AccountNotificationListItemDto
             }
         }
 
-        var marker = "bổ sung hồ sơ seller";
-        var markerIndex = normalizedMessage.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (markerIndex >= 0)
+        var markers = new[] { "bổ sung hồ sơ người bán", "bổ sung hồ sơ seller" };
+        foreach (var marker in markers)
         {
+            var markerIndex = normalizedMessage.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0)
+            {
+                continue;
+            }
+
             var candidate = normalizedMessage[(markerIndex + marker.Length)..].Trim();
             if (candidate.StartsWith(":", StringComparison.Ordinal))
             {

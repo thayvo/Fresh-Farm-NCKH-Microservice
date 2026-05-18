@@ -51,6 +51,7 @@ public sealed class NotificationsAdminController : ControllerBase
 
         var baseQuery = _db.CustomerNotifications
             .AsNoTracking()
+            .Where(x => !x.ExpiresAt.HasValue || x.ExpiresAt.Value > DateTime.UtcNow)
             .AsQueryable();
 
         var filteredQuery = ApplyFilters(baseQuery, q, type, isRead, userId, orderId);
@@ -90,7 +91,10 @@ public sealed class NotificationsAdminController : ControllerBase
                 message = x.Message,
                 isRead = x.IsRead ?? false,
                 isPushNotification = x.IsPushNotification ?? false,
+                popupType = x.PopupType,
+                popupImageUrl = x.PopupImageUrl,
                 createdAt = x.CreatedAt,
+                expiresAt = x.ExpiresAt,
                 readAt = x.ReadAt
             })
             .ToListAsync(cancellationToken);
@@ -140,6 +144,77 @@ public sealed class NotificationsAdminController : ControllerBase
         return Ok(new { success = true, message = "Đã đánh dấu đã đọc." });
     }
 
+    [HttpPost("broadcast")]
+    public async Task<IActionResult> CreateBroadcastNotification(
+        [FromBody] CreateBroadcastNotificationRequest? request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request is null)
+        {
+            return BadRequest(new { success = false, message = "Payload thông báo không hợp lệ." });
+        }
+
+        var userIds = request.UserIds
+            .Where(userId => userId > 0)
+            .Distinct()
+            .ToList();
+
+        if (userIds.Count == 0)
+        {
+            return BadRequest(new { success = false, message = "Chưa có người nhận hợp lệ." });
+        }
+
+        var title = NormalizeRequiredText(request.Title, 255);
+        var message = NormalizeRequiredText(request.Message, 2000);
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(message))
+        {
+            return BadRequest(new { success = false, message = "Tiêu đề và nội dung là bắt buộc." });
+        }
+
+        if (request.ExpiresAt.HasValue && request.ExpiresAt.Value <= DateTime.UtcNow)
+        {
+            return BadRequest(new { success = false, message = "Thời gian hết hạn phải ở tương lai." });
+        }
+
+        var now = DateTime.UtcNow;
+        var notificationType = NormalizeNotificationType(request.NotificationType);
+        var popupType = NormalizePopupType(request.PopupType, request.ShowPopup);
+        var popupImageUrl = popupType == "image"
+            ? NormalizeRequiredText(request.PopupImageUrl, 1000)
+            : null;
+
+        if (popupType == "image" && string.IsNullOrWhiteSpace(popupImageUrl))
+        {
+            return BadRequest(new { success = false, message = "Vui lòng nhập URL ảnh popup." });
+        }
+
+        var notifications = userIds.Select(userId => new CustomerNotification
+        {
+            UserId = userId,
+            OrderId = 0,
+            NotificationType = notificationType,
+            Title = title,
+            Message = message,
+            IsRead = false,
+            IsPushNotification = request.ShowPopup,
+            PopupType = popupType,
+            PopupImageUrl = popupImageUrl,
+            CreatedAt = now,
+            ExpiresAt = request.ExpiresAt,
+            ReadAt = null
+        }).ToList();
+
+        _db.CustomerNotifications.AddRange(notifications);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = $"Đã gửi thông báo đến {notifications.Count} người nhận.",
+            affected = notifications.Count
+        });
+    }
+
     [AllowAnonymous]
     [HttpPost("internal")]
     public async Task<IActionResult> CreateInternalNotification(
@@ -180,7 +255,10 @@ public sealed class NotificationsAdminController : ControllerBase
             Message = message,
             IsRead = false,
             IsPushNotification = request.IsPushNotification,
+            PopupType = request.IsPushNotification ? "text" : "none",
+            PopupImageUrl = null,
             CreatedAt = request.CreatedAt ?? DateTime.UtcNow,
+            ExpiresAt = request.ExpiresAt,
             ReadAt = null
         };
 
@@ -199,7 +277,8 @@ public sealed class NotificationsAdminController : ControllerBase
     public async Task<IActionResult> MarkAllAsRead([FromBody] MarkAllNotificationsReadRequest? request, CancellationToken cancellationToken = default)
     {
         var query = ApplyFilters(
-            _db.CustomerNotifications.AsQueryable(),
+            _db.CustomerNotifications
+                .Where(x => !x.ExpiresAt.HasValue || x.ExpiresAt.Value > DateTime.UtcNow),
             request?.Q,
             request?.Type,
             request?.IsRead,
@@ -290,6 +369,17 @@ public sealed class NotificationsAdminController : ControllerBase
             : normalized;
     }
 
+    private static string NormalizePopupType(string? value, bool showPopup)
+    {
+        if (!showPopup)
+        {
+            return "none";
+        }
+
+        var normalized = NormalizeRequiredText(value, 20)?.ToLowerInvariant();
+        return normalized is "image" or "text" ? normalized : "text";
+    }
+
     private static string? NormalizeRequiredText(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -316,6 +406,25 @@ public sealed class NotificationsAdminController : ControllerBase
         public int? OrderId { get; set; }
     }
 
+    public sealed class CreateBroadcastNotificationRequest
+    {
+        public List<int> UserIds { get; set; } = new();
+
+        public string? NotificationType { get; set; }
+
+        public string? Title { get; set; }
+
+        public string? Message { get; set; }
+
+        public bool ShowPopup { get; set; }
+
+        public string? PopupType { get; set; }
+
+        public string? PopupImageUrl { get; set; }
+
+        public DateTime? ExpiresAt { get; set; }
+    }
+
     public sealed class CreateInternalNotificationRequest
     {
         public int UserId { get; set; }
@@ -331,5 +440,7 @@ public sealed class NotificationsAdminController : ControllerBase
         public bool IsPushNotification { get; set; }
 
         public DateTime? CreatedAt { get; set; }
+
+        public DateTime? ExpiresAt { get; set; }
     }
 }

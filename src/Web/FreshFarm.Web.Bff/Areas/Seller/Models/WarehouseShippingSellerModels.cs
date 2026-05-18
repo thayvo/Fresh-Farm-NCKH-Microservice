@@ -299,6 +299,14 @@ public sealed class Order
 
     public string? ItemSummary { get; set; }
 
+    public int? PackageWeight { get; set; }
+
+    public int? PackageLength { get; set; }
+
+    public int? PackageWidth { get; set; }
+
+    public int? PackageHeight { get; set; }
+
     public List<Payment> Payments { get; set; } = new();
 
     public List<DeliveryAssignment> DeliveryAssignments { get; set; } = new();

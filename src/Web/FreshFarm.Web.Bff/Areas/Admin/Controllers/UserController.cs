@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Admin.Models;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,8 @@ namespace FreshFarm.Web.Bff.Areas.Admin.Controllers;
 public sealed class UserController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const int DefaultUserPageSize = 15;
+    private const int MaxUserPageSize = 100;
 
     private readonly IHttpClientFactory _httpClientFactory;
 
@@ -29,34 +32,34 @@ public sealed class UserController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageUsers(string? userType = "all", bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null)
+    public async Task<IActionResult> ManageUsers(string? userType = "all", string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(null, userType, isActive, createdFrom, createdTo);
+        return await RenderManageUsersAsync(searchTerm, userType, isActive, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageAdmins(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null)
+    public async Task<IActionResult> ManageAdmins(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "admin", isActive, createdFrom, createdTo);
+        return await RenderManageUsersAsync(searchTerm, "admin", isActive, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageSellers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null)
+    public async Task<IActionResult> ManageSellers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "seller", isActive, createdFrom, createdTo);
+        return await RenderManageUsersAsync(searchTerm, "seller", isActive, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageBuyers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null)
+    public async Task<IActionResult> ManageBuyers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "buyer", isActive, createdFrom, createdTo);
+        return await RenderManageUsersAsync(searchTerm, "buyer", isActive, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SearchUsers(string? searchTerm, string? userType = "all", bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null)
+    public async Task<IActionResult> SearchUsers(string? searchTerm, string? userType = "all", bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, userType, isActive, createdFrom, createdTo);
+        return await RenderManageUsersAsync(searchTerm, userType, isActive, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
@@ -157,13 +160,23 @@ public sealed class UserController : LegacySellerControllerBase
         return Json(new { success = true, message = "Da vo hieu hoa tai khoan nguoi dung." });
     }
 
-    private async Task<IActionResult> RenderManageUsersAsync(string? searchTerm, string? userType, bool? isActive, DateTime? createdFrom, DateTime? createdTo)
+    private async Task<IActionResult> RenderManageUsersAsync(string? searchTerm, string? userType, bool? isActive, DateTime? createdFrom, DateTime? createdTo, int page, int pageSize)
     {
         var normalizedUserType = NormalizeUserType(userType);
         var usersTask = GetUsersAsync(searchTerm, normalizedUserType, isActive, createdFrom, createdTo);
         var rolesTask = GetRolesAsync(normalizedUserType);
 
         await Task.WhenAll(usersTask, rolesTask);
+
+        var allUsers = usersTask.Result;
+        var normalizedPageSize = NormalizePageSize(pageSize);
+        var totalUsers = allUsers.Count;
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalUsers / (double)normalizedPageSize));
+        var currentPage = Math.Clamp(page, 1, totalPages);
+        var pagedUsers = allUsers
+            .Skip((currentPage - 1) * normalizedPageSize)
+            .Take(normalizedPageSize)
+            .ToList();
 
         var model = new AdminUserManagementPageViewModel
         {
@@ -173,10 +186,27 @@ public sealed class UserController : LegacySellerControllerBase
             CreatedFrom = createdFrom?.Date,
             CreatedTo = createdTo?.Date,
             Roles = rolesTask.Result,
-            Users = usersTask.Result
+            Users = pagedUsers,
+            Page = currentPage,
+            PageSize = normalizedPageSize,
+            TotalUsers = totalUsers,
+            ActiveUsers = allUsers.Count(x => x.IsActive),
+            AdminUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase)),
+            SellerUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Seller", StringComparison.OrdinalIgnoreCase)),
+            BuyerUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Customer", StringComparison.OrdinalIgnoreCase))
         };
 
         return View("ManageUsers", model);
+    }
+
+    private static int NormalizePageSize(int pageSize)
+    {
+        if (pageSize <= 0)
+        {
+            return DefaultUserPageSize;
+        }
+
+        return Math.Min(pageSize, MaxUserPageSize);
     }
 
     private async Task<List<AdminUserViewModel>> GetUsersAsync(string? searchTerm, string userType, bool? isActive, DateTime? createdFrom, DateTime? createdTo)
@@ -285,6 +315,7 @@ public sealed class UserController : LegacySellerControllerBase
             Email = dto.email ?? string.Empty,
             Phone = dto.phone,
             Avatar = dto.avatar,
+            AvatarUrl = AvatarImagePaths.ResolveRequestPath(dto.avatar) ?? AvatarImagePaths.FallbackImageRequestPath,
             RoleID = dto.roleId,
             Role = dto.role is null
                 ? null
@@ -311,6 +342,7 @@ public sealed class UserController : LegacySellerControllerBase
             email = user.Email,
             phone = user.Phone,
             avatar = user.Avatar,
+            avatarUrl = user.AvatarUrl,
             roleId = user.RoleID,
             role = user.Role is null
                 ? null

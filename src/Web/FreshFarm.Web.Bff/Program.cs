@@ -292,7 +292,7 @@ builder.Services // Dang ky cookie authentication cho user web.
                     return Task.CompletedTask;
                 }
 
-                var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+                var returnUrl = ResolveInteractiveReturnUrl(context.Request);
                 var loginPath = "/account/signin";
 
                 if (context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
@@ -315,7 +315,7 @@ builder.Services // Dang ky cookie authentication cho user web.
                     return Task.CompletedTask;
                 }
 
-                var returnUrl = context.Request.PathBase + context.Request.Path + context.Request.QueryString;
+                var returnUrl = ResolveInteractiveReturnUrl(context.Request);
                 var loginPath = "/account/signin";
 
                 if (context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
@@ -725,6 +725,30 @@ static string ResolveRateLimitActor(HttpContext context)
         context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
         context.Connection.RemoteIpAddress?.ToString() ??
         "anonymous";
+}
+
+static string ResolveInteractiveReturnUrl(HttpRequest request)
+{
+    if (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+    {
+        return request.PathBase + request.Path + request.QueryString;
+    }
+
+    var referer = request.Headers.Referer.ToString();
+    if (Uri.TryCreate(referer, UriKind.Absolute, out var absoluteReferer) &&
+        string.Equals(absoluteReferer.Authority, request.Host.Value, StringComparison.OrdinalIgnoreCase))
+    {
+        return absoluteReferer.PathAndQuery;
+    }
+
+    if (Uri.TryCreate(referer, UriKind.Relative, out _) &&
+        referer.StartsWith("/", StringComparison.Ordinal) &&
+        !referer.StartsWith("//", StringComparison.Ordinal))
+    {
+        return referer;
+    }
+
+    return "/";
 }
 
 static string BuildCspFormActionSources(VnPayOptions vnPayOptions)

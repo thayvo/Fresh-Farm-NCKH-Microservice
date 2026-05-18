@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityRefreshSignal.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityRefreshSignal.cs
-// Thu muc hoc tap: HocGoiY
-
 using System.Threading.Channels;
 
 namespace FreshFarm.Ordering.Api.Services;
@@ -44,4 +40,3 @@ public sealed class RecommendationAffinityRefreshSignal
         }
     }
 }
-

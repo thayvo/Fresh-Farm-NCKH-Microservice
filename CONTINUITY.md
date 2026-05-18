@@ -1,121 +1,78 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Đổi tên tài liệu trong `HocGoiY` để nhìn vào biết nên học file nào trước.
-  - Success criteria: các file `.md` và `.docx` có tiền tố thứ tự học rõ ràng (`00`, `01`, `02`, `03`, `10`-`15`) và không còn tham chiếu tên cũ trong tài liệu Markdown.
+  - Implement the agreed Admin/Seller shipping business-flow correction in FreshFarm.
+  - Success means removing the incorrect Admin delivery-dispatch flow, upgrading Admin/Seller Shipping Management with proper marketplace responsibilities, and verifying with automated tests plus real browser UI checks.
 - **Constraints/Assumptions**:
-  - Trả lời bằng tiếng Việt có dấu.
+  - Reply in Vietnamese with ledger snapshot at the start of every reply.
   - Workspace: `D:\NCKH\DOAN\NCKH-FRESH-FARM`.
-  - Khong revert thay doi khong phai cua minh.
-  - Khong xoa file/untrack file khi user chua yeu cau ro.
-  - Artifact root cho output tam: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM`.
-  - Khong tao artifact tam trong repo root.
-  - `rg.exe` bi Windows chan quyen chay; dung PowerShell `Get-ChildItem`/`Select-String` thay the.
+  - Temporary Codex artifacts must go under `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM`.
+  - Do not create temporary/build/test/browser artifacts in repository root.
+  - Do not revert user changes.
+  - Use actual local source code as evidence; mark uncertain items as `UNCONFIRMED`.
+  - The current audit is based on source files for Admin/Seller dashboard, sidebar, controllers, models, and selected business views rather than screenshots. Screenshots were not provided in the thread. UNCONFIRMED.
 - **Key decisions**:
-  - Viet tai lieu moi trong `HocGoiY/` vi day la khu vuc tai lieu rieng cho phan goi y va khong bi `.gitignore` ignore.
-  - Tai lieu tap trung vao "da xay dung/da lam gi" theo source hien co, khong sua code runtime.
-  - Chia docs theo module nho: event tracking, Product Insights, materialized affinity, ML.NET, home recommendation, similar products, search ranking, session rerank, A/B metrics, rollout/tuning, UI integration, DI/config, tests.
-  - Bo sung phan "Lo trinh doc theo cap do" vao dau docs thay vi tach file moi.
-  - Khong dọn/xoa/untrack artifact neu user chua yeu cau ro; chi bao cao so lieu.
-  - User hoi "chi cach don di"; tra loi bang huong dan truoc, chua tu dong chay lenh.
-  - User co cac file Word `.docx` dang `??` chua git add; chi can ignore neu khong muon commit.
-  - Tao file moi `HocGoiY/08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md` thay vi ghi de file 07, vi file 07 la docs "da lam gi", file 08 la giao trinh hoc.
+  - Treat Admin as platform operations/dashboard for the whole marketplace.
+  - Treat Seller as seller-center dashboard focused on shop operations, orders, inventory, fulfilment, reviews, finance, and support.
+  - Separate source-backed findings from screenshot-only visual judgments that remain UNCONFIRMED.
+  - Treat Admin "Điều phối giao hàng" as a high-priority business-flow defect because Admin should not assign shipper per seller order in a marketplace model.
+  - Treat shipper/carrier selection, pickup readiness, packing, and handoff as Seller/fulfillment responsibilities; Admin should monitor SLA, carrier config, disputes, exceptions, and policy compliance.
+  - Merge useful delivery handoff actions into Shipping Management; remove the separate Delivery Dispatch surface unless a distinct Logistics role is introduced.
+  - Keep Admin COD reconciliation in Shipping Management because platform/admin finance can own COD oversight.
+  - Remove Seller COD reconciliation, shipping delete, and delivery-staff assignment from Seller Shipping because these are unsafe/self-serving seller powers.
 - **State**:
   - *Done*:
-    - Da doc ledger hien co.
-    - Da inspect repo va thay source chinh la ASP.NET Core/.NET 8 BFF + Ordering/Catalog services.
-    - Da dung skill `aspnet-core`.
-    - Da tim cac file recommendation trong `src\Services\Ordering\FreshFarm.Ordering.Api` va `src\Web\FreshFarm.Web.Bff`.
-    - Da doc cac controller/service chinh: `ProductInsightsController`, `RecommendationEventsController`, `RecommendationMetricsController`, `RecommendationMlController`, `RecommendationAffinityService`, `RecommendationMlTrainingService`, `BffCatalogController`, `BffRecommendationEventsController`, `SessionAwareRecommendationReranker`, `SessionSignalService`, `IRecommendationExperimentService`, `MultiObjectiveRecommendationRolloutService`.
-    - Da doc cac file UI chinh: `home-page.js`, `product-page.js`, `search-page.js`.
-    - Da tham chieu roadmap cu `docs\RECOMMENDATION_ML_ROADMAP_2026-03-29.md` de doi chieu tien do.
-    - Da tao docs moi ban dau trong `docs\RECOMMENDATION_IMPLEMENTATION_NOTES_2026-05-10.md` nhung phat hien `docs/` bi `.gitignore` ignore.
-    - Da chuyen noi dung docs sang `HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.md` va xoa file docs bi ignore do minh tao.
-    - Da doc lai file docs moi sau khi tao.
-    - Da bo sung lo trinh doc 7 cap do: tong quan, luong du lieu, API serving, materialized scoring, ML/session rerank, A/B rollout, config/test.
-    - Da do repo: `.git` ~814.72 MiB, tong repo ~1678.61 MiB.
-    - `git ls-files` co 67409 file tracked.
-    - `git count-objects -vH`: 9563 loose objects, size ~804.49 MiB, chua co pack.
-    - Nhom tracked lon nhat: `.codex-build` 65364 file; artifact dirs `.codex-build`/`output`/`tmp`/`artifacts`/`.playwright-cli` tong 66459 file tracked.
-    - File source lon nhat hien tai chi khoang 1.73 MiB, nen van de chinh la artifact/build outputs bi track, khong phai source/app assets lon.
-    - Sau khi user chay `git rm -r --cached --ignore-unmatch ...`, `git ls-files` cho `.codex-build`/`artifacts`/`output`/`tmp`/`.playwright-cli`/`.codex-obj`/`.codex-temp`/`starttest.txt` tra ve 0.
-    - Dang co 66553 file staged; trong do co 21 file `src/` staged modified, nen neu chi commit dọn artifact can unstage `src/` truoc.
-    - Cac file Word/report trong `BaoCao` dang `??` untracked, chua bi add.
-    - User da commit cleanup: `29325dd Remove generated artifacts from git tracking`.
-    - Sau cleanup: artifact tracked count = 0; total tracked files = 880; `git count-objects -vH` con 14 loose objects ~99.75 KiB, 2 packs ~394.71 MiB.
-    - Dung luong `.git` giam tu ~814.72 MiB xuong ~395.03 MiB; tong repo tu ~1678.61 MiB xuong ~1258.92 MiB.
-    - Status hien con modified `.gitignore`, `CONTINUITY.md`; untracked Word `.doc` trong `BaoCao`, docs `HocGoiY/07...md`, va 2 scripts report.
-    - Da doc cac file ly thuyet `HocGoiY/LyThuyet/01..06`.
-    - Da trich cong thuc/trong so tu source: product affinity `32/14/6`, preference `10/28/22/35`, user-product `42/22/18/8`, basket `30/6`, replenishment, ML decay `0.5^(age/30)`, session rerank, objective metrics.
-    - Da tao `HocGoiY/08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md`.
-    - Da cap nhat `HocGoiY/README.md` va `HocGoiY/LO_TRINH_DOC.md` de tro den file 08.
-    - User yêu cầu sửa trực tiếp vào file Word.
-    - Đã dùng skill `doc` để xử lý `.docx`.
-    - Đã xác định `BaoCao/Bao_cao_nghiem_thu_FreshFarm_hoan_chinh.docx` là bản báo cáo FreshFarm hoàn chỉnh phù hợp nhất để sửa.
-    - User làm rõ: không sửa vào báo cáo chính, mà tạo thêm 1 file Word gợi ý bằng tiếng Việt có dấu.
-    - Đã tạo `HocGoiY/Giao_Trinh_Hoc_Module_Goi_Y_FreshFarm.docx` bằng tiếng Việt có dấu.
-    - Đã kiểm tra lại bằng `python-docx`: file tồn tại, 87 đoạn văn, 3 bảng; nội dung tiếng Việt có dấu đọc được.
-    - Không render trực quan được vì `soffice` không có trong PATH.
-    - User yêu cầu tạo hết bản sao trong `HocGoiY`, viết toàn bộ bằng tiếng Việt có dấu và xuất thành `.docx`.
-    - Đã tạo bản `.docx` tương ứng cho 10 file Markdown trong `HocGoiY` và `HocGoiY/LyThuyet`.
-    - Tổng `.docx` hiện có trong `HocGoiY`: 11 file, gồm bản giáo trình riêng đã tạo trước.
-    - Đã viết lại sạch bằng tiếng Việt có dấu cho `07_Cac_Phan_Da_Lam_Module_Goi_Y.docx`, `08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.docx`, và `README.docx`.
-    - Đã kiểm tra bằng `python-docx`: các file mở được, có đoạn văn/bảng hợp lệ.
-    - User yêu cầu đổi tên file để nhìn vào biết nên học cái nào trước.
-    - Đã đổi tên root docs: `00_Bat_Dau_O_Day_Huong_Dan_Hoc_Goi_Y`, `01_Giao_Trinh_Tong_Hop_Hoc_Tu_Ly_Thuyet_Den_Code`, `01A_Giao_Trinh_Tong_Hop_Ban_Word_Rieng`, `02_Nhung_Phan_Da_Lam_Trong_Module_Goi_Y`, `03_Lo_Trinh_Doc_Source_Code_Recommendation`.
-    - Đã đổi tên nhóm lý thuyết thành `10_Ly_Thuyet_...` đến `15_Ly_Thuyet_...`.
-    - Đã cập nhật tham chiếu tên mới trong các file Markdown và Word liên quan; kiểm tra không còn token tên cũ trong `.md`.
+    - Located Admin and Seller areas in `src\Web\FreshFarm.Web.Bff\Areas`.
+    - Read Admin/Seller dashboards, sidebars, dashboard models, layout files, and theme CSS.
+    - Confirmed Admin dashboard pulls platform/order KPI and user metrics.
+    - Confirmed Seller dashboard pulls seller-scoped data through ordering admin-style endpoints protected by seller/admin policy.
+    - Confirmed Admin Delivery renders the Seller Delivery view and calls `/api/orders/admin/reports/shipping` plus `/api/orders/admin/{orderId}/status`.
+    - Confirmed Delivery "assign" does not persist an assignment; it changes order status to `Shipped`.
+    - Confirmed report shipping staff names are generated from fixed/demo names by order ID rather than real persisted delivery assignment.
+    - Confirmed Admin and Seller both already have "Quản lý vận chuyển" menu entries.
+    - Confirmed Admin sidebar also has a separate "Điều phối giao hàng" menu entry that duplicates/conflicts with shipping management.
+    - Confirmed Seller Shipping has a valid "MarkReadyForPickup" flow, but also exposes delete shipping, COD reconcile/unreconcile, and delivery-staff selection.
+    - Confirmed backend shipping payload returns empty delivery staff/assignment data, so delivery-staff UI is not backed by real persisted assignment.
+    - Added `ShippingManagementUxContractTests` guard tests for Admin/Seller shipping UX/business contracts.
+    - Deleted the separate Admin/Seller Delivery controllers and Seller Delivery view.
+    - Removed the Admin sidebar entry for "Điều phối giao hàng".
+    - Upgraded Admin Shipping copy/status labels to platform monitoring/SLAs/COD oversight and removed delivery-staff/delete UI/actions.
+    - Upgraded Seller Shipping to focus on handoff, waybill creation, pickup readiness, and read-only COD status; removed delete, COD reconcile/unreconcile, and delivery-staff selection.
+    - Removed leftover staff filters/columns/query DTOs from Admin/Seller Shipping after visual QA exposed the residual "Nhân viên giao hàng" wording.
+    - Verified targeted shipping guard tests pass.
+    - Verified shipping-related BFF tests pass.
+    - Verified BFF project builds from an external artifact output path.
+    - Verified Admin/Seller Shipping visually in Chromium/Playwright at desktop and mobile sizes; screenshots saved under `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual`.
+    - Confirmed the temporary BFF server is running on `http://localhost:5112` with PID `35544`.
+    - Removed the "Nhận tại cửa hàng" / store-pickup UI and form branches from Admin/Seller Shipping because FreshFarm is modeled as a marketplace shipping flow, not in-store pickup.
+    - Forced Admin/Seller Shipping Create/Edit payloads to send `isStorePickup = false` and `storeAddress = null` from these management screens.
+    - Added guard-test coverage so `Nhận tại cửa hàng`, `IsStorePickup`, and `StoreAddress` cannot reappear in Shipping Management views.
+    - Re-verified targeted shipping guard tests and shipping-related tests after removing store pickup.
+    - Restarted the temporary BFF server on `http://localhost:5112` with PID `28168`.
   - *Now*:
-    - User chạy `git add .` và hỏi vì thấy Git theo dõi thêm file.
-    - Đã kiểm tra staging: `git add .` đã stage tài liệu `HocGoiY`, `.gitignore`, `CONTINUITY.md`, scripts và vài file mẫu Word trong `BaoCao`.
-    - Đã gỡ staging file tạm Word `HocGoiY/~$_Bat_Dau_O_Day_Huong_Dan_Hoc_Goi_Y.docx`, các mẫu `.doc` trong `BaoCao`, `CONTINUITY.md`, và 2 script report.
-    - Đã thêm ignore cho `BaoCao/**/*.doc`, `BaoCao/*.doc`, và file tạm Office `~$*.doc`, `~$*.docx`.
-    - User chạy lại `git add .`; cảnh báo chỉ là LF->CRLF nhưng đã stage lại `CONTINUITY.md` và 2 scripts.
-    - Đã gỡ staging lại `CONTINUITY.md` và `scripts/generate_freshfarm_*.py`.
-    - Đã đọc 2 scripts: chúng là tool Python dùng `python-docx`/Pillow để sinh báo cáo Word FreshFarm, lấy ảnh từ `output/playwright/freshfarm-bao-cao` và ghi vào `BaoCao/*.docx`.
-    - Đã gỡ staging 2 scripts lần nữa; hiện chúng là untracked `??`.
-    - User xác nhận không cần add 2 scripts; đã thêm ignore cụ thể cho `scripts/generate_freshfarm_nghiemthu_report.py` và `scripts/generate_freshfarm_report.py`.
-    - Đã chạy `git check-ignore -v` xác nhận 2 scripts được ignore bởi `.gitignore`.
+    - Summarizing the store-pickup removal and verification results for the user.
   - *Next*:
-    - Báo user không cần add scripts; `.gitignore` đã xử lý, chỉ commit `.gitignore` cùng tài liệu nếu muốn.
+    - User can open the running URL and test Admin/Seller Shipping manually.
 - **Open questions** (UNCONFIRMED if needed):
-  - Chưa có.
+  - Full BFF test project still has 7 unrelated failures in seller-notification wording and catalog similar-products seasonal reason assertions.
 - **Working set** (files/ids/commands):
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\CONTINUITY.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\Giao_Trinh_Hoc_Module_Goi_Y_FreshFarm.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\README.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LO_TRINH_DOC.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\BaoCao\Bao_cao_nghiem_thu_FreshFarm_hoan_chinh.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\docs\RECOMMENDATION_ML_ROADMAP_2026-03-29.md`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ProductInsightsController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationEventsController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationMetricsController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\RecommendationMlController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationAffinityService.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Services\RecommendationMlTrainingService.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Controllers\BffCatalogController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Controllers\BffRecommendationEventsController.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\SessionAwareRecommendationReranker.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\SessionSignalService.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\IRecommendationExperimentService.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Services\MultiObjectiveRecommendationRolloutService.cs`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\home-page.js`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\product-page.js`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\wwwroot\js\search-page.js`
-  - Command: `git count-objects -vH`
-  - Command: `git ls-files | Measure-Object`
-  - Command: do dung luong `.git` va repo bang PowerShell `Get-ChildItem`.
-
-
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\07_Cac_Phan_Da_Lam_Module_Goi_Y.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\08_Giao_Trinh_Hoc_Module_Goi_Y_Tu_Ly_Thuyet_Den_Code.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\README.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LO_TRINH_DOC.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\01_Tong_Quan_He_Thong_Goi_Y.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\02_Content_Based_Filtering.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\03_Collaborative_Filtering.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\04_Hybrid_Cold_Start_Da_Dang.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\05_Ranking_Reranking_Sections.docx`
-  - `D:\NCKH\DOAN\NCKH-FRESH-FARM\HocGoiY\LyThuyet\06_Du_Lieu_Su_Kien_Materialize_Danh_Gia.docx`
+  - Admin dashboard: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Home\Dashboard.cshtml`.
+  - Admin sidebar: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Shared\_SideBar.cshtml`.
+  - Admin controller/model: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\HomeController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Admin\Models\AdminDashboardModels.cs`.
+  - Seller dashboard: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Home\Dashboard.cshtml`.
+  - Seller sidebar: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Shared\_SideBar.cshtml`.
+  - Seller controller/model: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Controllers\HomeController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Seller\Models\HomeSellerModels.cs`.
+  - Shared styling: `src\Web\FreshFarm.Web.Bff\wwwroot\admin\css\theme.css`, `src\Web\FreshFarm.Web.Bff\wwwroot\seller\css\style.css`.
+  - Delivery dispatch Admin: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\DeliveryController.cs`.
+  - Delivery dispatch Seller shared view: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Delivery\Index.cshtml`.
+  - Admin shipping: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\ShippingController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Shipping\ManageShipping.cshtml`.
+  - Seller shipping: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Controllers\ShippingController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Shipping\ManageShipping.cshtml`.
+  - Shipping guard tests: `src\Tests\FreshFarm.Web.Bff.Tests\ShippingManagementUxContractTests.cs`.
+  - Local visual-test BFF URL: `http://localhost:5112`.
+  - Visual screenshots: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\admin-shipping-desktop-final-fresh-login.png`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\seller-shipping-desktop-final.png`.
+  - Store-pickup removal screenshot: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\admin-edit-shipping-no-store-pickup.png`.
+  - Test results: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-ux-final\shipping-ux-final.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-final\shipping-final.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\web-bff-full-final\web-bff-full-final.trx`.
+  - Store-pickup removal test results: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-ux-no-store-pickup\shipping-ux-no-store-pickup.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-no-store-pickup\shipping-no-store-pickup.trx`.
+  - Shipping report backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ReportsAdminController.cs`.
+  - Shipping backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ShippingAdminController.cs`.
+  - Order status transition backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\OrdersController.cs`.

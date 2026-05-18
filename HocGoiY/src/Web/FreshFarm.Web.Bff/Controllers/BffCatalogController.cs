@@ -1,13 +1,15 @@
-// Nguon goc: src\Web\FreshFarm.Web.Bff\Controllers\BffCatalogController.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Web\FreshFarm.Web.Bff\Controllers\BffCatalogController.cs
-// Thu muc hoc tap: HocGoiY
-
+using FreshFarm.Web.Bff.Options;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Globalization;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace FreshFarm.Web.Bff.Controllers;
@@ -21,6 +23,15 @@ public sealed class BffCatalogController : ControllerBase
     private const string HomeRecommendationPlacement = "home_today";
     private const string HomeRecommendationAlgorithm = "content_based_home_v1";
     private const string HybridHomeRecommendationAlgorithm = "hybrid_home_v1";
+    private const string HomeTrendingPlacement = "home_trending";
+    private const string HomeTrendingAlgorithm = "global_trending_v1";
+    private const string HomeTrendingSignalSource = "global_metrics_catalog_v1";
+    private const string HomeNewArrivalsPlacement = "home_new_arrivals";
+    private const string HomeNewArrivalsAlgorithm = "catalog_new_arrivals_v1";
+    private const string HomeNewArrivalsSignalSource = "catalog_created_at_v1";
+    private const string HomeBestSellersPlacement = "home_best_sellers";
+    private const string HomeBestSellersAlgorithm = "global_best_sellers_v1";
+    private const string HomeBestSellersSignalSource = "ordering_sold_count_v1";
     private const string SimilarRecommendationPlacement = "product_similar";
     private const string SimilarRecommendationAlgorithm = "content_based_similar_v1";
     private const string HybridSimilarRecommendationAlgorithm = "hybrid_similar_v1";
@@ -35,22 +46,183 @@ public sealed class BffCatalogController : ControllerBase
     private const int SearchFirstPassSellerCap = 2;
     private const int SearchDiscoveryWindow = 8;
     private const int FavoriteShopFirstPassSellerCap = 2;
+    private const int HomeContentCandidatePoolLimit = 160;
+    private const int HomeMlCandidatePoolLimit = 96;
+    private const int HomeCollaborativeCandidatePoolLimit = 48;
+    private const int HomePreferenceSeedCandidatePoolLimit = 24;
+    private const int HomeSessionAwareCandidatePoolLimit = 200;
+    private const int HomeRecommendationMetricImpressionLimit = 10;
+    private const double HomeMlCandidateWeight = 1.0d;
+    private const double HomeCollaborativeCandidateWeight = 0.8d;
+    private const double HomeContentCandidateWeight = 0.6d;
+    private const string HomeMlCandidateSource = "ML";
+    private const string HomeCollaborativeCandidateSource = "Collaborative";
+    private const string HomeContentCandidateSource = "Content";
     private const string HomeContentSignalSource = "catalog_content_v1";
     private const string SimilarContentSignalSource = "catalog_content_v1";
     private const string SearchContentSignalSource = "catalog_keyword_v1";
     private const int BuyAgainRecentWindowDays = 30;
     private const string RecommendationSignalSourceHeader = "X-Recommendation-Signal-Source";
     private const string RecommendationFallbackReasonHeader = "X-Recommendation-Fallback-Reason";
+    private static readonly TimeSpan SessionAwareRerankBudget = TimeSpan.FromMilliseconds(40);
+    private static readonly TimeSpan SessionAwareRerankCancelAfter = TimeSpan.FromMilliseconds(35);
+    private static readonly string[] HomeCandidateSourceInterleavingOrder =
+    [
+        HomeMlCandidateSource,
+        HomeCollaborativeCandidateSource,
+        HomeContentCandidateSource
+    ];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISessionAwareRecommendationReranker _sessionAwareRecommendationReranker;
+    private readonly ISessionSignalService _sessionSignalService;
+    private readonly IRecommendationMetricsClient _recommendationMetricsClient;
+    private readonly IRecommendationExperimentService _recommendationExperimentService;
+    private readonly SessionAwareRecommendationOptions _sessionAwareRecommendationOptions;
 
     public BffCatalogController(IHttpClientFactory httpClientFactory)
+        : this(
+            httpClientFactory,
+            NoopSessionAwareRecommendationReranker.Instance,
+            NoopSessionSignalService.Instance,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    public BffCatalogController(
+        IHttpClientFactory httpClientFactory,
+        ISessionAwareRecommendationReranker sessionAwareRecommendationReranker)
+        : this(
+            httpClientFactory,
+            sessionAwareRecommendationReranker,
+            NoopSessionSignalService.Instance,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    public BffCatalogController(
+        IHttpClientFactory httpClientFactory,
+        ISessionAwareRecommendationReranker sessionAwareRecommendationReranker,
+        ISessionSignalService sessionSignalService)
+        : this(
+            httpClientFactory,
+            sessionAwareRecommendationReranker,
+            sessionSignalService,
+            NoopRecommendationMetricsClient.Instance,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    public BffCatalogController(
+        IHttpClientFactory httpClientFactory,
+        ISessionAwareRecommendationReranker sessionAwareRecommendationReranker,
+        ISessionSignalService sessionSignalService,
+        IRecommendationMetricsClient recommendationMetricsClient)
+        : this(
+            httpClientFactory,
+            sessionAwareRecommendationReranker,
+            sessionSignalService,
+            recommendationMetricsClient,
+            NoopRecommendationExperimentService.Instance)
+    {
+    }
+
+    public BffCatalogController(
+        IHttpClientFactory httpClientFactory,
+        ISessionAwareRecommendationReranker sessionAwareRecommendationReranker,
+        ISessionSignalService sessionSignalService,
+        IRecommendationMetricsClient recommendationMetricsClient,
+        IRecommendationExperimentService recommendationExperimentService)
+        : this(
+            httpClientFactory,
+            sessionAwareRecommendationReranker,
+            sessionSignalService,
+            recommendationMetricsClient,
+            recommendationExperimentService,
+            Microsoft.Extensions.Options.Options.Create(new SessionAwareRecommendationOptions()))
+    {
+    }
+
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public BffCatalogController(
+        IHttpClientFactory httpClientFactory,
+        ISessionAwareRecommendationReranker sessionAwareRecommendationReranker,
+        ISessionSignalService sessionSignalService,
+        IRecommendationMetricsClient recommendationMetricsClient,
+        IRecommendationExperimentService recommendationExperimentService,
+        IOptions<SessionAwareRecommendationOptions> sessionAwareRecommendationOptions)
     {
         _httpClientFactory = httpClientFactory;
+        _sessionAwareRecommendationReranker = sessionAwareRecommendationReranker;
+        _sessionSignalService = sessionSignalService;
+        _recommendationMetricsClient = recommendationMetricsClient;
+        _recommendationExperimentService = recommendationExperimentService;
+        _sessionAwareRecommendationOptions = sessionAwareRecommendationOptions.Value;
+    }
+
+    private sealed class NoopSessionAwareRecommendationReranker : ISessionAwareRecommendationReranker
+    {
+        public static readonly NoopSessionAwareRecommendationReranker Instance = new();
+
+        public Task<IReadOnlyList<SessionAwareRerankedProduct>> RerankAsync(
+            int userId,
+            IReadOnlyList<SessionAwareRecommendationCandidate> candidates,
+            SessionAwareRecommendationContext? context = null,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<SessionAwareRerankedProduct> results = candidates
+                .OrderByDescending(item => item.BaseScore)
+                .ThenBy(item => item.ProductId)
+                .Select(item => new SessionAwareRerankedProduct
+                {
+                    Product = item,
+                    BaseScore = item.BaseScore,
+                    FinalScore = item.BaseScore,
+                    SignalSource = "session_rerank_disabled"
+                })
+                .ToArray();
+
+            return Task.FromResult(results);
+        }
+    }
+
+    private sealed class NoopRecommendationExperimentService : IRecommendationExperimentService
+    {
+        public static readonly NoopRecommendationExperimentService Instance = new();
+
+        public string ResolveGroup(HttpContext httpContext, int? userId)
+        {
+            return RecommendationExperimentGroups.SessionRerank;
+        }
+    }
+
+    private sealed class NoopSessionSignalService : ISessionSignalService
+    {
+        public static readonly NoopSessionSignalService Instance = new();
+
+        public Task TrackSearchAsync(
+            int userId,
+            string keyword,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task TrackClickAsync(
+            int userId,
+            int productId,
+            int sellerId,
+            string? categoryName,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private void AttachAccessToken(HttpClient client)
@@ -73,6 +245,82 @@ public sealed class BffCatalogController : ControllerBase
     {
         return !string.IsNullOrWhiteSpace(Request.Headers.Authorization.ToString())
             || !string.IsNullOrWhiteSpace(HttpContext.Session.GetString(AccessTokenSessionKey));
+    }
+
+    private void TrackSearchSignalFireAndForget(string? keyword)
+    {
+        if (string.IsNullOrWhiteSpace(keyword) || ResolveRecommendationUserId() is not { } userId)
+        {
+            return;
+        }
+
+        _ = _sessionSignalService.TrackSearchAsync(userId, keyword, CancellationToken.None);
+    }
+
+    private void TrackProductClickSignalFireAndForget(
+        CatalogProductApiDto product,
+        int? recommendationPosition = null)
+    {
+        var userId = ResolveRecommendationUserId();
+        if (userId.HasValue)
+        {
+            _ = _sessionSignalService.TrackClickAsync(
+                userId.Value,
+                product.ProductId,
+                product.PrimarySellerId.GetValueOrDefault(),
+                product.CategoryName,
+                CancellationToken.None);
+        }
+
+        var normalizedRecommendationPosition = NormalizeRecommendationPosition(recommendationPosition);
+        if (normalizedRecommendationPosition.HasValue)
+        {
+            var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, userId);
+            _ = _recommendationMetricsClient.TrackClickAsync(
+                userId,
+                product.ProductId,
+                normalizedRecommendationPosition,
+                experimentGroup,
+                CancellationToken.None);
+        }
+    }
+
+    private void TrackHomeRecommendationImpressionsFireAndForget(
+        IReadOnlyList<RecommendationProductApiDto> rankedItems,
+        string experimentGroup)
+    {
+        if (rankedItems.Count == 0)
+        {
+            return;
+        }
+
+        var userId = ResolveRecommendationUserId();
+        var impressions = rankedItems
+            .Take(HomeRecommendationMetricImpressionLimit)
+            .Select((item, index) => new RecommendationMetricImpression(
+                item.ProductId,
+                index + 1,
+                ResolveRecommendationMetricSource(item),
+                experimentGroup))
+            .ToArray();
+
+        _ = _recommendationMetricsClient.TrackImpressionsAsync(
+            userId,
+            impressions,
+            CancellationToken.None);
+    }
+
+    private static string ResolveRecommendationMetricSource(RecommendationProductApiDto item)
+    {
+        var finalScore = item.FinalScore ?? item.RecommendationScore;
+        return Math.Abs(finalScore - item.RecommendationScore) > 0.0001d
+            ? "Session"
+            : "ML";
+    }
+
+    private static int? NormalizeRecommendationPosition(int? position)
+    {
+        return position is > 0 ? position.Value : null;
     }
 
     [HttpGet("products")]
@@ -277,6 +525,7 @@ public sealed class BffCatalogController : ControllerBase
         }
 
         var normalizedKeyword = (name ?? string.Empty).Trim();
+        TrackSearchSignalFireAndForget(normalizedKeyword);
         var effectiveSort = string.IsNullOrWhiteSpace(sort)
             ? normalizedPreset switch
             {
@@ -434,7 +683,10 @@ public sealed class BffCatalogController : ControllerBase
 
     [HttpGet("products/{id:int}")]
     [EnableRateLimiting("public-read")]
-    public async Task<IActionResult> GetProductById([FromRoute] int id)
+    public async Task<IActionResult> GetProductById(
+        [FromRoute] int id,
+        [FromQuery] int? recommendationPosition = null,
+        [FromQuery] int? position = null)
     {
         var loadResult = await LoadCatalogProductByIdAsync(id, "Chua ket noi duoc dich vu chi tiet san pham. Vui long thu lai sau.");
         if (loadResult.ErrorResult is not null)
@@ -447,6 +699,7 @@ public sealed class BffCatalogController : ControllerBase
             return CreateJsonContentResult(new { message = "Không tìm thấy sản phẩm." }, StatusCodes.Status404NotFound);
         }
 
+        TrackProductClickSignalFireAndForget(loadResult.Product, recommendationPosition ?? position);
         return CreateJsonContentResult(loadResult.Product);
     }
 
@@ -454,52 +707,131 @@ public sealed class BffCatalogController : ControllerBase
     [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetHomeRecommendations([FromQuery] int limit = 12)
     {
-        var loadResult = await LoadCatalogProductsAsync(
+        var normalizedLimit = Math.Clamp(limit, 1, 24);
+        var stableSessionId = await EnsureStableRecommendationSessionIdAsync();
+        var hasAuthenticatedRecommendationContext = HasAuthenticatedRecommendationContext();
+        var recommendationUserId = ResolveRecommendationUserId();
+        var experimentGroup = _recommendationExperimentService.ResolveGroup(HttpContext, recommendationUserId);
+
+        var contentCandidateTask = LoadCatalogProductsAsync(
             name: null,
             sellerId: null,
             categoryIds: null,
             origins: null,
             standards: null,
             units: null,
-            "Chua ket noi duoc dich vu goi y san pham. Vui long thu lai sau.");
+            "Chua ket noi duoc dich vu goi y san pham. Vui long thu lai sau.",
+            productIds: null,
+            maxItems: HomeContentCandidatePoolLimit);
+        var preferenceSeedTask = GetOrderingHomePreferenceSeedsAsync(stableSessionId, HomePreferenceSeedCandidatePoolLimit);
+        var collaborativeCandidateTask = GetOrderingHomeCollaborativeCandidatesAsync(stableSessionId, HomeCollaborativeCandidatePoolLimit);
+        var userProductScoreTask = hasAuthenticatedRecommendationContext
+            ? GetOrderingUserProductScoresAsync(productIds: null, HomeMlCandidatePoolLimit)
+            : Task.FromResult(new OrderingUserProductScoreResult());
+        var userCategoryScoreTask = hasAuthenticatedRecommendationContext
+            ? GetOrderingUserCategoryScoresAsync(categoryIds: null, 16)
+            : Task.FromResult(new OrderingUserCategoryScoreResult());
+        var userSellerScoreTask = hasAuthenticatedRecommendationContext
+            ? GetOrderingUserSellerScoresAsync(sellerIds: null, 24)
+            : Task.FromResult(new OrderingUserSellerScoreResult());
+
+        await Task.WhenAll(
+            contentCandidateTask,
+            preferenceSeedTask,
+            collaborativeCandidateTask,
+            userProductScoreTask,
+            userCategoryScoreTask,
+            userSellerScoreTask);
+
+        var loadResult = await contentCandidateTask;
 
         if (loadResult.ErrorResult is not null)
         {
             return loadResult.ErrorResult;
         }
 
-        var normalizedLimit = Math.Clamp(limit, 1, 24);
-        await EnrichCatalogProductsWithMerchantDataAsync(loadResult.Items);
-        var stableSessionId = await EnsureStableRecommendationSessionIdAsync();
-        var preferenceSeedResult = await GetOrderingHomePreferenceSeedsAsync(stableSessionId, 12);
-        var collaborativeCandidateResult = await GetOrderingHomeCollaborativeCandidatesAsync(stableSessionId, 24);
+        var preferenceSeedResult = await preferenceSeedTask;
+        var collaborativeCandidateResult = await collaborativeCandidateTask;
+        var userProductScoreResult = await userProductScoreTask;
+        var userCategoryScoreResult = await userCategoryScoreTask;
+        var userSellerScoreResult = await userSellerScoreTask;
         var preferenceSeeds = preferenceSeedResult.Seeds;
         var collaborativeCandidates = collaborativeCandidateResult.Candidates;
-        var hasAuthenticatedRecommendationContext = HasAuthenticatedRecommendationContext();
-        var userProductScoreResult = hasAuthenticatedRecommendationContext
-            ? await GetOrderingUserProductScoresAsync(loadResult.Items.Select(item => item.ProductId), 24)
-            : new OrderingUserProductScoreResult();
-        var userPurchaseSeedResult = hasAuthenticatedRecommendationContext
-            ? await GetOrderingUserProductScoresAsync(productIds: null, limit: 48)
-            : new OrderingUserProductScoreResult();
-        var userCategoryScoreResult = hasAuthenticatedRecommendationContext
-            ? await GetOrderingUserCategoryScoresAsync(loadResult.Items.Select(item => item.CategoryId), 16)
-            : new OrderingUserCategoryScoreResult();
-        var userSellerScoreResult = hasAuthenticatedRecommendationContext
-            ? await GetOrderingUserSellerScoresAsync(
-                loadResult.Items.Select(item => item.PrimarySellerId.GetValueOrDefault())
-                    .Where(id => id > 0),
-                24)
-            : new OrderingUserSellerScoreResult();
         var userProductScores = userProductScoreResult.Scores;
         var userCategoryScores = userCategoryScoreResult.Scores;
         var userSellerScores = userSellerScoreResult.Scores;
-        var purchaseHistorySeeds = BuildPurchaseHistorySeeds(preferenceSeeds, userPurchaseSeedResult.Scores);
-        var rankedItems = BuildHomeRecommendations(loadResult.Items, normalizedLimit, preferenceSeeds, collaborativeCandidates, userProductScores, userCategoryScores, userSellerScores);
+        var mlModelComputedAtUtc = userProductScoreResult.LatestComputedAtUtc;
+        var candidatePool = BuildHomeCandidatePool(
+            loadResult.Items,
+            collaborativeCandidates,
+            userProductScores,
+            HomeSessionAwareCandidatePoolLimit);
+        var candidateProductIds = candidatePool.Candidates
+            .Select(candidate => candidate.ProductId)
+            .ToArray();
+        var loadedContentCandidateIds = loadResult.Items
+            .Select(item => item.ProductId)
+            .ToHashSet();
+        var missingCandidateProductIds = candidateProductIds
+            .Where(productId => !loadedContentCandidateIds.Contains(productId))
+            .ToArray();
+        var missingCandidateResult = missingCandidateProductIds.Length == 0
+            ? new CatalogProductsLoadResult()
+            : await LoadCatalogProductsAsync(
+                name: null,
+                sellerId: null,
+                categoryIds: null,
+                origins: null,
+                standards: null,
+                units: null,
+                "Chua ket noi duoc dich vu goi y san pham. Vui long thu lai sau.",
+                productIds: missingCandidateProductIds,
+                maxItems: HomeSessionAwareCandidatePoolLimit);
+        if (missingCandidateResult.ErrorResult is not null)
+        {
+            return missingCandidateResult.ErrorResult;
+        }
+
+        var diversityPenaltySettings = CreateCandidateDiversityPenaltySettings(_sessionAwareRecommendationOptions);
+        var candidateMergeResult = MergeCatalogCandidateItems(
+            loadResult.Items,
+            missingCandidateResult.Items,
+            candidatePool.Candidates,
+            HomeSessionAwareCandidatePoolLimit,
+            diversityPenaltySettings);
+        var candidateItems = candidateMergeResult.Items;
+        await EnrichCatalogProductsWithMerchantDataAsync(candidateItems);
+        var candidateItemProductIds = candidateItems.Select(item => item.ProductId).ToHashSet();
+        var mlScoreHitCount = userProductScores.Keys.Count(candidateItemProductIds.Contains);
+        var mlSignalSource = mlScoreHitCount > 0 ? userProductScoreResult.SignalSource : null;
+        var purchaseHistorySeeds = BuildPurchaseHistorySeeds(preferenceSeeds, userProductScores);
+        var compactRankedItems = BuildHomeRecommendations(candidateItems, normalizedLimit, preferenceSeeds, collaborativeCandidates, userProductScores, userCategoryScores, userSellerScores);
+        SessionAwareHomeRerankResult sessionAwareRerankResult;
+        if (RecommendationExperimentGroups.IsSessionRerankEnabled(experimentGroup))
+        {
+            var sessionAwareCandidateLimit = Math.Min(
+                HomeSessionAwareCandidatePoolLimit,
+                Math.Max(normalizedLimit, candidateItems.Count));
+            var sessionAwareCandidates = sessionAwareCandidateLimit > normalizedLimit
+                ? BuildHomeRecommendations(candidateItems, sessionAwareCandidateLimit, preferenceSeeds, collaborativeCandidates, userProductScores, userCategoryScores, userSellerScores)
+                : compactRankedItems;
+            sessionAwareRerankResult = await ApplySessionAwareHomeRerankAsync(sessionAwareCandidates);
+        }
+        else
+        {
+            sessionAwareRerankResult = new SessionAwareHomeRerankResult(compactRankedItems, HasSessionEffect: false);
+        }
+        var rankedItems = sessionAwareRerankResult.HasSessionEffect
+            ? sessionAwareRerankResult.Items.Take(normalizedLimit).ToList()
+            : compactRankedItems;
+        if (!sessionAwareRerankResult.HasSessionEffect)
+        {
+            ApplyFallbackFinalScores(rankedItems);
+        }
         var hasPersonalSignals = preferenceSeeds.Count > 0 || collaborativeCandidates.Count > 0 || userProductScores.Count > 0 || userCategoryScores.Count > 0 || userSellerScores.Count > 0;
         var preferenceSignalSource = preferenceSeeds.Count > 0 ? preferenceSeedResult.SignalSource : null;
         var collaborativeSignalSource = collaborativeCandidates.Count > 0 ? collaborativeCandidateResult.SignalSource : null;
-        var overallSignalSource = BuildRecommendationSignalSource(preferenceSignalSource, collaborativeSignalSource);
+        var overallSignalSource = BuildRecommendationSignalSource(preferenceSignalSource, collaborativeSignalSource, mlSignalSource);
         var overallFallbackReason = BuildCompositeFallbackReason(
             ("preference", preferenceSeedResult.FallbackReason),
             ("collaborative", collaborativeCandidateResult.FallbackReason));
@@ -507,17 +839,17 @@ public sealed class BffCatalogController : ControllerBase
             ? await GetOrderingBasketAffinitiesAsync(
                 purchaseHistorySeeds.Values
                     .Where(seed => seed.ProductId > 0 && seed.PurchaseCount > 0)
-                    .OrderByDescending(seed => seed.PurchaseCount)
-                    .ThenByDescending(seed => seed.LastInteractedAtUtc ?? DateTime.MinValue)
-                    .Select(seed => seed.ProductId)
-                    .Take(4),
-                loadResult.Items.Select(item => item.ProductId),
+                .OrderByDescending(seed => seed.PurchaseCount)
+                .ThenByDescending(seed => seed.LastInteractedAtUtc ?? DateTime.MinValue)
+                .Select(seed => seed.ProductId)
+                .Take(4),
+                candidateItems.Select(item => item.ProductId),
                 24)
             : new OrderingBasketAffinityResult();
         var replenishmentProfileResult = hasAuthenticatedRecommendationContext
-            ? await GetOrderingReplenishmentProfilesAsync(loadResult.Items.Select(item => item.ProductId), 24)
+            ? await GetOrderingReplenishmentProfilesAsync(candidateItems.Select(item => item.ProductId), 24)
             : new OrderingReplenishmentProfileResult();
-        return Ok(new RecommendationCollectionApiDto
+        var responsePayload = new RecommendationCollectionApiDto
         {
             Placement = HomeRecommendationPlacement,
             Algorithm = hasPersonalSignals
@@ -530,6 +862,10 @@ public sealed class BffCatalogController : ControllerBase
             PreferenceFallbackReason = preferenceSeedResult.FallbackReason,
             CollaborativeSignalSource = collaborativeSignalSource,
             CollaborativeFallbackReason = collaborativeCandidateResult.FallbackReason,
+            MlSignalSource = mlSignalSource,
+            MlScoreHitCount = mlScoreHitCount,
+            MlModelComputedAtUtc = mlModelComputedAtUtc,
+            CandidateDiversity = candidateMergeResult.Stats,
             SignalBreakdown = new RecommendationSignalBreakdownDto
             {
                 Content = HomeContentSignalSource,
@@ -538,19 +874,210 @@ public sealed class BffCatalogController : ControllerBase
                 Preference = preferenceSignalSource,
                 PreferenceReason = preferenceSeedResult.FallbackReason,
                 Collaborative = collaborativeSignalSource,
-                CollaborativeReason = collaborativeCandidateResult.FallbackReason
+                CollaborativeReason = collaborativeCandidateResult.FallbackReason,
+                Ml = mlSignalSource
             },
             GeneratedAtUtc = DateTime.UtcNow,
             Items = rankedItems,
             Sections = BuildHomeRecommendationSections(
-                loadResult.Items,
+                candidateItems,
                 rankedItems,
                 purchaseHistorySeeds,
                 userSellerScores,
                 basketAffinityResult.Signals,
                 replenishmentProfileResult.Profiles,
                 hasPersonalSignals)
-        });
+        };
+
+        TrackHomeRecommendationImpressionsFireAndForget(rankedItems, experimentGroup);
+        return Ok(responsePayload);
+    }
+
+    [HttpGet("products/trending")]
+    [EnableRateLimiting("public-read")]
+    public async Task<IActionResult> GetTrendingProducts(
+        [FromQuery] int limit = 12,
+        [FromQuery] int[]? personalizedProductIds = null,
+        [FromQuery] int[]? excludeProductIds = null)
+    {
+        var normalizedLimit = Math.Clamp(limit, 1, 24);
+        var controlledOverlapProductIds = (personalizedProductIds ?? excludeProductIds ?? Array.Empty<int>())
+            .Where(productId => productId > 0)
+            .Distinct()
+            .Take(100)
+            .ToArray();
+
+        var loadResult = await LoadCatalogProductsAsync(
+            name: null,
+            sellerId: null,
+            categoryIds: null,
+            origins: null,
+            standards: null,
+            units: null,
+            "Chua ket noi duoc nguon san pham thinh hanh. Vui long thu lai sau.",
+            productIds: null,
+            maxItems: HomeContentCandidatePoolLimit);
+
+        if (loadResult.ErrorResult is not null)
+        {
+            return loadResult.ErrorResult;
+        }
+
+        var candidates = loadResult.Items
+            .Where(IsRecommendationCandidate)
+            .ToList();
+        await EnrichCatalogProductsWithMerchantDataAsync(candidates);
+
+        var trendingSelection = BuildTrendingProducts(candidates, normalizedLimit, controlledOverlapProductIds);
+        var responsePayload = new RecommendationCollectionApiDto
+        {
+            Placement = HomeTrendingPlacement,
+            Algorithm = HomeTrendingAlgorithm,
+            ContentSignalSource = HomeTrendingSignalSource,
+            SignalSource = HomeTrendingSignalSource,
+            GeneratedAtUtc = DateTime.UtcNow,
+            Items = trendingSelection.Items,
+            OverlapCount = trendingSelection.OverlapCount,
+            OverlapRatio = trendingSelection.OverlapRatio
+        };
+
+        return Ok(responsePayload);
+    }
+
+    [HttpGet("products/new-arrivals")]
+    [EnableRateLimiting("public-read")]
+    public async Task<IActionResult> GetNewArrivalsProducts(
+        [FromQuery] int limit = 12,
+        [FromQuery] int[]? excludeProductIds = null)
+    {
+        var normalizedLimit = Math.Clamp(limit, 12, 24);
+        var excludedIds = (excludeProductIds ?? Array.Empty<int>())
+            .Where(productId => productId > 0)
+            .Distinct()
+            .Take(100)
+            .ToHashSet();
+        var candidateLimit = Math.Clamp(normalizedLimit + excludedIds.Count + 24, normalizedLimit, HomeContentCandidatePoolLimit);
+
+        var loadResult = await LoadCatalogProductsAsync(
+            name: null,
+            sellerId: null,
+            categoryIds: null,
+            origins: null,
+            standards: null,
+            units: null,
+            "Chua ket noi duoc nguon san pham moi. Vui long thu lai sau.",
+            productIds: null,
+            maxItems: candidateLimit);
+
+        if (loadResult.ErrorResult is not null)
+        {
+            return loadResult.ErrorResult;
+        }
+
+        var candidates = loadResult.Items
+            .Where(IsRecommendationCandidate)
+            .Where(item => !excludedIds.Contains(item.ProductId))
+            .OrderByDescending(item => item.CreatedDate)
+            .ThenByDescending(item => item.ProductId)
+            .Take(normalizedLimit)
+            .ToList();
+        await EnrichCatalogProductsWithMerchantDataAsync(candidates);
+
+        var newArrivalItems = candidates
+            .Select(item => MapRecommendationProduct(
+                item,
+                CalculateNewArrivalScore(item),
+                BuildNewArrivalReason(item)))
+            .ToList();
+        var responsePayload = new RecommendationCollectionApiDto
+        {
+            Placement = HomeNewArrivalsPlacement,
+            Algorithm = HomeNewArrivalsAlgorithm,
+            ContentSignalSource = HomeNewArrivalsSignalSource,
+            SignalSource = HomeNewArrivalsSignalSource,
+            GeneratedAtUtc = DateTime.UtcNow,
+            Items = newArrivalItems
+        };
+
+        return Ok(responsePayload);
+    }
+
+    [HttpGet("products/best-sellers")]
+    [EnableRateLimiting("public-read")]
+    public async Task<IActionResult> GetBestSellersProducts(
+        [FromQuery] int limit = 12,
+        [FromQuery] int[]? excludeProductIds = null)
+    {
+        var normalizedLimit = Math.Clamp(limit, 12, 24);
+        var excludedIds = (excludeProductIds ?? Array.Empty<int>())
+            .Where(productId => productId > 0)
+            .Distinct()
+            .Take(100)
+            .ToHashSet();
+        var candidateLimit = Math.Clamp(normalizedLimit + excludedIds.Count + 64, normalizedLimit, HomeContentCandidatePoolLimit);
+
+        var loadResult = await LoadCatalogProductsAsync(
+            name: null,
+            sellerId: null,
+            categoryIds: null,
+            origins: null,
+            standards: null,
+            units: null,
+            "Chua ket noi duoc nguon san pham ban chay. Vui long thu lai sau.",
+            productIds: null,
+            maxItems: candidateLimit);
+
+        if (loadResult.ErrorResult is not null)
+        {
+            return loadResult.ErrorResult;
+        }
+
+        var recommendationCandidates = loadResult.Items
+            .Where(IsRecommendationCandidate)
+            .ToList();
+        var candidates = BuildBestSellerCandidates(recommendationCandidates, normalizedLimit, excludedIds);
+        if (candidates.Count == 0 && excludedIds.Count > 0)
+        {
+            candidates = BuildBestSellerCandidates(recommendationCandidates, normalizedLimit, new HashSet<int>());
+        }
+
+        await EnrichCatalogProductsWithMerchantDataAsync(candidates);
+
+        var bestSellerItems = candidates
+            .Select(item => MapRecommendationProduct(
+                item,
+                CalculateBestSellerScore(item),
+                BuildBestSellerReason(item)))
+            .ToList();
+        var responsePayload = new RecommendationCollectionApiDto
+        {
+            Placement = HomeBestSellersPlacement,
+            Algorithm = HomeBestSellersAlgorithm,
+            ContentSignalSource = HomeBestSellersSignalSource,
+            SignalSource = HomeBestSellersSignalSource,
+            GeneratedAtUtc = DateTime.UtcNow,
+            Items = bestSellerItems
+        };
+
+        return Ok(responsePayload);
+    }
+
+    private static List<CatalogProductApiDto> BuildBestSellerCandidates(
+        IEnumerable<CatalogProductApiDto> source,
+        int limit,
+        IReadOnlySet<int> excludedProductIds)
+    {
+        return source
+            .Where(item => !excludedProductIds.Contains(item.ProductId))
+            .Where(item => CalculateBestSellerRankingScore(item) > 0d)
+            .OrderByDescending(CalculateBestSellerRankingScore)
+            .ThenByDescending(item => item.RecentSoldCount)
+            .ThenByDescending(item => item.SoldCount)
+            .ThenByDescending(item => item.AverageRating)
+            .ThenByDescending(item => item.ReviewCount)
+            .ThenByDescending(item => item.ProductId)
+            .Take(limit)
+            .ToList();
     }
 
     private bool HasAuthenticatedRecommendationContext()
@@ -562,6 +1089,553 @@ public sealed class BffCatalogController : ControllerBase
 
         var token = HttpContext.Session.GetString(AccessTokenSessionKey);
         return !string.IsNullOrWhiteSpace(token);
+    }
+
+    private sealed record HomeCandidatePoolResult(IReadOnlyList<HomeCandidateScoreDto> Candidates);
+
+    private sealed record HomeCandidateMergeResult(
+        List<CatalogProductApiDto> Items,
+        HomeCandidateDiversityStatsDto Stats);
+
+    private sealed record HomeCandidateScoreDto(
+        int ProductId,
+        string Source,
+        double SourceWeight,
+        double RawScore,
+        double WeightedScore);
+
+    private sealed record HomeHydratedCandidateDto(
+        CatalogProductApiDto Item,
+        HomeCandidateScoreDto Candidate);
+
+    private sealed record HomeSoftRankedCandidateDto(
+        CatalogProductApiDto Item,
+        HomeCandidateScoreDto Candidate,
+        double SoftAdjustedScore,
+        double DiversityPenaltyMultiplier);
+
+    private sealed record TrendingSelectionResult(
+        List<RecommendationProductApiDto> Items,
+        int OverlapCount,
+        double OverlapRatio);
+
+    private sealed record HomeCandidateDiversityPenaltySettings(
+        double SellerAlpha,
+        double CategoryBeta,
+        double MinMultiplier);
+
+    private static HomeCandidatePoolResult BuildHomeCandidatePool(
+        IReadOnlyList<CatalogProductApiDto> contentCandidates,
+        IReadOnlyDictionary<int, OrderingHomeCollaborativeCandidateApiDto> collaborativeCandidates,
+        IReadOnlyDictionary<int, OrderingUserProductScoreApiDto> userProductScores,
+        int limit)
+    {
+        var cappedLimit = Math.Clamp(limit, 1, HomeSessionAwareCandidatePoolLimit);
+        var candidateByProductId = new Dictionary<int, HomeCandidateScoreDto>();
+        AddHomeCandidateScores(
+            candidateByProductId,
+            userProductScores.Values
+                .Where(score => score.ProductId > 0 && score.UserProductScore > 0d)
+                .OrderByDescending(score => score.UserProductScore)
+                .ThenByDescending(score => score.PurchaseCount)
+                .ThenByDescending(score => score.LastInteractedAtUtc ?? DateTime.MinValue)
+                .Select(score => (score.ProductId, RawScore: score.UserProductScore)),
+            HomeMlCandidateSource,
+            HomeMlCandidateWeight);
+        AddHomeCandidateScores(
+            candidateByProductId,
+            collaborativeCandidates.Values
+                .Where(candidate => candidate.ProductId > 0 && candidate.CollaborativeScore > 0d)
+                .OrderByDescending(candidate => candidate.CollaborativeScore)
+                .ThenByDescending(candidate => candidate.CoPurchaseOrderCount)
+                .ThenByDescending(candidate => candidate.CoClickSessionCount)
+                .Select(candidate => (candidate.ProductId, RawScore: candidate.CollaborativeScore)),
+            HomeCollaborativeCandidateSource,
+            HomeCollaborativeCandidateWeight);
+        AddHomeCandidateScores(
+            candidateByProductId,
+            contentCandidates
+                .Where(IsRecommendationCandidate)
+                .Select(item => new { item.ProductId, RawScore = CalculateHomeRecommendationScore(item), item.CreatedDate })
+                .Where(candidate => candidate.RawScore > 0d)
+                .OrderByDescending(candidate => candidate.RawScore)
+                .ThenByDescending(candidate => candidate.CreatedDate)
+                .Select(candidate => (candidate.ProductId, candidate.RawScore)),
+            HomeContentCandidateSource,
+            HomeContentCandidateWeight);
+
+        return new HomeCandidatePoolResult(InterleaveHomeCandidates(candidateByProductId.Values, cappedLimit));
+    }
+
+    private static IReadOnlyList<HomeCandidateScoreDto> InterleaveHomeCandidates(
+        IEnumerable<HomeCandidateScoreDto> candidates,
+        int limit)
+    {
+        var cappedLimit = Math.Clamp(limit, 1, HomeSessionAwareCandidatePoolLimit);
+        var queuesBySource = HomeCandidateSourceInterleavingOrder
+            .ToDictionary(
+                source => source,
+                source => new Queue<HomeCandidateScoreDto>(
+                    candidates
+                        .Where(candidate => string.Equals(candidate.Source, source, StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(candidate => candidate.WeightedScore)
+                        .ThenByDescending(candidate => candidate.SourceWeight)
+                        .ThenByDescending(candidate => candidate.RawScore)
+                        .ThenByDescending(candidate => candidate.ProductId)),
+                StringComparer.OrdinalIgnoreCase);
+        var interleaved = new List<HomeCandidateScoreDto>(cappedLimit);
+        while (interleaved.Count < cappedLimit && queuesBySource.Values.Any(queue => queue.Count > 0))
+        {
+            foreach (var source in HomeCandidateSourceInterleavingOrder)
+            {
+                if (interleaved.Count >= cappedLimit)
+                {
+                    break;
+                }
+
+                var queue = queuesBySource[source];
+                if (queue.Count == 0)
+                {
+                    continue;
+                }
+
+                interleaved.Add(queue.Dequeue());
+            }
+        }
+
+        return interleaved;
+    }
+
+    private static void AddHomeCandidateScores(
+        Dictionary<int, HomeCandidateScoreDto> candidateByProductId,
+        IEnumerable<(int ProductId, double RawScore)> candidates,
+        string source,
+        double sourceWeight)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (candidate.ProductId <= 0 || candidate.RawScore <= 0d)
+            {
+                continue;
+            }
+
+            var weightedScore = candidate.RawScore * sourceWeight;
+            var next = new HomeCandidateScoreDto(
+                candidate.ProductId,
+                source,
+                sourceWeight,
+                candidate.RawScore,
+                weightedScore);
+            if (!candidateByProductId.TryGetValue(candidate.ProductId, out var existing)
+                || next.WeightedScore > existing.WeightedScore
+                || (Math.Abs(next.WeightedScore - existing.WeightedScore) < double.Epsilon && next.SourceWeight > existing.SourceWeight))
+            {
+                candidateByProductId[candidate.ProductId] = next;
+            }
+        }
+    }
+
+    private static HomeCandidateMergeResult MergeCatalogCandidateItems(
+        IReadOnlyList<CatalogProductApiDto> contentCandidates,
+        IReadOnlyList<CatalogProductApiDto> signalCandidates,
+        IReadOnlyList<HomeCandidateScoreDto> candidateScores,
+        int limit,
+        HomeCandidateDiversityPenaltySettings diversityPenaltySettings)
+    {
+        var lookup = contentCandidates
+            .Concat(signalCandidates)
+            .Where(item => item.ProductId > 0)
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var cappedLimit = Math.Clamp(limit, 1, HomeSessionAwareCandidatePoolLimit);
+        var hydratedCandidates = new List<HomeHydratedCandidateDto>(Math.Min(candidateScores.Count, lookup.Count));
+        var missingDetailCount = 0;
+        foreach (var candidate in candidateScores)
+        {
+            if (!lookup.TryGetValue(candidate.ProductId, out var item))
+            {
+                missingDetailCount++;
+                continue;
+            }
+
+            hydratedCandidates.Add(new HomeHydratedCandidateDto(item, candidate));
+        }
+
+        var beforeDiversity = BuildCandidateDiversitySnapshot(hydratedCandidates.Take(cappedLimit));
+        var softRankedCandidates = ApplySoftDiversityInterleaving(
+            hydratedCandidates,
+            cappedLimit,
+            diversityPenaltySettings);
+        var merged = softRankedCandidates
+            .Select(candidate => candidate.Item)
+            .ToList();
+        var afterDiversity = BuildCandidateDiversitySnapshot(softRankedCandidates);
+
+        return new HomeCandidateMergeResult(
+            merged,
+            new HomeCandidateDiversityStatsDto
+            {
+                CandidateLimit = cappedLimit,
+                InputCandidateCount = candidateScores.Count,
+                UniqueProductCount = candidateScores.Select(candidate => candidate.ProductId).Distinct().Count(),
+                FinalCandidateCount = merged.Count,
+                MissingProductDetailCount = missingDetailCount,
+                DroppedBySellerCap = 0,
+                DroppedByCategoryCap = 0,
+                MaxItemsPerSeller = null,
+                MaxItemsPerCategory = null,
+                SellerDiversityAlpha = diversityPenaltySettings.SellerAlpha,
+                CategoryDiversityBeta = diversityPenaltySettings.CategoryBeta,
+                MinDiversityMultiplier = diversityPenaltySettings.MinMultiplier,
+                SoftPenaltyFormula = "score * max(minMultiplier, 1/(1 + alpha*sellerCount + beta*categoryCount))",
+                InterleavingOrder = HomeCandidateSourceInterleavingOrder,
+                SourceCounts = afterDiversity.SourceCounts,
+                SellerCounts = afterDiversity.SellerCounts,
+                CategoryCounts = afterDiversity.CategoryCounts,
+                BeforeSoftDiversity = beforeDiversity,
+                AfterSoftDiversity = afterDiversity,
+                ProductIds = merged.Select(item => item.ProductId).ToArray()
+            });
+    }
+
+    private static List<HomeSoftRankedCandidateDto> ApplySoftDiversityInterleaving(
+        IReadOnlyList<HomeHydratedCandidateDto> hydratedCandidates,
+        int limit,
+        HomeCandidateDiversityPenaltySettings diversityPenaltySettings)
+    {
+        var cappedLimit = Math.Clamp(limit, 1, HomeSessionAwareCandidatePoolLimit);
+        var remaining = hydratedCandidates
+            .GroupBy(candidate => candidate.Candidate.ProductId)
+            .Select(group => group.OrderByDescending(candidate => candidate.Candidate.WeightedScore).First())
+            .ToList();
+        var selected = new List<HomeSoftRankedCandidateDto>(Math.Min(cappedLimit, remaining.Count));
+        var sellerCounts = new Dictionary<int, int>();
+        var categoryCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        while (selected.Count < cappedLimit && remaining.Count > 0)
+        {
+            var pickedThisRound = false;
+            foreach (var source in HomeCandidateSourceInterleavingOrder)
+            {
+                if (selected.Count >= cappedLimit)
+                {
+                    break;
+                }
+
+                var bestCandidate = remaining
+                    .Where(candidate => string.Equals(candidate.Candidate.Source, source, StringComparison.OrdinalIgnoreCase))
+                    .Select(candidate => ScoreSoftDiversityCandidate(
+                        candidate,
+                        sellerCounts,
+                        categoryCounts,
+                        diversityPenaltySettings))
+                    .OrderByDescending(candidate => candidate.SoftAdjustedScore)
+                    .ThenByDescending(candidate => candidate.Candidate.WeightedScore)
+                    .ThenByDescending(candidate => candidate.Candidate.RawScore)
+                    .ThenByDescending(candidate => candidate.Candidate.ProductId)
+                    .FirstOrDefault();
+                if (bestCandidate is null)
+                {
+                    continue;
+                }
+
+                selected.Add(bestCandidate);
+                remaining.RemoveAll(candidate => candidate.Candidate.ProductId == bestCandidate.Candidate.ProductId);
+                if (bestCandidate.Item.PrimarySellerId.HasValue && bestCandidate.Item.PrimarySellerId.Value > 0)
+                {
+                    var sellerId = bestCandidate.Item.PrimarySellerId.Value;
+                    sellerCounts[sellerId] = sellerCounts.TryGetValue(sellerId, out var sellerCount) ? sellerCount + 1 : 1;
+                }
+
+                var categoryKey = GetCandidateCategoryKey(bestCandidate.Item);
+                categoryCounts[categoryKey] = categoryCounts.TryGetValue(categoryKey, out var categoryCount) ? categoryCount + 1 : 1;
+                pickedThisRound = true;
+            }
+
+            if (!pickedThisRound)
+            {
+                break;
+            }
+        }
+
+        return selected;
+    }
+
+    private static HomeSoftRankedCandidateDto ScoreSoftDiversityCandidate(
+        HomeHydratedCandidateDto candidate,
+        IReadOnlyDictionary<int, int> sellerCounts,
+        IReadOnlyDictionary<string, int> categoryCounts,
+        HomeCandidateDiversityPenaltySettings diversityPenaltySettings)
+    {
+        var sellerCount = candidate.Item.PrimarySellerId.HasValue && candidate.Item.PrimarySellerId.Value > 0
+            ? sellerCounts.GetValueOrDefault(candidate.Item.PrimarySellerId.Value)
+            : 0;
+        var categoryCount = categoryCounts.GetValueOrDefault(GetCandidateCategoryKey(candidate.Item));
+        var rawPenaltyMultiplier = 1d / (
+            1d
+            + (diversityPenaltySettings.SellerAlpha * sellerCount)
+            + (diversityPenaltySettings.CategoryBeta * categoryCount));
+        var penaltyMultiplier = Math.Max(diversityPenaltySettings.MinMultiplier, rawPenaltyMultiplier);
+        return new HomeSoftRankedCandidateDto(
+            candidate.Item,
+            candidate.Candidate,
+            candidate.Candidate.WeightedScore * penaltyMultiplier,
+            penaltyMultiplier);
+    }
+
+    private static HomeCandidateDiversityPenaltySettings CreateCandidateDiversityPenaltySettings(
+        SessionAwareRecommendationOptions options)
+    {
+        var sellerAlpha = Math.Clamp(options.CandidateSellerDiversityAlpha, 0d, 5d);
+        var categoryBeta = Math.Clamp(options.CandidateCategoryDiversityBeta, 0d, 5d);
+        var minMultiplier = Math.Clamp(options.CandidateDiversityMinMultiplier, 0.4d, 1d);
+
+        return new HomeCandidateDiversityPenaltySettings(sellerAlpha, categoryBeta, minMultiplier);
+    }
+
+    private static HomeCandidateDiversitySnapshotDto BuildCandidateDiversitySnapshot(
+        IEnumerable<HomeHydratedCandidateDto> candidates)
+        => BuildCandidateDiversitySnapshot(candidates.Select(candidate => (candidate.Item, candidate.Candidate)));
+
+    private static HomeCandidateDiversitySnapshotDto BuildCandidateDiversitySnapshot(
+        IEnumerable<HomeSoftRankedCandidateDto> candidates)
+        => BuildCandidateDiversitySnapshot(candidates.Select(candidate => (candidate.Item, candidate.Candidate)));
+
+    private static HomeCandidateDiversitySnapshotDto BuildCandidateDiversitySnapshot(
+        IEnumerable<(CatalogProductApiDto Item, HomeCandidateScoreDto Candidate)> candidates)
+    {
+        var materialized = candidates.ToList();
+        return new HomeCandidateDiversitySnapshotDto
+        {
+            CandidateCount = materialized.Count,
+            SourceCounts = materialized
+                .GroupBy(candidate => candidate.Candidate.Source, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase),
+            SellerCounts = materialized
+                .Where(candidate => candidate.Item.PrimarySellerId.HasValue && candidate.Item.PrimarySellerId.Value > 0)
+                .GroupBy(candidate => candidate.Item.PrimarySellerId!.Value)
+                .ToDictionary(
+                    group => group.Key.ToString(CultureInfo.InvariantCulture),
+                    group => group.Count(),
+                    StringComparer.OrdinalIgnoreCase),
+            CategoryCounts = materialized
+                .GroupBy(candidate => GetCandidateCategoryKey(candidate.Item), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase),
+            ProductIds = materialized.Select(candidate => candidate.Item.ProductId).ToArray()
+        };
+    }
+
+    private static string GetCandidateCategoryKey(CatalogProductApiDto item)
+        => string.IsNullOrWhiteSpace(item.CategoryName)
+            ? $"category-{item.CategoryId}"
+            : item.CategoryName.Trim();
+
+    private sealed record SessionAwareHomeRerankResult(
+        List<RecommendationProductApiDto> Items,
+        bool HasSessionEffect);
+
+    private async Task<SessionAwareHomeRerankResult> ApplySessionAwareHomeRerankAsync(
+        List<RecommendationProductApiDto> rankedItems)
+    {
+        if (rankedItems.Count == 0)
+        {
+            return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+        }
+
+        var userId = ResolveRecommendationUserId();
+        if (!userId.HasValue)
+        {
+            ApplyFallbackFinalScores(rankedItems);
+            return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+        }
+
+        var candidates = rankedItems
+            .Select(MapRecommendationProductToSessionCandidate)
+            .ToArray();
+        var rankedItemById = rankedItems.ToDictionary(item => item.ProductId);
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+            timeout.CancelAfter(SessionAwareRerankCancelAfter);
+            var reranked = await _sessionAwareRecommendationReranker
+                .RerankAsync(
+                    userId.Value,
+                    candidates,
+                    BuildSessionAwareRecommendationContext(rankedItems),
+                    timeout.Token)
+                .WaitAsync(SessionAwareRerankBudget, HttpContext.RequestAborted);
+
+            if (reranked.Count == 0)
+            {
+                ApplyFallbackFinalScores(rankedItems);
+                return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+            }
+
+            var hasSessionEffect = reranked.Any(result => result.AppliedSignals.Count > 0);
+            if (!hasSessionEffect)
+            {
+                ApplyFallbackFinalScores(rankedItems);
+                return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+            }
+
+            var ordered = new List<RecommendationProductApiDto>(rankedItems.Count);
+            var emittedIds = new HashSet<int>();
+            foreach (var result in reranked)
+            {
+                if (!rankedItemById.TryGetValue(result.Product.ProductId, out var item)
+                    || !emittedIds.Add(item.ProductId))
+                {
+                    continue;
+                }
+
+                item.FinalScore = result.FinalScore;
+                ordered.Add(item);
+            }
+
+            foreach (var item in rankedItems)
+            {
+                if (emittedIds.Add(item.ProductId))
+                {
+                    item.FinalScore ??= item.RecommendationScore;
+                    ordered.Add(item);
+                }
+            }
+
+            return new SessionAwareHomeRerankResult(ordered, HasSessionEffect: true);
+        }
+        catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            ApplyFallbackFinalScores(rankedItems);
+            return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+        }
+        catch (TimeoutException)
+        {
+            ApplyFallbackFinalScores(rankedItems);
+            return new SessionAwareHomeRerankResult(rankedItems, HasSessionEffect: false);
+        }
+    }
+
+    private int? ResolveRecommendationUserId()
+    {
+        var claimValue = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")
+            ?? User.FindFirstValue("userId")
+            ?? User.FindFirstValue("uid");
+        if (TryParsePositiveInt(claimValue, out var userId))
+        {
+            return userId;
+        }
+
+        var authHeader = Request.Headers.Authorization.ToString();
+        if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            var headerTokenUserId = ResolveRecommendationUserIdFromJwt(authHeader["Bearer ".Length..].Trim());
+            if (headerTokenUserId.HasValue)
+            {
+                return headerTokenUserId;
+            }
+        }
+
+        return ResolveRecommendationUserIdFromJwt(HttpContext.Session.GetString(AccessTokenSessionKey));
+    }
+
+    private static int? ResolveRecommendationUserIdFromJwt(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        try
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            var claimValue = jwt.Subject
+                ?? jwt.Claims.FirstOrDefault(claim =>
+                    string.Equals(claim.Type, ClaimTypes.NameIdentifier, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "sub", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "userId", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(claim.Type, "uid", StringComparison.OrdinalIgnoreCase))?.Value;
+
+            return TryParsePositiveInt(claimValue, out var userId) ? userId : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool TryParsePositiveInt(string? value, out int result)
+    {
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result) && result > 0;
+    }
+
+    private static void ApplyFallbackFinalScores(IEnumerable<RecommendationProductApiDto> items)
+    {
+        foreach (var item in items)
+        {
+            item.FinalScore ??= item.RecommendationScore;
+        }
+    }
+
+    private static SessionAwareRecommendationContext BuildSessionAwareRecommendationContext(
+        IReadOnlyCollection<RecommendationProductApiDto> items)
+    {
+        var nearbySellerIds = items
+            .Where(item => item.PrimarySellerId is > 0 && IsNearbyRecommendationCandidate(item))
+            .Select(item => item.PrimarySellerId!.Value)
+            .ToHashSet();
+
+        return new SessionAwareRecommendationContext
+        {
+            NearbySellerIds = nearbySellerIds
+        };
+    }
+
+    private static SessionAwareRecommendationCandidate MapRecommendationProductToSessionCandidate(
+        RecommendationProductApiDto item)
+    {
+        return new SessionAwareRecommendationCandidate
+        {
+            ProductId = item.ProductId,
+            ProductName = item.ProductName,
+            CategoryName = item.CategoryName,
+            Origin = item.Origin,
+            Standard = item.Standard,
+            PrimarySellerId = item.PrimarySellerId,
+            SellerShopName = item.SellerShopName,
+            SellerAddressSummary = item.SellerAddressSummary,
+            AvailableStock = item.AvailableStock,
+            BaseScore = item.RecommendationScore,
+            IsNearbyShop = IsNearbyRecommendationCandidate(item),
+            SearchableTerms = BuildSessionAwareSearchableTerms(item)
+        };
+    }
+
+    private static IReadOnlyCollection<string> BuildSessionAwareSearchableTerms(
+        RecommendationProductApiDto item)
+    {
+        return new[]
+            {
+                item.ProductName,
+                item.CategoryName,
+                item.Origin,
+                item.Standard,
+                item.SellerShopName,
+                item.Preservation,
+                item.Weight,
+                item.RecommendationReason
+            }
+            .Concat(item.RecommendationTags)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static bool IsNearbyRecommendationCandidate(RecommendationProductApiDto item)
+    {
+        return HasFastReorderDeliverySignal(item.SellerAddressSummary)
+            || IsOriginAlignedWithSellerRegion(item);
     }
 
     private async Task<string> EnsureStableRecommendationSessionIdAsync()
@@ -874,6 +1948,7 @@ public sealed class BffCatalogController : ControllerBase
         public int ReviewCount { get; set; }
         public List<CatalogProductInfoApiDto>? ProductInfos { get; set; }
         public List<CatalogProductAttributeApiDto>? ProductAttributes { get; set; }
+        public int RecentSoldCount { get; set; }
     }
 
     private sealed class CatalogProductInfoApiDto
@@ -898,6 +1973,7 @@ public sealed class BffCatalogController : ControllerBase
         public int ProductId { get; set; }
         public decimal AverageRating { get; set; }
         public int ReviewCount { get; set; }
+        public int RecentSoldCount { get; set; }
         public int SoldCount { get; set; }
     }
 
@@ -939,11 +2015,50 @@ public sealed class BffCatalogController : ControllerBase
         public string? PreferenceFallbackReason { get; set; }
         public string? CollaborativeSignalSource { get; set; }
         public string? CollaborativeFallbackReason { get; set; }
+        public string? MlSignalSource { get; set; }
+        public int MlScoreHitCount { get; set; }
+        public DateTime? MlModelComputedAtUtc { get; set; }
+        public HomeCandidateDiversityStatsDto? CandidateDiversity { get; set; }
         public RecommendationSignalBreakdownDto? SignalBreakdown { get; set; }
         public DateTime GeneratedAtUtc { get; set; }
         public int? SeedProductId { get; set; }
+        public int OverlapCount { get; set; }
+        public double OverlapRatio { get; set; }
         public List<RecommendationProductApiDto> Items { get; set; } = new();
         public List<RecommendationSectionApiDto> Sections { get; set; } = new();
+    }
+
+    private sealed class HomeCandidateDiversityStatsDto
+    {
+        public int CandidateLimit { get; set; }
+        public int InputCandidateCount { get; set; }
+        public int UniqueProductCount { get; set; }
+        public int FinalCandidateCount { get; set; }
+        public int MissingProductDetailCount { get; set; }
+        public int DroppedBySellerCap { get; set; }
+        public int DroppedByCategoryCap { get; set; }
+        public int? MaxItemsPerSeller { get; set; }
+        public int? MaxItemsPerCategory { get; set; }
+        public double SellerDiversityAlpha { get; set; }
+        public double CategoryDiversityBeta { get; set; }
+        public double MinDiversityMultiplier { get; set; }
+        public string SoftPenaltyFormula { get; set; } = string.Empty;
+        public string[] InterleavingOrder { get; set; } = Array.Empty<string>();
+        public Dictionary<string, int> SourceCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> SellerCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> CategoryCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public HomeCandidateDiversitySnapshotDto? BeforeSoftDiversity { get; set; }
+        public HomeCandidateDiversitySnapshotDto? AfterSoftDiversity { get; set; }
+        public int[] ProductIds { get; set; } = Array.Empty<int>();
+    }
+
+    private sealed class HomeCandidateDiversitySnapshotDto
+    {
+        public int CandidateCount { get; set; }
+        public Dictionary<string, int> SourceCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> SellerCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> CategoryCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public int[] ProductIds { get; set; } = Array.Empty<int>();
     }
 
     private sealed class RecommendationSectionApiDto
@@ -1007,6 +2122,7 @@ public sealed class BffCatalogController : ControllerBase
         public string? PreferenceReason { get; set; }
         public string? Collaborative { get; set; }
         public string? CollaborativeReason { get; set; }
+        public string? Ml { get; set; }
     }
 
     private sealed class SearchRankingSignalBreakdownDto
@@ -1033,16 +2149,30 @@ public sealed class BffCatalogController : ControllerBase
         public int? PrimarySellerId { get; set; }
         public string? SellerShopName { get; set; }
         public string? SellerAddressSummary { get; set; }
+        public DateTime CreatedAt { get; set; }
         public decimal AverageRating { get; set; }
         public int SoldCount { get; set; }
+        public int RecentSoldCount { get; set; }
         public int ReviewCount { get; set; }
         public int AvailableStock { get; set; }
         public double RecommendationScore { get; set; }
+        [JsonPropertyName("final_score")]
+        public double? FinalScore { get; set; }
         public string RecommendationReason { get; set; } = string.Empty;
         public string[] RecommendationTags { get; set; } = Array.Empty<string>();
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
-    private sealed class OrderingHomePreferenceSeedApiDto
+    private interface ISeasonalitySignalApiDto
+    {
+        double? SeasonalityScore { get; }
+        string? SeasonalityLabel { get; }
+        string? SeasonalityBadgeLabel { get; }
+    }
+
+    private sealed class OrderingHomePreferenceSeedApiDto : ISeasonalitySignalApiDto
     {
         public int ProductId { get; set; }
         public int ViewCount { get; set; }
@@ -1051,15 +2181,21 @@ public sealed class BffCatalogController : ControllerBase
         public int PurchaseCount { get; set; }
         public double PreferenceScore { get; set; }
         public DateTime? LastInteractedAtUtc { get; set; }
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
-    private sealed class OrderingHomeCollaborativeCandidateApiDto
+    private sealed class OrderingHomeCollaborativeCandidateApiDto : ISeasonalitySignalApiDto
     {
         public int ProductId { get; set; }
         public int CoPurchaseOrderCount { get; set; }
         public int CoViewSessionCount { get; set; }
         public int CoClickSessionCount { get; set; }
         public double CollaborativeScore { get; set; }
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     private sealed class OrderingUserProductScoreApiDto
@@ -1072,6 +2208,7 @@ public sealed class BffCatalogController : ControllerBase
         public int PurchaseCount { get; set; }
         public double UserProductScore { get; set; }
         public DateTime? LastInteractedAtUtc { get; set; }
+        public DateTime? ComputedAtUtc { get; set; }
     }
 
     private sealed class OrderingUserSellerScoreApiDto
@@ -1142,6 +2279,8 @@ public sealed class BffCatalogController : ControllerBase
     private sealed class OrderingUserProductScoreResult
     {
         public IReadOnlyDictionary<int, OrderingUserProductScoreApiDto> Scores { get; init; } = new Dictionary<int, OrderingUserProductScoreApiDto>();
+        public string? SignalSource { get; init; }
+        public DateTime? LatestComputedAtUtc { get; init; }
     }
 
     private sealed class OrderingBasketAffinityResult
@@ -1259,12 +2398,14 @@ public sealed class BffCatalogController : ControllerBase
         IEnumerable<string>? origins,
         IEnumerable<string>? standards,
         IEnumerable<string>? units,
-        string unavailableMessage)
+        string unavailableMessage,
+        IEnumerable<int>? productIds = null,
+        int? maxItems = null)
     {
         var client = _httpClientFactory.CreateClient("Catalog");
         AttachAccessToken(client);
 
-        var url = BuildCatalogProductsUrl(name, sellerId, categoryIds, origins, standards, units);
+        var url = BuildCatalogProductsUrl(name, sellerId, productIds, categoryIds, origins, standards, units, maxItems);
         HttpResponseMessage response;
         try
         {
@@ -1356,10 +2497,12 @@ public sealed class BffCatalogController : ControllerBase
     private static string BuildCatalogProductsUrl(
         string? name,
         int? sellerId,
+        IEnumerable<int>? productIds,
         IEnumerable<int>? categoryIds,
         IEnumerable<string>? origins,
         IEnumerable<string>? standards,
-        IEnumerable<string>? units)
+        IEnumerable<string>? units,
+        int? maxItems)
     {
         var query = new List<string>();
         if (!string.IsNullOrWhiteSpace(name))
@@ -1370,6 +2513,11 @@ public sealed class BffCatalogController : ControllerBase
         if (sellerId.HasValue && sellerId.Value > 0)
         {
             query.Add($"sellerId={sellerId.Value}");
+        }
+
+        foreach (var productId in (productIds ?? Array.Empty<int>()).Where(id => id > 0).Distinct().Take(HomeSessionAwareCandidatePoolLimit))
+        {
+            query.Add($"productIds={productId}");
         }
 
         foreach (var categoryId in (categoryIds ?? Array.Empty<int>()).Where(id => id > 0).Distinct())
@@ -1399,6 +2547,11 @@ public sealed class BffCatalogController : ControllerBase
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             query.Add($"units={Uri.EscapeDataString(unit)}");
+        }
+
+        if (maxItems.HasValue)
+        {
+            query.Add($"limit={Math.Clamp(maxItems.Value, 1, HomeSessionAwareCandidatePoolLimit)}");
         }
 
         return query.Count == 0 ? "/api/products" : "/api/products?" + string.Join("&", query);
@@ -1460,7 +2613,7 @@ public sealed class BffCatalogController : ControllerBase
                     LongTermPreferenceProfileBoost = longTermPreferenceProfileBoost,
                     LongTermSellerBoost = longTermSellerBoost,
                     RecentSellerBoost = recentSellerBoost,
-                Score = entry.BaseScore
+                    Score = entry.BaseScore
                     + (entry.Match?.Score ?? 0d)
                     + (entry.CollaborativeCandidate?.CollaborativeScore ?? 0d)
                     + (entry.UserProductScore?.UserProductScore ?? 0d)
@@ -1526,7 +2679,8 @@ public sealed class BffCatalogController : ControllerBase
                     entry.Item.PrimarySellerId.HasValue && userSellerScores.TryGetValue(entry.Item.PrimarySellerId.Value, out var userSellerScore)
                         ? userSellerScore
                         : null,
-                    longTermPreferenceProfile)));
+                    longTermPreferenceProfile),
+                PickSeasonalitySignal(entry.Match?.Signal, entry.CollaborativeCandidate)));
             if (selected.Count >= limit)
             {
                 EnsureLongTermDiscoveryCandidate(selected, scoredItems, userSellerScores, longTermPreferenceProfile, limit);
@@ -1559,7 +2713,8 @@ public sealed class BffCatalogController : ControllerBase
                     entry.Item.PrimarySellerId.HasValue && userSellerScores.TryGetValue(entry.Item.PrimarySellerId.Value, out var userSellerScore)
                         ? userSellerScore
                         : null,
-                    longTermPreferenceProfile)));
+                    longTermPreferenceProfile),
+                PickSeasonalitySignal(entry.Match?.Signal, entry.CollaborativeCandidate)));
             if (selected.Count >= limit)
             {
                 break;
@@ -1571,6 +2726,344 @@ public sealed class BffCatalogController : ControllerBase
         EnsureFavoriteSellerDiscoveryCandidate(selected, scoredItems, userSellerScores, longTermPreferenceProfile, limit);
 
         return selected;
+    }
+
+    private static List<RecommendationProductApiDto> BuildTrendingProducts(
+        IReadOnlyList<CatalogProductApiDto> items,
+        int limit)
+    {
+        return BuildTrendingProducts(items, limit, Array.Empty<int>()).Items;
+    }
+
+    private static TrendingSelectionResult BuildTrendingProducts(
+        IReadOnlyList<CatalogProductApiDto> items,
+        int limit,
+        IReadOnlyCollection<int> personalizedProductIds)
+    {
+        var cappedLimit = Math.Clamp(limit, 1, 24);
+        var candidates = items
+            .Where(IsRecommendationCandidate)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return new TrendingSelectionResult(new List<RecommendationProductApiDto>(), 0, 0d);
+        }
+
+        var queuesBySource = new Dictionary<string, Queue<CatalogProductApiDto>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["top_sold"] = new Queue<CatalogProductApiDto>(
+                candidates
+                    .OrderByDescending(item => item.SoldCount)
+                    .ThenByDescending(item => item.AverageRating)
+                    .ThenByDescending(item => item.ReviewCount)
+                    .ThenByDescending(item => item.ProductId)),
+            ["top_rated"] = new Queue<CatalogProductApiDto>(
+                candidates
+                    .OrderByDescending(item => item.AverageRating)
+                    .ThenByDescending(item => item.ReviewCount)
+                    .ThenByDescending(item => item.SoldCount)
+                    .ThenByDescending(item => item.ProductId)),
+            ["recent_popular"] = new Queue<CatalogProductApiDto>(
+                candidates
+                    .OrderByDescending(CalculateRecentPopularScore)
+                    .ThenByDescending(item => item.CreatedDate)
+                    .ThenByDescending(item => item.ProductId))
+        };
+
+        var queuedIds = new HashSet<int>();
+        var orderedTrendingCandidates = new List<RecommendationProductApiDto>(candidates.Count);
+        while (orderedTrendingCandidates.Count < candidates.Count && queuesBySource.Values.Any(queue => queue.Count > 0))
+        {
+            var pickedThisRound = false;
+            foreach (var source in queuesBySource.Keys)
+            {
+                if (orderedTrendingCandidates.Count >= candidates.Count)
+                {
+                    break;
+                }
+
+                var queue = queuesBySource[source];
+                while (queue.Count > 0)
+                {
+                    var item = queue.Dequeue();
+                    if (!queuedIds.Add(item.ProductId))
+                    {
+                        continue;
+                    }
+
+                    orderedTrendingCandidates.Add(MapRecommendationProduct(
+                        item,
+                        CalculateTrendingScore(item, source),
+                        BuildTrendingReason(item, source)));
+                    pickedThisRound = true;
+                    break;
+                }
+            }
+
+            if (!pickedThisRound)
+            {
+                break;
+            }
+        }
+
+        return SelectTrendingWithControlledOverlap(
+            orderedTrendingCandidates,
+            personalizedProductIds,
+            cappedLimit);
+    }
+
+    private static TrendingSelectionResult SelectTrendingWithControlledOverlap(
+        IReadOnlyList<RecommendationProductApiDto> trendingCandidates,
+        IReadOnlyCollection<int> personalizedProductIds,
+        int limitTrending)
+    {
+        var cappedLimit = Math.Clamp(limitTrending, 1, 24);
+        var personalizedIds = personalizedProductIds
+            .Where(productId => productId > 0)
+            .ToHashSet();
+        var selected = new List<RecommendationProductApiDto>(Math.Min(cappedLimit, trendingCandidates.Count));
+        var deferredOverlap = new List<RecommendationProductApiDto>();
+        var selectedIds = new HashSet<int>();
+        var overlapCount = 0;
+
+        foreach (var candidate in trendingCandidates)
+        {
+            if (candidate.ProductId <= 0 || !selectedIds.Add(candidate.ProductId))
+            {
+                continue;
+            }
+
+            if (personalizedIds.Contains(candidate.ProductId))
+            {
+                deferredOverlap.Add(candidate);
+                continue;
+            }
+
+            selected.Add(candidate);
+            if (selected.Count >= cappedLimit)
+            {
+                return new TrendingSelectionResult(selected, 0, 0d);
+            }
+        }
+
+        var maxOverlap = Math.Max(0, (int)Math.Floor(cappedLimit * 0.30d));
+        var targetOverlap = Math.Max(0, (int)Math.Floor(cappedLimit * 0.20d));
+        var overlapLimit = Math.Min(
+            maxOverlap,
+            Math.Max(targetOverlap, cappedLimit - selected.Count));
+
+        foreach (var candidate in deferredOverlap)
+        {
+            if (selected.Count >= cappedLimit || overlapCount >= overlapLimit)
+            {
+                break;
+            }
+
+            selected.Add(candidate);
+            overlapCount++;
+        }
+
+        if (selected.Count < cappedLimit)
+        {
+            foreach (var candidate in deferredOverlap.Skip(overlapCount))
+            {
+                if (selected.Count >= cappedLimit)
+                {
+                    break;
+                }
+
+                selected.Add(candidate);
+                overlapCount++;
+            }
+        }
+
+        var overlapRatio = cappedLimit <= 0
+            ? 0d
+            : Math.Round(overlapCount / (double)cappedLimit, 4);
+        return new TrendingSelectionResult(selected, overlapCount, overlapRatio);
+    }
+
+    private static double CalculateTrendingScore(CatalogProductApiDto item, string source)
+    {
+        var score = source switch
+        {
+            "top_sold" => Math.Log10(item.SoldCount + 1) * 42d,
+            "top_rated" => (double)item.AverageRating * 22d + Math.Log10(item.ReviewCount + 1) * 14d,
+            "recent_popular" => CalculateRecentPopularScore(item),
+            _ => 0d
+        };
+
+        score += item.AvailableStock switch
+        {
+            > 20 => 10d,
+            > 0 => 6d,
+            _ => -20d
+        };
+
+        return Math.Round(score, 2);
+    }
+
+    private static double CalculateNewArrivalScore(CatalogProductApiDto item)
+    {
+        var ageDays = Math.Max(0d, (DateTime.UtcNow - item.CreatedDate).TotalDays);
+        var recencyScore = Math.Max(0d, 30d - Math.Min(ageDays, 30d));
+        var score = recencyScore
+            + Math.Log10(item.AvailableStock + 1) * 8d
+            + (double)item.AverageRating * 4d
+            + Math.Log10(item.SoldCount + 1) * 4d;
+
+        return Math.Round(score, 2);
+    }
+
+    private static double CalculateBestSellerScore(CatalogProductApiDto item)
+    {
+        var score = CalculateBestSellerRankingScore(item) * 10d
+            + (double)item.AverageRating * 6d
+            + Math.Log10(item.ReviewCount + 1) * 6d;
+
+        if (item.AvailableStock > 20)
+        {
+            score += 8d;
+        }
+        else if (item.AvailableStock > 0)
+        {
+            score += 4d;
+        }
+
+        return Math.Round(score, 2);
+    }
+
+    private static double CalculateBestSellerRankingScore(CatalogProductApiDto item)
+    {
+        return (item.RecentSoldCount * 0.7d) + (item.SoldCount * 0.3d);
+    }
+
+    private static RecommendationReasonDto BuildBestSellerReason(CatalogProductApiDto item)
+    {
+        var tags = new List<string>(4) { "Bán chạy" };
+        if (item.RecentSoldCount > 0)
+        {
+            tags.Add($"{item.RecentSoldCount} lượt bán gần đây");
+        }
+
+        if (item.SoldCount > 0)
+        {
+            tags.Add($"{item.SoldCount} lượt bán tổng");
+        }
+
+        if (item.AverageRating >= 4m)
+        {
+            tags.Add($"{item.AverageRating:0.#}/5 sao");
+        }
+        else if (item.ReviewCount > 0)
+        {
+            tags.Add($"{item.ReviewCount} đánh giá");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.CategoryName))
+        {
+            tags.Add(item.CategoryName);
+        }
+
+        return new RecommendationReasonDto
+        {
+            Text = string.Join(" · ", tags.Take(3)),
+            Tags = tags.Take(3).ToArray()
+        };
+    }
+
+    private static RecommendationReasonDto BuildNewArrivalReason(CatalogProductApiDto item)
+    {
+        var tags = new List<string>(4) { "Hàng mới về" };
+        var ageDays = Math.Max(0d, (DateTime.UtcNow - item.CreatedDate).TotalDays);
+        if (ageDays < 1d)
+        {
+            tags.Add("Vừa cập nhật hôm nay");
+        }
+        else if (ageDays <= 7d)
+        {
+            tags.Add("Mới trong tuần");
+        }
+        else if (ageDays <= 30d)
+        {
+            tags.Add("Mới trong tháng");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.CategoryName))
+        {
+            tags.Add(item.CategoryName);
+        }
+
+        if (item.AvailableStock > 0)
+        {
+            tags.Add("Còn hàng");
+        }
+
+        return new RecommendationReasonDto
+        {
+            Text = string.Join(" · ", tags.Take(3)),
+            Tags = tags.Take(3).ToArray()
+        };
+    }
+
+    private static double CalculateRecentPopularScore(CatalogProductApiDto item)
+    {
+        var ageDays = Math.Max(0d, (DateTime.UtcNow - item.CreatedDate).TotalDays);
+        var recencyScore = Math.Max(0d, 30d - Math.Min(ageDays, 30d));
+        return recencyScore
+            + Math.Log10(item.SoldCount + 1) * 18d
+            + (double)item.AverageRating * 8d
+            + Math.Log10(item.ReviewCount + 1) * 6d;
+    }
+
+    private static RecommendationReasonDto BuildTrendingReason(CatalogProductApiDto item, string source)
+    {
+        var tags = new List<string>(4);
+        switch (source)
+        {
+            case "top_sold":
+                tags.Add("Bán chạy");
+                if (item.SoldCount > 0)
+                {
+                    tags.Add($"{item.SoldCount} lượt bán");
+                }
+                break;
+            case "top_rated":
+                tags.Add("Đánh giá cao");
+                if (item.AverageRating > 0)
+                {
+                    tags.Add($"{item.AverageRating:0.#}/5 sao");
+                }
+                break;
+            case "recent_popular":
+                tags.Add("Đang được quan tâm");
+                if (item.CreatedDate >= DateTime.UtcNow.AddDays(-30))
+                {
+                    tags.Add("Mới gần đây");
+                }
+                break;
+        }
+
+        if (item.ReviewCount > 0 && !tags.Any(tag => tag.Contains("sao", StringComparison.OrdinalIgnoreCase)))
+        {
+            tags.Add($"{item.ReviewCount} đánh giá");
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.CategoryName))
+        {
+            tags.Add(item.CategoryName);
+        }
+
+        if (tags.Count == 0)
+        {
+            tags.Add("Xu hướng chung");
+        }
+
+        return new RecommendationReasonDto
+        {
+            Text = string.Join(" · ", tags.Take(3)),
+            Tags = tags.Take(3).ToArray()
+        };
     }
 
     private static void EnsureLongTermDiscoveryCandidate(
@@ -1619,7 +3112,8 @@ public sealed class BffCatalogController : ControllerBase
                 discoveryCandidate.Item.PrimarySellerId.HasValue && userSellerScores.TryGetValue(discoveryCandidate.Item.PrimarySellerId.Value, out var userSellerScore)
                     ? userSellerScore
                     : null,
-                longTermPreferenceProfile));
+                longTermPreferenceProfile),
+            PickSeasonalitySignal(discoveryCandidate.Match?.Signal, discoveryCandidate.CollaborativeCandidate));
 
         if (selected.Count < limit)
         {
@@ -1682,7 +3176,8 @@ public sealed class BffCatalogController : ControllerBase
                 recentSellerCandidate.Item.PrimarySellerId.HasValue && userSellerScores.TryGetValue(recentSellerCandidate.Item.PrimarySellerId.Value, out var userSellerScore)
                     ? userSellerScore
                     : null,
-                longTermPreferenceProfile));
+                longTermPreferenceProfile),
+            PickSeasonalitySignal(recentSellerCandidate.Match?.Signal, recentSellerCandidate.CollaborativeCandidate));
 
         if (selected.Count < limit)
         {
@@ -1753,7 +3248,8 @@ public sealed class BffCatalogController : ControllerBase
                 favoriteSellerCandidate.Item.PrimarySellerId.HasValue && userSellerScores.TryGetValue(favoriteSellerCandidate.Item.PrimarySellerId.Value, out var userSellerScore)
                     ? userSellerScore
                     : null,
-                longTermPreferenceProfile));
+                longTermPreferenceProfile),
+            PickSeasonalitySignal(favoriteSellerCandidate.Match?.Signal, favoriteSellerCandidate.CollaborativeCandidate));
 
         if (selected.Count < limit)
         {
@@ -1820,9 +3316,9 @@ public sealed class BffCatalogController : ControllerBase
             Id = hasPersonalSignals ? "for_you" : "today_highlights",
             Title = hasPersonalSignals ? "Dành cho bạn" : "Gợi ý cho bạn hôm nay",
             Subtitle = hasPersonalSignals
-                ? "Dựa trên sản phẩm bạn vừa xem, tìm kiếm và chọn gần đây."
+                ? "Những món phù hợp hôm nay."
                 : "Chọn từ danh sách nổi bật, đúng mùa và hợp xu hướng hôm nay.",
-            PillLabel = hasPersonalSignals ? "Cá nhân hóa" : "Nổi bật hôm nay",
+            PillLabel = hasPersonalSignals ? "Gợi ý hợp gu" : "Nổi bật hôm nay",
             Items = primaryItems
         });
 
@@ -2843,13 +4339,17 @@ public sealed class BffCatalogController : ControllerBase
             ReviewCount = source.ReviewCount,
             AvailableStock = source.AvailableStock,
             RecommendationScore = source.RecommendationScore,
+            FinalScore = source.FinalScore,
             RecommendationReason = recommendationReason,
             RecommendationTags = recommendationTags
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .Select(tag => tag.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Take(6)
-                .ToArray()
+                .ToArray(),
+            SeasonalityScore = source.SeasonalityScore,
+            SeasonalityLabel = source.SeasonalityLabel,
+            SeasonalityBadgeLabel = source.SeasonalityBadgeLabel
         };
     }
 
@@ -3041,7 +4541,8 @@ public sealed class BffCatalogController : ControllerBase
             selected.Add(MapRecommendationProduct(
                 entry.Item,
                 entry.Score,
-                BuildSimilarRecommendationReason(seedProduct, entry.Item, entry.CollaborativeSignal, entry.UserCategoryScore, entry.UserSellerScore)));
+                BuildSimilarRecommendationReason(seedProduct, entry.Item, entry.CollaborativeSignal, entry.UserCategoryScore, entry.UserSellerScore),
+                entry.CollaborativeSignal));
             if (selected.Count >= limit)
             {
                 return selected;
@@ -3066,7 +4567,8 @@ public sealed class BffCatalogController : ControllerBase
             selected.Add(MapRecommendationProduct(
                 entry.Item,
                 entry.Score,
-                BuildSimilarRecommendationReason(seedProduct, entry.Item, entry.CollaborativeSignal, entry.UserCategoryScore, entry.UserSellerScore)));
+                BuildSimilarRecommendationReason(seedProduct, entry.Item, entry.CollaborativeSignal, entry.UserCategoryScore, entry.UserSellerScore),
+                entry.CollaborativeSignal));
             IncrementSellerCount(sellerCounts, entry.Item.PrimarySellerId);
             IncrementOriginCount(originCounts, remainingOriginKey);
             if (selected.Count >= limit)
@@ -3612,7 +5114,7 @@ public sealed class BffCatalogController : ControllerBase
         }
 
         var categoryScores = new Dictionary<int, double>();
-        var categoryLabels = new Dictionary<int, string>( );
+        var categoryLabels = new Dictionary<int, string>();
         var originScores = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         var originLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -3896,8 +5398,16 @@ public sealed class BffCatalogController : ControllerBase
         return boost;
     }
 
-    private static RecommendationProductApiDto MapRecommendationProduct(CatalogProductApiDto item, double score, RecommendationReasonDto reason)
+    private static RecommendationProductApiDto MapRecommendationProduct(
+        CatalogProductApiDto item,
+        double score,
+        RecommendationReasonDto reason,
+        ISeasonalitySignalApiDto? seasonalitySignal = null)
     {
+        var seasonality = ShouldExposeSeasonalityBadge(seasonalitySignal)
+            ? seasonalitySignal
+            : null;
+
         return new RecommendationProductApiDto
         {
             ProductId = item.ProductId,
@@ -3913,14 +5423,40 @@ public sealed class BffCatalogController : ControllerBase
             PrimarySellerId = item.PrimarySellerId,
             SellerShopName = item.SellerShopName,
             SellerAddressSummary = item.SellerAddressSummary,
+            CreatedAt = item.CreatedDate,
             AverageRating = item.AverageRating,
             SoldCount = item.SoldCount,
+            RecentSoldCount = item.RecentSoldCount,
             ReviewCount = item.ReviewCount,
             AvailableStock = item.AvailableStock,
             RecommendationScore = Math.Round(score, 2),
             RecommendationReason = reason.Text,
-            RecommendationTags = reason.Tags
+            RecommendationTags = reason.Tags,
+            SeasonalityScore = seasonality?.SeasonalityScore,
+            SeasonalityLabel = NormalizeOptionalText(seasonality?.SeasonalityLabel),
+            SeasonalityBadgeLabel = NormalizeOptionalText(seasonality?.SeasonalityBadgeLabel)
         };
+    }
+
+    private static ISeasonalitySignalApiDto? PickSeasonalitySignal(params ISeasonalitySignalApiDto?[] signals)
+    {
+        return signals
+            .Where(ShouldExposeSeasonalityBadge)
+            .OrderByDescending(signal => signal!.SeasonalityScore ?? 0d)
+            .FirstOrDefault();
+    }
+
+    private static bool ShouldExposeSeasonalityBadge(ISeasonalitySignalApiDto? signal)
+    {
+        return !string.IsNullOrWhiteSpace(signal?.SeasonalityBadgeLabel)
+               && (!signal.SeasonalityScore.HasValue || signal.SeasonalityScore.Value > 0d);
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
     }
 
     private static RecommendationReasonDto BuildHomeRecommendationReason(
@@ -4957,6 +6493,7 @@ public sealed class BffCatalogController : ControllerBase
         public decimal Price { get; set; }
         public decimal AverageRating { get; set; }
         public int SoldCount { get; set; }
+        public int RecentSoldCount { get; set; }
         public int StockQuantity { get; set; }
         public int AvailableStock { get; set; }
         public int OnHandStock { get; set; }
@@ -4972,6 +6509,9 @@ public sealed class BffCatalogController : ControllerBase
         public int ReviewCount { get; set; }
         public string? RecommendationReason { get; set; }
         public string[] RecommendationTags { get; set; } = Array.Empty<string>();
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
         public List<CatalogProductAttributeApiDto>? ProductAttributes { get; set; }
     }
 
@@ -4992,16 +6532,19 @@ public sealed class BffCatalogController : ControllerBase
         public string[] Tags { get; set; } = Array.Empty<string>();
     }
 
-    private sealed class OrderingSimilarProductSignalApiDto
+    private sealed class OrderingSimilarProductSignalApiDto : ISeasonalitySignalApiDto
     {
         public int ProductId { get; set; }
         public int CoPurchaseOrderCount { get; set; }
         public int CoViewSessionCount { get; set; }
         public int CoClickSessionCount { get; set; }
         public double CollaborativeScore { get; set; }
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
-    private sealed class OrderingSearchRankingSignalApiDto
+    private sealed class OrderingSearchRankingSignalApiDto : ISeasonalitySignalApiDto
     {
         public int ProductId { get; set; }
         public int SearchClickCount { get; set; }
@@ -5009,6 +6552,9 @@ public sealed class BffCatalogController : ControllerBase
         public int SearchViewSessionCount { get; set; }
         public int SearchRecommendationClickCount { get; set; }
         public double HybridSearchScore { get; set; }
+        public double? SeasonalityScore { get; set; }
+        public string? SeasonalityLabel { get; set; }
+        public string? SeasonalityBadgeLabel { get; set; }
     }
 
     private static string GetAvailabilityStatus(int stockQuantity)
@@ -5559,6 +7105,18 @@ public sealed class BffCatalogController : ControllerBase
             var reason = BuildSearchRecommendationReason(item, keyword, rankingSignal, categoryScore, sellerScore);
             item.RecommendationReason = reason.Text;
             item.RecommendationTags = reason.Tags;
+            if (ShouldExposeSeasonalityBadge(rankingSignal))
+            {
+                item.SeasonalityScore = rankingSignal!.SeasonalityScore;
+                item.SeasonalityLabel = NormalizeOptionalText(rankingSignal.SeasonalityLabel);
+                item.SeasonalityBadgeLabel = NormalizeOptionalText(rankingSignal.SeasonalityBadgeLabel);
+            }
+            else
+            {
+                item.SeasonalityScore = null;
+                item.SeasonalityLabel = null;
+                item.SeasonalityBadgeLabel = null;
+            }
         }
     }
 
@@ -5703,7 +7261,10 @@ public sealed class BffCatalogController : ControllerBase
         var client = _httpClientFactory.CreateClient("Ordering");
         AttachAccessToken(client);
 
-        var query = string.Join("&", normalizedProductIds.Select(productId => $"productIds={productId}"));
+        var queryParts = normalizedProductIds
+            .Select(productId => $"productIds={productId}")
+            .Append("recentWindowDays=90");
+        var query = string.Join("&", queryParts);
 
         try
         {
@@ -5759,8 +7320,14 @@ public sealed class BffCatalogController : ControllerBase
             var content = await response.Content.ReadAsStringAsync();
             var items = JsonSerializer.Deserialize<List<OrderingUserProductScoreApiDto>>(content, JsonOptions)
                         ?? new List<OrderingUserProductScoreApiDto>();
+            var computedAtValues = items
+                .Where(item => item.ComputedAtUtc.HasValue)
+                .Select(item => item.ComputedAtUtc!.Value)
+                .ToArray();
             return new OrderingUserProductScoreResult
             {
+                SignalSource = GetRecommendationSignalSource(response),
+                LatestComputedAtUtc = computedAtValues.Length == 0 ? null : computedAtValues.Max(),
                 Scores = items
                     .Where(item => item.ProductId > 0 && item.UserProductScore > 0d)
                     .GroupBy(item => item.ProductId)
@@ -6306,6 +7873,7 @@ public sealed class BffCatalogController : ControllerBase
 
             item.AverageRating = stats.AverageRating;
             item.SoldCount = stats.SoldCount;
+            item.RecentSoldCount = stats.RecentSoldCount;
             item.ReviewCount = stats.ReviewCount;
         }
     }
@@ -6321,6 +7889,7 @@ public sealed class BffCatalogController : ControllerBase
 
             item.AverageRating = stats.AverageRating;
             item.SoldCount = stats.SoldCount;
+            item.RecentSoldCount = stats.RecentSoldCount;
             item.ReviewCount = stats.ReviewCount;
         }
     }
@@ -6353,7 +7922,11 @@ public sealed class BffCatalogController : ControllerBase
             score += 3;
         }
 
+        if (item.RecentSoldCount > 0)
+        {
+            score += 4;
+        }
+
         return score;
     }
 }
-

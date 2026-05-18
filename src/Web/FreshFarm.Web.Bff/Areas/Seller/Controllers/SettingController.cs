@@ -17,7 +17,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class SettingController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
-    private static readonly Regex VietnamPhoneRegex = new(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", RegexOptions.Compiled);
+    private static readonly Regex GhnPhoneLikeRegex = new(@"^(0\d{9}|\+84\d{9})$", RegexOptions.Compiled);
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGhnSandboxService _ghnSandboxService;
@@ -86,21 +86,21 @@ public class SettingController : LegacySellerControllerBase
             model.GhnWardCode = model.GhnWardCode?.Trim();
             model.GhnWardName = model.GhnWardName?.Trim();
 
-            if (!IsVietnamPhone(model.StorePhone))
+            if (!IsGhnPhoneLike(model.StorePhone))
             {
                 return Json(new
                 {
                     success = false,
-                    message = "Số điện thoại cửa hàng phải đúng định dạng di động Việt Nam, ví dụ 0328898307 hoặc +84328898307."
+                    message = "Số điện thoại cửa hàng chưa đúng định dạng. Vui lòng nhập 10 chữ số bắt đầu bằng 0 hoặc dạng +84xxxxxxxxx."
                 });
             }
 
-            if (!string.IsNullOrWhiteSpace(model.GhnPickupPhone) && !IsVietnamPhone(model.GhnPickupPhone))
+            if (!string.IsNullOrWhiteSpace(model.GhnPickupPhone) && !IsGhnPhoneLike(model.GhnPickupPhone))
             {
                 return Json(new
                 {
                     success = false,
-                    message = "Số điện thoại lấy hàng GHN phải đúng định dạng di động Việt Nam, ví dụ 0328898307 hoặc +84328898307."
+                    message = "Số điện thoại lấy hàng GHN chưa đúng định dạng. Vui lòng nhập 10 chữ số bắt đầu bằng 0 hoặc dạng +84xxxxxxxxx."
                 });
             }
 
@@ -222,9 +222,9 @@ public class SettingController : LegacySellerControllerBase
         };
     }
 
-    private static bool IsVietnamPhone(string? value)
+    private static bool IsGhnPhoneLike(string? value)
     {
-        return !string.IsNullOrWhiteSpace(value) && VietnamPhoneRegex.IsMatch(value.Trim());
+        return !string.IsNullOrWhiteSpace(value) && GhnPhoneLikeRegex.IsMatch(value.Trim());
     }
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)

@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using FreshFarm.Web.Bff.Areas.Admin.Controllers;
 using FreshFarm.Web.Bff.Areas.Admin.Models;
@@ -11,6 +12,27 @@ namespace FreshFarm.Web.Bff.Tests;
 
 public sealed class FinanceControllerTests
 {
+    [Fact]
+    public void SellerFinanceView_UsesProfessionalSettlementLabels()
+    {
+        var view = File.ReadAllText(GetSellerFinanceViewPath());
+
+        Assert.Contains("Giá trị thanh toán thành công", view);
+        Assert.Contains("Phí nền tảng tạm tính", view);
+        Assert.Contains("Phí nền tảng đủ điều kiện đối soát", view);
+        Assert.Contains("Số tiền người bán tạm tính", view);
+        Assert.Contains("Số tiền đủ điều kiện đối soát", view);
+        Assert.Contains("Chờ chi trả", view);
+        Assert.Contains("Số tiền có thể rút", view);
+
+        Assert.DoesNotContain("Thanh toán đã ghi nhận", view);
+        Assert.DoesNotContain("Hoa hồng đã phát sinh", view);
+        Assert.DoesNotContain("Hoa hồng đủ đối soát", view);
+        Assert.DoesNotContain("Thu nhập đã phát sinh", view);
+        Assert.DoesNotContain("Thu nhập đủ đối soát", view);
+        Assert.DoesNotContain("Chi trả chờ xử lý", view);
+    }
+
     [Fact]
     public async Task Index_DedupesDuplicateFiltersRowsAndOwnerSummary_FromOrdering()
     {
@@ -30,6 +52,11 @@ public sealed class FinanceControllerTests
                     "grossMerchandiseValue": 1000000,
                     "capturedPayments": 900000,
                     "platformCommission": 100000,
+                    "sellerEarning": 900000,
+                    "reconciliationGrossMerchandiseValue": 700000,
+                    "reconciliationPlatformCommission": 70000,
+                    "reconciliationSellerEarning": 630000,
+                    "withdrawableAmount": 380000,
                     "pendingPayoutAmount": 250000,
                     "refundedAmount": 50000,
                     "openReturns": 1,
@@ -165,6 +192,10 @@ public sealed class FinanceControllerTests
         Assert.Equal(1, owner.OverdueCount);
         Assert.Equal(2, owner.DueSoonCount);
         Assert.Equal(1, owner.NoFollowUpCount);
+        Assert.Equal(700000, model.Stats.ReconciliationGrossMerchandiseValue);
+        Assert.Equal(70000, model.Stats.ReconciliationPlatformCommission);
+        Assert.Equal(630000, model.Stats.ReconciliationSellerEarning);
+        Assert.Equal(380000, model.Stats.WithdrawableAmount);
         Assert.Equal(250000, model.Stats.PendingPayoutAmount);
     }
 
@@ -182,6 +213,23 @@ public sealed class FinanceControllerTests
                 HttpContext = CreateHttpContext("7")
             }
         };
+    }
+
+    private static string GetSellerFinanceViewPath([CallerFilePath] string testFilePath = "")
+    {
+        var testDirectory = Path.GetDirectoryName(testFilePath)
+            ?? throw new InvalidOperationException("Cannot resolve test source directory.");
+        var srcDirectory = Directory.GetParent(testDirectory)?.Parent?.FullName
+            ?? throw new InvalidOperationException("Cannot resolve source directory.");
+        return Path.Combine(
+            srcDirectory,
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Seller",
+            "Views",
+            "Finance",
+            "Index.cshtml");
     }
 
     private static HttpContext CreateHttpContext(string userId)

@@ -29,55 +29,154 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <style>
-        body { background: radial-gradient(circle at top left, #eafaf1 0, transparent 35%), #f4f7f5; }
-        .notification-shell { max-width: 1180px; }
+        body {
+            background: linear-gradient(180deg, #eef8f2 0, #f7faf8 34%, #f5f7f6 100%);
+            color: #16251f;
+        }
+        .notification-shell { max-width: 1240px; }
         .notification-hero {
-            background: linear-gradient(135deg, #0f9f5b, #0b6b3d);
+            background:
+                linear-gradient(135deg, rgba(13, 117, 68, .96), rgba(15, 151, 89, .94)),
+                radial-gradient(circle at 88% 20%, rgba(255,255,255,.22), transparent 34%);
             color: #fff;
-            border-radius: 1.5rem;
+            border-radius: 1.1rem;
         }
-        .feed-item {
-            border-left: 4px solid #dbe3dd;
-            padding-left: 1rem;
+        .notification-page-grid {
+            align-items: flex-start;
         }
-        .feed-item.success { border-left-color: #198754; }
-        .feed-item.warning { border-left-color: #f59f00; }
-        .feed-item.info { border-left-color: #0dcaf0; }
-        .feed-item.secondary { border-left-color: #6c757d; }
-        .notification-preview {
+        .notification-board {
+            border: 1px solid rgba(15, 43, 29, .08);
             border-radius: 1rem;
-            background: rgba(15, 159, 91, 0.08);
+            background: #fff;
+            box-shadow: 0 16px 34px rgba(13, 36, 24, .07);
         }
-        .notification-stat-card {
-            border-radius: 1rem;
-            border: 1px solid rgba(15, 159, 91, 0.12);
+        .notification-toolbar {
+            border-bottom: 1px solid rgba(15, 43, 29, .08);
+            background: #fbfdfc;
+            border-radius: 1rem 1rem 0 0;
+        }
+        .notification-kpi {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            border: 1px solid #dce7e0;
+            border-radius: 999px;
+            background: #fff;
+            padding: .42rem .75rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .notification-kpi.danger {
+            color: #c72e45;
+            border-color: rgba(199, 46, 69, .22);
+            background: #fff7f8;
+        }
+        .notification-kpi.warning {
+            color: #8a5c00;
+            border-color: rgba(245, 159, 0, .28);
+            background: #fff9e8;
+        }
+        .notification-filter-tabs .btn {
+            border-radius: 999px;
+            padding: .48rem .9rem;
+            font-weight: 700;
+        }
+        .notification-field {
+            border-color: #dce7e0;
+            border-radius: .8rem;
+            min-height: 44px;
+        }
+        .notification-list {
+            border: 1px solid rgba(15, 43, 29, .08);
+            border-radius: .9rem;
+            overflow: hidden;
             background: #fff;
         }
+        .feed-item {
+            border-bottom: 1px solid rgba(15, 43, 29, .08);
+            background: #fff;
+        }
+        .feed-item:last-child { border-bottom: 0; }
+        .feed-item.unread { background: linear-gradient(90deg, rgba(15, 159, 91, .075), #fff 44%); }
+        .notification-card-compact {
+            transition: background-color .16s ease;
+        }
+        .notification-card-compact:hover { background: #f8fbf9; }
+        .notification-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            color: #087846;
+            background: #e9f8ef;
+        }
+        .notification-icon.info { color: #1367c8; background: #eaf3ff; }
+        .notification-icon.warning { color: #a86b00; background: #fff5d8; }
+        .notification-icon.secondary { color: #55606a; background: #eef1f3; }
+        .notification-icon.success { color: #087846; background: #e9f8ef; }
+        .notification-card-compact .min-w-0 { min-width: 0; }
+        .notification-title-line,
+        .notification-message-clamp {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .notification-title-line {
+            -webkit-line-clamp: 1;
+        }
+        .notification-message-clamp {
+            -webkit-line-clamp: 2;
+            line-height: 1.55;
+        }
+        .notification-detail-body { white-space: pre-wrap; line-height: 1.65; }
+        .notification-stat-card { border-radius: 1rem; border: 1px solid rgba(15, 159, 91, 0.12); background: #fff; }
         .notification-empty-state {
             border: 1px dashed rgba(15, 159, 91, 0.25);
             border-radius: 1.25rem;
             background: linear-gradient(180deg, rgba(15, 159, 91, 0.06), rgba(15, 159, 91, 0.02));
         }
+        .notification-review-alert {
+            background: #e9f9ff;
+            border: 1px solid #beeefa;
+            border-radius: .9rem;
+        }
+        .notification-status-strip {
+            border-top: 1px solid rgba(15, 43, 29, .08);
+            background: #fbfdfc;
+        }
+        .account-nav .list-group-item.active {
+            background: #078b4f;
+            border-color: #078b4f;
+            color: #fff;
+        }
+        @@media (max-width: 991.98px) {
+            .notification-hero { border-radius: .9rem; }
+            .notification-board { border-radius: .9rem; }
+        }
     </style>
 </head>
 <body>
-    <main class="container notification-shell my-5">
-        <section class="notification-hero shadow-sm p-4 p-md-5 mb-4">
-            <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
+    <main class="container notification-shell my-4 my-md-5">
+        <section class="notification-hero shadow-sm p-4 mb-4">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
                 <div>
-                    <div class="text-uppercase small opacity-75 mb-2">FreshFarm Account</div>
-                    <h1 class="fw-bold mb-2">Thông báo tài khoản</h1>
-                    <p class="mb-0 opacity-75">Đọc trực tiếp các cập nhật tài khoản từ notification center, theo dõi unread và xử lý nhanh ngay trên một trang.</p>
+                    <div class="text-uppercase small opacity-75 fw-semibold mb-2">Trung tâm thông báo</div>
+                    <h1 class="h2 fw-bold mb-2">Thông báo tài khoản</h1>
+                    <p class="mb-0 opacity-75">Theo dõi đơn hàng, hồ sơ người bán và cập nhật hệ thống trong một hộp thư gọn.</p>
                 </div>
-                <div class="text-lg-end">
-                    <div class="small opacity-75">Chưa đọc</div>
-                    <div class="display-6 fw-bold mb-1">@vm.UnreadNotifications</div>
-                    <div class="small opacity-75">@vm.TotalNotifications thông báo</div>
+                <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+                    <span class="notification-kpi text-dark"><i class="bi bi-bell me-1 text-success"></i>@vm.TotalNotifications tổng</span>
+                    <span class="notification-kpi danger"><i class="bi bi-dot fs-4 lh-1"></i>@vm.UnreadNotifications chưa đọc</span>
+                    <span class="notification-kpi warning"><i class="bi bi-clock-history me-1"></i>@vm.Recent24hNotifications trong 24h</span>
                 </div>
             </div>
         </section>
 
-        <div class="row g-4">
+        <div class="row g-4 notification-page-grid">
             @await Html.PartialAsync("_AccountNav")
 
             <section class="col-lg-9">
@@ -98,11 +197,11 @@
 
                 @if (sellerApplication.HasSellerReviewAlert)
                 {
-                    <div class="alert alert-@sellerApplication.SellerReviewAlertTone border-0 shadow-sm mb-4">
-                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-start">
+                    <div class="notification-review-alert shadow-sm p-3 p-md-4 mb-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center">
                             <div>
                                 <div class="fw-semibold mb-1">@sellerApplication.SellerReviewAlertTitle</div>
-                                <div>@sellerApplication.SellerReviewAlertBody</div>
+                                <div class="text-muted">@sellerApplication.SellerReviewAlertBody</div>
                                 @if (sellerApplication.ReviewedAtUtc.HasValue)
                                 {
                                     <div class="small mt-2 text-muted">Cập nhật lúc @sellerApplication.ReviewedAtUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
@@ -110,77 +209,75 @@
                             </div>
                             <div class="text-md-end">
                                 <a href="/account/become-seller" class="btn btn-sm btn-outline-dark">
-                                    <i class="bi bi-shop-window me-2"></i>Xem hồ sơ seller
+                                    <i class="bi bi-shop-window me-2"></i>Xem hồ sơ người bán
                                 </a>
                             </div>
                         </div>
                     </div>
                 }
 
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body p-4 p-md-5">
-                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-4">
+                <div class="notification-board">
+                    <div class="notification-toolbar p-3 p-md-4">
+                        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-start gap-3 mb-3">
                             <div>
-                                <h5 class="fw-bold mb-1">Dòng cập nhật gần đây</h5>
-                                <div class="text-muted small">Lọc theo loại, trạng thái đọc và đánh dấu đã đọc ngay tại đây.</div>
+                                <h2 class="h4 fw-bold mb-1">Hộp thư thông báo</h2>
+                                <div class="text-muted small">@vm.ResultsSummary. Bấm một thông báo để xem đầy đủ nội dung.</div>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
-                                <span class="badge text-bg-light border">@vm.TotalNotifications tổng</span>
-                                <span class="badge text-bg-danger">@vm.UnreadNotifications chưa đọc</span>
-                                <span class="badge text-bg-light border">@vm.Recent24hNotifications trong 24h</span>
-                            </div>
-                        </div>
-
-                        @await Html.PartialAsync("_NotificationStats", vm)
-                        @await Html.PartialAsync("_NotificationPriorityPanel", vm)
-
-                        <div class="border rounded-4 bg-light-subtle p-3 mb-4">
-                            <div class="d-flex flex-column gap-3">
-                                <div>
-                                    <div class="small text-uppercase text-muted fw-semibold mb-2">Truy cập nhanh</div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <a href="@vm.BuildNotificationsUrl(vm.Type, null, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead is null ? "btn-success" : "btn-outline-success")">
-                                            Tất cả
-                                            <span class="ms-1 badge @(vm.IsRead is null ? "text-bg-light" : "text-bg-success")">@vm.TotalNotifications</span>
-                                        </a>
-                                        <a href="@vm.BuildNotificationsUrl(vm.Type, false, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead == false ? "btn-danger" : "btn-outline-danger")">
-                                            Chưa đọc
-                                            <span class="ms-1 badge @(vm.IsRead == false ? "text-bg-light" : "text-bg-danger")">@vm.UnreadNotifications</span>
-                                        </a>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div class="small text-uppercase text-muted fw-semibold mb-2">Nhóm thông báo</div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach (var quickFilter in typeQuickFilters)
+                                @if (vm.HasNotifications)
+                                {
+                                    <a href="@vm.BuildNotificationsUrl(vm.Type, vm.IsRead, !vm.RecentOnly, vm.FocusType)"
+                                       class="btn btn-sm @(vm.RecentOnly ? "btn-warning" : "btn-outline-warning")">
+                                        <i class="bi @(vm.RecentOnly ? "bi-list-ul" : "bi-clock-history") me-2"></i>
+                                        @(vm.RecentOnly ? "Xem tất cả" : "Mới cập nhật")
+                                    </a>
+                                    <form method="post" action="/account/notifications/mark-all-read">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="q" value="@vm.Query" />
+                                        <input type="hidden" name="type" value="@vm.Type" />
+                                        @if (vm.IsRead.HasValue)
                                         {
-                                            var isActiveType = string.Equals(vm.Type, quickFilter.Key, StringComparison.OrdinalIgnoreCase)
-                                                || (string.IsNullOrWhiteSpace(vm.Type) && string.IsNullOrWhiteSpace(quickFilter.Key));
-                                            <a href="@vm.BuildNotificationsUrl(quickFilter.Key, vm.IsRead, vm.RecentOnly ? true : null, string.IsNullOrWhiteSpace(quickFilter.Key) ? null : quickFilter.Key)" class="btn btn-sm @(isActiveType ? "btn-dark" : "btn-outline-dark")">
-                                                @quickFilter.Label
-                                                @if (!string.IsNullOrWhiteSpace(quickFilter.Key))
-                                                {
-                                                    <span class="ms-1 badge @(isActiveType ? "text-bg-light" : "text-bg-secondary")">@vm.GetVisibleCount(quickFilter.Key)</span>
-                                                }
-                                            </a>
+                                            <input type="hidden" name="isRead" value="@vm.IsRead.Value.ToString().ToLowerInvariant()" />
                                         }
-                                    </div>
-                                </div>
+                                        <input type="hidden" name="page" value="@vm.Page" />
+                                        <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
+                                        <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
+                                        <input type="hidden" name="focusType" value="@vm.FocusType" />
+                                        <button type="submit" class="btn btn-outline-success btn-sm" @(vm.UnreadNotifications == 0 ? "disabled" : null)>
+                                            <i class="bi bi-check2-all me-2"></i>Đánh dấu đã đọc
+                                        </button>
+                                    </form>
+                                }
                             </div>
                         </div>
 
-                        <form method="get" action="/account/notifications" class="row g-3 mb-4">
+                        <div class="notification-filter-tabs d-flex flex-wrap gap-2 mb-3">
+                            <a href="@vm.BuildNotificationsUrl(vm.Type, null, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead is null ? "btn-success" : "btn-outline-success")">
+                                Tất cả <span class="ms-1">@vm.TotalNotifications</span>
+                            </a>
+                            <a href="@vm.BuildNotificationsUrl(vm.Type, false, vm.RecentOnly ? true : null, vm.FocusType)" class="btn btn-sm @(vm.IsRead == false ? "btn-danger" : "btn-outline-danger")">
+                                Chưa đọc <span class="ms-1">@vm.UnreadNotifications</span>
+                            </a>
+                            @foreach (var quickFilter in typeQuickFilters.Where(x => !string.IsNullOrWhiteSpace(x.Key)))
+                            {
+                                var isActiveType = string.Equals(vm.Type, quickFilter.Key, StringComparison.OrdinalIgnoreCase);
+                                <a href="@vm.BuildNotificationsUrl(quickFilter.Key, vm.IsRead, vm.RecentOnly ? true : null, quickFilter.Key)" class="btn btn-sm @(isActiveType ? "btn-dark" : "btn-outline-dark")">
+                                    @quickFilter.Label <span class="ms-1">@vm.GetVisibleCount(quickFilter.Key)</span>
+                                </a>
+                            }
+                        </div>
+
+                        <form method="get" action="/account/notifications" class="row g-2 align-items-end">
                             <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
                             <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
                             <input type="hidden" name="focusType" value="@vm.FocusType" />
-                            <div class="col-md-5">
-                                <label class="form-label">Từ khóa</label>
-                                <input type="text" class="form-control" name="q" value="@vm.Query" placeholder="Tìm theo tiêu đề, nội dung..." />
+                            <div class="col-lg-5">
+                                <label class="form-label small text-muted fw-semibold">Tìm kiếm</label>
+                                <input type="text" class="form-control notification-field" name="q" value="@vm.Query" placeholder="Tiêu đề, nội dung, mã đơn..." />
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Loại thông báo</label>
-                                <select class="form-select" name="type">
+                            <div class="col-md-4 col-lg-3">
+                                <label class="form-label small text-muted fw-semibold">Loại</label>
+                                <select class="form-select notification-field" name="type">
                                     <option value="">Tất cả</option>
                                     @foreach (var typeOption in vm.TypeOptions)
                                     {
@@ -189,79 +286,40 @@
                                     }
                                 </select>
                             </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Trạng thái đọc</label>
-                                <select class="form-select" name="isRead">
+                            <div class="col-md-4 col-lg-2">
+                                <label class="form-label small text-muted fw-semibold">Trạng thái</label>
+                                <select class="form-select notification-field" name="isRead">
                                     <option value="" selected="@(vm.IsRead is null ? "selected" : null)">Tất cả</option>
                                     <option value="false" selected="@(vm.IsRead == false ? "selected" : null)">Chưa đọc</option>
                                     <option value="true" selected="@(vm.IsRead == true ? "selected" : null)">Đã đọc</option>
                                 </select>
                             </div>
-                            <div class="col-md-2 d-flex align-items-end gap-2">
+                            <div class="col-md-4 col-lg-2 d-flex gap-2">
                                 <button type="submit" class="btn btn-success flex-fill">
                                     <i class="bi bi-funnel me-2"></i>Lọc
                                 </button>
                                 <a href="/account/notifications" class="btn btn-outline-secondary">Reset</a>
                             </div>
                         </form>
+                    </div>
 
-                        <div class="border rounded-4 p-3 p-md-4 bg-body-tertiary mb-4">
-                            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3">
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="small text-uppercase text-muted fw-semibold">Trạng thái hiện tại</div>
-                                    <div class="fw-semibold">Trang @vm.Page / @vm.TotalPages</div>
-                                    <div class="small text-muted">@vm.ResultsSummary.</div>
-                                    @if (vm.HasActiveFilters)
-                                    {
-                                        <div class="d-flex flex-wrap gap-2">
-                                            @foreach (var chip in vm.ActiveFilterChips)
-                                            {
-                                                <span class="badge text-bg-@chip.Tone">@chip.Label</span>
-                                            }
-                                            <a href="/account/notifications" class="btn btn-sm btn-link px-0 text-decoration-none">
-                                                <i class="bi bi-arrow-counterclockwise me-1"></i>Xóa toàn bộ bộ lọc
-                                            </a>
-                                        </div>
-                                    }
-                                </div>
-                            <div class="d-flex flex-wrap gap-2">
-                                @if (vm.HasNotifications)
+                    <div class="p-3 p-md-4">
+                        @await Html.PartialAsync("_NotificationStats", vm)
+                        @await Html.PartialAsync("_NotificationPriorityPanel", vm)
+
+                        @if (vm.HasActiveFilters)
+                        {
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                <span class="small text-muted fw-semibold">Bộ lọc đang dùng:</span>
+                                @foreach (var chip in vm.ActiveFilterChips)
                                 {
-                                    <a href="@vm.BuildNotificationsUrl(vm.Type, vm.IsRead, !vm.RecentOnly, vm.FocusType)"
-                                       class="btn btn-sm @(vm.RecentOnly ? "btn-warning" : "btn-outline-warning")">
-                                        <i class="bi @(vm.RecentOnly ? "bi-list-ul" : "bi-clock-history") me-2"></i>
-                                        @(vm.RecentOnly ? "Xem tất cả" : "Chỉ mới cập nhật")
-                                    </a>
-                                    <button type="button"
-                                            class="btn btn-outline-secondary btn-sm"
-                                            data-section-toggle-all="expand">
-                                        <i class="bi bi-arrows-expand me-2"></i>Mở rộng tất cả
-                                    </button>
-                                    <button type="button"
-                                            class="btn btn-outline-secondary btn-sm"
-                                            data-section-toggle-all="collapse">
-                                        <i class="bi bi-arrows-collapse me-2"></i>Thu gọn tất cả
-                                    </button>
+                                    <span class="badge text-bg-@chip.Tone">@chip.Label</span>
                                 }
-                                <form method="post" action="/account/notifications/mark-all-read">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="q" value="@vm.Query" />
-                                    <input type="hidden" name="type" value="@vm.Type" />
-                                    @if (vm.IsRead.HasValue)
-                                    {
-                                        <input type="hidden" name="isRead" value="@vm.IsRead.Value.ToString().ToLowerInvariant()" />
-                                    }
-                                    <input type="hidden" name="page" value="@vm.Page" />
-                                    <input type="hidden" name="returnUrl" value="@vm.ReturnUrl" />
-                                    <input type="hidden" name="recentOnly" value="@vm.RecentOnly.ToString().ToLowerInvariant()" />
-                                    <input type="hidden" name="focusType" value="@vm.FocusType" />
-                                    <button type="submit" class="btn btn-outline-dark btn-sm" @(vm.UnreadNotifications == 0 ? "disabled" : null)>
-                                        <i class="bi bi-check2-all me-2"></i>Đánh dấu tất cả đã đọc
-                                    </button>
-                                </form>
+                                <a href="/account/notifications" class="btn btn-sm btn-link px-0 text-decoration-none">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i>Xóa bộ lọc
+                                </a>
                             </div>
-                        </div>
-                        </div>
+                        }
 
                         @if (!vm.HasNotifications)
                         {
@@ -282,21 +340,21 @@
                                 </div>
                             </div>
                         }
-        else
-        {
-            <div class="d-flex flex-column gap-4">
-                @foreach (var notificationSection in vm.NotificationSections)
-                {
-                    @await Html.PartialAsync("_NotificationSection", new FreshFarm.Web.Bff.Dtos.AccountNotificationSectionViewModel
-                    {
-                        Page = vm,
-                        Section = notificationSection
-                    })
-                }
-            </div>
+                        else
+                        {
+                            <div class="notification-list mb-3">
+                                @foreach (var notificationSection in vm.NotificationSections)
+                                {
+                                    @await Html.PartialAsync("_NotificationSection", new FreshFarm.Web.Bff.Dtos.AccountNotificationSectionViewModel
+                                    {
+                                        Page = vm,
+                                        Section = notificationSection
+                                    })
+                                }
+                            </div>
 
-            @if (vm.TotalPages > 1)
-            {
+                            @if (vm.TotalPages > 1)
+                            {
                                 <nav class="mt-4" aria-label="Notification pagination">
                                     <div class="d-flex flex-wrap gap-2">
                                         @for (var pageNumber = 1; pageNumber <= vm.TotalPages; pageNumber++)
@@ -308,6 +366,21 @@
                                     </div>
                                 </nav>
                             }
+                        }
+                    </div>
+
+                    <div class="notification-status-strip px-3 px-md-4 py-3 d-flex flex-column flex-md-row justify-content-between gap-2 small text-muted">
+                        <span>Trang @vm.Page / @vm.TotalPages · @vm.DisplayedCountSummary</span>
+                        @if (vm.HasNotifications)
+                        {
+                            <span class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-section-toggle-all="expand">
+                                    <i class="bi bi-arrows-expand me-1"></i>Mở nhóm
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-section-toggle-all="collapse">
+                                    <i class="bi bi-arrows-collapse me-1"></i>Thu nhóm
+                                </button>
+                            </span>
                         }
                     </div>
                 </div>

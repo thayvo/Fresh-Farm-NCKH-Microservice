@@ -331,7 +331,7 @@
                                     <div class="d-flex gap-3">
                                         @if (!string.IsNullOrWhiteSpace(merchant.Avatar))
                                         {
-                                            <img src="@merchant.Avatar" alt="@merchant.ShopName" class="merchant-avatar" />
+                                            <img src="@merchant.Avatar" alt="@merchant.ShopName" class="merchant-avatar" loading="lazy" decoding="async" />
                                         }
                                         else
                                         {
@@ -425,7 +425,7 @@
                         <div class="d-flex gap-3 align-items-center mb-3">
                             @if (!string.IsNullOrWhiteSpace(Model.Details.Avatar))
                             {
-                                <img src="@Model.Details.Avatar" alt="@Model.Details.ShopName" class="merchant-avatar" />
+                                <img src="@Model.Details.Avatar" alt="@Model.Details.ShopName" class="merchant-avatar" loading="lazy" decoding="async" />
                             }
                             else
                             {

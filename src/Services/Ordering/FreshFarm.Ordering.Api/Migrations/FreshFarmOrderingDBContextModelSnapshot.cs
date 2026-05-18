@@ -942,6 +942,9 @@ namespace FreshFarm.Ordering.Api.Migrations
                         .HasColumnType("datetime")
                         .HasDefaultValueSql("(getdate())");
 
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime");
+
                     b.Property<bool?>("IsPushNotification")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -965,6 +968,15 @@ namespace FreshFarm.Ordering.Api.Migrations
                     b.Property<int>("OrderId")
                         .HasColumnType("int")
                         .HasColumnName("OrderID");
+
+                    b.Property<string>("PopupImageUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PopupType")
+                        .HasMaxLength(20)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(20)");
 
                     b.Property<DateTime?>("ReadAt")
                         .HasColumnType("datetime");

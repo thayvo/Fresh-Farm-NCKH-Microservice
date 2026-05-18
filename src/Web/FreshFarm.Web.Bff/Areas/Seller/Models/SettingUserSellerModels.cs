@@ -19,7 +19,7 @@ public sealed class SellerSettingViewModel
 
     [Required(ErrorMessage = "So dien thoai cua hang la bat buoc")]
     [StringLength(20, ErrorMessage = "So dien thoai toi da 20 ky tu")]
-    [RegularExpression(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", ErrorMessage = "So dien thoai cua hang phai dung dinh dang di dong Viet Nam, vi du 0328898307 hoac +84328898307")]
+    [RegularExpression(@"^(0\d{9}|\+84\d{9})$", ErrorMessage = "So dien thoai cua hang phai gom 10 chu so bat dau bang 0 hoac dung dang +84xxxxxxxxx")]
     public string StorePhone { get; set; } = string.Empty;
 
     public bool IsCODEnabled { get; set; } = true;
@@ -51,7 +51,7 @@ public sealed class SellerSettingViewModel
     public string? GhnPickupName { get; set; }
 
     [StringLength(20, ErrorMessage = "Số điện thoại GHN tối đa 20 ký tự")]
-    [RegularExpression(@"^(0(3|5|7|8|9)\d{8}|\+84(3|5|7|8|9)\d{8})$", ErrorMessage = "Số điện thoại lấy hàng GHN phải đúng định dạng di động Việt Nam, ví dụ 0328898307 hoặc +84328898307")]
+    [RegularExpression(@"^(0\d{9}|\+84\d{9})$", ErrorMessage = "Số điện thoại lấy hàng GHN phải gồm 10 chữ số bắt đầu bằng 0 hoặc dùng dạng +84xxxxxxxxx")]
     public string? GhnPickupPhone { get; set; }
 
     [StringLength(500, ErrorMessage = "Địa chỉ lấy hàng GHN tối đa 500 ký tự")]

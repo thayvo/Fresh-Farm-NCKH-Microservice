@@ -1,7 +1,3 @@
-// Nguon goc: src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationHomeCollaborativeCandidate.cs
-// Duoc sao chep tu: D:\NCKH\DOAN\NCKH-FRESH-FARM\src\Services\Ordering\FreshFarm.Ordering.Api\Models\RecommendationHomeCollaborativeCandidate.cs
-// Thu muc hoc tap: HocGoiY
-
 namespace FreshFarm.Ordering.Api.Models;
 
 public partial class RecommendationHomeCollaborativeCandidate
@@ -26,4 +22,3 @@ public partial class RecommendationHomeCollaborativeCandidate
 
     public DateTime ComputedAt { get; set; }
 }
-

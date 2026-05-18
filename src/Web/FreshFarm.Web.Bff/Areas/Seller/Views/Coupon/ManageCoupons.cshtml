@@ -9,6 +9,10 @@
     var couponCreateLabel = (string?)ViewData["CouponCreateLabel"] ?? "Tạo mã mới";
     var couponEmptyTitle = (string?)ViewData["CouponEmptyTitle"] ?? "Chưa có mã giảm giá nào";
     var couponEmptySubtitle = (string?)ViewData["CouponEmptySubtitle"] ?? "Hãy tạo mã đầu tiên để bắt đầu chương trình khuyến mãi.";
+    var couponCanManage = (bool?)ViewData["CouponCanManage"] ?? currentArea == "Admin";
+    var couponCanSend = (bool?)ViewData["CouponCanSend"] ?? couponCanManage;
+    var couponPolicyNotice = (string?)ViewData["CouponPolicyNotice"];
+    var actionColumnCount = couponCanManage || couponCanSend ? 7 : 6;
 }
 
 <style>
@@ -311,20 +315,34 @@
                             </div>
                         </div>
                     </div>
-                    <div class="text-md-end">
-                        <button class="btn btn-success btn-pill d-inline-flex align-items-center gap-2"
-                                data-bs-toggle="modal"
-                                data-bs-target="#couponModal"
-                                id="btnCreateNew">
-                            <i class="bi bi-plus-circle"></i>
-                            <span>@couponCreateLabel</span>
-                        </button>
-                    </div>
+                    @if (couponCanManage)
+                    {
+                        <div class="text-md-end">
+                            <button class="btn btn-success btn-pill d-inline-flex align-items-center gap-2"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#couponModal"
+                                    id="btnCreateNew">
+                                <i class="bi bi-plus-circle"></i>
+                                <span>@couponCreateLabel</span>
+                            </button>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
 
         <!-- ALERTS -->
+        @if (!string.IsNullOrWhiteSpace(couponPolicyNotice))
+        {
+            <div class="alert alert-info d-flex align-items-start gap-3 mb-3" role="alert">
+                <i class="bi bi-info-circle-fill fs-4"></i>
+                <div>
+                    <strong>Chính sách mã giảm giá</strong>
+                    <div>@couponPolicyNotice</div>
+                </div>
+            </div>
+        }
+
         @if (TempData["Error"] != null)
         {
             <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
@@ -355,7 +373,10 @@
                             <th><i class="bi bi-calendar-event me-1"></i> Ngày kết thúc</th>
                             <th><i class="bi bi-hash me-1"></i> Sử dụng</th>
                             <th><i class="bi bi-check2-circle me-1"></i> Trạng thái</th>
-                            <th class="text-end"><i class="bi bi-gear me-1"></i> Hành động</th>
+                            @if (couponCanManage || couponCanSend)
+                            {
+                                <th class="text-end"><i class="bi bi-gear me-1"></i> Hành động</th>
+                            }
                         </tr>
                     </thead>
                     <tbody id="coupons-table-body">
@@ -389,43 +410,52 @@
                                             @item.StatusDisplayDetailed
                                         </span>
                                     </td>
-                                    <td class="text-end">
-                                        <div class="btn-group" role="group">
-                                            <button class="btn btn-sm btn-outline-info btn-action btn-send-all me-1"
-                                                    title="Gửi cho tất cả khách hàng"
-                                                    data-coupon-code="@item.Code">
-                                                <i class="bi bi-broadcast"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-primary btn-action btn-send me-1"
-                                                    title="Gửi mã"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#sendCouponModal"
-                                                    data-coupon-code="@item.Code">
-                                                <i class="bi bi-send-fill"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-success btn-action btn-edit me-1"
-                                                    title="Sửa"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#couponModal"
-                                                    data-id="@item.CouponID">
-                                                <i class="bi bi-pencil-square"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger btn-action btn-delete"
-                                                    title="Xóa"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#deleteModal"
-                                                    data-id="@item.CouponID">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
+                                    @if (couponCanManage || couponCanSend)
+                                    {
+                                        <td class="text-end">
+                                            <div class="btn-group" role="group">
+                                                @if (couponCanSend)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-info btn-action btn-send-all me-1"
+                                                            title="Gửi cho tất cả khách hàng"
+                                                            data-coupon-code="@item.Code">
+                                                        <i class="bi bi-broadcast"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-primary btn-action btn-send me-1"
+                                                            title="Gửi mã"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#sendCouponModal"
+                                                            data-coupon-code="@item.Code">
+                                                        <i class="bi bi-send-fill"></i>
+                                                    </button>
+                                                }
+                                                @if (couponCanManage)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-success btn-action btn-edit me-1"
+                                                            title="Sửa"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#couponModal"
+                                                            data-id="@item.CouponID">
+                                                        <i class="bi bi-pencil-square"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger btn-action btn-delete"
+                                                            title="Xóa"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#deleteModal"
+                                                            data-id="@item.CouponID">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    }
                                 </tr>
                             }
                         }
                         else
                         {
                             <tr>
-                                <td colspan="7" class="text-center py-5">
+                                <td colspan="@actionColumnCount" class="text-center py-5">
                                     <div class="d-flex flex-column align-items-center gap-3">
                                         <div class="p-4 rounded-circle"
                                              style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
@@ -448,6 +478,8 @@
 </div>
 
 @section modal{
+    @if (couponCanManage || couponCanSend)
+    {
     <!-- Modal Thêm/Sửa -->
     <div class="modal fade" id="couponModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
@@ -625,9 +657,12 @@
             </div>
         </div>
     </div>
+    }
 }
 
 @section scripts{
+    @if (couponCanManage || couponCanSend)
+    {
     <script>
         // Toast mini giống view Vận Chuyển
         function showNotification(message, type = 'info') {
@@ -1069,4 +1104,5 @@
             }
         })();
     </script>
+    }
 }

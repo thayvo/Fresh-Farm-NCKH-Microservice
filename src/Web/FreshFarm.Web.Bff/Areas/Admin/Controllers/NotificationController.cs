@@ -113,6 +113,7 @@ public sealed class NotificationController : LegacySellerControllerBase
                 IsRead = x.IsRead,
                 IsPushNotification = x.IsPushNotification,
                 CreatedAt = x.CreatedAt,
+                ExpiresAt = x.ExpiresAt,
                 ReadAt = x.ReadAt
             }).ToList() ?? new List<NotificationCenterRowViewModel>();
         }
@@ -122,6 +123,81 @@ public sealed class NotificationController : LegacySellerControllerBase
         }
 
         return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult CreateBroadcast()
+    {
+        return View(new NotificationBroadcastEditorInput());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateBroadcast(NotificationBroadcastEditorInput input)
+    {
+        input.TargetAudience = NotificationBroadcastEditorInput.NormalizeTargetAudience(input.TargetAudience);
+        input.PopupType = NotificationBroadcastEditorInput.NormalizePopupType(input.PopupType, input.ShowPopup);
+        input.PopupImageUrl = input.PopupImageUrl?.Trim() ?? string.Empty;
+
+        if (string.Equals(input.TargetAudience, "user", StringComparison.OrdinalIgnoreCase)
+            && (!input.TargetUserId.HasValue || input.TargetUserId.Value <= 0))
+        {
+            ModelState.AddModelError(nameof(input.TargetUserId), "Vui lòng nhập User ID cần gửi.");
+        }
+
+        if (input.ShowPopup
+            && string.Equals(input.PopupType, "image", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(input.PopupImageUrl))
+        {
+            ModelState.AddModelError(nameof(input.PopupImageUrl), "Vui lòng nhập URL ảnh popup.");
+        }
+
+        if (input.ExpiresAt.HasValue && input.ExpiresAt.Value <= DateTime.Now)
+        {
+            ModelState.AddModelError(nameof(input.ExpiresAt), "Thời gian hết hạn phải ở tương lai.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(input);
+        }
+
+        try
+        {
+            var userIds = await ResolveBroadcastUserIdsAsync(input);
+            if (userIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Không tìm thấy người nhận phù hợp với đối tượng đã chọn.");
+                return View(input);
+            }
+
+            var client = CreateOrderingClient();
+            var response = await client.PostAsJsonAsync("/api/orders/admin/notifications/broadcast", new NotificationBroadcastApiRequest
+            {
+                UserIds = userIds,
+                NotificationType = input.NotificationType,
+                Title = input.Title,
+                Message = input.Message,
+                ShowPopup = input.ShowPopup,
+                PopupType = input.PopupType,
+                PopupImageUrl = input.PopupType == "image" ? input.PopupImageUrl : null,
+                ExpiresAt = input.ExpiresAt?.ToUniversalTime()
+            });
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ModelState.AddModelError(string.Empty, await ReadApiErrorAsync(response, "Không thể gửi thông báo broadcast."));
+                return View(input);
+            }
+
+            TempData["SuccessMessage"] = await ReadApiSuccessAsync(response, $"Đã gửi thông báo đến {userIds.Count} người nhận.");
+            return RedirectToAction(nameof(CreateBroadcast));
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError(string.Empty, "Lỗi khi gửi thông báo broadcast: " + ex.Message);
+            return View(input);
+        }
     }
 
     [HttpPost]
@@ -149,6 +225,51 @@ public sealed class NotificationController : LegacySellerControllerBase
         }
 
         return RedirectToIndex(q, type, isRead, userId, orderId, page);
+    }
+
+    private async Task<List<int>> ResolveBroadcastUserIdsAsync(NotificationBroadcastEditorInput input)
+    {
+        if (string.Equals(input.TargetAudience, "user", StringComparison.OrdinalIgnoreCase))
+        {
+            return input.TargetUserId.HasValue && input.TargetUserId.Value > 0
+                ? new List<int> { input.TargetUserId.Value }
+                : new List<int>();
+        }
+
+        if (string.Equals(input.TargetAudience, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var buyersTask = FetchActiveUserIdsByTypeAsync("buyer");
+            var sellersTask = FetchActiveUserIdsByTypeAsync("seller");
+            await Task.WhenAll(buyersTask, sellersTask);
+
+            return buyersTask.Result
+                .Concat(sellersTask.Result)
+                .Distinct()
+                .ToList();
+        }
+
+        return await FetchActiveUserIdsByTypeAsync(input.TargetAudience);
+    }
+
+    private async Task<List<int>> FetchActiveUserIdsByTypeAsync(string userType)
+    {
+        var client = CreateIdentityClient();
+        var query = "take=10000&isActive=true&userType=" + Uri.EscapeDataString(userType);
+
+        var response = await client.GetAsync("/auth/admin/users?" + query);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(await ReadApiErrorAsync(response, "Không thể lấy danh sách người nhận."));
+        }
+
+        var users = await response.Content.ReadFromJsonAsync<List<AdminBroadcastUserApiDto>>(JsonOptions)
+            ?? new List<AdminBroadcastUserApiDto>();
+
+        return users
+            .Where(user => user.userId > 0)
+            .Select(user => user.userId)
+            .Distinct()
+            .ToList();
     }
 
     [HttpPost]
@@ -196,6 +317,20 @@ public sealed class NotificationController : LegacySellerControllerBase
     private HttpClient CreateOrderingClient()
     {
         var client = _httpClientFactory.CreateClient("Ordering");
+        client.DefaultRequestHeaders.Remove("Authorization");
+
+        var token = GetAccessToken(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    private HttpClient CreateIdentityClient()
+    {
+        var client = _httpClientFactory.CreateClient("Identity");
         client.DefaultRequestHeaders.Remove("Authorization");
 
         var token = GetAccessToken(AccessTokenSessionKey);
@@ -255,5 +390,29 @@ public sealed class NotificationController : LegacySellerControllerBase
         }
 
         return fallback;
+    }
+
+    private sealed class AdminBroadcastUserApiDto
+    {
+        public int userId { get; set; }
+    }
+
+    private sealed class NotificationBroadcastApiRequest
+    {
+        public List<int> UserIds { get; set; } = new();
+
+        public string NotificationType { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string Message { get; set; } = string.Empty;
+
+        public bool ShowPopup { get; set; }
+
+        public string PopupType { get; set; } = "text";
+
+        public string? PopupImageUrl { get; set; }
+
+        public DateTime? ExpiresAt { get; set; }
     }
 }

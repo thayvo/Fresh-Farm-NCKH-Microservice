@@ -282,7 +282,7 @@ public sealed class SellerShippingControllerTests
                         storePhone = "0123456789",
                         adminNotificationEmail = "seller@example.com",
                         ghnPickupName = "FreshFarm Seller",
-                        ghnPickupPhone = "0123456789",
+                        ghnPickupPhone = "12345",
                         ghnPickupAddress = "12 Nguyen Hue",
                         ghnDistrictId = 1442,
                         ghnWardCode = "20308",
@@ -308,6 +308,321 @@ public sealed class SellerShippingControllerTests
         Assert.False(payload.GetProperty("success").GetBoolean());
         Assert.Contains("thông tin lấy hàng hợp lệ", payload.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
         Assert.Empty(ghnService.CreateOrderRequests);
+    }
+
+    [Fact]
+    public async Task GetGhnSellerOrigin_AcceptsSandboxPhoneLikePickupNumber()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var identityHandler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/settings/store")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        storeName = "FreshFarm Seller",
+                        storeAddress = "Kho A",
+                        storeEmail = "seller@example.com",
+                        storePhone = "0123456789",
+                        adminNotificationEmail = "seller@example.com",
+                        ghnPickupName = "FreshFarm Seller",
+                        ghnPickupPhone = "0123456789",
+                        ghnPickupAddress = "12 Nguyen Hue",
+                        ghnProvinceId = 202,
+                        ghnDistrictId = 1442,
+                        ghnWardCode = "20308",
+                        hasGhnOrigin = true
+                    })
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var controller = CreateController(orderingHandler, identityHandler, new FakeGhnSandboxService());
+
+        var result = await controller.GetGhnSellerOrigin(CancellationToken.None);
+
+        var payload = ReadJsonResult(result);
+        Assert.True(payload.GetProperty("success").GetBoolean());
+        Assert.True(payload.GetProperty("hasGhnOrigin").GetBoolean());
+        Assert.Equal("Địa chỉ lấy hàng đã sẵn sàng để dùng.", payload.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task MarkReadyForPickup_CreatesGhnWaybill_ThenMarksOrderReady()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/order-info/321")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        success = true,
+                        fullName = "Nguyen Van Buyer",
+                        phone = "0901234567",
+                        email = "buyer@example.com",
+                        address = "45 Nguyen Van Cu, Phuong 1",
+                        shippingFee = 30000m,
+                        itemsAmount = 145000m,
+                        totalAmount = 175000m,
+                        totalQuantity = 3,
+                        itemSummary = "Rau cu tong hop",
+                        paymentMethod = "COD",
+                        isCod = true,
+                        codAmount = 175000m
+                    })
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/internal/321/ghn-metadata")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { success = true })
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { success = true })
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var identityHandler = CreateValidSellerOriginHandler();
+        var ghnService = new FakeGhnSandboxService
+        {
+            CreateOrderResult = new GhnSandboxCreateOrderResult
+            {
+                Success = true,
+                OrderCode = "GHN-321",
+                ClientOrderCode = "FF-ORD-000321",
+                TotalFee = 30000,
+                Message = "GHN OK"
+            }
+        };
+
+        var controller = CreateController(orderingHandler, identityHandler, ghnService);
+
+        var result = await controller.MarkReadyForPickup(new ShippingController.MarkReadyForPickupRequest
+        {
+            OrderId = 321,
+            CurrentStatus = "Pending",
+            ToDistrictId = 1482,
+            ToWardCode = "90777",
+            Height = 13,
+            Length = 24,
+            Width = 22,
+            Weight = 1500
+        }, CancellationToken.None);
+
+        var payload = ReadJsonResult(result);
+        Assert.True(payload.GetProperty("success").GetBoolean());
+        Assert.Equal("Ready", payload.GetProperty("status").GetString());
+        Assert.Equal("GHN-321", payload.GetProperty("orderCode").GetString());
+
+        var createRequest = Assert.Single(ghnService.CreateOrderRequests);
+        Assert.Equal("Nguyen Van Buyer", createRequest.ToName);
+        Assert.Equal(1482, createRequest.ToDistrictId);
+        Assert.Equal("90777", createRequest.ToWardCode);
+        Assert.Equal(13, createRequest.Height);
+        Assert.Equal(24, createRequest.Length);
+        Assert.Equal(22, createRequest.Width);
+        Assert.Equal(1500, createRequest.Weight);
+
+        var metadataIndex = orderingHandler.Requests.FindIndex(request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/internal/321/ghn-metadata");
+        var processingIndex = orderingHandler.Requests.FindIndex(request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status" &&
+            RequestBodyContains(request, "\"newStatus\":\"Processing\""));
+        var readyIndex = orderingHandler.Requests.FindIndex(request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status" &&
+            RequestBodyContains(request, "\"newStatus\":\"Ready\""));
+
+        Assert.InRange(metadataIndex, 0, int.MaxValue);
+        Assert.True(metadataIndex < processingIndex);
+        Assert.True(processingIndex < readyIndex);
+    }
+
+    [Fact]
+    public async Task MarkReadyForPickup_CreatesGhnWaybill_WhenAlreadyReadyButMissingGhnCode()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/order-info/321")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        success = true,
+                        fullName = "Nguyen Van Buyer",
+                        phone = "0901234567",
+                        email = "buyer@example.com",
+                        address = "45 Nguyen Van Cu, Phuong 1",
+                        shippingFee = 30000m,
+                        itemsAmount = 145000m,
+                        totalAmount = 175000m,
+                        totalQuantity = 3,
+                        itemSummary = "Rau cu tong hop",
+                        paymentMethod = "COD",
+                        isCod = true,
+                        codAmount = 175000m
+                    })
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/internal/321/ghn-metadata")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { success = true })
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { success = true })
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var identityHandler = CreateValidSellerOriginHandler();
+        var ghnService = new FakeGhnSandboxService
+        {
+            CreateOrderResult = new GhnSandboxCreateOrderResult
+            {
+                Success = true,
+                OrderCode = "GHN-READY-321",
+                ClientOrderCode = "FF-ORD-000321",
+                TotalFee = 30000,
+                Message = "GHN OK"
+            }
+        };
+
+        var controller = CreateController(orderingHandler, identityHandler, ghnService);
+
+        var result = await controller.MarkReadyForPickup(new ShippingController.MarkReadyForPickupRequest
+        {
+            OrderId = 321,
+            CurrentStatus = "Ready",
+            ToDistrictId = 1482,
+            ToWardCode = "90777",
+            Height = 13,
+            Length = 24,
+            Width = 22,
+            Weight = 1500
+        }, CancellationToken.None);
+
+        var payload = ReadJsonResult(result);
+        Assert.True(payload.GetProperty("success").GetBoolean());
+        Assert.Equal("Ready", payload.GetProperty("status").GetString());
+        Assert.Equal("GHN-READY-321", payload.GetProperty("orderCode").GetString());
+        Assert.True(payload.GetProperty("ghnCreated").GetBoolean());
+
+        var createRequest = Assert.Single(ghnService.CreateOrderRequests);
+        Assert.Equal("Nguyen Van Buyer", createRequest.ToName);
+        Assert.Equal(1482, createRequest.ToDistrictId);
+        Assert.Equal("90777", createRequest.ToWardCode);
+        Assert.Equal(13, createRequest.Height);
+        Assert.Equal(24, createRequest.Length);
+        Assert.Equal(22, createRequest.Width);
+        Assert.Equal(1500, createRequest.Weight);
+
+        Assert.Contains(orderingHandler.Requests, request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/internal/321/ghn-metadata");
+        Assert.DoesNotContain(orderingHandler.Requests, request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status");
+    }
+
+    [Fact]
+    public async Task MarkReadyForPickup_DoesNotMarkReady_WhenGhnWaybillCreationFails()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/shippings/order-info/321")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        success = true,
+                        fullName = "Nguyen Van Buyer",
+                        phone = "0901234567",
+                        email = "buyer@example.com",
+                        address = "45 Nguyen Van Cu, Phuong 1",
+                        shippingFee = 30000m,
+                        itemsAmount = 145000m,
+                        totalAmount = 175000m,
+                        totalQuantity = 3,
+                        itemSummary = "Rau cu tong hop",
+                        paymentMethod = "COD",
+                        isCod = true,
+                        codAmount = 175000m
+                    })
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new { success = true })
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var identityHandler = CreateValidSellerOriginHandler();
+        var ghnService = new FakeGhnSandboxService
+        {
+            CreateOrderResult = new GhnSandboxCreateOrderResult
+            {
+                Success = false,
+                Message = "GHN báo địa chỉ nhận hàng không hợp lệ."
+            }
+        };
+
+        var controller = CreateController(orderingHandler, identityHandler, ghnService);
+
+        var result = await controller.MarkReadyForPickup(new ShippingController.MarkReadyForPickupRequest
+        {
+            OrderId = 321,
+            CurrentStatus = "Pending",
+            ToDistrictId = 1482,
+            ToWardCode = "90777",
+            Height = 13,
+            Length = 24,
+            Width = 22,
+            Weight = 1500
+        }, CancellationToken.None);
+
+        var payload = ReadJsonResult(result);
+        Assert.False(payload.GetProperty("success").GetBoolean());
+        Assert.Contains("GHN", payload.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Single(ghnService.CreateOrderRequests);
+        Assert.DoesNotContain(orderingHandler.Requests, request =>
+            request.Method == HttpMethod.Post &&
+            request.RequestUri?.AbsolutePath == "/api/orders/admin/321/status");
     }
 
     private static ShippingController CreateController(
@@ -359,11 +674,41 @@ public sealed class SellerShippingControllerTests
         };
     }
 
+    private static RecordingHttpMessageHandler CreateValidSellerOriginHandler()
+        => new(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/settings/store")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        storeName = "FreshFarm Seller",
+                        storeAddress = "Kho A",
+                        storeEmail = "seller@example.com",
+                        storePhone = "0911222333",
+                        adminNotificationEmail = "seller@example.com",
+                        ghnPickupName = "FreshFarm Seller",
+                        ghnPickupPhone = "0911222333",
+                        ghnPickupAddress = "12 Nguyen Hue",
+                        ghnDistrictId = 1442,
+                        ghnWardCode = "20308",
+                        hasGhnOrigin = true
+                    })
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
     private static JsonElement ReadJsonResult(JsonResult result)
     {
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
         return json.RootElement.Clone();
     }
+
+    private static bool RequestBodyContains(HttpRequestMessage request, string expected)
+        => request.Content?.ReadAsStringAsync().GetAwaiter().GetResult().Contains(expected, StringComparison.Ordinal) == true;
 
     private static string CreateAccessToken(string userId)
     {

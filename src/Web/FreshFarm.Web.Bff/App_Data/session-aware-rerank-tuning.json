@@ -24,33 +24,9 @@
     "stableWindowCount": 0,
     "stageStartedAtUtc": "2026-04-29T11:29:56.5265722Z",
     "isLocked": false,
-    "computedAtUtc": "2026-05-09T08:51:03.3896737Z",
+    "computedAtUtc": "2026-05-18T19:23:34.7564459Z",
     "reason": "insufficient_data",
     "runs": [
-      {
-        "computedAtUtc": "2026-04-29T11:29:56.5265722Z",
-        "baselineImpressions": 220,
-        "variantImpressions": 110,
-        "baselineCtr": 0,
-        "variantCtr": 0,
-        "baselinePurchaseRate": 0,
-        "variantPurchaseRate": 0,
-        "baselineRevenuePerImpression": 0.000000,
-        "variantRevenuePerImpression": 0.000000,
-        "decision": "warming_up_20_percent"
-      },
-      {
-        "computedAtUtc": "2026-04-29T12:29:56.6574899Z",
-        "baselineImpressions": 220,
-        "variantImpressions": 110,
-        "baselineCtr": 0,
-        "variantCtr": 0,
-        "baselinePurchaseRate": 0,
-        "variantPurchaseRate": 0,
-        "baselineRevenuePerImpression": 0.000000,
-        "variantRevenuePerImpression": 0.000000,
-        "decision": "warming_up_20_percent"
-      },
       {
         "computedAtUtc": "2026-04-29T13:29:56.7563436Z",
         "baselineImpressions": 220,
@@ -97,6 +73,18 @@
         "variantPurchaseRate": 0,
         "baselineRevenuePerImpression": 0.471183,
         "variantRevenuePerImpression": 0.000000,
+        "decision": "rollback_purchase_rate_drop_gt_5_percent"
+      },
+      {
+        "computedAtUtc": "2026-05-15T15:26:47.5253939Z",
+        "baselineImpressions": 30,
+        "variantImpressions": 10,
+        "decision": "rollback_purchase_rate_drop_gt_5_percent"
+      },
+      {
+        "computedAtUtc": "2026-05-15T16:26:47.9021836Z",
+        "baselineImpressions": 50,
+        "variantImpressions": 10,
         "decision": "rollback_purchase_rate_drop_gt_5_percent"
       }
     ],

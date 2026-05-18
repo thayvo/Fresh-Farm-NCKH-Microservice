@@ -3,7 +3,7 @@
 @using System.Linq
 
 @{
-    ViewBag.Title = "Quản Lý Vận Chuyển";
+    ViewBag.Title = "Giám sát vận chuyển";
     Layout = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
 
     var provinces = ViewBag.Provinces as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>());
@@ -15,9 +15,6 @@
     int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
     int totalItems = ViewBag.TotalItems is int ti ? ti : 0;
     var shippingRows = Model?.ToList() ?? new List<FreshFarm.Web.Bff.Areas.Seller.Models.Shipping>();
-
-    var staffsSrc = ViewBag.DeliveryStaffs as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>();
-    var selectedStaff = ViewBag.CurrentStaffId != null ? ViewBag.CurrentStaffId.ToString() : null;
 
     Func<string, string, IHtmlContent> SoftBadge = (text, cls) =>
         new HtmlString($"<span class='px-3 py-1 rounded-pill border text-nowrap {cls}' style='font-size:.8rem'>{text}</span>");
@@ -31,7 +28,7 @@
         {
             case "Pending": return SoftBadge("Chờ xử lý", "bg-body-tertiary text-secondary border-secondary-subtle");
             case "Processing": return SoftBadge("Đang xử lý", "bg-warning-subtle text-warning-emphasis border-warning-subtle");
-            case "Ready": return SoftBadge("Đã xử lý", "bg-primary-subtle text-primary-emphasis border-primary-subtle");
+            case "Ready": return SoftBadge("Chờ shipper lấy", "bg-primary-subtle text-primary-emphasis border-primary-subtle");
             case "Shipped": return SoftBadge("Đang giao", "bg-info-subtle text-info-emphasis border-info-subtle");
             case "Delivered":
                 var pay = o.Payments?.FirstOrDefault(p => p.PaymentMethod == "COD");
@@ -384,8 +381,8 @@
                                 <i class="bi bi-truck text-white" style="font-size: 2.5rem;"></i>
                             </div>
                             <div>
-                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">Quản Lý Vận Chuyển</h1>
-                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">Theo dõi và quản lý đơn hàng vận chuyển hiệu quả</p>
+                                <h1 class="fw-bold mb-1 text-white" style="font-size: 2.5rem; text-shadow: 0 4px 12px rgba(0,0,0,0.3);">Giám sát vận chuyển</h1>
+                                <p class="mb-0 text-white opacity-90" style="font-size: 1.125rem; text-shadow: 0 2px 8px rgba(0,0,0,0.2);">Theo dõi SLA, trạng thái giao hàng và đối soát COD trên toàn sàn</p>
                             </div>
                         </div>
                     </div>
@@ -640,15 +637,6 @@
                 </div>
 
                 <div class="col-12 col-md-6 col-lg-3">
-                    <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                    @Html.DropDownList(
-                        "staffId",
-                        new SelectList(staffsSrc, "Value", "Text", selectedStaff),
-                        "Tất cả nhân viên",
-                        new { @class = "form-select" })
-                </div>
-
-                <div class="col-12 col-md-6 col-lg-3">
                     <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-search me-2"></i> Tìm kiếm</label>
                     <div class="search-icon-wrapper">
                         <i class="bi bi-search"></i>
@@ -681,20 +669,19 @@
                         <tr>
                             <th class="px-4">#</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "code_asc" ? "code_desc" : "code_asc") })">
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "code_asc" ? "code_desc" : "code_asc") })">
                                     <i class="bi bi-box-seam"></i> Mã đơn hàng
                                 </a>
                             </th>
-                            <th class="px-4"><i class="bi bi-person-badge me-1"></i> NV giao hàng</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "receiver_asc" ? "receiver_desc" : "receiver_asc") })">
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "receiver_asc" ? "receiver_desc" : "receiver_asc") })">
                                     <i class="bi bi-person"></i> Người nhận
                                 </a>
                             </th>
                             <th class="px-4"><i class="bi bi-telephone me-1"></i> SĐT</th>
                             <th class="px-4"><i class="bi bi-geo-alt me-1"></i> Địa chỉ</th>
                             <th class="px-4">
-                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "status_asc" ? "status_desc" : "status_asc") })">
+                                <a class="text-decoration-none d-flex align-items-center gap-2" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, pageSize = pageSize, sort = (ViewBag.CurrentSort == "status_asc" ? "status_desc" : "status_asc") })">
                                     <i class="bi bi-info-circle"></i> Trạng thái
                                 </a>
                             </th>
@@ -709,10 +696,7 @@
                                 var i = 0;
                                 foreach (var item in shippingRows)
                                 {
-                                    <tr data-has-assign="@((item.Order != null && item.Order.DeliveryAssignments != null
-                                                            && item.Order.DeliveryAssignments.Any(da => da.IsActive && da.AssignedToAdminID.HasValue))
-                                                            .ToString().ToLower())"
-                                        data-order-status="@((item.Order?.Status ?? "").ToLower())"
+                                    <tr data-order-status="@((item.Order?.Status ?? "").ToLower())"
                                         data-ghn-order-label="@("#DH" + item.OrderID.ToString().PadLeft(5, '0'))"
                                         data-ghn-order-id="@item.OrderID"
                                         data-ghn-name="@item.FullName"
@@ -733,49 +717,19 @@
                                                 <span class="order-code">@("#DH" + item.OrderID.ToString().PadLeft(5, '0'))</span>
                                             </div>
                                         </td>
-                                        <td class="px-4">
-                                            @{
-                                                var activeAssign = (item.Order != null && item.Order.DeliveryAssignments != null)
-                                                    ? item.Order.DeliveryAssignments.Where(da => da.IsActive && da.AssignedToAdminID.HasValue)
-                                                        .OrderByDescending(da => da.UpdatedAt ?? da.CreatedAt)
-                                                        .FirstOrDefault()
-                                                    : null;
-                                                var staffName = activeAssign != null
-                                                    ? (!string.IsNullOrWhiteSpace(activeAssign.UserAdmin?.FullName)
-                                                        ? activeAssign.UserAdmin.FullName
-                                                        : (activeAssign.AssignedToAdminID is int assignedAdminId ? $"NV #{assignedAdminId:D4}" : "Chưa phân công"))
-                                                    : "Chưa phân công";
-                                            }
-                                            <div class="d-flex align-items-center gap-2">
-                                                <div class="p-2 rounded-3" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
-                                                    <i class="bi bi-person text-primary"></i>
-                                                </div>
-                                                <span class="fw-medium">@staffName</span>
-                                            </div>
-                                        </td>
                                         <td class="px-4"><span class="fw-semibold text-primary-blue">@item.FullName</span></td>
                                         <td class="px-4"><div class="d-flex align-items-center gap-2"><i class="bi bi-telephone-fill text-success"></i><span class="font-monospace">@item.Phone</span></div></td>
                                         <td class="px-4">
-                                            @if (item.IsStorePickup)
-                                            {
-                                                <div class="d-flex flex-column gap-1">
-                                                    <span class="badge rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</span>
-                                                    <small class="text-muted">@item.StoreAddress</small>
+                                            <div class="d-flex align-items-start gap-2">
+                                                <i class="bi bi-geo-alt-fill text-danger mt-1"></i>
+                                                <div class="text-truncate" style="max-width:340px">
+                                                    <span class="fw-medium">@(!string.IsNullOrWhiteSpace(item.AddressDetail) ? item.AddressDetail : "Chưa có địa chỉ giao hàng")</span>
+                                                    @if (item.Commune != null)
+                                                    {<text>, @item.Commune.CommuneName</text>}
+                                                    @if (item.Province != null)
+                                                    {<text>, @item.Province.ProvinceName</text>}
                                                 </div>
-                                            }
-                                            else
-                                            {
-                                                <div class="d-flex align-items-start gap-2">
-                                                    <i class="bi bi-geo-alt-fill text-danger mt-1"></i>
-                                                    <div class="text-truncate" style="max-width:340px">
-                                                        <span class="fw-medium">@item.AddressDetail</span>
-                                                        @if (item.Commune != null)
-                                                        {<text>, @item.Commune.CommuneName</text>}
-                                                        @if (item.Province != null)
-                                                        {<text>, @item.Province.ProvinceName</text>}
-                                                    </div>
-                                                </div>
-                                            }
+                                            </div>
                                         </td>
                                         <td class="px-4">
                                             <div class="d-flex flex-column gap-2">
@@ -798,7 +752,6 @@
                                         <td class="text-center px-4">
                                             <div class="btn-group" role="group">
                                                 <button type="button" class="btn btn-sm btn-outline-primary btn-action btn-edit" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#editShippingModal" title="Sửa"><i class="bi bi-pencil-square"></i></button>
-                                                <button type="button" class="btn btn-sm btn-outline-danger btn-action btn-delete" data-id="@item.ShippingID" data-bs-toggle="modal" data-bs-target="#deleteModal" title="Xóa"><i class="bi bi-trash3"></i></button>
                                                 @{ var cod = item.Order?.Payments?.FirstOrDefault(p => p.PaymentMethod == "COD"); bool codDone = cod == null ? true : (cod.PaymentDate.HasValue || (!string.IsNullOrWhiteSpace(cod.PaymentStatus) && paidStatuses.Any(s => string.Equals(s, cod.PaymentStatus, System.StringComparison.OrdinalIgnoreCase)))); }
                                                 @if (item.Order?.Status == "Delivered" && !codDone)
                                                 {<button type="button" class="btn btn-sm btn-outline-success btn-action btn-reconcile" data-orderid="@item.OrderID" title="Đánh dấu ĐÃ đối soát COD"><i class="bi bi-check2-circle"></i></button>}
@@ -842,17 +795,17 @@
                     </div>
                     <ul class="pagination mb-0">
                         <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = currentPage - 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-left"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = currentPage - 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-left"></i></a>
                         </li>
                         @{ int start = Math.Max(1, currentPage - 2); int end = Math.Min(totalPages, currentPage + 2); }
                         @for (int p = start; p <= end; p++)
                         {
                             <li class="page-item @(p == currentPage ? "active" : "")">
-                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = p, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })">@p</a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = p, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })">@p</a>
                             </li>
                         }
                         <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-                            <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = currentPage + 1, status = currentStatus, deliveredState = deliveredState, staffId = ViewBag.CurrentStaffId, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-right"></i></a>
+                                <a class="page-link" href="@Url.Action("ManageShipping", "Shipping", new { area = "Admin", page = currentPage + 1, status = currentStatus, deliveredState = deliveredState, q = ViewBag.CurrentQuery, sort = ViewBag.CurrentSort, pageSize = pageSize })"><i class="bi bi-chevron-right"></i></a>
                         </li>
                     </ul>
                 </div>
@@ -883,18 +836,6 @@
                             @Html.DropDownList("OrderID", (SelectList)ViewBag.Orders, "-- Chọn đơn hàng --", new { @class = "form-select", id = "OrderID", required = "required" })
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                            @Html.DropDownList("DeliveryStaffId", (SelectList)ViewBag.DeliveryStaffs, "-- Chọn nhân viên --", new { @class = "form-select", id = "DeliveryStaffId" })
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-3 border" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="IsStorePickup" name="IsStorePickup" value="true" style="width: 3rem; height: 1.5rem;">
-                                    <label class="form-check-label fw-semibold ms-2" for="IsStorePickup"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person me-2"></i> Người nhận <span class="text-danger">*</span></label>
                             <input type="text" name="FullName" id="FullName" class="form-control" placeholder="Nhập họ tên người nhận" required />
                         </div>
@@ -910,21 +851,16 @@
                             <div class="col-12"><div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-geo-alt-fill text-danger"></i>Thông tin giao hàng</h6></div></div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary-blue">Tỉnh/Thành phố <span class="text-danger">*</span></label>
-                                @Html.DropDownList("ProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "ProvinceId" })
+                                @Html.DropDownList("ProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "ProvinceId", required = "required" })
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary-blue">Xã/Phường <span class="text-danger">*</span></label>
-                                <select id="CommuneId" name="CommuneId" class="form-select"><option value="">-- Chọn Xã/Phường --</option></select>
+                                <select id="CommuneId" name="CommuneId" class="form-select" required><option value="">-- Chọn Xã/Phường --</option></select>
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết <span class="text-danger">*</span></label>
-                                <input type="text" id="AddressDetail" name="AddressDetail" class="form-control" placeholder="Số nhà, tên đường..." />
+                                <input type="text" id="AddressDetail" name="AddressDetail" class="form-control" placeholder="Số nhà, tên đường..." required />
                             </div>
-                        </div>
-                        <div id="storePickupInfo" style="display:none" class="col-12">
-                            <div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-shop text-info"></i>Thông tin cửa hàng</h6></div>
-                            <label class="form-label fw-semibold text-primary-blue">Địa chỉ cửa hàng <span class="text-danger">*</span></label>
-                            <input type="text" id="StoreAddress" name="StoreAddress" class="form-control" placeholder="Nhập địa chỉ cửa hàng" />
                         </div>
                     </form>
                 </div>
@@ -948,18 +884,6 @@
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="ShippingID" id="EditShippingID" />
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person-badge me-2"></i> Nhân viên giao hàng</label>
-                            @Html.DropDownList("DeliveryStaffId", (SelectList)ViewBag.DeliveryStaffs, "-- Chọn nhân viên --", new { @class = "form-select", id = "EditDeliveryStaffId" })
-                        </div>
-                        <div class="col-md-6">
-                            <div class="p-3 rounded-3 border" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="EditIsStorePickup" name="IsStorePickup" value="true" style="width: 3rem; height: 1.5rem;">
-                                    <label class="form-check-label fw-semibold ms-2" for="EditIsStorePickup"><i class="bi bi-shop me-1"></i> Nhận tại cửa hàng</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label fw-semibold text-primary-blue"><i class="bi bi-person me-2"></i> Người nhận <span class="text-danger">*</span></label>
                             <input type="text" name="FullName" id="EditFullName" class="form-control" required />
                         </div>
@@ -975,21 +899,16 @@
                             <div class="col-12"><div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-geo-alt-fill text-danger"></i>Thông tin giao hàng</h6></div></div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary-blue">Tỉnh/Thành phố <span class="text-danger">*</span></label>
-                                @Html.DropDownList("EditProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "EditProvinceId" })
+                                @Html.DropDownList("EditProvinceId", provinces, "-- Chọn tỉnh/thành --", new { @class = "form-select", id = "EditProvinceId", required = "required" })
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary-blue">Xã/Phường <span class="text-danger">*</span></label>
-                                <select id="EditCommuneId" name="CommuneId" class="form-select"><option value="">-- Chọn Xã/Phường --</option></select>
+                                <select id="EditCommuneId" name="CommuneId" class="form-select" required><option value="">-- Chọn Xã/Phường --</option></select>
                             </div>
                             <div class="col-12">
                                 <label class="form-label fw-semibold text-primary-blue">Địa chỉ chi tiết <span class="text-danger">*</span></label>
-                                <input type="text" id="EditAddressDetail" name="AddressDetail" class="form-control" />
+                                <input type="text" id="EditAddressDetail" name="AddressDetail" class="form-control" required />
                             </div>
-                        </div>
-                        <div id="editStorePickupInfo" style="display:none" class="col-12">
-                            <div class="border-top pt-3"><h6 class="fw-bold mb-3 d-flex align-items-center gap-2 text-primary-blue"><i class="bi bi-shop text-info"></i>Thông tin cửa hàng</h6></div>
-                            <label class="form-label fw-semibold text-primary-blue">Địa chỉ cửa hàng <span class="text-danger">*</span></label>
-                            <input type="text" id="EditStoreAddress" name="StoreAddress" class="form-control" />
                         </div>
                     </form>
                 </div>
@@ -1001,23 +920,6 @@
         </div>
     </div>
 
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header bg-danger"><h5 class="modal-title fw-bold d-flex align-items-center gap-2 text-white"><i class="bi bi-exclamation-triangle"></i>Xác nhận xóa</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
-                <div class="modal-body p-4 text-center">
-                    <div class="mb-4"><div class="p-4 rounded-circle d-inline-flex" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);"><i class="bi bi-trash3" style="font-size: 3rem; color: #dc2626;"></i></div></div>
-                    <h5 class="fw-bold mb-2">Bạn có chắc chắn muốn xóa?</h5>
-                    <p class="text-muted mb-0">Hành động này không thể hoàn tác. Thông tin vận chuyển sẽ bị xóa vĩnh viễn.</p>
-                </div>
-                <div class="modal-footer p-4 border-top justify-content-center">
-                    <form id="deleteForm">@Html.AntiForgeryToken()<input type="hidden" id="DeleteId" name="id" /></form>
-                    <button type="button" class="btn btn-light btn-pill px-4" data-bs-dismiss="modal"><i class="bi bi-x-circle me-2"></i>Hủy</button>
-                    <button type="button" class="btn btn-danger btn-pill px-4" id="btnConfirmDelete"><i class="bi bi-trash3 me-2"></i>Xóa ngay</button>
-                </div>
-            </div>
-        </div>
-    </div>
 }
 
 @section scripts {
@@ -1645,29 +1547,6 @@
             }
         }
 
-        function toggleAddFormValidation(isStorePickup) {
-            const delivery = document.getElementById('deliveryInfo');
-            const store = document.getElementById('storePickupInfo');
-            const province = document.getElementById('ProvinceId');
-            const commune = document.getElementById('CommuneId');
-            const address = document.getElementById('AddressDetail');
-            const storeAddr = document.getElementById('StoreAddress');
-            if (!delivery || !store) return;
-            if (isStorePickup) { delivery.style.display = 'none'; store.style.display = 'block'; province?.removeAttribute('required'); commune?.removeAttribute('required'); address?.removeAttribute('required'); storeAddr?.setAttribute('required', 'required'); }
-            else { delivery.style.display = 'block'; store.style.display = 'none'; province?.setAttribute('required', 'required'); commune?.setAttribute('required', 'required'); address?.setAttribute('required', 'required'); storeAddr?.removeAttribute('required'); }
-        }
-        function toggleEditFormValidation(isStorePickup) {
-            const delivery = document.getElementById('editDeliveryInfo');
-            const store = document.getElementById('editStorePickupInfo');
-            const province = document.getElementById('EditProvinceId');
-            const commune = document.getElementById('EditCommuneId');
-            const address = document.getElementById('EditAddressDetail');
-            const storeAddr = document.getElementById('EditStoreAddress');
-            if (!delivery || !store) return;
-            if (isStorePickup) { delivery.style.display = 'none'; store.style.display = 'block'; province?.removeAttribute('required'); commune?.removeAttribute('required'); address?.removeAttribute('required'); storeAddr?.setAttribute('required', 'required'); }
-            else { delivery.style.display = 'block'; store.style.display = 'none'; province?.setAttribute('required', 'required'); commune?.setAttribute('required', 'required'); address?.setAttribute('required','required'); storeAddr?.removeAttribute('required'); }
-        }
-
         // Load danh sách xã/phường theo tỉnh được chọn
         function loadCommunes(provinceSelectId, communeSelectId, callback) {
             const provinceSelect = document.getElementById(provinceSelectId);
@@ -1734,9 +1613,6 @@
           }
         });
 
-        document.getElementById('IsStorePickup')?.addEventListener('change', function(){ toggleAddFormValidation(this.checked); });
-        document.getElementById('EditIsStorePickup')?.addEventListener('change', function(){ toggleEditFormValidation(this.checked); });
-
         document.getElementById('OrderID')?.addEventListener('change', function(){
           const id=this.value;
           if(!id) {
@@ -1790,7 +1666,6 @@
         document.getElementById('btnAddNew')?.addEventListener('click', function(){
           const f = document.getElementById('addShippingForm');
           if (f) f.reset();
-          toggleAddFormValidation(false);
           const c = document.getElementById('CommuneId');
           if (c) c.innerHTML = '<option value="">-- Chọn Xã/Phường --</option>';
         });
@@ -1825,16 +1700,6 @@
           const modal = document.getElementById('editShippingModal');
           const body  = modal.querySelector('.modal-body');
           const bak   = body.innerHTML;
-          try {
-              const row = this.closest('tr');
-              const hasActiveAssign = row?.getAttribute('data-has-assign') === 'true';
-              const statusRaw = (row?.getAttribute('data-order-status') || '').toLowerCase();
-              const isCanceled = statusRaw === 'canceled';
-              if (hasActiveAssign && !isCanceled) {
-                  showNotification('Đơn đã có người giao, không thể sửa (chỉ được sửa khi đơn bị hủy).', 'danger');
-                  return;
-              }
-          } catch {}
           body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">Đang tải dữ liệu...</p></div>';
 
           try { bootstrap.Modal.getOrCreateInstance(modal).show(); } catch {}
@@ -1844,25 +1709,17 @@
               body.innerHTML = bak;
               if(!d || !d.success){ showNotification('Không tải được dữ liệu','danger'); return; }
               document.getElementById('EditShippingID').value = d.shippingID;
-              const s = document.getElementById('EditDeliveryStaffId'); if(s) s.value = d.deliveryStaffId || '';
               document.getElementById('EditFullName').value   = d.fullName || '';
               document.getElementById('EditPhone').value      = d.phone    || '';
               document.getElementById('EditEmail').value      = d.email    || '';
-              document.getElementById('EditIsStorePickup').checked = d.isStorePickup === true;
-              toggleEditFormValidation(d.isStorePickup === true);
-
-              if(d.isStorePickup){
-                document.getElementById('EditStoreAddress').value = d.storeAddress || '';
-              } else {
-                if(d.provinceId){
-                  const pv = document.getElementById('EditProvinceId');
-                  pv.value = d.provinceId;
-                  loadCommunes('EditProvinceId', 'EditCommuneId', function() {
-                      if(d.communeId) document.getElementById('EditCommuneId').value = d.communeId;
-                  });
-                }
-                document.getElementById('EditAddressDetail').value = d.addressDetail || '';
+              if(d.provinceId){
+                const pv = document.getElementById('EditProvinceId');
+                pv.value = d.provinceId;
+                loadCommunes('EditProvinceId', 'EditCommuneId', function() {
+                    if(d.communeId) document.getElementById('EditCommuneId').value = d.communeId;
+                });
               }
+              document.getElementById('EditAddressDetail').value = d.addressDetail || '';
             })
             .catch(()=>{ body.innerHTML = bak; showNotification('Có lỗi xảy ra khi tải dữ liệu!','danger'); });
         }));
@@ -1885,34 +1742,6 @@
             showNotification(d.message, d.success?'success':'danger');
             if(d.success){
               bootstrap.Modal.getInstance(document.getElementById('editShippingModal')).hide();
-              setTimeout(()=>location.reload(),800);
-            }
-          })
-          .catch(()=>showNotification('Có lỗi xảy ra!','danger'))
-          .finally(()=>{ btn.disabled=false; btn.innerHTML=old; });
-        });
-
-        let currentDeleteId = 0;
-        document.querySelectorAll('.btn-delete').forEach(b=>b.addEventListener('click', function(){
-          currentDeleteId = this.getAttribute('data-id');
-          document.getElementById('DeleteId').value = currentDeleteId;
-        }));
-        document.getElementById('btnConfirmDelete')?.addEventListener('click', function(){
-          const form=document.getElementById('deleteForm');
-          const fd=new FormData(form);
-          const btn=this, old=btn.innerHTML;
-          btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Đang xóa...';
-
-          fetch('@Url.Action("Delete","Shipping", new { area = "Admin" })', {
-            method:'POST',
-            credentials:'same-origin',
-            body:fd
-          })
-          .then(r=>r.json())
-          .then(d=>{
-            showNotification(d.message, d.success?'success':'danger');
-            if(d.success){
-              bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
               setTimeout(()=>location.reload(),800);
             }
           })

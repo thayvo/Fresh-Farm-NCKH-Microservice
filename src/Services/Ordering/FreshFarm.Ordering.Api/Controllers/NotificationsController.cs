@@ -47,7 +47,8 @@ public sealed class NotificationsController : ControllerBase
 
         var baseQuery = _db.CustomerNotifications
             .AsNoTracking()
-            .Where(x => x.UserId == userId.Value);
+            .Where(x => x.UserId == userId.Value)
+            .Where(x => !x.ExpiresAt.HasValue || x.ExpiresAt.Value > DateTime.UtcNow);
 
         var filteredQuery = ApplyFilters(baseQuery, q, type, isRead, recentOnly);
 
@@ -86,7 +87,10 @@ public sealed class NotificationsController : ControllerBase
                 message = x.Message,
                 isRead = x.IsRead ?? false,
                 isPushNotification = x.IsPushNotification ?? false,
+                popupType = x.PopupType,
+                popupImageUrl = x.PopupImageUrl,
                 createdAt = x.CreatedAt,
+                expiresAt = x.ExpiresAt,
                 readAt = x.ReadAt
             })
             .ToListAsync(cancellationToken);
@@ -114,6 +118,46 @@ public sealed class NotificationsController : ControllerBase
             },
             notifications = rows
         });
+    }
+
+    [HttpGet("home-popup")]
+    public async Task<IActionResult> GetHomePopup(CancellationToken cancellationToken = default)
+    {
+        var userId = TryGetUserIdFromToken();
+        if (!userId.HasValue)
+        {
+            return Unauthorized(new { message = "Token khong co claim user id hop le." });
+        }
+
+        var now = DateTime.UtcNow;
+        var popup = await _db.CustomerNotifications
+            .AsNoTracking()
+            .Where(x => x.UserId == userId.Value)
+            .Where(x => !(x.IsRead ?? false))
+            .Where(x => x.IsPushNotification ?? false)
+            .Where(x => !x.ExpiresAt.HasValue || x.ExpiresAt.Value > now)
+            .Where(x => x.PopupType == "image" || x.PopupType == "text" || x.PopupType == null || x.PopupType == "")
+            .OrderByDescending(x => x.CreatedAt ?? DateTime.MinValue)
+            .ThenByDescending(x => x.NotificationId)
+            .Select(x => new
+            {
+                notificationId = x.NotificationId,
+                notificationType = x.NotificationType,
+                title = x.Title,
+                message = x.Message,
+                popupType = x.PopupType == null || x.PopupType == "" ? "text" : x.PopupType,
+                popupImageUrl = x.PopupImageUrl,
+                createdAt = x.CreatedAt,
+                expiresAt = x.ExpiresAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (popup is null)
+        {
+            return NoContent();
+        }
+
+        return Ok(popup);
     }
 
     [HttpPost("{id:int}/mark-read")]
@@ -152,7 +196,9 @@ public sealed class NotificationsController : ControllerBase
         }
 
         var query = ApplyFilters(
-            _db.CustomerNotifications.Where(x => x.UserId == userId.Value),
+            _db.CustomerNotifications
+                .Where(x => x.UserId == userId.Value)
+                .Where(x => !x.ExpiresAt.HasValue || x.ExpiresAt.Value > DateTime.UtcNow),
             request?.Q,
             request?.Type,
             request?.IsRead,

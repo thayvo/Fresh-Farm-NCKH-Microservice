@@ -122,7 +122,10 @@ public sealed class CustomerNotificationService
             Message = message,
             IsRead = false,
             IsPushNotification = false,
-            CreatedAt = DateTime.UtcNow
+            PopupType = "none",
+            PopupImageUrl = null,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = null
         });
 
         await _db.SaveChangesAsync(cancellationToken);
