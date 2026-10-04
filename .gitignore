@@ -80,3 +80,18 @@ scripts/generate_freshfarm_report.py
 
 # Local JWT scratch file (contains real signing key)
 tmp-jwt.cs
+
+# Internal workspace docs and scratch (kept local only)
+/BCNT_V2.docx
+/CONTINUITY.md
+/Dat
+/SignIn
+/Xem
+/LOT_4_5_PERSISTENCE_HARDENING.md
+/LOT_5_0_INVENTORY_MAPPING.md
+/LOT_5_6_HARDENING_AUDIT.md
+/ROADMAP_SELLER_ADMIN_MIGRATION.md
+/SYSTEM_AUDIT_2026-02-26.md
+/finalBaoMat.docx
+/finalBaoMat_source.md
+/usecase.docx
