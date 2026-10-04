@@ -10,7 +10,6 @@ using FreshFarm.Web.Bff.Services;
 
 namespace FreshFarm.Web.Bff.Controllers;
 
-[AllowAnonymous]
 [ApiController]
 [Route("bff/events")]
 public sealed class BffRecommendationEventsController : ControllerBase

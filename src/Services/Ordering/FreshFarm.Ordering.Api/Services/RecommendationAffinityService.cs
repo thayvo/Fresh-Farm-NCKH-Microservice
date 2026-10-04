@@ -3,6 +3,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FreshFarm.Ordering.Api.Services;
 
+// Service build các bảng dữ liệu gợi ý theo batch/offline.
+// Luồng chính:
+// - Sản phẩm -> sản phẩm: RecommendationProductAffinity, RecommendationBasketAffinity.
+// - User -> danh mục: RecommendationUserCategoryScore.
+// - User -> seller/người bán: RecommendationUserSellerScore.
+// - Home/session -> sản phẩm: RecommendationHomePreferenceSeed, RecommendationHomeCollaborativeCandidate.
+// - Mua lại định kỳ: RecommendationReplenishmentProfile.
 public sealed class RecommendationAffinityService
 {
     private static readonly string[] SuccessfulOrderStatuses = ["delivered", "completed"];
@@ -41,6 +48,9 @@ public sealed class RecommendationAffinityService
     public async Task<RecommendationAffinityRefreshResult> RebuildAsync(CancellationToken cancellationToken)
     {
         var lookbackFromUtc = DateTime.UtcNow.Subtract(LookbackWindow);
+
+        // Lưu quan hệ sản phẩm -> sản phẩm trong bộ nhớ trước khi ghi xuống bảng RecommendationProductAffinity.
+        // Mỗi cặp gồm sản phẩm gốc và sản phẩm ứng viên thường được mua/xem/click cùng nhau.
         var affinityByPair = new Dictionary<(int SeedProductId, int CandidateProductId), RecommendationProductAffinity>(capacity: 2048);
 
         void AddSignal(int seedProductId, int candidateProductId, Action<RecommendationProductAffinity> apply)
@@ -164,6 +174,9 @@ public sealed class RecommendationAffinityService
         }
 
         var computedAt = DateTime.UtcNow;
+
+        // Chốt điểm gợi ý sản phẩm -> sản phẩm từ 3 tín hiệu: mua cùng đơn, click cùng phiên, xem cùng phiên.
+        // Dữ liệu này phục vụ các khu vực "sản phẩm liên quan" hoặc ứng viên gợi ý dựa trên sản phẩm đang xem.
         var materializedRows = affinityByPair.Values
             .Select(affinity =>
             {
@@ -197,6 +210,9 @@ public sealed class RecommendationAffinityService
             computedAt,
             computedAt,
             cancellationToken);
+
+        // Các nhóm dữ liệu bên dưới là phần materialize chính của hệ gợi ý:
+        // user-product, user-category, user-seller, basket, mua lại định kỳ và gợi ý trang chủ.
         var userProductScores = await BuildUserProductScoresAsync(
             DateTime.UtcNow.Subtract(ReplenishmentLookbackWindow),
             computedAt,
@@ -403,6 +419,8 @@ public sealed class RecommendationAffinityService
         IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         CancellationToken cancellationToken)
     {
+        // Seed trang chủ là các sản phẩm đã thể hiện sở thích mạnh trong từng scope.
+        // Scope có thể là user thật hoặc session ẩn danh, nên bảng này giúp trang chủ vẫn có gợi ý khi chưa đủ hồ sơ dài hạn.
         var seedsByScope = new Dictionary<(string ScopeType, string ScopeKey, int ProductId), RecommendationHomePreferenceSeed>();
 
         void UpdateSeed(string scopeType, string scopeKey, int? userId, int productId, Action<RecommendationHomePreferenceSeed> apply)
@@ -624,6 +642,8 @@ public sealed class RecommendationAffinityService
         IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         DateTime computedAt)
     {
+        // Từ các seed trang chủ, mở rộng sang sản phẩm ứng viên bằng bảng sản phẩm -> sản phẩm.
+        // Đây là lớp collaborative cho home/session: người dùng thích A thì gợi ý thêm B thường đi cùng A.
         if (homePreferenceSeeds.Count == 0 || productAffinities.Count == 0)
         {
             return new List<RecommendationHomeCollaborativeCandidate>();
@@ -710,6 +730,8 @@ public sealed class RecommendationAffinityService
         IReadOnlyDictionary<(int UserId, int ProductId), RecommendationNegativeFeedbackScore> negativeFeedbackScores,
         CancellationToken cancellationToken)
     {
+        // Gom các hành vi view/click/mua theo từng user-product để tính điểm sở thích trực tiếp.
+        // Điểm này là nền cho user -> sản phẩm và cũng được dùng để suy ra user -> danh mục.
         var scoresByUserProduct = new Dictionary<(int UserId, int ProductId), RecommendationUserProductScore>();
 
         void UpdateScore(int userId, int productId, Action<RecommendationUserProductScore> apply)
@@ -867,6 +889,8 @@ public sealed class RecommendationAffinityService
         DateTime computedAt,
         CancellationToken cancellationToken)
     {
+        // Gom hành vi của user theo người bán để biết user có xu hướng quan tâm/mua từ seller nào.
+        // Bảng này phục vụ hướng gợi ý user -> seller/người bán.
         var scoresByUserSeller = new Dictionary<(int UserId, int SellerId), RecommendationUserSellerScore>();
 
         void UpdateScore(int userId, int sellerId, Action<RecommendationUserSellerScore> apply)
@@ -1001,6 +1025,8 @@ public sealed class RecommendationAffinityService
         DateTime computedAt,
         CancellationToken cancellationToken)
     {
+        // Suy ra sở thích danh mục từ các sản phẩm user đã tương tác.
+        // Nếu user thường xem/click/mua sản phẩm thuộc danh mục nào thì danh mục đó có điểm cao hơn.
         if (userProductScores.Count == 0)
         {
             return new List<RecommendationUserCategoryScore>();
@@ -1102,6 +1128,8 @@ public sealed class RecommendationAffinityService
         IReadOnlyCollection<RecommendationProductAffinity> productAffinities,
         DateTime computedAt)
     {
+        // Dữ liệu giỏ hàng chỉ lấy các cặp có tín hiệu mua cùng đơn.
+        // Mục tiêu là gợi ý sản phẩm đi kèm khi user đang xem giỏ hàng hoặc chuẩn bị mua.
         return productAffinities
             .Where(item => item.CoPurchaseOrderCount > 0)
             .Select(item => new RecommendationBasketAffinity
@@ -1127,6 +1155,8 @@ public sealed class RecommendationAffinityService
         DateTime computedAt,
         CancellationToken cancellationToken)
     {
+        // Phân tích chu kỳ mua lại của từng user-product.
+        // Dùng cho nhóm sản phẩm có khả năng cần mua lại định kỳ, ví dụ thực phẩm tiêu dùng lặp lại.
         var purchaseRows = await (
                 from order in _db.Orders.AsNoTracking()
                 join detail in _db.OrderDetails.AsNoTracking() on order.OrderId equals detail.OrderId

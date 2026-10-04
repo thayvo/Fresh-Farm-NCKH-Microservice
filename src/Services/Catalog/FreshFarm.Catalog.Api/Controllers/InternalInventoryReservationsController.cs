@@ -1,5 +1,6 @@
 using FreshFarm.Catalog.Api.Models;
 using FreshFarm.Catalog.Api.Options;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,6 +10,7 @@ namespace FreshFarm.Catalog.Api.Controllers;
 [ApiController]
 [ApiExplorerSettings(IgnoreApi = true)]
 [Route("internal/inventory/reservations")]
+[AllowAnonymous] // JWT is intentionally bypassed; every action validates the configured X-Service-Key.
 public sealed class InternalInventoryReservationsController : ControllerBase
 {
     private const string ServiceKeyHeaderName = "X-Service-Key";

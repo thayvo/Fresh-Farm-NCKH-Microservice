@@ -20,7 +20,6 @@ public sealed class BffProductReviewsController : Controller
     }
 
     [HttpGet("products/{productId:int}")]
-    [AllowAnonymous]
     [EnableRateLimiting("public-read")]
     public async Task<IActionResult> GetByProduct([FromRoute] int productId)
     {

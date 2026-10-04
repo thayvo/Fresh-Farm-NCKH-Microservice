@@ -139,18 +139,25 @@ public sealed class FinanceController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GeneratePayouts(string? q, string? status, string? followUpBucket, int? sellerId, int page = 1)
+    public async Task<IActionResult> GeneratePayouts(string? q, string? status, string? followUpBucket, int? sellerId, bool releaseNow = false, int page = 1)
     {
         try
         {
             var client = CreateOrderingClient();
-            var endpoint = sellerId.HasValue && sellerId.Value > 0
-                ? $"/api/orders/admin/finance/payouts/generate?sellerId={sellerId.Value}"
-                : "/api/orders/admin/finance/payouts/generate";
+            var query = new List<string>();
+            if (sellerId.HasValue && sellerId.Value > 0)
+            {
+                query.Add($"sellerId={sellerId.Value}");
+            }
+            if (releaseNow)
+            {
+                query.Add("releaseNow=true");
+            }
+            var endpoint = "/api/orders/admin/finance/payouts/generate" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
             var response = await client.PostAsJsonAsync(endpoint, new { });
 
             TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
-                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã tạo payout chờ chi trả." : "Không thể tạo payout chờ chi trả.");
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã ghi nhận chi trả cho người bán." : "Không thể tạo payout chờ chi trả.");
         }
         catch (Exception ex)
         {
@@ -192,7 +199,7 @@ public sealed class FinanceController : LegacySellerControllerBase
         ViewData["AreaName"] = "Admin";
         ViewData["LayoutPath"] = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
         ViewData["FinanceScopeLabel"] = "Toàn sàn";
-        return View("~/Areas/Seller/Views/Finance/Index.cshtml", model);
+        return View("~/Areas/Admin/Views/Finance/Index.cshtml", model);
     }
 
     private HttpClient CreateOrderingClient()
@@ -255,6 +262,10 @@ public sealed class FinanceController : LegacySellerControllerBase
             ReconciliationPlatformCommission = payload.Stats?.ReconciliationPlatformCommission ?? 0m,
             ReconciliationSellerEarning = payload.Stats?.ReconciliationSellerEarning ?? 0m,
             WithdrawableAmount = payload.Stats?.WithdrawableAmount ?? 0m,
+            PendingSellerPayoutAmount = payload.Stats?.PendingSellerPayoutAmount ?? 0m,
+            PaidPayoutAmount = payload.Stats?.PaidPayoutAmount ?? 0m,
+            WithdrawnAmount = payload.Stats?.WithdrawnAmount ?? 0m,
+            RemainingWithdrawableAmount = payload.Stats?.RemainingWithdrawableAmount ?? 0m,
             PendingPayoutAmount = payload.Stats?.PendingPayoutAmount ?? 0m,
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,
@@ -321,6 +332,23 @@ public sealed class FinanceController : LegacySellerControllerBase
                 LastActionSummary = x.LastActionSummary ?? string.Empty
             })
             .ToList() ?? new List<FinanceConsoleRowViewModel>();
+        model.SellerBreakdown = payload.SellerBreakdown?
+            .Where(x => x.SellerId > 0)
+            .Select(x => new FinanceSellerBreakdownViewModel
+            {
+                SellerId = x.SellerId,
+                SellerLabel = string.IsNullOrWhiteSpace(x.SellerLabel) ? $"Seller #{x.SellerId}" : x.SellerLabel.Trim(),
+                OrderCount = x.OrderCount,
+                GrossMerchandiseValue = x.GrossMerchandiseValue,
+                PlatformCommission = x.PlatformCommission,
+                SellerEarning = x.SellerEarning,
+                PaidAmount = x.PaidAmount,
+                PendingAmount = x.PendingAmount,
+                UnpaidAmount = x.UnpaidAmount
+            })
+            .OrderByDescending(x => x.SellerEarning)
+            .ThenBy(x => x.SellerId)
+            .ToList() ?? new List<FinanceSellerBreakdownViewModel>();
         model.OwnerSummary = DeduplicateOwnerSummary(payload.OwnerSummary)?
             .Select(x => new FinanceOwnerSummaryViewModel
             {

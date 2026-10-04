@@ -33,6 +33,16 @@ public sealed class GoogleRecaptchaService : IGoogleRecaptchaService
         string? remoteIp,
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(expectedAction))
+        {
+            _logger.LogWarning("Google reCAPTCHA verify bi tu choi do expected action rong.");
+            return new GoogleRecaptchaVerificationResult
+            {
+                Success = false,
+                ErrorMessage = "Cấu hình action reCAPTCHA không hợp lệ."
+            };
+        }
+
         if (CanUseDevelopmentBypass(token))
         {
             _logger.LogInformation(
@@ -94,8 +104,7 @@ public sealed class GoogleRecaptchaService : IGoogleRecaptchaService
         var payload = await response.Content.ReadFromJsonAsync<GoogleRecaptchaSiteVerifyResponse>(cancellationToken: cancellationToken);
         if (payload?.Success == true)
         {
-            if (!string.IsNullOrWhiteSpace(expectedAction) &&
-                !string.Equals(payload.Action, expectedAction, StringComparison.Ordinal))
+            if (!string.Equals(payload.Action, expectedAction, StringComparison.Ordinal))
             {
                 _logger.LogWarning(
                     "Google reCAPTCHA action khong khop. Expected={ExpectedAction}, Actual={ActualAction}",
@@ -123,6 +132,21 @@ public sealed class GoogleRecaptchaService : IGoogleRecaptchaService
                 {
                     Success = false,
                     ErrorMessage = "Yêu cầu đăng ký bị đánh giá là không an toàn. Vui lòng thử lại.",
+                    Score = payload.Score,
+                    Action = payload.Action
+                };
+            }
+
+            if (!IsAllowedHostname(payload.Hostname))
+            {
+                _logger.LogWarning(
+                    "Google reCAPTCHA hostname khong nam trong allowlist. Hostname={Hostname}",
+                    payload.Hostname);
+
+                return new GoogleRecaptchaVerificationResult
+                {
+                    Success = false,
+                    ErrorMessage = "Xác minh reCAPTCHA không đúng nguồn. Vui lòng thử lại.",
                     Score = payload.Score,
                     Action = payload.Action
                 };
@@ -158,6 +182,24 @@ public sealed class GoogleRecaptchaService : IGoogleRecaptchaService
             && string.Equals(token?.Trim(), _options.DevelopmentBypassToken, StringComparison.Ordinal);
     }
 
+    private bool IsAllowedHostname(string? hostname)
+    {
+        if (string.IsNullOrWhiteSpace(hostname))
+        {
+            return false;
+        }
+
+        var normalizedHostname = NormalizeHostname(hostname);
+        return _options.AllowedHostnames.Any(allowedHostname =>
+            string.Equals(
+                NormalizeHostname(allowedHostname),
+                normalizedHostname,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeHostname(string hostname)
+        => hostname.Trim().TrimEnd('.');
+
     private sealed class GoogleRecaptchaSiteVerifyResponse
     {
         public bool Success { get; set; }
@@ -165,6 +207,8 @@ public sealed class GoogleRecaptchaService : IGoogleRecaptchaService
         public decimal? Score { get; set; }
 
         public string? Action { get; set; }
+
+        public string? Hostname { get; set; }
 
         [JsonPropertyName("error-codes")]
         public string[]? ErrorCodes { get; set; }

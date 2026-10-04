@@ -169,8 +169,8 @@
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
             <div>
                 <div class="ff-admin-chip mb-3">Quản trị nhà bán hàng</div>
-                <h1 class="fw-bold mb-2">Vòng đời nhà bán hàng và hồ sơ tuân thủ</h1>
-                <p class="mb-0 opacity-75">Theo dõi hồ sơ đăng ký, tình trạng hoạt động và các mục cần bổ sung trước khi duyệt hoặc tạm khóa nhà bán hàng.</p>
+                <h1 class="fw-bold mb-2">Hồ sơ và trạng thái nhà bán hàng</h1>
+                <p class="mb-0 opacity-75">Theo dõi hồ sơ đăng ký, trạng thái hoạt động và các mục cần bổ sung trước khi duyệt hoặc tạm khóa nhà bán hàng.</p>
             </div>
             <div class="text-lg-end">
                 <div class="small opacity-75">Nguồn dữ liệu</div>
@@ -197,10 +197,10 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng nhà bán hàng</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng hồ sơ người bán</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tài khoản đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Cần rà soát</div><div class="display-6 fw-bold text-warning">@Model.Stats.ReviewNeeded</div></div></div>
@@ -212,7 +212,7 @@
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Thiếu địa chỉ</div><div class="display-6 fw-bold text-primary">@Model.Stats.MissingAddress</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Hàng chờ duyệt</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Chờ duyệt mới</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Bổ sung hồ sơ</div><div class="display-6 fw-bold text-warning">@Model.Stats.ProfileFixQueue</div></div></div>
@@ -495,19 +495,19 @@
                             <div class="d-flex flex-wrap gap-2 mt-2">
                                 @if (!string.IsNullOrWhiteSpace(Model.Details.CitizenIdFrontUrl))
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" href="@Model.Details.CitizenIdFrontUrl" target="_blank" rel="noopener">Xem CCCD mặt trước</a>
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.CitizenIdFrontUrl })" target="_blank" rel="noopener">Xem CCCD mặt trước</a>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(Model.Details.CitizenIdBackUrl))
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" href="@Model.Details.CitizenIdBackUrl" target="_blank" rel="noopener">Xem CCCD mặt sau</a>
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.CitizenIdBackUrl })" target="_blank" rel="noopener">Xem CCCD mặt sau</a>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(Model.Details.BusinessLicenseUrl))
                                 {
-                                    <a class="btn btn-sm btn-outline-primary" href="@Model.Details.BusinessLicenseUrl" target="_blank" rel="noopener">Xem giấy phép kinh doanh</a>
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.BusinessLicenseUrl })" target="_blank" rel="noopener">Xem giấy phép kinh doanh</a>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(Model.Details.AdditionalDocumentUrl))
                                 {
-                                    <a class="btn btn-sm btn-outline-secondary" href="@Model.Details.AdditionalDocumentUrl" target="_blank" rel="noopener">Xem chứng từ bổ sung</a>
+                                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.AdditionalDocumentUrl })" target="_blank" rel="noopener">Xem chứng từ bổ sung</a>
                                 }
                             </div>
                             @if (!string.IsNullOrWhiteSpace(Model.Details.KycNotes))

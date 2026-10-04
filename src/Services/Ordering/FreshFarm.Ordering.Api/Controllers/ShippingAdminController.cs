@@ -563,7 +563,7 @@ public sealed class ShippingAdminController : ControllerBase
         return await UpsertGhnMetadataCore(orderId, request, sellerId, isAdmin, bypassOwnershipCheck: false, cancellationToken);
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // Internal GHN sync: authenticated with X-Internal-Service-Key inside the action.
     [HttpGet("internal/ghn-sync-candidates")]
     public async Task<IActionResult> GetInternalGhnSyncCandidates(
         [FromQuery] int limit = 10,
@@ -609,7 +609,7 @@ public sealed class ShippingAdminController : ControllerBase
         });
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // Internal GHN sync: authenticated with X-Internal-Service-Key inside the action.
     [HttpPost("internal/{orderId:int}/ghn-metadata")]
     public async Task<IActionResult> UpsertGhnMetadataInternal(
         [FromRoute] int orderId,
@@ -625,7 +625,7 @@ public sealed class ShippingAdminController : ControllerBase
         return await UpsertGhnMetadataCore(orderId, request, sellerId: null, isAdmin: true, bypassOwnershipCheck: true, cancellationToken);
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // Internal GHN sync: authenticated with X-Internal-Service-Key inside the action.
     [HttpPost("internal/ghn-metadata/by-code")]
     public async Task<IActionResult> UpsertGhnMetadataInternalByCode(
         [FromBody] GhnMetadataByCodeUpsertRequest request,

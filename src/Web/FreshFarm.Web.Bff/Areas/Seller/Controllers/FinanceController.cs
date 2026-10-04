@@ -58,6 +58,7 @@ public sealed class FinanceController : LegacySellerControllerBase
             }
 
             MapPayload(model, payload);
+            await LoadSellerBankInfoAsync(model);
             model.ShowSellerFilter = false;
         }
         catch (Exception ex)
@@ -66,6 +67,39 @@ public sealed class FinanceController : LegacySellerControllerBase
         }
 
         return RenderView(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Withdraw(decimal amount, string? bankName, string? bankAccountName, string? bankAccountNumber, string? note)
+    {
+        if (amount <= 0m)
+        {
+            TempData["ErrorMessage"] = "Số tiền nhận phải lớn hơn 0.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.PostAsJsonAsync("/api/orders/admin/finance/seller-withdrawals", new
+            {
+                amount,
+                bankName,
+                bankAccountName,
+                bankAccountNumber,
+                note
+            });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã ghi nhận nhận tiền." : "Không thể ghi nhận nhận tiền.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi ghi nhận nhận tiền: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     private IActionResult RenderView(FinanceConsolePageViewModel model)
@@ -87,6 +121,80 @@ public sealed class FinanceController : LegacySellerControllerBase
         }
 
         return client;
+    }
+
+    private HttpClient CreateIdentityClient()
+    {
+        var client = _httpClientFactory.CreateClient("Identity");
+        client.DefaultRequestHeaders.Remove("Authorization");
+
+        var token = GetAccessToken(AccessTokenSessionKey);
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        return client;
+    }
+
+    private async Task LoadSellerBankInfoAsync(FinanceConsolePageViewModel model)
+    {
+        try
+        {
+            var client = CreateIdentityClient();
+            var response = await client.GetAsync("/auth/seller-application/me");
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var profile = await response.Content.ReadFromJsonAsync<SellerApplicationBankDto>(JsonOptions);
+            ApplyBankInfo(model, profile?.BankAccountInfo);
+        }
+        catch
+        {
+        }
+    }
+
+    private static void ApplyBankInfo(FinanceConsolePageViewModel model, string? bankAccountInfo)
+    {
+        if (string.IsNullOrWhiteSpace(bankAccountInfo))
+        {
+            return;
+        }
+
+        var normalized = bankAccountInfo.Replace("\r", "\n");
+        var parts = normalized
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        model.BankName = PickBankField(parts, "ngân hàng", "ngan hang", "bank") ?? model.BankName;
+        model.BankAccountName = PickBankField(parts, "chủ tài khoản", "chu tai khoan", "tên tài khoản", "ten tai khoan", "account name") ?? model.BankAccountName;
+        model.BankAccountNumber = PickBankField(parts, "số tài khoản", "so tai khoan", "stk", "account number") ?? model.BankAccountNumber;
+
+        if (parts.Count == 1 && model.BankName == "Vietcombank")
+        {
+            model.BankName = parts[0];
+        }
+    }
+
+    private static string? PickBankField(IEnumerable<string> parts, params string[] keys)
+    {
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (!keys.Any(key => lower.Contains(key)))
+            {
+                continue;
+            }
+
+            var separatorIndex = part.IndexOf(':');
+            return separatorIndex >= 0 && separatorIndex < part.Length - 1
+                ? part[(separatorIndex + 1)..].Trim()
+                : part.Trim();
+        }
+
+        return null;
     }
 
     private static string BuildEndpoint(string section, string q, string status, int page, int pageSize)
@@ -127,6 +235,10 @@ public sealed class FinanceController : LegacySellerControllerBase
             ReconciliationPlatformCommission = payload.Stats?.ReconciliationPlatformCommission ?? 0m,
             ReconciliationSellerEarning = payload.Stats?.ReconciliationSellerEarning ?? 0m,
             WithdrawableAmount = payload.Stats?.WithdrawableAmount ?? 0m,
+            PendingSellerPayoutAmount = payload.Stats?.PendingSellerPayoutAmount ?? 0m,
+            PaidPayoutAmount = payload.Stats?.PaidPayoutAmount ?? 0m,
+            WithdrawnAmount = payload.Stats?.WithdrawnAmount ?? 0m,
+            RemainingWithdrawableAmount = payload.Stats?.RemainingWithdrawableAmount ?? 0m,
             PendingPayoutAmount = payload.Stats?.PendingPayoutAmount ?? 0m,
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,
@@ -206,5 +318,10 @@ public sealed class FinanceController : LegacySellerControllerBase
         }
 
         return fallback;
+    }
+
+    private sealed class SellerApplicationBankDto
+    {
+        public string? BankAccountInfo { get; set; }
     }
 }

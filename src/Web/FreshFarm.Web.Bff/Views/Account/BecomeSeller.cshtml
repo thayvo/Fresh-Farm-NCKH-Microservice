@@ -278,7 +278,7 @@
                                     <input asp-for="CitizenIdFrontFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp" />
                                     @if (!string.IsNullOrWhiteSpace(form.CitizenIdFrontUrl))
                                     {
-                                        <div class="field-note mt-1"><a href="@form.CitizenIdFrontUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                        <div class="field-note mt-1"><a href="@Url.Action("SellerKycDocument", "Account", new { reference = form.CitizenIdFrontUrl })" target="_blank" rel="noopener">Xem file hiện tại</a></div>
                                     }
                                     <span asp-validation-for="CitizenIdFrontFile" class="text-danger small"></span>
                                 </div>
@@ -287,7 +287,7 @@
                                     <input asp-for="CitizenIdBackFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp" />
                                     @if (!string.IsNullOrWhiteSpace(form.CitizenIdBackUrl))
                                     {
-                                        <div class="field-note mt-1"><a href="@form.CitizenIdBackUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                        <div class="field-note mt-1"><a href="@Url.Action("SellerKycDocument", "Account", new { reference = form.CitizenIdBackUrl })" target="_blank" rel="noopener">Xem file hiện tại</a></div>
                                     }
                                     <span asp-validation-for="CitizenIdBackFile" class="text-danger small"></span>
                                 </div>
@@ -296,7 +296,7 @@
                                     <input asp-for="BusinessLicenseFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" />
                                     @if (!string.IsNullOrWhiteSpace(form.BusinessLicenseUrl))
                                     {
-                                        <div class="field-note mt-1"><a href="@form.BusinessLicenseUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                        <div class="field-note mt-1"><a href="@Url.Action("SellerKycDocument", "Account", new { reference = form.BusinessLicenseUrl })" target="_blank" rel="noopener">Xem file hiện tại</a></div>
                                     }
                                     <span asp-validation-for="BusinessLicenseFile" class="text-danger small"></span>
                                 </div>
@@ -305,7 +305,7 @@
                                     <input asp-for="AdditionalDocumentFile" class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" />
                                     @if (!string.IsNullOrWhiteSpace(form.AdditionalDocumentUrl))
                                     {
-                                        <div class="field-note mt-1"><a href="@form.AdditionalDocumentUrl" target="_blank" rel="noopener">Xem file hiện tại</a></div>
+                                        <div class="field-note mt-1"><a href="@Url.Action("SellerKycDocument", "Account", new { reference = form.AdditionalDocumentUrl })" target="_blank" rel="noopener">Xem file hiện tại</a></div>
                                     }
                                     <span asp-validation-for="AdditionalDocumentFile" class="text-danger small"></span>
                                 </div>

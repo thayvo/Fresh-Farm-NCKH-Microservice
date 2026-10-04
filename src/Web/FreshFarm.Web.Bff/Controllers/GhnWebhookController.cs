@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,6 +17,8 @@ namespace FreshFarm.Web.Bff.Controllers;
 [AllowAnonymous]
 public sealed class GhnWebhookController : ControllerBase
 {
+    private static readonly ConcurrentDictionary<string, EventGate> EventGates = new(StringComparer.Ordinal);
+
     private static readonly IReadOnlyDictionary<string, string> StatusLabels =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -87,74 +90,87 @@ public sealed class GhnWebhookController : ControllerBase
         }
 
         var eventKey = BuildEventKey(request);
-        if (IsDuplicateEvent(eventKey, options))
+        var eventGate = AcquireEventGate(eventKey);
+        var enteredEventGate = false;
+        try
         {
+            await eventGate.Semaphore.WaitAsync(cancellationToken);
+            enteredEventGate = true;
+
+            if (IsProcessedEvent(eventKey))
+            {
+                _logger.LogInformation(
+                    "Bo qua webhook GHN trung lap. EventKey={EventKey}, OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Type={Type}, Status={Status}",
+                    eventKey,
+                    request.OrderCode,
+                    request.ClientOrderCode,
+                    request.Type,
+                    request.Status);
+                return Ok(new
+                {
+                    success = true,
+                    message = "Webhook GHN trung lap da duoc bo qua.",
+                    duplicate = true,
+                    orderCode = request.OrderCode?.Trim(),
+                    clientOrderCode = request.ClientOrderCode?.Trim()
+                });
+            }
+
             _logger.LogInformation(
-                "Bo qua webhook GHN trung lap. EventKey={EventKey}, OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Type={Type}, Status={Status}",
+                "Nhan webhook GHN. EventKey={EventKey}, OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Type={Type}, Status={Status}",
                 eventKey,
                 request.OrderCode,
                 request.ClientOrderCode,
                 request.Type,
                 request.Status);
+
+            var orderingOptions = _orderingOptions.CurrentValue;
+            if (string.IsNullOrWhiteSpace(orderingOptions.InternalServiceKey))
+            {
+                _logger.LogWarning("Ghn webhook khong the persist vi thieu Services:Ordering:InternalServiceKey.");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = "Thieu internal service key." });
+            }
+
+            var metadataRequest = await BuildMetadataRequestAsync(request, cancellationToken);
+            using var message = new HttpRequestMessage(HttpMethod.Post, "/api/orders/admin/shippings/internal/ghn-metadata/by-code")
+            {
+                Content = JsonContent.Create(metadataRequest)
+            };
+            message.Headers.Add("X-Internal-Service-Key", orderingOptions.InternalServiceKey);
+
+            var client = _httpClientFactory.CreateClient("Ordering");
+            using var response = await client.SendAsync(message, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning(
+                    "Ghn webhook khong persist duoc metadata. HTTP {StatusCode}. OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Response={Response}",
+                    (int)response.StatusCode,
+                    request.OrderCode,
+                    request.ClientOrderCode,
+                    responseText);
+                return StatusCode((int)response.StatusCode, new
+                {
+                    success = false,
+                    message = "Khong persist duoc metadata GHN.",
+                    response = responseText
+                });
+            }
+
+            MarkEventProcessed(eventKey, options);
             return Ok(new
             {
                 success = true,
-                message = "Webhook GHN trung lap da duoc bo qua.",
-                duplicate = true,
+                message = "Da nhan webhook GHN.",
+                duplicate = false,
                 orderCode = request.OrderCode?.Trim(),
                 clientOrderCode = request.ClientOrderCode?.Trim()
             });
         }
-
-        _logger.LogInformation(
-            "Nhan webhook GHN. EventKey={EventKey}, OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Type={Type}, Status={Status}",
-            eventKey,
-            request.OrderCode,
-            request.ClientOrderCode,
-            request.Type,
-            request.Status);
-
-        var orderingOptions = _orderingOptions.CurrentValue;
-        if (string.IsNullOrWhiteSpace(orderingOptions.InternalServiceKey))
+        finally
         {
-            _logger.LogWarning("Ghn webhook khong the persist vi thieu Services:Ordering:InternalServiceKey.");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { success = false, message = "Thieu internal service key." });
+            ReleaseEventGate(eventKey, eventGate, enteredEventGate);
         }
-
-        var metadataRequest = await BuildMetadataRequestAsync(request, cancellationToken);
-        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/orders/admin/shippings/internal/ghn-metadata/by-code")
-        {
-            Content = JsonContent.Create(metadataRequest)
-        };
-        message.Headers.Add("X-Internal-Service-Key", orderingOptions.InternalServiceKey);
-
-        var client = _httpClientFactory.CreateClient("Ordering");
-        using var response = await client.SendAsync(message, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogWarning(
-                "Ghn webhook khong persist duoc metadata. HTTP {StatusCode}. OrderCode={OrderCode}, ClientOrderCode={ClientOrderCode}, Response={Response}",
-                (int)response.StatusCode,
-                request.OrderCode,
-                request.ClientOrderCode,
-                responseText);
-            return StatusCode((int)response.StatusCode, new
-            {
-                success = false,
-                message = "Khong persist duoc metadata GHN.",
-                response = responseText
-            });
-        }
-
-        return Ok(new
-        {
-            success = true,
-            message = "Da nhan webhook GHN.",
-            duplicate = false,
-            orderCode = request.OrderCode?.Trim(),
-            clientOrderCode = request.ClientOrderCode?.Trim()
-        });
     }
 
     private async Task<GhnMetadataByCodeUpsertRequest> BuildMetadataRequestAsync(
@@ -209,16 +225,10 @@ public sealed class GhnWebhookController : ControllerBase
         var configuredSecret = options.Secret?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return true;
+            return false;
         }
 
-        var incomingSecret =
-            Request.Query["secret"].ToString().Trim();
-
-        if (string.IsNullOrWhiteSpace(incomingSecret))
-        {
-            incomingSecret = Request.Headers["X-Webhook-Secret"].ToString().Trim();
-        }
+        var incomingSecret = Request.Headers["X-Webhook-Secret"].ToString().Trim();
 
         if (string.IsNullOrWhiteSpace(incomingSecret))
         {
@@ -248,18 +258,59 @@ public sealed class GhnWebhookController : ControllerBase
             : normalized;
     }
 
-    private bool IsDuplicateEvent(string eventKey, GhnOrderStatusWebhookOptions options)
-    {
-        if (_memoryCache.TryGetValue(eventKey, out _))
-        {
-            return true;
-        }
+    private bool IsProcessedEvent(string eventKey)
+        => _memoryCache.TryGetValue(BuildProcessedEventCacheKey(eventKey), out _);
 
+    private void MarkEventProcessed(string eventKey, GhnOrderStatusWebhookOptions options)
+    {
         _memoryCache.Set(
-            eventKey,
+            BuildProcessedEventCacheKey(eventKey),
             true,
             TimeSpan.FromSeconds(Math.Max(30, options.DeduplicationWindowSeconds)));
-        return false;
+    }
+
+    private static string BuildProcessedEventCacheKey(string eventKey)
+        => $"ghn:webhook:processed:{eventKey}";
+
+    private static EventGate AcquireEventGate(string eventKey)
+    {
+        while (true)
+        {
+            var gate = EventGates.GetOrAdd(eventKey, static _ => new EventGate());
+            lock (gate)
+            {
+                if (gate.Removed)
+                {
+                    continue;
+                }
+
+                gate.ReferenceCount++;
+                return gate;
+            }
+        }
+    }
+
+    private static void ReleaseEventGate(string eventKey, EventGate gate, bool enteredSemaphore)
+    {
+        if (enteredSemaphore)
+        {
+            gate.Semaphore.Release();
+        }
+
+        lock (gate)
+        {
+            gate.ReferenceCount--;
+            if (gate.ReferenceCount != 0)
+            {
+                return;
+            }
+
+            gate.Removed = true;
+            if (EventGates.TryGetValue(eventKey, out var currentGate) && ReferenceEquals(currentGate, gate))
+            {
+                EventGates.TryRemove(eventKey, out _);
+            }
+        }
     }
 
     private static string BuildEventKey(GhnOrderStatusWebhookRequest request)
@@ -313,5 +364,14 @@ public sealed class GhnWebhookController : ControllerBase
         public DateTime? ExpectedDeliveryTime { get; set; }
 
         public DateTime? LastSyncedAt { get; set; }
+    }
+
+    private sealed class EventGate
+    {
+        public SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        public int ReferenceCount { get; set; }
+
+        public bool Removed { get; set; }
     }
 }

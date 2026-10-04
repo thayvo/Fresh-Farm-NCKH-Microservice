@@ -47,9 +47,20 @@ if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 
 Directory.CreateDirectory(dataProtectionKeysPath);
-builder.Services.AddDataProtection()
+var dataProtectionBuilder = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
     .SetApplicationName("FreshFarm.Identity");
+var dataProtectionCertificateThumbprint =
+    builder.Configuration["DataProtection:CertificateThumbprint"]?.Trim();
+if (!string.IsNullOrWhiteSpace(dataProtectionCertificateThumbprint))
+{
+    dataProtectionBuilder.ProtectKeysWithCertificate(dataProtectionCertificateThumbprint);
+}
+else if (builder.Environment.IsProduction())
+{
+    throw new InvalidOperationException(
+        "Production requires DataProtection:CertificateThumbprint so persisted keys are encrypted at rest.");
+}
 builder.Services.AddDbContext<FreshFarmIdentityDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityDB")));
 builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IPasswordHasher<User>, Microsoft.AspNetCore.Identity.PasswordHasher<User>>();
@@ -58,10 +69,12 @@ builder.Services.Configure<EmailVerificationOptions>(builder.Configuration.GetSe
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
 builder.Services.Configure<GeoIpOptions>(builder.Configuration.GetSection(GeoIpOptions.SectionName));
 builder.Services.Configure<OrderingServiceOptions>(builder.Configuration.GetSection(OrderingServiceOptions.SectionName));
+builder.Services.Configure<InternalBffOptions>(builder.Configuration.GetSection(InternalBffOptions.SectionName));
 builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
 builder.Services.AddScoped<IEmailVerificationTokenService, EmailVerificationTokenService>();
 builder.Services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
 builder.Services.AddScoped<IAuthAuditService, AuthAuditService>();
+builder.Services.AddScoped<ILoginDeviceSecurityService, LoginDeviceSecurityService>();
 builder.Services.AddScoped<ISellerStoreSettingsResolver, SellerStoreSettingsResolver>();
 builder.Services.AddHttpClient<IGeoIpLookupService, GeoIpLookupService>((serviceProvider, client) =>
 {
@@ -101,25 +114,97 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = ClaimTypes.Role,
             NameClaimType = "username"
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var rawUserId = context.Principal?.FindFirstValue("sub")
+                    ?? context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                var rawTokenVersion = context.Principal?.FindFirstValue("token_version");
+                var accountAccess = context.Principal?.FindFirstValue("account_access");
+                var tokenApprovalStatus = context.Principal?.FindFirstValue("approval_status");
+                if (!int.TryParse(rawUserId, out var userId)
+                    || !int.TryParse(rawTokenVersion, out var tokenVersion)
+                    || string.IsNullOrWhiteSpace(accountAccess)
+                    || string.IsNullOrWhiteSpace(tokenApprovalStatus))
+                {
+                    context.Fail("Token is missing required account state claims.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices.GetRequiredService<FreshFarmIdentityDBContext>();
+                var accountState = await db.Users
+                    .AsNoTracking()
+                    .Where(user => user.UserId == userId)
+                    .Select(user => new
+                    {
+                        user.IsActive,
+                        user.EmailConfirmed,
+                        user.ApprovalStatus,
+                        TokenVersion = user.UserAuth == null ? 0 : user.UserAuth.TokenVersion
+                    })
+                    .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+
+                var commonStateIsValid = accountState is not null
+                    && accountState.IsActive
+                    && accountState.EmailConfirmed
+                    && accountState.TokenVersion == tokenVersion
+                    && string.Equals(accountState.ApprovalStatus, tokenApprovalStatus, StringComparison.OrdinalIgnoreCase);
+                var fullAccessIsValid = commonStateIsValid
+                    && string.Equals(accountAccess, "full", StringComparison.Ordinal)
+                    && string.Equals(accountState!.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase);
+                var pendingAccessIsValid = commonStateIsValid
+                    && string.Equals(accountAccess, "pending", StringComparison.Ordinal)
+                    && string.Equals(accountState!.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase)
+                    && context.Principal?.IsInRole("Guest") == true
+                    && context.Principal?.IsInRole("Admin") != true
+                    && context.Principal?.IsInRole("Seller") != true
+                    && context.Principal?.IsInRole("Customer") != true;
+
+                if (!fullAccessIsValid && !pendingAccessIsValid)
+                {
+                    context.Fail("Account is no longer eligible to use this token.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
 {
+    var fullAccessPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+            JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim("account_access", "full")
+        .Build();
+
+    options.DefaultPolicy = fullAccessPolicy;
+    options.FallbackPolicy = fullAccessPolicy;
+    options.AddPolicy("AnyAuthenticated", policy =>
+    {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+        policy.RequireAuthenticatedUser();
+    });
     options.AddPolicy("SellerOnly", policy =>
     {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Seller");
     });
 
     options.AddPolicy("AdminOnly", policy =>
     {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Admin");
     });
 
     options.AddPolicy("SellerOrAdmin", policy =>
     {
+        policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Seller", "Admin");
     });
 });
@@ -139,5 +224,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok("ok"));
+app.MapGet("/health", () => Results.Ok("ok")).AllowAnonymous();
 app.Run();

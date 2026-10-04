@@ -21,7 +21,8 @@ public sealed class ResetPasswordRequest
     public string Token { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Mật khẩu mới là bắt buộc.")]
-    [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu phải từ 6 đến 100 ký tự.")]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu phải từ 8 đến 100 ký tự.")]
+    [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).+$", ErrorMessage = "Mật khẩu phải có ít nhất một chữ cái và một chữ số.")]
     public string NewPassword { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Xác nhận mật khẩu là bắt buộc.")]

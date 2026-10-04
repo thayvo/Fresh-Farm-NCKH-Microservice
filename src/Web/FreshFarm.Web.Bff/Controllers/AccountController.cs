@@ -18,6 +18,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key luu JWT trong session.
     private const string SignUpCaptchaSessionKey = "SIGNUP_CAPTCHA_CODE";
+    private const string ForgotPasswordCaptchaSessionKey = "FORGOT_PASSWORD_CAPTCHA_CODE";
     private const string TwoFactorChallengeSessionKey = "ACCOUNT_2FA_CHALLENGE";
     private readonly IHttpClientFactory _httpClientFactory; // Factory tao HttpClient theo ten.
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
@@ -25,6 +26,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     private readonly GoogleRecaptchaOptions _googleRecaptchaOptions;
     private readonly IGoogleRecaptchaService _googleRecaptchaService;
     private readonly ISignUpCaptchaService _signUpCaptchaService;
+    private readonly IBotChallengeService _botChallengeService;
     private readonly ISellerKycStorageService _sellerKycStorageService;
 
     public AccountController(
@@ -34,6 +36,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         IOptions<GoogleRecaptchaOptions> googleRecaptchaOptions,
         IGoogleRecaptchaService googleRecaptchaService,
         ISignUpCaptchaService signUpCaptchaService,
+        IBotChallengeService botChallengeService,
         ISellerKycStorageService sellerKycStorageService) // Inject factory qua DI.
     {
         _httpClientFactory = httpClientFactory; // Gan vao field.
@@ -42,6 +45,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         _googleRecaptchaOptions = googleRecaptchaOptions.Value;
         _googleRecaptchaService = googleRecaptchaService;
         _signUpCaptchaService = signUpCaptchaService;
+        _botChallengeService = botChallengeService;
         _sellerKycStorageService = sellerKycStorageService;
     }
 
@@ -53,6 +57,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         ClearTwoFactorChallenge();
         if (User.Identity?.IsAuthenticated == true) // Neu da dang nhap thi khong can vao form.
         {
+            if (string.Equals(User.FindFirstValue("account_access"), "pending", StringComparison.Ordinal))
+            {
+                PopulateSignInViewData(normalizedReturnUrl, rateLimitError, retryAfter);
+                ViewData["PendingApproval"] = true;
+                ViewData["PendingApprovalMessage"] =
+                    "Tài khoản của bạn đang chờ quản trị viên phê duyệt.";
+                ViewData["PendingAccountName"] = User.FindFirstValue(ClaimTypes.Email)
+                    ?? User.Identity.Name
+                    ?? "Tài khoản FreshFarm";
+                return View(new LoginRequestDto());
+            }
+
             return RedirectToLocal(normalizedReturnUrl); // Quay ve trang truoc hoac fallback.
         }
 
@@ -63,15 +79,21 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
                 : "Đăng nhập Google chưa hoàn tất. Vui lòng thử lại.";
         }
 
+        PopulateSignInViewData(normalizedReturnUrl, rateLimitError, retryAfter);
+        return View(); // Views/Account/SignIn.cshtml.
+    }
+
+    private void PopulateSignInViewData(string? normalizedReturnUrl, bool rateLimitError = false, string? retryAfter = null)
+    {
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["PendingVerificationIdentifier"] = TempData["PendingVerificationIdentifier"] as string;
-        ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
+        ViewData["ReturnUrl"] = normalizedReturnUrl;
         ViewData["LockoutExpiresAtUtc"] = null;
         ViewData["FormErrorMessage"] = null;
+        ViewData["PendingApproval"] = false;
         ViewData["RateLimitErrorMessage"] = rateLimitError
             ? BuildRateLimitMessage(retryAfter)
             : null;
-        return View(); // Views/Account/SignIn.cshtml.
     }
 
     private static string BuildRateLimitMessage(string? retryAfter)
@@ -166,6 +188,11 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
         await SignInWithIdentityTokenAsync(auth, request.Identifier);
 
+        if (auth.IsPendingApproval)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
+
         return RedirectToLocal(normalizedReturnUrl); // Login xong quay ve trang dang dung neu hop le.
     }
 
@@ -213,7 +240,24 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }
 
+        var emailVerifiedValue = externalAuth.Principal.FindFirstValue(GoogleAuthenticationClaimTypes.EmailVerified);
+        if (!bool.TryParse(emailVerifiedValue, out var emailVerified) || !emailVerified)
+        {
+            await HttpContext.SignOutAsync("GoogleExternal");
+            TempData["ErrorMessage"] = "Google chưa xác minh địa chỉ email này. Vui lòng dùng một tài khoản Google có email đã xác minh.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
         var fullName = externalAuth.Principal.FindFirstValue(ClaimTypes.Name) ?? email;
+        var providerSubject = externalAuth.Principal.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? externalAuth.Principal.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(providerSubject))
+        {
+            await HttpContext.SignOutAsync("GoogleExternal");
+            TempData["ErrorMessage"] = "Google chưa trả về định danh tài khoản hợp lệ. Vui lòng thử lại.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
         var avatarUrl = externalAuth.Principal.FindFirstValue("picture")
             ?? externalAuth.Principal.FindFirstValue("urn:google:picture");
 
@@ -225,7 +269,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             new ExternalLoginExchangeRequestDto
             {
                 Provider = "Google",
+                ProviderSubject = providerSubject,
                 Email = email,
+                EmailVerified = true,
+                HostedDomain = externalAuth.Principal.FindFirstValue(GoogleAuthenticationClaimTypes.HostedDomain),
                 FullName = fullName,
                 AvatarUrl = avatarUrl
             });
@@ -272,6 +319,11 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         await SignInWithIdentityTokenAsync(auth, email);
+        if (auth.IsPendingApproval)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
+
         return RedirectToLocal(normalizedReturnUrl);
     }
 
@@ -341,7 +393,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     public IActionResult SignUp(string? returnUrl = null) // Render view signup.
     {
         ViewData["ReturnUrl"] = NormalizeReturnUrl(returnUrl);
-        PopulateSignUpCaptchaViewData();
+        PopulateBotChallengeViewData(BotChallengePurpose.SignUp);
         return View(new RegisterRequestDto()); // Views/Account/SignUp.cshtml.
     }
 
@@ -350,15 +402,15 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult SignUpCaptcha()
     {
-        var captchaCode = _signUpCaptchaService.GenerateCode();
-        HttpContext.Session.SetString(SignUpCaptchaSessionKey, captchaCode);
+        return RenderLocalCaptcha(BotChallengePurpose.SignUp);
+    }
 
-        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
-        Response.Headers.Pragma = "no-cache";
-        Response.Headers.Expires = "0";
-
-        var svg = _signUpCaptchaService.BuildSvg(captchaCode);
-        return Content(svg, "image/svg+xml; charset=utf-8", System.Text.Encoding.UTF8);
+    [HttpGet("/account/forgot-password/captcha")]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult ForgotPasswordCaptcha()
+    {
+        return RenderLocalCaptcha(BotChallengePurpose.ForgotPassword);
     }
 
     [HttpGet("/account/terms")]
@@ -383,7 +435,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
         ViewData["ReturnUrl"] = normalizedReturnUrl;
-        PopulateSignUpCaptchaViewData();
+        PopulateBotChallengeViewData(BotChallengePurpose.SignUp);
 
         request.FullName = request.FullName?.Trim() ?? string.Empty;
         request.UserName = request.UserName?.Trim() ?? string.Empty;
@@ -391,29 +443,25 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         request.Phone = request.Phone?.Trim() ?? string.Empty;
         request.RoleName = "Customer";
         request.CaptchaCode = request.CaptchaCode?.Trim().ToUpperInvariant() ?? string.Empty;
-        request.RecaptchaToken = request.RecaptchaToken?.Trim() ?? string.Empty;
+        request.BotChallengeToken = request.BotChallengeToken?.Trim() ?? string.Empty;
 
-        if (_googleRecaptchaOptions.IsConfigured)
+        var challengeResult = await VerifyBotChallengeAsync(
+            BotChallengePurpose.SignUp,
+            request.BotChallengeToken,
+            request.CaptchaCode);
+        ClearSubmittedBotChallenge(
+            nameof(RegisterRequestDto.BotChallengeToken),
+            nameof(RegisterRequestDto.CaptchaCode),
+            () => request.BotChallengeToken = string.Empty,
+            () => request.CaptchaCode = string.Empty);
+        if (!challengeResult.Success)
         {
-            var verificationResult = await _googleRecaptchaService.VerifyAsync(
-                request.RecaptchaToken,
-                _googleRecaptchaOptions.SignUpAction,
-                HttpContext.Connection.RemoteIpAddress?.ToString(),
-                HttpContext.RequestAborted);
-            if (!verificationResult.Success)
-            {
-                ModelState.AddModelError(nameof(RegisterRequestDto.RecaptchaToken), verificationResult.ErrorMessage ?? "Xác minh reCAPTCHA không hợp lệ.");
-            }
-        }
-        else
-        {
-            var expectedCaptchaCode = HttpContext.Session.GetString(SignUpCaptchaSessionKey);
-            if (!_signUpCaptchaService.Matches(expectedCaptchaCode, request.CaptchaCode))
-            {
-                ModelState.AddModelError(nameof(RegisterRequestDto.CaptchaCode), "Mã xác nhận không đúng hoặc đã hết hạn. Vui lòng thử lại.");
-            }
-
-            HttpContext.Session.Remove(SignUpCaptchaSessionKey);
+            var fieldName = challengeResult.Provider == BotChallengeProvider.LocalSvg
+                ? nameof(RegisterRequestDto.CaptchaCode)
+                : nameof(RegisterRequestDto.BotChallengeToken);
+            ModelState.AddModelError(
+                fieldName,
+                challengeResult.ErrorMessage ?? "Xác minh bảo mật không hợp lệ. Vui lòng thử lại.");
         }
 
         if (!string.IsNullOrWhiteSpace(request.Password))
@@ -458,10 +506,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResultDto>()
                             ?? new RegisterResultDto
                             {
-                                Email = request.Email,
-                                EmailVerificationRequired = true,
-                                VerificationEmailSent = true,
-                                Message = "Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập."
+                                 Email = request.Email,
+                                 EmailVerificationRequired = true,
+                                 VerificationEmailSent = true,
+                                 Message = "Tài khoản đã được tạo. Vui lòng xác minh email; sau đó bạn có thể đăng nhập để xem trạng thái chờ quản trị viên duyệt."
                             };
 
         return RedirectToAction(
@@ -474,11 +522,71 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             });
     }
 
-    private void PopulateSignUpCaptchaViewData()
+    private void PopulateBotChallengeViewData(BotChallengePurpose purpose)
     {
-        ViewData["GoogleRecaptchaEnabled"] = _googleRecaptchaOptions.IsConfigured;
-        ViewData["GoogleRecaptchaSiteKey"] = _googleRecaptchaOptions.SiteKey;
-        ViewData["GoogleRecaptchaAction"] = _googleRecaptchaOptions.SignUpAction;
+        ViewData["BotChallenge"] = _botChallengeService.GetPresentation(purpose);
+    }
+
+    private async Task<BotChallengeVerificationResult> VerifyBotChallengeAsync(
+        BotChallengePurpose purpose,
+        string token,
+        string submittedLocalCode)
+    {
+        var presentation = _botChallengeService.GetPresentation(purpose);
+        string? expectedLocalCode = null;
+        if (presentation.Provider == BotChallengeProvider.LocalSvg)
+        {
+            var sessionKey = GetLocalCaptchaSessionKey(purpose);
+            expectedLocalCode = HttpContext.Session.GetString(sessionKey);
+            HttpContext.Session.Remove(sessionKey);
+        }
+
+        return await _botChallengeService.VerifyAsync(
+            new BotChallengeVerificationRequest
+            {
+                Purpose = purpose,
+                Token = token,
+                RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                ExpectedLocalCode = expectedLocalCode,
+                SubmittedLocalCode = submittedLocalCode
+            },
+            HttpContext.RequestAborted);
+    }
+
+    private IActionResult RenderLocalCaptcha(BotChallengePurpose purpose)
+    {
+        var presentation = _botChallengeService.GetPresentation(purpose);
+        if (!presentation.IsAvailable || presentation.Provider != BotChallengeProvider.LocalSvg)
+        {
+            return NotFound();
+        }
+
+        var captchaCode = _signUpCaptchaService.GenerateCode();
+        HttpContext.Session.SetString(GetLocalCaptchaSessionKey(purpose), captchaCode);
+
+        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+
+        var svg = _signUpCaptchaService.BuildSvg(captchaCode);
+        return Content(svg, "image/svg+xml; charset=utf-8", System.Text.Encoding.UTF8);
+    }
+
+    private static string GetLocalCaptchaSessionKey(BotChallengePurpose purpose)
+        => purpose == BotChallengePurpose.ForgotPassword
+            ? ForgotPasswordCaptchaSessionKey
+            : SignUpCaptchaSessionKey;
+
+    private void ClearSubmittedBotChallenge(
+        string tokenFieldName,
+        string localCodeFieldName,
+        Action clearToken,
+        Action clearLocalCode)
+    {
+        ModelState.Remove(tokenFieldName);
+        ModelState.Remove(localCodeFieldName);
+        clearToken();
+        clearLocalCode();
     }
 
     [HttpGet("/account/verify-email/pending")]
@@ -601,12 +709,12 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             });
         }
 
-        TempData["SuccessMessage"] = "Xác minh email thành công. Bạn có thể đăng nhập.";
+        TempData["SuccessMessage"] = "Xác minh email thành công. Bạn có thể đăng nhập để xem trạng thái chờ duyệt.";
         return View("VerifyEmailResult", new EmailVerificationResultViewModel
         {
             Success = true,
             Title = "Xác minh email thành công",
-            Message = "Email của bạn đã được xác minh. Bây giờ bạn có thể đăng nhập vào FreshFarm.",
+            Message = "Email của bạn đã được xác minh. Bạn có thể đăng nhập với quyền Khách để xem trạng thái; các chức năng sẽ được mở sau khi quản trị viên phê duyệt.",
             ReturnUrl = normalizedReturnUrl,
             Email = normalizedEmail
         });
@@ -616,6 +724,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [AllowAnonymous] // Cho phép user chưa login truy cập.
     public IActionResult ForgotPassword() // Render view forgot password.
     {
+        PopulateBotChallengeViewData(BotChallengePurpose.ForgotPassword);
         return View(new ForgotPasswordRequestDto()); // Trả view với model rỗng.
     }
 
@@ -625,12 +734,34 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [EnableRateLimiting("password-recovery")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequestDto request) // Nhận email từ form.
     {
+        PopulateBotChallengeViewData(BotChallengePurpose.ForgotPassword);
+        request.Email = request.Email?.Trim() ?? string.Empty;
+        request.CaptchaCode = request.CaptchaCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        request.BotChallengeToken = request.BotChallengeToken?.Trim() ?? string.Empty;
+
+        var challengeResult = await VerifyBotChallengeAsync(
+            BotChallengePurpose.ForgotPassword,
+            request.BotChallengeToken,
+            request.CaptchaCode);
+        ClearSubmittedBotChallenge(
+            nameof(ForgotPasswordRequestDto.BotChallengeToken),
+            nameof(ForgotPasswordRequestDto.CaptchaCode),
+            () => request.BotChallengeToken = string.Empty,
+            () => request.CaptchaCode = string.Empty);
+        if (!challengeResult.Success)
+        {
+            var fieldName = challengeResult.Provider == BotChallengeProvider.LocalSvg
+                ? nameof(ForgotPasswordRequestDto.CaptchaCode)
+                : nameof(ForgotPasswordRequestDto.BotChallengeToken);
+            ModelState.AddModelError(
+                fieldName,
+                challengeResult.ErrorMessage ?? "Xác minh bảo mật không hợp lệ. Vui lòng thử lại.");
+        }
+
         if (!ModelState.IsValid) // Validate DataAnnotation.
         {
             return View(request); // Render lại form nếu dữ liệu sai.
         }
-
-        request.Email = request.Email.Trim(); // Chuẩn hóa email trước khi gọi API.
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
         using var forgotPasswordHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
@@ -716,7 +847,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpPost("/account/logout")] // Route POST logout.
     [ValidateAntiForgeryToken] // Logout cũng là state-changing action.
-    [Authorize] // Bat buoc login.
+    [Authorize(Policy = "AnyAuthenticated")] // Guest dang cho duyet van phai co the dang xuat.
     public async Task<IActionResult> Logout() // Xu ly logout.
     {
         HttpContext.Session.Remove(AccessTokenSessionKey); // Xoa JWT khoi session.
@@ -921,6 +1052,41 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
 
         return View(model);
+    }
+
+    [HttpGet("/account/become-seller/kyc-document")]
+    [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> SellerKycDocument(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(SellerKycPaths.NormalizeStoredFileName(reference)))
+        {
+            return NotFound();
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = "/account/become-seller" });
+        }
+
+        var (summary, error) = await GetSellerApplicationSummaryAsync(token);
+        if (!string.IsNullOrWhiteSpace(error) || !IsOwnedKycReference(summary.Kyc, reference))
+        {
+            return NotFound();
+        }
+
+        var storedFile = _sellerKycStorageService.OpenRead(reference);
+        if (storedFile is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+        var downloadFileName = SellerKycPaths.NormalizeStoredFileName(reference)!;
+        return File(storedFile.Content, storedFile.ContentType, downloadFileName, enableRangeProcessing: true);
     }
 
     [HttpGet("/account/notifications")]
@@ -1577,13 +1743,28 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             claims.Add(new Claim(ClaimTypes.Role, roleClaim.Value));
         }
 
+        foreach (var claimType in new[] { "account_access", "approval_status", "token_version" })
+        {
+            var claimValue = jwt.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(claimValue))
+            {
+                claims.Add(new Claim(claimType, claimValue));
+            }
+        }
+
+        claims.Add(new Claim("session_checked_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
-        var authProperties = new AuthenticationProperties();
+        // Customer sign-in has no explicit "Remember me" choice, so keep this as a
+        // browser-session cookie. Admin/Seller flows handle their own opt-in choice.
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = false
+        };
         if (auth.ExpiredAtUtc > DateTime.UtcNow)
         {
             authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
-            authProperties.IsPersistent = true;
         }
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
@@ -1713,6 +1894,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
                 Notes = payload.Kyc?.Notes ?? string.Empty
             }
         }, null);
+    }
+
+    private static bool IsOwnedKycReference(SellerKycSummaryDto kyc, string? requestedReference)
+    {
+        return new[]
+        {
+            kyc.CitizenIdFrontUrl,
+            kyc.CitizenIdBackUrl,
+            kyc.BusinessLicenseUrl,
+            kyc.AdditionalDocumentUrl
+        }.Any(storedReference =>
+            SellerKycPaths.AreEquivalentStoredReferences(storedReference, requestedReference));
     }
 
     private async Task<(AccountNotificationsPageViewModel? Model, string? Error)> GetAccountNotificationsPageViewModelAsync(

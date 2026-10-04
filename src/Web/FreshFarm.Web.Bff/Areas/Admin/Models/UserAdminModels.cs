@@ -38,6 +38,22 @@ public sealed class AdminUserViewModel
 
     public bool IsActive { get; set; } = true;
 
+    public bool EmailConfirmed { get; set; }
+
+    public DateTime? EmailConfirmedAt { get; set; }
+
+    public string ApprovalStatus { get; set; } = "Pending";
+
+    public long ApprovalVersion { get; set; }
+
+    public DateTime? ApprovedAt { get; set; }
+
+    public int? ApprovedByUserId { get; set; }
+
+    public string? ApprovalNote { get; set; }
+
+    public DateTime? ApprovalStatusChangedAt { get; set; }
+
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedDate { get; set; }
@@ -52,6 +68,8 @@ public sealed class AdminUserManagementPageViewModel
     public string SearchTerm { get; set; } = string.Empty;
 
     public bool? IsActive { get; set; }
+
+    public string ApprovalStatus { get; set; } = "all";
 
     public DateTime? CreatedFrom { get; set; }
 
@@ -76,6 +94,14 @@ public sealed class AdminUserManagementPageViewModel
     public int SellerUsers { get; set; }
 
     public int BuyerUsers { get; set; }
+
+    public int PendingUsers { get; set; }
+
+    public int ApprovedUsers { get; set; }
+
+    public int RejectedUsers { get; set; }
+
+    public int SuspendedUsers { get; set; }
 
     public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalUsers / (double)Math.Max(1, PageSize)));
 

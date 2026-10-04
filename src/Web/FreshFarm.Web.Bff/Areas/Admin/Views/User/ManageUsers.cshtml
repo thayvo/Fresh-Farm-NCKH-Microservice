@@ -11,6 +11,7 @@
     var q = (Model?.SearchTerm ?? string.Empty).Trim();
     var userType = (Model?.UserType ?? "all").Trim().ToLowerInvariant();
     var isActive = Model?.IsActive;
+    var approvalStatus = (Model?.ApprovalStatus ?? "all").Trim().ToLowerInvariant();
     var createdFrom = Model?.CreatedFrom?.ToString("yyyy-MM-dd") ?? string.Empty;
     var createdTo = Model?.CreatedTo?.ToString("yyyy-MM-dd") ?? string.Empty;
     var currentPage = Math.Max(1, Model?.Page ?? 1);
@@ -24,6 +25,10 @@
     var adminCount = Model?.AdminUsers ?? users.Count(x => string.Equals(x.Role?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase));
     var sellerCount = Model?.SellerUsers ?? users.Count(x => string.Equals(x.Role?.RoleName, "Seller", StringComparison.OrdinalIgnoreCase));
     var buyerCount = Model?.BuyerUsers ?? users.Count(x => string.Equals(x.Role?.RoleName, "Customer", StringComparison.OrdinalIgnoreCase));
+    var pendingCount = Model?.PendingUsers ?? users.Count(x => string.Equals(x.ApprovalStatus, "Pending", StringComparison.OrdinalIgnoreCase));
+    var approvedCount = Model?.ApprovedUsers ?? users.Count(x => string.Equals(x.ApprovalStatus, "Approved", StringComparison.OrdinalIgnoreCase));
+    var rejectedCount = Model?.RejectedUsers ?? users.Count(x => string.Equals(x.ApprovalStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
+    var suspendedCount = Model?.SuspendedUsers ?? users.Count(x => string.Equals(x.ApprovalStatus, "Suspended", StringComparison.OrdinalIgnoreCase));
     var fallbackAvatarUrl = Url.Content(AvatarImagePaths.FallbackImageRequestPath);
 
     var pageTitle = userType switch
@@ -98,12 +103,40 @@
             userType = userType == "all" ? userType : null,
             searchTerm = string.IsNullOrWhiteSpace(q) ? null : q,
             isActive,
+            approvalStatus = approvalStatus == "all" ? null : approvalStatus,
             createdFrom = string.IsNullOrWhiteSpace(createdFrom) ? null : createdFrom,
             createdTo = string.IsNullOrWhiteSpace(createdTo) ? null : createdTo,
             page = targetPage,
             pageSize = currentPageSize
         }) ?? "#";
     }
+
+    string ApprovalLabel(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "pending" => "Chờ duyệt",
+        "approved" => "Đã duyệt",
+        "rejected" => "Từ chối",
+        "suspended" => "Đình chỉ",
+        _ => "Chưa rõ"
+    };
+
+    string ApprovalBadgeClass(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "pending" => "badge-approval-pending",
+        "approved" => "badge-success-custom",
+        "rejected" => "badge-approval-rejected",
+        "suspended" => "badge-approval-suspended",
+        _ => "badge-light-custom"
+    };
+
+    string ApprovalIcon(string? status) => (status ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        "pending" => "hourglass-split",
+        "approved" => "check-circle-fill",
+        "rejected" => "x-circle-fill",
+        "suspended" => "pause-circle-fill",
+        _ => "question-circle"
+    };
 }
 
 <style>
@@ -496,6 +529,59 @@
         color: var(--gray-600);
     }
 
+    .badge-approval-pending {
+        background: #fef3c7;
+        color: #92400e;
+        box-shadow: inset 0 0 0 1px #fcd34d;
+    }
+
+    .badge-approval-rejected {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .badge-approval-suspended {
+        background: #ede9fe;
+        color: #5b21b6;
+    }
+
+    .table-modern tbody tr.row-pending-approval {
+        background: linear-gradient(90deg, rgba(254, 243, 199, .55), rgba(255,255,255,0));
+        box-shadow: inset 4px 0 0 #f59e0b;
+    }
+
+    .btn-approve {
+        border-color: #059669;
+        color: #047857;
+        background: #ecfdf5;
+    }
+
+    .btn-approve:hover {
+        background: #059669;
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .btn-security {
+        border-color: #7c3aed;
+        color: #6d28d9;
+    }
+
+    .btn-security:hover {
+        background: #7c3aed;
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .approval-queue-banner {
+        border: 1px solid #fcd34d;
+        border-left: 6px solid #f59e0b;
+        background: linear-gradient(135deg, #fffbeb 0%, #fff7ed 100%);
+        color: #78350f;
+        border-radius: 1.25rem;
+        box-shadow: 0 12px 30px rgba(245, 158, 11, .12);
+    }
+
     /* STATS CARD (side) */
     .stats-card {
         background: rgba(255,255,255,0.98);
@@ -742,6 +828,26 @@
         </a>
     </div>
 
+    @if (pendingCount > 0)
+    {
+        <div class="approval-queue-banner p-3 p-md-4 mb-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3" role="status">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-person-check-fill fs-2"></i>
+                <div>
+                    <div class="fw-bold fs-5">Có @pendingCount tài khoản đang chờ quản trị viên duyệt</div>
+                    <div class="small">Tài khoản này chỉ đăng nhập ở vai trò Khách và chưa thể dùng chức năng nghiệp vụ.</div>
+                </div>
+            </div>
+            @if (approvalStatus != "pending")
+            {
+                <a class="btn btn-warning fw-semibold rounded-pill px-4"
+                   href="@Url.Action(currentListAction, "User", new { area = "Admin", userType = userType == "all" ? userType : null, searchTerm = string.IsNullOrWhiteSpace(q) ? null : q, isActive, approvalStatus = "Pending", createdFrom = string.IsNullOrWhiteSpace(createdFrom) ? null : createdFrom, createdTo = string.IsNullOrWhiteSpace(createdTo) ? null : createdTo, page = 1, pageSize = currentPageSize })">
+                    <i class="bi bi-hourglass-split me-1"></i>Mở hàng chờ duyệt
+                </a>
+            }
+        </div>
+    }
+
     <div class="filter-card ff-admin-card p-4 mb-4">
         <div class="d-flex align-items-center gap-3 mb-3">
             <div class="p-3 rounded-3" style="background: linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
@@ -821,6 +927,50 @@
                                 }
                             </select>
                         </div>
+                        <div style="min-width:185px">
+                            <select class="form-select" name="approvalStatus" aria-label="Lọc trạng thái phê duyệt">
+                                @if (approvalStatus == "all")
+                                {
+                                    <option value="all" selected>Mọi trạng thái duyệt</option>
+                                }
+                                else
+                                {
+                                    <option value="all">Mọi trạng thái duyệt</option>
+                                }
+                                @if (approvalStatus == "pending")
+                                {
+                                    <option value="Pending" selected>Đang chờ duyệt</option>
+                                }
+                                else
+                                {
+                                    <option value="Pending">Đang chờ duyệt</option>
+                                }
+                                @if (approvalStatus == "approved")
+                                {
+                                    <option value="Approved" selected>Đã duyệt</option>
+                                }
+                                else
+                                {
+                                    <option value="Approved">Đã duyệt</option>
+                                }
+                                @if (approvalStatus == "rejected")
+                                {
+                                    <option value="Rejected" selected>Đã từ chối</option>
+                                }
+                                else
+                                {
+                                    <option value="Rejected">Đã từ chối</option>
+                                }
+                                @if (approvalStatus == "suspended")
+                                {
+                                    <option value="Suspended" selected>Đang đình chỉ</option>
+                                }
+                                else
+                                {
+                                    <option value="Suspended">Đang đình chỉ</option>
+                                }
+                            </select>
+                        </div>
                         <div class="flex-grow-1">
                             <div class="search-icon-wrapper">
                                 <i class="bi bi-search"></i>
@@ -872,7 +1022,8 @@
                                 <th style="min-width:120px">SĐT</th>
                                 <th style="min-width:130px">Quyền</th>
                                 <th style="min-width:135px">Trạng thái</th>
-                                <th style="width:190px" class="text-center">Thao tác</th>
+                                <th style="min-width:205px">Xác thực & duyệt</th>
+                                <th style="min-width:285px" class="text-center">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -880,7 +1031,12 @@
                             {
                                 foreach (var u in users)
                                 {
-                                    <tr data-id="@u.AdminID" data-name="@u.UserName">
+                                    <tr class="@(string.Equals(u.ApprovalStatus, "Pending", StringComparison.OrdinalIgnoreCase) ? "row-pending-approval" : string.Empty)"
+                                        data-id="@u.AdminID"
+                                        data-name="@u.UserName"
+                                        data-approval-status="@u.ApprovalStatus"
+                                        data-approval-version="@u.ApprovalVersion"
+                                        data-approval-note="@u.ApprovalNote">
                                         <td class="text-muted fw-semibold">#@u.AdminID</td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
@@ -925,9 +1081,40 @@
                                                 </span>
                                             }
                                         </td>
+                                        <td>
+                                            <div class="d-flex flex-column align-items-start gap-1">
+                                                <span class="badge-custom @ApprovalBadgeClass(u.ApprovalStatus)">
+                                                    <i class="bi bi-@ApprovalIcon(u.ApprovalStatus) me-1"></i>@ApprovalLabel(u.ApprovalStatus)
+                                                </span>
+                                                @if (u.EmailConfirmed)
+                                                {
+                                                    <small class="text-success"><i class="bi bi-envelope-check-fill me-1"></i>Email đã xác minh</small>
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-warning"><i class="bi bi-envelope-exclamation-fill me-1"></i>Email chưa xác minh</small>
+                                                }
+                                            </div>
+                                        </td>
                                         <td class="text-center text-nowrap">
+                                            @if (string.Equals(u.ApprovalStatus, "Pending", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                <button class="btn btn-sm btn-action btn-approve js-approval me-1"
+                                                        title="Duyệt tài khoản"
+                                                        data-target-status="Approved"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#approvalModal">
+                                                    <i class="bi bi-person-check-fill me-1"></i>Duyệt
+                                                </button>
+                                            }
                                             <button class="btn btn-sm btn-action btn-view js-view me-1" title="Xem chi tiết" data-bs-toggle="modal" data-bs-target="#viewUserModal">
                                                 <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-action btn-security js-approval me-1" title="Đổi trạng thái phê duyệt" data-bs-toggle="modal" data-bs-target="#approvalModal">
+                                                <i class="bi bi-shield-check"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-action btn-security js-unlock me-1" title="Mở khóa đăng nhập" data-bs-toggle="modal" data-bs-target="#unlockLoginModal">
+                                                <i class="bi bi-unlock-fill"></i>
                                             </button>
                                             <button class="btn btn-sm btn-action btn-edit js-edit me-1" title="Chỉnh sửa" data-bs-toggle="modal" data-bs-target="#editUserModal">
                                                 <i class="bi bi-pencil-square"></i>
@@ -942,7 +1129,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="10" class="empty-state">
+                                    <td colspan="8" class="empty-state">
                                         <i class="bi bi-inbox"></i>
                                         <div class="fw-semibold">Chưa có dữ liệu trong lane hiện tại</div>
                                         <div class="small">Thử đổi tab Buyer/Seller/Admin, trạng thái hoặc khoảng ngày tạo</div>
@@ -1040,6 +1227,22 @@
                 <div class="stats-detail">
                     <div><i class="bi bi-person text-warning me-1"></i>Buyer</div>
                     <div class="fw-bold text-warning">@buyerCount</div>
+                </div>
+                <div class="stats-detail">
+                    <div><i class="bi bi-hourglass-split text-warning me-1"></i>Chờ duyệt</div>
+                    <div class="fw-bold text-warning">@pendingCount</div>
+                </div>
+                <div class="stats-detail" style="border-top: none; margin-top: 0;">
+                    <div><i class="bi bi-person-check-fill text-success me-1"></i>Đã duyệt</div>
+                    <div class="fw-bold text-success">@approvedCount</div>
+                </div>
+                <div class="stats-detail" style="border-top: none; margin-top: 0;">
+                    <div><i class="bi bi-person-x-fill text-danger me-1"></i>Từ chối</div>
+                    <div class="fw-bold text-danger">@rejectedCount</div>
+                </div>
+                <div class="stats-detail" style="border-top: none; margin-top: 0;">
+                    <div><i class="bi bi-pause-circle-fill me-1" style="color:#7c3aed"></i>Đình chỉ</div>
+                    <div class="fw-bold" style="color:#7c3aed">@suspendedCount</div>
                 </div>
             </div>
         </div>
@@ -1151,6 +1354,14 @@
                         <div id="v_role" class="fw-semibold">-</div>
                     </div>
                     <div class="col-md-6">
+                        <label class="form-label text-muted mb-1"><i class="bi bi-envelope-check me-1"></i>Xác minh email</label>
+                        <div id="v_emailConfirmed" class="fw-semibold">-</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted mb-1"><i class="bi bi-person-check me-1"></i>Trạng thái phê duyệt</label>
+                        <div><span id="v_approvalStatus" class="badge-custom badge-light-custom">-</span></div>
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label text-muted mb-1"><i class="bi bi-clock-history me-1"></i>Đăng nhập cuối</label>
                         <div id="v_lastLogin" class="fw-semibold">-</div>
                     </div>
@@ -1161,6 +1372,14 @@
                     <div class="col-md-6">
                         <label class="form-label text-muted mb-1"><i class="bi bi-calendar-check me-1"></i>Cập nhật gần nhất</label>
                         <div id="v_updated" class="fw-semibold">-</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted mb-1"><i class="bi bi-calendar-event me-1"></i>Đổi trạng thái duyệt</label>
+                        <div id="v_approvalChanged" class="fw-semibold">-</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-muted mb-1"><i class="bi bi-chat-left-text me-1"></i>Ghi chú phê duyệt</label>
+                        <div id="v_approvalNote" class="p-3 rounded-3 bg-light text-break">Không có ghi chú</div>
                     </div>
                 </div>
             </div>
@@ -1237,6 +1456,87 @@
                     </button>
                     <button class="btn btn-pill btn-primary-custom" type="submit">
                         <i class="bi bi-check-circle me-1"></i>Cập nhật
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ACCOUNT APPROVAL *@
+<div class="modal fade" id="approvalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            @using (Html.BeginForm("ChangeApproval", "User", FormMethod.Post, new { area = "Admin", id = "frmChangeApproval" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="a_userId" />
+                <input type="hidden" name="expectedApprovalVersion" id="a_expectedApprovalVersion" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-check-fill me-2"></i>Xử lý phê duyệt tài khoản</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="approval-queue-banner p-3 mb-3">
+                        <div class="small text-muted">Tài khoản</div>
+                        <div class="fw-bold" id="a_userName">-</div>
+                        <div class="small mt-1">Hiện tại: <strong id="a_currentStatus">-</strong></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="a_status"><i class="bi bi-shield-check me-1"></i>Quyết định</label>
+                        <select class="form-select" name="status" id="a_status" required>
+                            <option value="Approved">Duyệt — cho phép dùng đầy đủ chức năng sau lần đăng nhập tiếp theo</option>
+                            <option value="Pending">Chuyển về chờ duyệt — chỉ cho phép phiên Khách</option>
+                            <option value="Rejected">Từ chối — chặn đăng nhập</option>
+                            <option value="Suspended">Đình chỉ — thu hồi quyền sử dụng</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="a_note"><i class="bi bi-chat-left-text me-1"></i>Lý do / ghi chú</label>
+                        <textarea class="form-control" name="note" id="a_note" rows="4" maxlength="500" placeholder="Bắt buộc khi từ chối hoặc đình chỉ; tối đa 500 ký tự"></textarea>
+                        <div id="a_noteHelp" class="small text-muted mt-1">Ghi chú sẽ được lưu vào lịch sử phê duyệt.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary-soft" type="button" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                    </button>
+                    <button class="btn btn-pill btn-primary-custom" type="submit">
+                        <i class="bi bi-check-circle me-1"></i>Xác nhận quyết định
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@* LOGIN UNLOCK *@
+<div class="modal fade" id="unlockLoginModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            @using (Html.BeginForm("UnlockLogin", "User", FormMethod.Post, new { area = "Admin", id = "frmUnlockLogin" }))
+            {
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="userId" id="u_userId" />
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-unlock-fill me-2"></i>Mở khóa đăng nhập</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning d-flex align-items-start gap-3" role="alert">
+                        <i class="bi bi-shield-exclamation fs-3"></i>
+                        <div>
+                            <strong>Xác nhận mở khóa cho <span id="u_userName">tài khoản này</span>?</strong>
+                            <div class="small mt-1">Hệ thống sẽ xóa số lần đăng nhập sai và mở khóa các dấu vết thiết bị liên quan đến tài khoản. Trạng thái phê duyệt không thay đổi.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary-soft" type="button" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Hủy bỏ
+                    </button>
+                    <button class="btn btn-pill btn-primary-custom" type="submit">
+                        <i class="bi bi-unlock-fill me-1"></i>Mở khóa đăng nhập
                     </button>
                 </div>
             }
@@ -1333,6 +1633,33 @@
                 });
             }
 
+            function approvalMeta(value) {
+                switch ((value || '').toLowerCase()) {
+                    case 'pending':
+                        return { label: 'Chờ duyệt', icon: 'hourglass-split', css: 'badge-approval-pending' };
+                    case 'approved':
+                        return { label: 'Đã duyệt', icon: 'check-circle-fill', css: 'badge-success-custom' };
+                    case 'rejected':
+                        return { label: 'Từ chối', icon: 'x-circle-fill', css: 'badge-approval-rejected' };
+                    case 'suspended':
+                        return { label: 'Đình chỉ', icon: 'pause-circle-fill', css: 'badge-approval-suspended' };
+                    default:
+                        return { label: 'Chưa rõ', icon: 'question-circle', css: 'badge-light-custom' };
+                }
+            }
+
+            function updateApprovalNoteRequirement() {
+                const status = ($('#a_status').val() || '').toLowerCase();
+                const isRequired = status === 'rejected' || status === 'suspended';
+                $('#a_note').prop('required', isRequired);
+                $('#a_noteHelp')
+                    .toggleClass('text-danger fw-semibold', isRequired)
+                    .toggleClass('text-muted', !isRequired)
+                    .text(isRequired
+                        ? 'Bắt buộc nhập lý do khi từ chối hoặc đình chỉ tài khoản.'
+                        : 'Ghi chú sẽ được lưu vào lịch sử phê duyệt.');
+            }
+
             function applyViewUser(d) {
                 const roleName = d.role && d.role.roleName ? d.role.roleName : 'Chưa gán';
                 $('#v_userId').text(d.userId || '-');
@@ -1341,10 +1668,21 @@
                 $('#v_email').text(d.email || '-');
                 $('#v_phone').text(d.phone || '-');
                 $('#v_role').text(roleName);
+                $('#v_emailConfirmed').html(d.emailConfirmed
+                    ? '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Đã xác minh' + (d.emailConfirmedAt ? ' · ' + formatUserDate(d.emailConfirmedAt) : '') + '</span>'
+                    : '<span class="text-warning"><i class="bi bi-exclamation-circle-fill me-1"></i>Chưa xác minh</span>');
                 $('#v_lastLogin').text(formatUserDate(d.lastLogin));
                 $('#v_created').text(formatUserDate(d.created));
                 $('#v_updated').text(formatUserDate(d.updated));
+                $('#v_approvalChanged').text(formatUserDate(d.approvalStatusChangedAt));
+                $('#v_approvalNote').text(d.approvalNote || 'Không có ghi chú');
                 $('#v_avatar').attr('src', d.avatarUrl || '@fallbackAvatarUrl');
+
+                const approval = approvalMeta(d.approvalStatus);
+                $('#v_approvalStatus')
+                    .removeClass('badge-light-custom badge-success-custom badge-approval-pending badge-approval-rejected badge-approval-suspended')
+                    .addClass(approval.css)
+                    .html(`<i class="bi bi-${approval.icon} me-1"></i>${approval.label}`);
 
                 const statusHtml = d.isActive
                     ? '<i class="bi bi-check-circle-fill me-1"></i>Hoạt động'
@@ -1431,6 +1769,84 @@
                             setTimeout(() => location.reload(), 700);
                         } else {
                             showNotification(res && res.message ? res.message : 'Lỗi không xác định.', 'danger');
+                        }
+                    },
+                    error: function (xhr) {
+                        showNotification(extractAjaxError(xhr, 'Có lỗi mạng, vui lòng thử lại.'), 'danger');
+                    }
+                });
+            });
+
+            // OPEN APPROVAL
+            $(document).on('click', '.js-approval', function () {
+                const $button = $(this);
+                const $tr = $button.closest('tr');
+                const currentStatus = $tr.attr('data-approval-status') || 'Pending';
+                const targetStatus = $button.attr('data-target-status') || currentStatus;
+                const current = approvalMeta(currentStatus);
+                $('#a_userId').val($tr.attr('data-id'));
+                $('#a_expectedApprovalVersion').val($tr.attr('data-approval-version'));
+                $('#a_userName').text($tr.attr('data-name') || 'Tài khoản');
+                $('#a_currentStatus').text(current.label);
+                $('#a_status').val(targetStatus);
+                $('#a_note').val($button.attr('data-target-status') ? '' : ($tr.attr('data-approval-note') || ''));
+                updateApprovalNoteRequirement();
+            });
+
+            $('#a_status').on('change', updateApprovalNoteRequirement);
+
+            // CHANGE APPROVAL
+            $('#frmChangeApproval').on('submit', function (e) {
+                e.preventDefault();
+                updateApprovalNoteRequirement();
+                if (!this.checkValidity()) {
+                    this.reportValidity();
+                    return;
+                }
+
+                const $f = $(this);
+                $.ajax({
+                    url: $f.attr('action'),
+                    type: 'POST',
+                    data: $f.serialize(),
+                    headers: { 'RequestVerificationToken': anti() },
+                    success: function (res) {
+                        if (res && res.success) {
+                            $('#approvalModal').modal('hide');
+                            showNotification(res.message || 'Đã cập nhật trạng thái phê duyệt.', 'success');
+                            setTimeout(() => location.reload(), 700);
+                        } else {
+                            showNotification(res && res.message ? res.message : 'Không cập nhật được trạng thái phê duyệt.', 'danger');
+                        }
+                    },
+                    error: function (xhr) {
+                        showNotification(extractAjaxError(xhr, 'Có lỗi mạng, vui lòng thử lại.'), 'danger');
+                    }
+                });
+            });
+
+            // OPEN LOGIN UNLOCK
+            $(document).on('click', '.js-unlock', function () {
+                const $tr = $(this).closest('tr');
+                $('#u_userId').val($tr.attr('data-id'));
+                $('#u_userName').text($tr.attr('data-name') || 'tài khoản này');
+            });
+
+            // UNLOCK LOGIN
+            $('#frmUnlockLogin').on('submit', function (e) {
+                e.preventDefault();
+                const $f = $(this);
+                $.ajax({
+                    url: $f.attr('action'),
+                    type: 'POST',
+                    data: $f.serialize(),
+                    headers: { 'RequestVerificationToken': anti() },
+                    success: function (res) {
+                        if (res && res.success) {
+                            $('#unlockLoginModal').modal('hide');
+                            showNotification(res.message || 'Đã mở khóa đăng nhập.', 'success');
+                        } else {
+                            showNotification(res && res.message ? res.message : 'Không mở khóa đăng nhập được.', 'danger');
                         }
                     },
                     error: function (xhr) {

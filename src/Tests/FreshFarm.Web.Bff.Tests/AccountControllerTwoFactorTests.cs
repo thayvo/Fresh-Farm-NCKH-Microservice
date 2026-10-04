@@ -22,6 +22,69 @@ namespace FreshFarm.Web.Bff.Tests;
 public sealed class AccountControllerTwoFactorTests
 {
     [Fact]
+    public async Task GoogleCallback_RejectsPrincipal_WhenVerifiedEmailClaimIsMissing()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+            throw new InvalidOperationException("Identity must not be called: " + request.RequestUri));
+        var controller = CreateController(handler);
+        var authentication = GetAuthenticationService(controller.HttpContext);
+        authentication.ResultToReturn = AuthenticateResult.Success(new AuthenticationTicket(
+            new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, "google-sub-unverified"),
+                new Claim(ClaimTypes.Email, "unverified@example.com"),
+                new Claim(ClaimTypes.Name, "Unverified User")
+            ], "GoogleExternal")),
+            "GoogleExternal"));
+
+        var result = await controller.GoogleCallback();
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(AccountController.SignIn), redirect.ActionName);
+        Assert.Empty(handler.Requests);
+        Assert.True(authentication.SignOutCalled);
+        Assert.Equal(
+            "Google chưa xác minh địa chỉ email này. Vui lòng dùng một tài khoản Google có email đã xác minh.",
+            controller.TempData["ErrorMessage"]);
+    }
+
+    [Fact]
+    public async Task GoogleCallback_ForwardsVerifiedEmailAndStableProviderSubject()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = JsonContent.Create(new { message = "stop-after-capture" })
+            });
+        var controller = CreateController(handler);
+        var authentication = GetAuthenticationService(controller.HttpContext);
+        authentication.ResultToReturn = AuthenticateResult.Success(new AuthenticationTicket(
+            new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.NameIdentifier, "google-sub-stable"),
+                new Claim(ClaimTypes.Email, "verified@example.com"),
+                new Claim(ClaimTypes.Name, "Verified User"),
+                new Claim(GoogleAuthenticationClaimTypes.EmailVerified, "true", ClaimValueTypes.Boolean),
+                new Claim(GoogleAuthenticationClaimTypes.HostedDomain, "example.com")
+            ], "GoogleExternal")),
+            "GoogleExternal"));
+
+        var result = await controller.GoogleCallback();
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("/auth/external-login", request.RequestUri?.AbsolutePath);
+        using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+        var payload = json.RootElement;
+        Assert.Equal("Google", payload.GetProperty("provider").GetString());
+        Assert.Equal("google-sub-stable", payload.GetProperty("providerSubject").GetString());
+        Assert.Equal("verified@example.com", payload.GetProperty("email").GetString());
+        Assert.True(payload.GetProperty("emailVerified").GetBoolean());
+        Assert.Equal("example.com", payload.GetProperty("hostedDomain").GetString());
+        Assert.True(authentication.SignOutCalled);
+    }
+
+    [Fact]
     public async Task OrderHistory_PopulatesAccountNotificationSummaryForSharedNav()
     {
         var handler = new RecordingHttpMessageHandler(request =>
@@ -442,6 +505,7 @@ public sealed class AccountControllerTwoFactorTests
             {
                 SiteKey = "site-key",
                 SecretKey = "secret-key",
+                AllowedHostnames = ["app.example.com"],
                 SellerApplicationAction = "become_seller"
             },
             googleRecaptchaService: recaptchaService);
@@ -529,6 +593,7 @@ public sealed class AccountControllerTwoFactorTests
             {
                 SiteKey = "site-key",
                 SecretKey = "secret-key",
+                AllowedHostnames = ["app.example.com"],
                 SellerApplicationAction = "become_seller"
             },
             googleRecaptchaService: recaptchaService);
@@ -754,11 +819,263 @@ public sealed class AccountControllerTwoFactorTests
         Assert.Equal("https://identity.test/auth/login/2fa", handler.Requests[0].RequestUri?.ToString());
     }
 
+    [Fact]
+    public async Task SignIn_PreservesRestrictedGuestClaimsAndShowsPendingNotice_WhenApprovalIsPending()
+    {
+        var token = CreateAccessToken(
+            "35",
+            "pendingbuyer",
+            "pendingbuyer@example.com",
+            ["Guest"],
+            accountAccess: "pending",
+            approvalStatus: "Pending",
+            tokenVersion: 7);
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new AuthResponseDto
+                {
+                    AccessToken = token,
+                    ExpiredAtUtc = DateTime.UtcNow.AddHours(1),
+                    AccountAccess = "pending",
+                    ApprovalStatus = "Pending",
+                    IsPendingApproval = true,
+                    AccountStatusMessage = "Tài khoản của bạn đang chờ quản trị viên phê duyệt."
+                })
+            });
+        var controller = CreateController(handler);
+
+        var result = await controller.SignIn(new LoginRequestDto
+        {
+            Identifier = "pendingbuyer@example.com",
+            Password = "Password123"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(AccountController.SignIn), redirect.ActionName);
+        Assert.Equal(token, controller.HttpContext.Session.GetString("ACCESS_TOKEN"));
+
+        var authService = GetAuthenticationService(controller.HttpContext);
+        Assert.True(authService.SignInCalled);
+        var principal = Assert.IsType<ClaimsPrincipal>(authService.LastPrincipal);
+        Assert.Equal("pending", principal.FindFirstValue("account_access"));
+        Assert.Equal("Pending", principal.FindFirstValue("approval_status"));
+        Assert.Equal("7", principal.FindFirstValue("token_version"));
+        Assert.True(principal.IsInRole("Guest"));
+        Assert.False(principal.IsInRole("Customer"));
+        Assert.NotNull(authService.LastProperties);
+        Assert.False(authService.LastProperties.IsPersistent);
+        Assert.NotNull(authService.LastProperties.ExpiresUtc);
+
+        controller.HttpContext.User = principal;
+        var pendingView = Assert.IsType<ViewResult>(controller.SignIn());
+        Assert.True(Assert.IsType<bool>(pendingView.ViewData["PendingApproval"]));
+        Assert.Equal(
+            "Tài khoản của bạn đang chờ quản trị viên phê duyệt.",
+            pendingView.ViewData["PendingApprovalMessage"]);
+        Assert.Equal("pendingbuyer@example.com", pendingView.ViewData["PendingAccountName"]);
+    }
+
+    [Fact]
+    public async Task SignUp_DoesNotCallIdentity_WhenBotChallengeFails()
+    {
+        var handler = new RecordingHttpMessageHandler(_ =>
+            throw new Xunit.Sdk.XunitException("Identity API must not be called when bot verification fails."));
+        var botChallenge = new FakeBotChallengeService
+        {
+            Provider = BotChallengeProvider.CloudflareTurnstile,
+            Result = new BotChallengeVerificationResult
+            {
+                Success = false,
+                Provider = BotChallengeProvider.CloudflareTurnstile,
+                ErrorMessage = "Turnstile rejected the token."
+            }
+        };
+        var controller = CreateController(handler, botChallengeService: botChallenge);
+
+        var result = await controller.SignUp(new RegisterRequestDto
+        {
+            FullName = "Test Customer",
+            UserName = "test_customer",
+            Email = "customer@example.com",
+            Phone = "0901234567",
+            Password = "Password1",
+            ConfirmPassword = "Password1",
+            AcceptTerms = true,
+            BotChallengeToken = "invalid-token"
+        });
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Empty(handler.Requests);
+        Assert.Equal(BotChallengePurpose.SignUp, botChallenge.LastRequest?.Purpose);
+        Assert.True(controller.ModelState.ContainsKey(nameof(RegisterRequestDto.BotChallengeToken)));
+    }
+
+    [Fact]
+    public async Task SignUp_CallsIdentityOnlyAfterBotChallengeSucceeds()
+    {
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new RegisterResultDto
+            {
+                Email = "customer@example.com",
+                EmailVerificationRequired = true,
+                VerificationEmailSent = true,
+                Message = "Check your email."
+            })
+        });
+        var botChallenge = new FakeBotChallengeService
+        {
+            Provider = BotChallengeProvider.CloudflareTurnstile,
+            Result = new BotChallengeVerificationResult
+            {
+                Success = true,
+                Provider = BotChallengeProvider.CloudflareTurnstile,
+                Action = "signup",
+                Hostname = "app.example.com"
+            }
+        };
+        var controller = CreateController(handler, botChallengeService: botChallenge);
+
+        var result = await controller.SignUp(new RegisterRequestDto
+        {
+            FullName = "Test Customer",
+            UserName = "test_customer",
+            Email = "customer@example.com",
+            Phone = "0901234567",
+            Password = "Password1",
+            ConfirmPassword = "Password1",
+            AcceptTerms = true,
+            BotChallengeToken = "valid-token"
+        });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("VerifyEmailPending", redirect.ActionName);
+        Assert.Single(handler.Requests);
+        Assert.Equal("/auth/register", handler.Requests[0].RequestUri?.AbsolutePath);
+        Assert.Equal("valid-token", botChallenge.LastRequest?.Token);
+        var forwardedBody = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.DoesNotContain("valid-token", forwardedBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_DoesNotCallIdentity_WhenBotChallengeFails()
+    {
+        var handler = new RecordingHttpMessageHandler(_ =>
+            throw new Xunit.Sdk.XunitException("Identity API must not be called when bot verification fails."));
+        var botChallenge = new FakeBotChallengeService
+        {
+            Provider = BotChallengeProvider.CloudflareTurnstile,
+            Result = new BotChallengeVerificationResult
+            {
+                Success = false,
+                Provider = BotChallengeProvider.CloudflareTurnstile,
+                ErrorMessage = "Turnstile rejected the token."
+            }
+        };
+        var controller = CreateController(handler, botChallengeService: botChallenge);
+
+        var result = await controller.ForgotPassword(new ForgotPasswordRequestDto
+        {
+            Email = "customer@example.com",
+            BotChallengeToken = "invalid-token"
+        });
+
+        Assert.IsType<ViewResult>(result);
+        Assert.Empty(handler.Requests);
+        Assert.Equal(BotChallengePurpose.ForgotPassword, botChallenge.LastRequest?.Purpose);
+        Assert.True(controller.ModelState.ContainsKey(nameof(ForgotPasswordRequestDto.BotChallengeToken)));
+    }
+
+    [Fact]
+    public async Task ForgotPassword_CallsIdentityOnlyAfterBotChallengeSucceeds()
+    {
+        var handler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var botChallenge = new FakeBotChallengeService
+        {
+            Provider = BotChallengeProvider.CloudflareTurnstile,
+            Result = new BotChallengeVerificationResult
+            {
+                Success = true,
+                Provider = BotChallengeProvider.CloudflareTurnstile,
+                Action = "forgot_password",
+                Hostname = "app.example.com"
+            }
+        };
+        var controller = CreateController(handler, botChallengeService: botChallenge);
+
+        var result = await controller.ForgotPassword(new ForgotPasswordRequestDto
+        {
+            Email = "customer@example.com",
+            BotChallengeToken = "valid-token"
+        });
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Single(handler.Requests);
+        Assert.Equal("/auth/forgot-password", handler.Requests[0].RequestUri?.AbsolutePath);
+        Assert.Equal("valid-token", botChallenge.LastRequest?.Token);
+    }
+
+    [Fact]
+    public async Task SellerKycDocument_ReturnsOwnedDocumentThroughProtectedStorage()
+    {
+        const string storedReference = "seller-kyc:cccd-front-0123456789abcdef.jpg";
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    hasApplication = true,
+                    kyc = new { citizenIdFrontUrl = storedReference }
+                })
+            });
+        var storage = new FakeSellerKycStorageService
+        {
+            StoredFileToReturn = new SellerKycStoredFile(
+                new MemoryStream([0xFF, 0xD8, 0xFF, 0xD9]),
+                "image/jpeg")
+        };
+        var controller = CreateController(handler, sellerKycStorageService: storage);
+        controller.HttpContext.Session.SetString("ACCESS_TOKEN", "test-access-token");
+
+        var result = await controller.SellerKycDocument(storedReference);
+
+        var file = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("image/jpeg", file.ContentType);
+        Assert.Equal("cccd-front-0123456789abcdef.jpg", file.FileDownloadName);
+        Assert.Equal(storedReference, Assert.Single(storage.OpenedReferences));
+    }
+
+    [Fact]
+    public async Task SellerKycDocument_DoesNotOpenDocumentOwnedByAnotherAccount()
+    {
+        const string ownedReference = "seller-kyc:cccd-front-0123456789abcdef.jpg";
+        const string requestedReference = "seller-kyc:cccd-back-0123456789abcdef.jpg";
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    hasApplication = true,
+                    kyc = new { citizenIdFrontUrl = ownedReference }
+                })
+            });
+        var storage = new FakeSellerKycStorageService();
+        var controller = CreateController(handler, sellerKycStorageService: storage);
+        controller.HttpContext.Session.SetString("ACCESS_TOKEN", "test-access-token");
+
+        var result = await controller.SellerKycDocument(requestedReference);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Empty(storage.OpenedReferences);
+    }
+
     private static AccountController CreateController(
         RecordingHttpMessageHandler handler,
         GoogleRecaptchaOptions? googleRecaptchaOptions = null,
         FakeGoogleRecaptchaService? googleRecaptchaService = null,
-        FakeSellerKycStorageService? sellerKycStorageService = null)
+        FakeSellerKycStorageService? sellerKycStorageService = null,
+        IBotChallengeService? botChallengeService = null)
     {
         var client = new HttpClient(handler)
         {
@@ -776,6 +1093,7 @@ public sealed class AccountControllerTwoFactorTests
         var services = new ServiceCollection();
         services.AddSingleton<IAuthenticationService>(authService);
         services.AddSingleton<IUrlHelperFactory>(new TestUrlHelperFactory(urlHelper));
+        services.AddSingleton<ILoginDeviceCookieService>(new FixedLoginDeviceCookieService());
         httpContext.RequestServices = services.BuildServiceProvider();
 
         var controller = new AccountController(
@@ -785,6 +1103,7 @@ public sealed class AccountControllerTwoFactorTests
             Microsoft.Extensions.Options.Options.Create(googleRecaptchaOptions ?? new GoogleRecaptchaOptions()),
             googleRecaptchaService ?? new FakeGoogleRecaptchaService(),
             new FakeSignUpCaptchaService(),
+            botChallengeService ?? new FakeBotChallengeService(),
             sellerKycStorageService ?? new FakeSellerKycStorageService())
         {
             ControllerContext = new ControllerContext
@@ -816,13 +1135,23 @@ public sealed class AccountControllerTwoFactorTests
         session.SetString("ACCOUNT_2FA_CHALLENGE", JsonSerializer.Serialize(challenge));
     }
 
-    private static string CreateAccessToken(string userId, string userName, string email, IEnumerable<string> roles)
+    private static string CreateAccessToken(
+        string userId,
+        string userName,
+        string email,
+        IEnumerable<string> roles,
+        string accountAccess = "full",
+        string approvalStatus = "Approved",
+        int tokenVersion = 0)
     {
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, userId),
             new("username", userName),
-            new(JwtRegisteredClaimNames.Email, email)
+            new(JwtRegisteredClaimNames.Email, email),
+            new("account_access", accountAccess),
+            new("approval_status", approvalStatus),
+            new("token_version", tokenVersion.ToString())
         };
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
@@ -950,11 +1279,15 @@ public sealed class AccountControllerTwoFactorTests
 
     private sealed class TestAuthenticationService : IAuthenticationService
     {
+        public AuthenticateResult ResultToReturn { get; set; } = AuthenticateResult.NoResult();
         public bool SignInCalled { get; private set; }
+        public bool SignOutCalled { get; private set; }
         public string? LastScheme { get; private set; }
+        public ClaimsPrincipal? LastPrincipal { get; private set; }
+        public AuthenticationProperties? LastProperties { get; private set; }
 
         public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme)
-            => Task.FromResult(AuthenticateResult.NoResult());
+            => Task.FromResult(ResultToReturn);
 
         public Task ChallengeAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
             => Task.CompletedTask;
@@ -966,11 +1299,16 @@ public sealed class AccountControllerTwoFactorTests
         {
             SignInCalled = true;
             LastScheme = scheme;
+            LastPrincipal = principal;
+            LastProperties = properties;
             return Task.CompletedTask;
         }
 
         public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties)
-            => Task.CompletedTask;
+        {
+            SignOutCalled = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class TestUrlHelper : IUrlHelper
@@ -1040,11 +1378,50 @@ public sealed class AccountControllerTwoFactorTests
         public bool Matches(string? expectedCode, string? submittedCode) => true;
     }
 
+    private sealed class FakeBotChallengeService : IBotChallengeService
+    {
+        public BotChallengeProvider Provider { get; set; } = BotChallengeProvider.LocalSvg;
+
+        public BotChallengeVerificationRequest? LastRequest { get; private set; }
+
+        public BotChallengeVerificationResult Result { get; set; } = new()
+        {
+            Success = true,
+            Provider = BotChallengeProvider.LocalSvg
+        };
+
+        public BotChallengePresentation GetPresentation(BotChallengePurpose purpose) => new()
+        {
+            Provider = Provider,
+            IsAvailable = true,
+            Action = purpose == BotChallengePurpose.SignUp ? "signup" : "forgot_password"
+        };
+
+        public Task<BotChallengeVerificationResult> VerifyAsync(
+            BotChallengeVerificationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastRequest = request;
+            return Task.FromResult(new BotChallengeVerificationResult
+            {
+                Success = Result.Success,
+                Provider = Result.Provider,
+                ErrorMessage = Result.ErrorMessage,
+                Action = Result.Action ?? (request.Purpose == BotChallengePurpose.SignUp ? "signup" : "forgot_password"),
+                Hostname = Result.Hostname
+            });
+        }
+    }
+
     private sealed class FakeSellerKycStorageService : ISellerKycStorageService
     {
         public List<string> SavedPaths { get; } = new();
 
         public List<string> DeletedPaths { get; } = new();
+
+        public List<string> OpenedReferences { get; } = new();
+
+        public SellerKycStoredFile? StoredFileToReturn { get; set; }
 
         public (bool isValid, string errorMessage) Validate(IFormFile file, bool allowPdf = false) => (true, string.Empty);
 
@@ -1055,6 +1432,16 @@ public sealed class AccountControllerTwoFactorTests
             return path;
         }
 
+        public SellerKycStoredFile? OpenRead(string? storedReference)
+        {
+            if (!string.IsNullOrWhiteSpace(storedReference))
+            {
+                OpenedReferences.Add(storedReference);
+            }
+
+            return StoredFileToReturn;
+        }
+
         public void Delete(string? requestPath)
         {
             if (!string.IsNullOrWhiteSpace(requestPath))
@@ -1062,6 +1449,12 @@ public sealed class AccountControllerTwoFactorTests
                 DeletedPaths.Add(requestPath);
             }
         }
+    }
+
+    private sealed class FixedLoginDeviceCookieService : ILoginDeviceCookieService
+    {
+        public string GetOrCreateDeviceId(HttpContext httpContext) =>
+            "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
     }
 
     private sealed class FakeGhnSandboxService : IGhnSandboxService

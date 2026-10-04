@@ -1,6 +1,6 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.CampaignCenterPageViewModel
 @{
-    ViewData["Title"] = "Trung tâm chiến dịch";
+    ViewData["Title"] = "Chương trình khuyến mãi";
     string selectedStatus = Model.SelectedCampaign?.Status ?? Model.Editor.Status;
     string selectedType = Model.SelectedCampaign?.CampaignType ?? Model.Editor.CampaignType;
 
@@ -29,12 +29,12 @@
 <section class="campaign-console ff-admin-shell">
     <div class="page-header ff-admin-hero mb-4">
         <div>
-            <p class="eyebrow ff-admin-kicker mb-2">Vận hành tăng trưởng</p>
-            <h1 class="fw-bold mb-2">Trung tâm chiến dịch</h1>
-            <p class="mb-0 opacity-75">Vận hành voucher sàn, flash sale và mức độ sẵn sàng để nhà bán hàng tham gia trong cùng một màn quản trị.</p>
+            <p class="eyebrow ff-admin-kicker mb-2">Khuyến mãi sàn</p>
+            <h1 class="fw-bold mb-2">Chương trình khuyến mãi</h1>
+            <p class="mb-0 opacity-75">Tạo và quản lý các chương trình flash sale, voucher và ưu đãi theo mùa cho nhà bán tham gia.</p>
         </div>
         <div class="header-note">
-            <span class="ff-admin-chip">Phase 7.7 MVP</span>
+            <span class="ff-admin-chip">Quản lý ưu đãi</span>
         </div>
     </div>
 
@@ -50,15 +50,10 @@
     {
         <div class="alert alert-warning">@pageError</div>
     }
-    @if (ViewBag.AdsError is string adsError && !string.IsNullOrWhiteSpace(adsError))
-    {
-        <div class="alert alert-warning">@adsError</div>
-    }
-
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="metric-card ff-admin-card">
-                <span class="metric-label">Chiến dịch</span>
+                <span class="metric-label">Chương trình</span>
                 <strong>@Model.Overview.TotalCampaigns</strong>
                 <small>@Model.Overview.RunningCampaigns đang chạy</small>
             </div>
@@ -91,8 +86,8 @@
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <h2 class="h5 mb-1">Danh sách chiến dịch</h2>
-                        <p class="text-muted mb-0">Lọc theo trạng thái, loại chiến dịch và từ khóa để điều phối sprint tăng trưởng.</p>
+                        <h2 class="h5 mb-1">Danh sách chương trình</h2>
+                        <p class="text-muted mb-0">Lọc theo trạng thái, loại ưu đãi và từ khóa để quản lý các chương trình khuyến mãi đang mở trên sàn.</p>
                     </div>
                 </div>
 
@@ -110,7 +105,7 @@
                     </div>
                     <div class="col-md-3">
                         <select class="form-select" name="type">
-                            @foreach (var option in Model.TypeOptions)
+                            @foreach (var option in Model.TypeOptions.Where(x => !string.Equals(x.Value, "livestream", StringComparison.OrdinalIgnoreCase)))
                             {
                                 <option value="@option.Value" selected="@(option.Value == Model.Type)">@option.Text</option>
                             }
@@ -125,7 +120,7 @@
                     <table class="table align-middle campaign-table">
                         <thead>
                             <tr>
-                                <th>Chiến dịch</th>
+                                <th>Chương trình</th>
                                 <th>Trạng thái</th>
                                 <th>Thời gian</th>
                                 <th>Voucher</th>
@@ -138,7 +133,7 @@
                             @if (Model.Campaigns.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">Chưa có chiến dịch nào. Hãy tạo chiến dịch đầu tiên ở cột bên phải.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">Chưa có chương trình khuyến mãi nào. Hãy tạo chương trình đầu tiên ở cột bên phải.</td>
                                 </tr>
                             }
                             else
@@ -186,13 +181,13 @@
 
             <div class="panel-card ff-admin-card">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">Chiến dịch sắp diễn ra</h2>
-                    <p class="text-muted mb-0">Theo dõi các chiến dịch gần hết hạn đăng ký để đội vận hành không bỏ sót.</p>
+                    <h2 class="h5 mb-1">Chương trình sắp diễn ra</h2>
+                    <p class="text-muted mb-0">Theo dõi các chương trình gần hết hạn đăng ký để đội vận hành không bỏ sót.</p>
                 </div>
                 <div class="upcoming-list">
                     @if (Model.Overview.Upcoming.Count == 0)
                     {
-                        <div class="text-muted">Chưa có chiến dịch sắp diễn ra.</div>
+                        <div class="text-muted">Chưa có chương trình sắp diễn ra.</div>
                     }
                     else
                     {
@@ -212,145 +207,26 @@
                     }
                 </div>
             </div>
-
-            <div class="panel-card ff-admin-card mt-4">
-                <div class="panel-head">
-                    <h2 class="h5 mb-1">Tổng quan tài chính quảng cáo</h2>
-                    <p class="text-muted mb-0">Theo dõi số dư ví, ngân sách giữ chỗ và các chiến dịch quảng cáo đang chạy theo từng nhà bán.</p>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="metric-card ff-admin-card compact">
-                            <span class="metric-label">Ví quảng cáo</span>
-                            <strong>@Model.AdsOverview.WalletCount</strong>
-                            <small>@Model.AdsOverview.ActiveWalletCount đang hoạt động</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card ff-admin-card compact">
-                            <span class="metric-label">Tổng số dư</span>
-                            <strong>@Model.AdsOverview.TotalBalance.ToString("N0") đ</strong>
-                            <small>@Model.AdsOverview.TotalAvailable.ToString("N0") đ khả dụng</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card ff-admin-card compact">
-                            <span class="metric-label">Ngân sách giữ chỗ</span>
-                            <strong>@Model.AdsOverview.TotalReserved.ToString("N0") đ</strong>
-                            <small>@Model.AdsOverview.RunningAdsCampaigns chiến dịch đang chạy</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card ff-admin-card compact">
-                            <span class="metric-label">Nạp / Chi</span>
-                            <strong>@Model.AdsOverview.TotalTopup.ToString("N0") đ</strong>
-                            <small>@Model.AdsOverview.TotalSpend.ToString("N0") đ đã chi</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="table-responsive mb-4">
-                    <table class="table align-middle campaign-table">
-                        <thead>
-                            <tr>
-                                <th>Nhà bán</th>
-                                <th>Số dư</th>
-                                <th>Giữ chỗ</th>
-                                <th>Khả dụng</th>
-                                <th>Trạng thái</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (Model.AdsWallets.Count == 0)
-                            {
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">Chưa có ví quảng cáo nào. Hãy dùng form bên phải để nạp tiền khởi tạo.</td>
-                                </tr>
-                            }
-                            else
-                            {
-                                @foreach (var wallet in Model.AdsWallets.Take(6))
-                                {
-                                    <tr>
-                                        <td>
-                                            <strong>Nhà bán #@wallet.SellerId</strong>
-                                            <div class="small text-muted">Ví #@wallet.WalletId</div>
-                                        </td>
-                                        <td>@wallet.Balance.ToString("N0") đ</td>
-                                        <td>@wallet.ReservedBalance.ToString("N0") đ</td>
-                                        <td>@wallet.AvailableBalance.ToString("N0") đ</td>
-                                        <td><span class="status-pill status-@wallet.Status.Replace("_", "-")">@wallet.Status</span></td>
-                                    </tr>
-                                }
-                            }
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="row g-3">
-                    <div class="col-lg-7">
-                        <div class="section-label">Hàng đợi chiến dịch quảng cáo</div>
-                        @if (Model.AdsCampaigns.Count == 0)
-                        {
-                            <div class="text-muted small">Chưa có chiến dịch quảng cáo MVP.</div>
-                        }
-                        else
-                        {
-                            @foreach (var ads in Model.AdsCampaigns.Take(5))
-                            {
-                                <div class="detail-item">
-                                    <div>
-                                        <strong>@ads.Name</strong>
-                                        <div class="small text-muted">Nhà bán #@ads.SellerId | @ads.Channel | @TranslateCampaignValue(ads.Status)</div>
-                                    </div>
-                                    <div class="small text-end text-muted">@ads.SpendToDate.ToString("N0") / @ads.TotalBudget.ToString("N0") đ</div>
-                                </div>
-                            }
-                        }
-                    </div>
-                    <div class="col-lg-5">
-                        <div class="section-label">Lần nạp gần đây</div>
-                        @if (Model.RecentTopups.Count == 0)
-                        {
-                            <div class="text-muted small">Chưa có lịch sử nạp ngân sách.</div>
-                        }
-                        else
-                        {
-                            @foreach (var topup in Model.RecentTopups.Take(4))
-                            {
-                                <div class="detail-item">
-                                    <div>
-                                        <strong>Nhà bán #@topup.SellerId</strong>
-                                        <div class="small text-muted">@topup.PaymentMethod ?? "manual" | @topup.CreatedAt.ToString("dd/MM HH:mm")</div>
-                                    </div>
-                                    <div class="small text-end text-muted">@topup.Amount.ToString("N0") đ</div>
-                                </div>
-                            }
-                        }
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="col-xl-4">
             <div class="panel-card ff-admin-card mb-4">
                 <div class="panel-head">
-                    <h2 class="h5 mb-1">@(Model.SelectedCampaign is null ? "Tạo chiến dịch mới" : "Cập nhật chiến dịch")</h2>
-                    <p class="text-muted mb-0">Voucher sàn, flash sale, tổng quan ví quảng cáo cơ bản.</p>
+                    <h2 class="h5 mb-1">@(Model.SelectedCampaign is null ? "Tạo chương trình mới" : "Cập nhật chương trình")</h2>
+                    <p class="text-muted mb-0">Thiết lập thời gian, loại ưu đãi, voucher liên kết và trạng thái đăng ký của nhà bán.</p>
                 </div>
 
                 <form method="post" asp-action="Save" asp-controller="Campaign" asp-area="Admin" class="row g-3">
                     @Html.AntiForgeryToken()
                     <input type="hidden" asp-for="Editor.CampaignId" />
                     <div class="col-12">
-                        <label asp-for="Editor.Name" class="form-label">Tên chiến dịch</label>
+                        <label asp-for="Editor.Name" class="form-label">Tên chương trình</label>
                         <input asp-for="Editor.Name" class="form-control" />
                     </div>
                     <div class="col-md-6">
                         <label asp-for="Editor.CampaignType" class="form-label">Loại</label>
                         <select asp-for="Editor.CampaignType" class="form-select">
-                            @foreach (var option in Model.TypeOptions.Where(x => x.Value != "all"))
+                            @foreach (var option in Model.TypeOptions.Where(x => x.Value != "all" && !string.Equals(x.Value, "livestream", StringComparison.OrdinalIgnoreCase)))
                             {
                                 if (option.Value == selectedType)
                                 {
@@ -409,10 +285,10 @@
                     </div>
                     <div class="col-12 form-check form-switch ms-1">
                         <input asp-for="Editor.IsFeatured" class="form-check-input" />
-                        <label asp-for="Editor.IsFeatured" class="form-check-label">Đánh dấu chiến dịch ưu tiên trên bảng điều khiển</label>
+                        <label asp-for="Editor.IsFeatured" class="form-check-label">Đánh dấu chương trình ưu tiên trên bảng điều khiển</label>
                     </div>
                     <div class="col-12 d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">@(Model.SelectedCampaign is null ? "Tạo chiến dịch" : "Lưu thay đổi")</button>
+                        <button type="submit" class="btn btn-primary">@(Model.SelectedCampaign is null ? "Tạo chương trình" : "Lưu thay đổi")</button>
                         @if (Model.SelectedCampaign is not null)
                         {
                             <button type="submit" formaction="@Url.Action("ToggleRegistration", "Campaign", new { area = "Admin", id = Model.SelectedCampaign.CampaignId })" formmethod="post" class="btn btn-outline-secondary">Mở / đóng đăng ký nhà bán</button>
@@ -421,9 +297,9 @@
                 </form>
                 @if (Model.SelectedCampaign is not null)
                 {
-                    <form method="post" asp-action="Delete" asp-controller="Campaign" asp-area="Admin" asp-route-id="@Model.SelectedCampaign.CampaignId" class="mt-3" onsubmit="return confirm('Xóa chiến dịch này? Chỉ chiến dịch chưa có nhà bán, suất sản phẩm hoặc ads campaign liên kết mới xóa được.');">
+                    <form method="post" asp-action="Delete" asp-controller="Campaign" asp-area="Admin" asp-route-id="@Model.SelectedCampaign.CampaignId" class="mt-3" onsubmit="return confirm('Xóa chương trình này? Chỉ chương trình chưa có nhà bán hoặc suất sản phẩm liên kết mới xóa được.');">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-outline-danger w-100">Xóa chiến dịch</button>
+                        <button type="submit" class="btn btn-outline-danger w-100">Xóa chương trình</button>
                     </form>
                 }
             </div>
@@ -433,7 +309,7 @@
                 <div class="panel-card ff-admin-card">
                     <div class="panel-head">
                         <h2 class="h5 mb-1">Tham gia của nhà bán</h2>
-                        <p class="text-muted mb-0">Đọc nhanh hàng đợi nhà bán đăng ký và các suất sản phẩm đã được đưa vào chiến dịch.</p>
+                        <p class="text-muted mb-0">Đọc nhanh hàng đợi nhà bán đăng ký và các suất sản phẩm đã được đưa vào chương trình.</p>
                     </div>
                     <div class="detail-stack">
                         <div>
@@ -479,120 +355,6 @@
                     </div>
                 </div>
             }
-
-            <div class="panel-card ff-admin-card mt-4">
-                <div class="panel-head">
-                    <h2 class="h5 mb-1">Thao tác ví quảng cáo</h2>
-                    <p class="text-muted mb-0">Nạp tiền, ghi nhận chi tiêu và tạo chiến dịch quảng cáo MVP cho nhà bán mà không cần rời khỏi trung tâm chiến dịch.</p>
-                </div>
-
-                <form method="post" asp-action="TopupAdsWallet" asp-controller="Campaign" asp-area="Admin" class="row g-3 mb-4">
-                    @Html.AntiForgeryToken()
-                    <div class="col-md-6">
-                        <label asp-for="AdsTopupEditor.SellerId" class="form-label">Mã nhà bán</label>
-                        <input asp-for="AdsTopupEditor.SellerId" class="form-control" type="number" min="1" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsTopupEditor.Amount" class="form-label">Số tiền nạp</label>
-                        <input asp-for="AdsTopupEditor.Amount" class="form-control" type="number" min="1000" step="1000" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsTopupEditor.PaymentMethod" class="form-label">Phương thức thanh toán</label>
-                        <input asp-for="AdsTopupEditor.PaymentMethod" class="form-control" placeholder="bank/manual" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsTopupEditor.ReferenceCode" class="form-label">Mã tham chiếu</label>
-                        <input asp-for="AdsTopupEditor.ReferenceCode" class="form-control" />
-                    </div>
-                    <div class="col-12">
-                        <label asp-for="AdsTopupEditor.Notes" class="form-label">Ghi chú</label>
-                        <textarea asp-for="AdsTopupEditor.Notes" class="form-control" rows="2"></textarea>
-                    </div>
-                    <div class="col-12 d-grid">
-                        <button type="submit" class="btn btn-outline-primary">Nạp ví quảng cáo</button>
-                    </div>
-                </form>
-
-                <form method="post" asp-action="SpendAdsWallet" asp-controller="Campaign" asp-area="Admin" class="row g-3 mb-4">
-                    @Html.AntiForgeryToken()
-                    <div class="col-md-4">
-                        <label asp-for="AdsSpendEditor.SellerId" class="form-label">Mã nhà bán</label>
-                        <input asp-for="AdsSpendEditor.SellerId" class="form-control" type="number" min="1" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsSpendEditor.AdsCampaignId" class="form-label">Mã chiến dịch quảng cáo</label>
-                        <input asp-for="AdsSpendEditor.AdsCampaignId" class="form-control" type="number" min="1" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsSpendEditor.Amount" class="form-label">Số tiền chi</label>
-                        <input asp-for="AdsSpendEditor.Amount" class="form-control" type="number" min="1000" step="1000" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsSpendEditor.SpendType" class="form-label">Loại chi tiêu</label>
-                        <input asp-for="AdsSpendEditor.SpendType" class="form-control" placeholder="click/manual_adjustment" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsSpendEditor.Notes" class="form-label">Ghi chú</label>
-                        <input asp-for="AdsSpendEditor.Notes" class="form-control" />
-                    </div>
-                    <div class="col-12 d-grid">
-                        <button type="submit" class="btn btn-outline-secondary">Ghi nhận chi tiêu</button>
-                    </div>
-                </form>
-
-                <form method="post" asp-action="CreateAdsCampaign" asp-controller="Campaign" asp-area="Admin" class="row g-3">
-                    @Html.AntiForgeryToken()
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.SellerId" class="form-label">Mã nhà bán</label>
-                        <input asp-for="AdsCampaignEditor.SellerId" class="form-control" type="number" min="1" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.CampaignId" class="form-label">Mã chiến dịch</label>
-                        <input asp-for="AdsCampaignEditor.CampaignId" class="form-control" type="number" min="1" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.Channel" class="form-label">Kênh</label>
-                        <input asp-for="AdsCampaignEditor.Channel" class="form-control" />
-                    </div>
-                    <div class="col-12">
-                        <label asp-for="AdsCampaignEditor.Name" class="form-label">Tên chiến dịch quảng cáo</label>
-                        <input asp-for="AdsCampaignEditor.Name" class="form-control" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.DailyBudget" class="form-label">Ngân sách ngày</label>
-                        <input asp-for="AdsCampaignEditor.DailyBudget" class="form-control" type="number" min="0" step="1000" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.TotalBudget" class="form-label">Tổng ngân sách</label>
-                        <input asp-for="AdsCampaignEditor.TotalBudget" class="form-control" type="number" min="0" step="1000" />
-                    </div>
-                    <div class="col-md-4">
-                        <label asp-for="AdsCampaignEditor.Status" class="form-label">Trạng thái</label>
-                        <select asp-for="AdsCampaignEditor.Status" class="form-select">
-                            <option value="draft">Nháp</option>
-                            <option value="scheduled">Đã lên lịch</option>
-                            <option value="running">Đang chạy</option>
-                            <option value="paused">Tạm dừng</option>
-                            <option value="completed">Hoàn tất</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsCampaignEditor.StartAt" class="form-label">Bắt đầu</label>
-                        <input asp-for="AdsCampaignEditor.StartAt" type="datetime-local" class="form-control" value="@Model.AdsCampaignEditor.StartAt.ToString("yyyy-MM-ddTHH:mm")" />
-                    </div>
-                    <div class="col-md-6">
-                        <label asp-for="AdsCampaignEditor.EndAt" class="form-label">Kết thúc</label>
-                        <input asp-for="AdsCampaignEditor.EndAt" type="datetime-local" class="form-control" value="@Model.AdsCampaignEditor.EndAt.ToString("yyyy-MM-ddTHH:mm")" />
-                    </div>
-                    <div class="col-12 form-check form-switch ms-1">
-                        <input asp-for="AdsCampaignEditor.ReserveBudget" class="form-check-input" />
-                        <label asp-for="AdsCampaignEditor.ReserveBudget" class="form-check-label">Giữ chỗ ngân sách ngay khi tạo chiến dịch quảng cáo</label>
-                    </div>
-                    <div class="col-12 d-grid">
-                        <button type="submit" class="btn btn-primary">Tạo chiến dịch quảng cáo</button>
-                    </div>
-                </form>
-            </div>
         </div>
     </div>
 </section>

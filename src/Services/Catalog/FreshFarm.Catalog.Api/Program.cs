@@ -1,4 +1,6 @@
 using FreshFarm.Catalog.Api.Options;
+using FreshFarm.Catalog.Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -7,13 +9,33 @@ using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var identityBaseUrl = builder.Configuration["Services:Identity:BaseUrl"];
+if (string.IsNullOrWhiteSpace(identityBaseUrl) && builder.Environment.IsDevelopment())
+{
+    identityBaseUrl = "https://localhost:7140";
+}
+
+if (!Uri.TryCreate(identityBaseUrl, UriKind.Absolute, out var identityBaseUri)
+    || (identityBaseUri.Scheme != Uri.UriSchemeHttps && identityBaseUri.Scheme != Uri.UriSchemeHttp))
+{
+    throw new InvalidOperationException(
+        "Services:Identity:BaseUrl must be an absolute HTTP(S) URL so JWT sessions can be validated live.");
+}
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.Configure<InternalInventoryOptions>(
-    builder.Configuration.GetSection(InternalInventoryOptions.SectionName));
+builder.Services.AddInternalInventoryOptions(builder.Configuration);
 builder.Services.AddDbContext<FreshFarm.Catalog.Api.Models.FreshFarmCatalogDBContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("FreshFarmCatalogDB"));
+});
+builder.Services.AddHttpClient<IIdentitySessionValidator, IdentitySessionValidator>(client =>
+{
+    client.BaseAddress = identityBaseUri;
+    client.Timeout = TimeSpan.FromSeconds(5);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false
 });
 
 builder.Services.AddSwaggerGen(c =>
@@ -61,25 +83,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             RoleClaimType = ClaimTypes.Role,
             NameClaimType = "username"
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = IdentitySessionJwtValidation.ValidateAsync
+        };
     });
 
 builder.Services.AddAuthorization(options =>
 {
+    var fullAccountAccessPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireClaim("account_access", "full")
+        .Build();
+
+    options.DefaultPolicy = fullAccountAccessPolicy;
+    options.FallbackPolicy = fullAccountAccessPolicy;
+
     options.AddPolicy("SellerOnly", policy =>
     {
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Seller");
     });
 
     options.AddPolicy("AdminOnly", policy =>
     {
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Admin");
     });
 
     options.AddPolicy("SellerOrAdmin", policy =>
     {
         policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
         policy.RequireRole("Seller", "Admin");
     });
 });
@@ -97,5 +134,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok("ok"));
+app.MapGet("/health", () => Results.Ok("ok"))
+    .AllowAnonymous();
 app.Run();

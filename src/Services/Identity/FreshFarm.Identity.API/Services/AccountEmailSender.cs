@@ -14,6 +14,8 @@ public interface IAccountEmailSender
 
     Task SendEmailVerificationAsync(string toEmail, string? toName, string verifyUrl, int expiresInMinutes, CancellationToken cancellationToken = default);
 
+    Task SendAccountApprovalResultAsync(string toEmail, string? toName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default);
+
     Task SendSellerApplicationReviewAsync(string toEmail, string? toName, string? storeName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default);
 }
 
@@ -90,9 +92,10 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             $"""
             <p>Xin chào {WebUtility.HtmlEncode(displayName)},</p>
             <p>Cảm ơn bạn đã đăng ký tài khoản FreshFarm.</p>
-            <p>Vui lòng bấm vào liên kết dưới đây để xác minh email trước khi đăng nhập:</p>
+            <p>Vui lòng bấm vào liên kết dưới đây để xác minh email:</p>
             <p><a href="{safeVerifyUrl}">Xác minh email</a></p>
             <p>Liên kết này có hiệu lực trong {expiresInMinutes} phút.</p>
+            <p>Sau khi xác minh email, bạn có thể đăng nhập với quyền Khách để xem trạng thái. Các chức năng chỉ được mở khi quản trị viên FreshFarm phê duyệt.</p>
             <p>Nếu bạn không tạo tài khoản này, bạn có thể bỏ qua email.</p>
             <p>Trân trọng,<br/>FreshFarm</p>
             """);
@@ -106,6 +109,52 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         };
 
         _logger.LogInformation("Đang gửi email xác minh tài khoản tới {Email} qua SMTP host {Host}.", toEmail, _options.Host);
+        cancellationToken.ThrowIfCancellationRequested();
+        await smtpClient.SendMailAsync(message, cancellationToken);
+    }
+
+    public async Task SendAccountApprovalResultAsync(
+        string toEmail,
+        string? toName,
+        bool isApproved,
+        string? reviewNote,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsConfigured)
+        {
+            throw new InvalidOperationException("SMTP chưa được cấu hình đầy đủ.");
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(toName) ? "bạn" : toName.Trim();
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeReviewNote = WebUtility.HtmlEncode(reviewNote?.Trim() ?? string.Empty);
+        var subject = isApproved
+            ? "FreshFarm - Tài khoản đã được phê duyệt"
+            : "FreshFarm - Kết quả xét duyệt tài khoản";
+        var body = isApproved
+            ? $"""
+                <p>Xin chào {safeName},</p>
+                <p>Tài khoản FreshFarm của bạn đã được quản trị viên phê duyệt.</p>
+                <p>Nếu bạn đã xác minh email, bạn có thể đăng nhập và sử dụng hệ thống.</p>
+                <p>Trân trọng,<br/>FreshFarm</p>
+                """
+            : $"""
+                <p>Xin chào {safeName},</p>
+                <p>Tài khoản FreshFarm của bạn hiện chưa được phê duyệt.</p>
+                <p>{(string.IsNullOrWhiteSpace(safeReviewNote) ? "Vui lòng liên hệ bộ phận hỗ trợ nếu bạn cần thêm thông tin." : safeReviewNote)}</p>
+                <p>Trân trọng,<br/>FreshFarm</p>
+                """;
+
+        using var message = CreateMailMessage(toEmail, displayName, subject, body);
+        using var smtpClient = new SmtpClient(_options.Host, _options.Port)
+        {
+            EnableSsl = _options.EnableSsl,
+            UseDefaultCredentials = false,
+            Credentials = new NetworkCredential(_options.UserName, _options.Password),
+            DeliveryMethod = SmtpDeliveryMethod.Network
+        };
+
+        _logger.LogInformation("Dang gui email ket qua phe duyet tai khoan toi {Email}. Approved={Approved}", toEmail, isApproved);
         cancellationToken.ThrowIfCancellationRequested();
         await smtpClient.SendMailAsync(message, cancellationToken);
     }

@@ -91,11 +91,8 @@ public sealed class PasswordResetTokenService : IPasswordResetTokenService
 
     private static string BuildSecurityVersion(User user, UserAuth? userAuth)
     {
-        var versionMoment = userAuth?.UpdatedAt
-            ?? user.UpdatedAt
-            ?? user.CreatedAt;
-
-        return versionMoment.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
+        var nonce = userAuth?.PasswordResetNonce;
+        return string.IsNullOrWhiteSpace(nonce) ? "missing" : nonce;
     }
 
     private static string NormalizeEmail(string? email)

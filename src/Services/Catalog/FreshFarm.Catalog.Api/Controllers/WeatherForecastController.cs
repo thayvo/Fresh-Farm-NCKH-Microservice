@@ -17,7 +17,7 @@ namespace FreshFarm.Catalog.Api.Controllers
         {
             _logger = logger;
         }
-        [Authorize(Roles = "Seller")]
+        [Authorize(Policy = "SellerOnly")]
         [HttpGet(Name = "GetWeatherForecast")]
         public IEnumerable<WeatherForecast> Get()
         {

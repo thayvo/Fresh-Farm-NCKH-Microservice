@@ -215,7 +215,7 @@ public sealed class NotificationsAdminController : ControllerBase
         });
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // Internal caller: authenticated with X-Internal-Service-Key inside the action.
     [HttpPost("internal")]
     public async Task<IActionResult> CreateInternalNotification(
         [FromBody] CreateInternalNotificationRequest? request,

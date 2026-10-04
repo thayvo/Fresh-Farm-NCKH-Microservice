@@ -1,6 +1,9 @@
 using System.Net.Http;
 using System.Net.Http.Json;
+using FreshFarm.Web.Bff.Dtos;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreshFarm.Web.Bff.Utilities;
 
@@ -12,6 +15,14 @@ public static class ForwardedAuthRequestBuilder
         string requestUri,
         object? payload)
     {
+        if (payload is LoginRequestDto loginRequest)
+        {
+            var deviceCookieService = httpContext.RequestServices.GetRequiredService<ILoginDeviceCookieService>();
+            // Never forward a DeviceId supplied by the public form. The only trusted value is
+            // recovered from (or created inside) the Data Protection-protected BFF cookie.
+            loginRequest.DeviceId = deviceCookieService.GetOrCreateDeviceId(httpContext);
+        }
+
         var request = new HttpRequestMessage(method, requestUri);
         if (payload is not null)
         {

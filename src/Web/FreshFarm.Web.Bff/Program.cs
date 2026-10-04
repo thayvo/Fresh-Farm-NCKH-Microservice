@@ -1,18 +1,24 @@
 using FreshFarm.Web.Bff.Areas.Seller.Hubs;
 using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Thêm using để dùng ICartSessionService/CartSessionService.
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies; // Su dung cookie auth cho web MVC.
+using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models; // Cau hinh OpenAPI/Swagger.
 using StackExchange.Redis;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -31,20 +37,37 @@ if (string.IsNullOrWhiteSpace(dataProtectionKeysPath))
 }
 
 Directory.CreateDirectory(dataProtectionKeysPath);
-builder.Services.AddDataProtection()
+var dataProtectionBuilder = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
     .SetApplicationName("FreshFarm.Bff");
+var dataProtectionCertificateThumbprint =
+    builder.Configuration["DataProtection:CertificateThumbprint"]?.Trim();
+if (!string.IsNullOrWhiteSpace(dataProtectionCertificateThumbprint))
+{
+    dataProtectionBuilder.ProtectKeysWithCertificate(dataProtectionCertificateThumbprint);
+}
+else if (builder.Environment.IsProduction())
+{
+    throw new InvalidOperationException(
+        "Production requires DataProtection:CertificateThumbprint so persisted keys are encrypted at rest.");
+}
 
 builder.Services.Configure<SessionStoreOptions>(
     builder.Configuration.GetSection(SessionStoreOptions.SectionName));
 builder.Services.Configure<IdleSessionOptions>(
     builder.Configuration.GetSection(IdleSessionOptions.SectionName));
+builder.Services.AddSingleton<IValidateOptions<SellerKycStorageOptions>, SellerKycStorageOptionsValidator>();
+builder.Services.AddOptions<SellerKycStorageOptions>()
+    .Bind(builder.Configuration.GetSection(SellerKycStorageOptions.SectionName))
+    .ValidateOnStart();
 builder.Services.Configure<OrderingServiceOptions>(
     builder.Configuration.GetSection(OrderingServiceOptions.SectionName));
 builder.Services.Configure<GhnBackgroundSyncOptions>(
     builder.Configuration.GetSection(GhnBackgroundSyncOptions.SectionName));
-builder.Services.Configure<GhnOrderStatusWebhookOptions>(
-    builder.Configuration.GetSection(GhnOrderStatusWebhookOptions.SectionName));
+builder.Services.AddOptions<GhnOrderStatusWebhookOptions>()
+    .Bind(builder.Configuration.GetSection(GhnOrderStatusWebhookOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 builder.Services.Configure<SessionAwareRecommendationOptions>(
     builder.Configuration.GetSection(SessionAwareRecommendationOptions.SectionName));
 builder.Services.Configure<RecommendationExperimentOptions>(
@@ -130,8 +153,15 @@ builder.Services.AddRateLimiter(options =>
             }));
 
     options.AddPolicy("auth-form", httpContext =>
-        RateLimitPartition.GetNoLimiter(
-            partitionKey: BuildRateLimitKey(httpContext, "auth-form")));
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: BuildRateLimitKey(httpContext, "auth-form"),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
 
     options.AddPolicy("password-recovery", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
@@ -273,7 +303,10 @@ builder.Services // Dang ky cookie authentication cho user web.
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.Cookie.Name = "FreshFarm.Bff.Auth";
+        // v2 intentionally invalidates authentication cookies issued before the
+        // authenticated-by-default rollout. Otherwise a browser can keep using an
+        // older persistent ticket and make the new login gate appear ineffective.
+        options.Cookie.Name = "FreshFarm.Bff.Auth.v2";
         options.Cookie.HttpOnly = true;
         options.Cookie.IsEssential = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
@@ -284,6 +317,69 @@ builder.Services // Dang ky cookie authentication cho user web.
         options.ExpireTimeSpan = TimeSpan.FromMinutes(idleSessionOptions.AuthenticationLifetimeMinutes); // Han cookie auth.
         options.Events = new CookieAuthenticationEvents
         {
+            OnValidatePrincipal = async context =>
+            {
+                const int validationIntervalSeconds = 60;
+                var checkedAtRaw = context.Principal?.FindFirstValue("session_checked_at");
+                if (long.TryParse(checkedAtRaw, out var checkedAtUnix)
+                    && DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(checkedAtUnix)
+                        < TimeSpan.FromSeconds(validationIntervalSeconds))
+                {
+                    return;
+                }
+
+                var accessToken = context.HttpContext.Session.GetString("ACCESS_TOKEN");
+                if (string.IsNullOrWhiteSpace(accessToken))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                    return;
+                }
+
+                try
+                {
+                    var clientFactory = context.HttpContext.RequestServices.GetRequiredService<IHttpClientFactory>();
+                    var identityClient = clientFactory.CreateClient("Identity");
+                    using var request = new HttpRequestMessage(HttpMethod.Get, "/auth/session-status");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    using var response = await identityClient.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        context.HttpContext.RequestAborted);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        context.HttpContext.Session.Clear();
+                        context.RejectPrincipal();
+                        await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                        return;
+                    }
+
+                    if (context.Principal?.Identity is ClaimsIdentity currentIdentity)
+                    {
+                        var refreshedIdentity = new ClaimsIdentity(currentIdentity);
+                        foreach (var staleClaim in refreshedIdentity.FindAll("session_checked_at").ToArray())
+                        {
+                            refreshedIdentity.RemoveClaim(staleClaim);
+                        }
+
+                        refreshedIdentity.AddClaim(new Claim(
+                            "session_checked_at",
+                            DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
+                        context.ReplacePrincipal(new ClaimsPrincipal(refreshedIdentity));
+                        context.ShouldRenew = true;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    var logger = context.HttpContext.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("AccountSessionValidation");
+                    logger.LogWarning(exception, "Khong the xac minh lai trang thai phien dang nhap voi Identity API.");
+                    context.HttpContext.Session.Clear();
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                }
+            },
             OnRedirectToLogin = context =>
             {
                 if (context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
@@ -293,6 +389,15 @@ builder.Services // Dang ky cookie authentication cho user web.
                 }
 
                 var returnUrl = ResolveInteractiveReturnUrl(context.Request);
+                if (string.Equals(
+                        context.HttpContext.User.FindFirstValue("account_access"),
+                        "pending",
+                        StringComparison.Ordinal))
+                {
+                    context.Response.Redirect($"/account/signin?returnUrl={Uri.EscapeDataString(returnUrl)}");
+                    return Task.CompletedTask;
+                }
+
                 var loginPath = "/account/signin";
 
                 if (context.Request.Path.StartsWithSegments("/Admin", StringComparison.OrdinalIgnoreCase))
@@ -344,8 +449,19 @@ builder.Services // Dang ky cookie authentication cho user web.
 
 builder.Services.Configure<GoogleAuthenticationOptions>(
     builder.Configuration.GetSection(GoogleAuthenticationOptions.SectionName));
-builder.Services.Configure<GoogleRecaptchaOptions>(
-    builder.Configuration.GetSection(GoogleRecaptchaOptions.SectionName));
+builder.Services.AddOptions<GoogleRecaptchaOptions>()
+    .Bind(builder.Configuration.GetSection(GoogleRecaptchaOptions.SectionName))
+    .Validate(
+        options =>
+            (string.IsNullOrWhiteSpace(options.SiteKey) &&
+             string.IsNullOrWhiteSpace(options.SecretKey)) ||
+            options.IsConfigured,
+        "Security:GoogleRecaptcha must use an HTTPS verification endpoint and at least one allowed hostname when credentials are configured.")
+    .ValidateOnStart();
+builder.Services.Configure<BotChallengeOptions>(
+    builder.Configuration.GetSection(BotChallengeOptions.SectionName));
+builder.Services.Configure<CloudflareTurnstileOptions>(
+    builder.Configuration.GetSection(CloudflareTurnstileOptions.SectionName));
 builder.Services.Configure<VnPayOptions>(
     builder.Configuration.GetSection(VnPayOptions.SectionName));
 
@@ -368,6 +484,13 @@ if (googleAuthOptions.IsConfigured)
             options.SignInScheme = "GoogleExternal";
             options.CallbackPath = "/signin-google";
             options.SaveTokens = false;
+            options.ClaimActions.MapJsonKey(
+                GoogleAuthenticationClaimTypes.EmailVerified,
+                "email_verified",
+                ClaimValueTypes.Boolean);
+            options.ClaimActions.MapJsonKey(
+                GoogleAuthenticationClaimTypes.HostedDomain,
+                "hd");
             options.Events.OnRemoteFailure = context =>
             {
                 var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
@@ -402,8 +525,32 @@ if (googleAuthOptions.IsConfigured)
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("SellerOnly", policy => policy.RequireRole("Seller"));
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    var fullAccessPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireClaim("account_access", "full")
+        .Build();
+
+    options.DefaultPolicy = fullAccessPolicy;
+    options.FallbackPolicy = fullAccessPolicy;
+    options.AddPolicy("AnyAuthenticated", policy => policy.RequireAuthenticatedUser());
+    options.AddPolicy("PendingAccount", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "pending");
+        policy.RequireRole("Guest");
+    });
+    options.AddPolicy("SellerOnly", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
+        policy.RequireRole("Seller");
+    });
+    options.AddPolicy("AdminOnly", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("account_access", "full");
+        policy.RequireRole("Admin");
+    });
 }); // Bat [Authorize] va policy role cho area controllers.
 builder.Services.AddSignalR();
 
@@ -411,6 +558,11 @@ builder.Services.AddHttpClient("Identity", client => // HttpClient typed by name
 {
     var baseUrl = builder.Configuration["Services:Identity:BaseUrl"]; // Doc base url tu config.
     client.BaseAddress = new Uri(baseUrl!); // Gan base address.
+    var internalServiceKey = builder.Configuration["Services:Identity:InternalServiceKey"];
+    if (!string.IsNullOrWhiteSpace(internalServiceKey))
+    {
+        client.DefaultRequestHeaders.TryAddWithoutValidation("X-FreshFarm-Internal-Key", internalServiceKey);
+    }
 });
 
 builder.Services.AddHttpClient("Catalog", client => // HttpClient cho Catalog API.
@@ -425,6 +577,10 @@ builder.Services.AddHttpClient("Ordering", client => // HttpClient cho Ordering 
     client.BaseAddress = new Uri(baseUrl!); // Gan base address.
 });
 builder.Services.AddHttpClient<IGoogleRecaptchaService, GoogleRecaptchaService>();
+builder.Services.AddHttpClient<ICloudflareTurnstileService, CloudflareTurnstileService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 builder.Services.Configure<GhnSandboxOptions>(builder.Configuration.GetSection(GhnSandboxOptions.SectionName));
 builder.Services.AddHttpClient("GhnSandbox", client =>
@@ -452,9 +608,11 @@ builder.Services.AddHostedService<SessionAwareRecommendationWeightTuningBackgrou
 builder.Services.AddSingleton<IMultiObjectiveRecommendationRolloutService, MultiObjectiveRecommendationRolloutService>(); // Hourly guarded rollout and objective-metric guardrails.
 builder.Services.AddHostedService<MultiObjectiveRecommendationRolloutBackgroundService>();
 builder.Services.AddScoped<IProductImageStorageService, ProductImageStorageService>(); // Lưu/xóa ảnh sản phẩm trong wwwroot/uploads/products.
-builder.Services.AddScoped<ISellerKycStorageService, SellerKycStorageService>(); // Lưu/xóa giấy tờ KYC seller trong wwwroot/uploads/seller-kyc.
+builder.Services.AddScoped<ISellerKycStorageService, SellerKycStorageService>(); // Lưu/xóa giấy tờ KYC trong kho riêng ngoài webroot.
 builder.Services.AddSingleton<IVnPayService, VnPayService>(); // Ký URL + verify callback VNPay sandbox.
 builder.Services.AddSingleton<ISignUpCaptchaService, SignUpCaptchaService>();
+builder.Services.AddScoped<IBotChallengeService, BotChallengeService>();
+builder.Services.AddScoped<ILoginDeviceCookieService, LoginDeviceCookieService>();
 
 var app = builder.Build(); // Build app pipeline.
 var redisSessionCacheState = app.Services.GetRequiredService<RedisSessionCacheState>();
@@ -504,16 +662,16 @@ app.Use(async (context, next) =>
             .Append("connect-src 'self' https: wss:; ");
 
         var strictScriptDirective = new StringBuilder()
-            .Append("script-src 'self' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com; ")
+            .Append("script-src 'self' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com; ")
             .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
-            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https:;");
+            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com https:;");
 
         var legacyScriptDirective = new StringBuilder()
             .Append("script-src 'self' 'unsafe-inline' 'nonce-")
             .Append(cspNonce)
-            .Append("' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com; ")
+            .Append("' https://cdn.jsdelivr.net https://cdn.ckeditor.com https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com; ")
             .Append("style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; ")
-            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https:;");
+            .Append("frame-src 'self' https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com https:;");
 
         var requestPath = context.Request.Path;
         var useReportOnly =
@@ -575,12 +733,12 @@ app.MapControllerRoute( // Map MVC default route.
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-app.MapGet("/health", () => Results.Ok("ok")); // Health check endpoint.
+app.MapGet("/health", () => Results.Ok("ok")).AllowAnonymous(); // Health check endpoint.
 app.MapHealthChecks("/health/redis", new HealthCheckOptions
 {
     Predicate = registration => string.Equals(registration.Name, "redis", StringComparison.OrdinalIgnoreCase),
     ResponseWriter = WriteHealthCheckResponseAsync
-});
+}).AllowAnonymous();
 
 app.Run(); // Chay app.
 

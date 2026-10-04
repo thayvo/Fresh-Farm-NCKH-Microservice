@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using FreshFarm.Identity.Api.Dtos;
+using FreshFarm.Identity.Api.Infrastructure;
 using FreshFarm.Identity.Api.Models;
 using FreshFarm.Identity.Api.Options;
 using FreshFarm.Identity.Api.Services;
@@ -24,6 +25,7 @@ namespace FreshFarm.Identity.Api.Controllers
     {
         private const int MaxFailedLoginAttempts = 5;
         private const int BaseLockoutDurationMinutes = 5;
+        private const string GoogleExternalLoginProvider = "Google";
         private static readonly Regex VietnamPhoneRegex = new(@"^(0\d{9}|\+84\d{9})$", RegexOptions.Compiled);
 
         private readonly FreshFarmIdentityDBContext _db;
@@ -35,6 +37,7 @@ namespace FreshFarm.Identity.Api.Controllers
         private readonly ITwoFactorLoginTicketService _twoFactorLoginTicketService;
         private readonly IAccountEmailSender _accountEmailSender;
         private readonly IAuthAuditService _authAuditService;
+        private readonly ILoginDeviceSecurityService _loginDeviceSecurityService;
         private readonly PasswordResetOptions _passwordResetOptions;
         private readonly EmailVerificationOptions _emailVerificationOptions;
         private readonly ILogger<AuthController> _logger;
@@ -49,6 +52,7 @@ namespace FreshFarm.Identity.Api.Controllers
             ITwoFactorLoginTicketService twoFactorLoginTicketService,
             IAccountEmailSender accountEmailSender,
             IAuthAuditService authAuditService,
+            ILoginDeviceSecurityService loginDeviceSecurityService,
             IOptions<PasswordResetOptions> passwordResetOptions,
             IOptions<EmailVerificationOptions> emailVerificationOptions,
             ILogger<AuthController> logger)
@@ -62,12 +66,15 @@ namespace FreshFarm.Identity.Api.Controllers
             _twoFactorLoginTicketService = twoFactorLoginTicketService;
             _accountEmailSender = accountEmailSender;
             _authAuditService = authAuditService;
+            _loginDeviceSecurityService = loginDeviceSecurityService;
             _passwordResetOptions = passwordResetOptions.Value;
             _emailVerificationOptions = emailVerificationOptions.Value;
             _logger = logger;
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (!TryValidateLoginRequest(request, out var validationProblem))
@@ -76,16 +83,45 @@ namespace FreshFarm.Identity.Api.Controllers
                 return validationProblem!;
             }
 
+            var cancellationToken = HttpContext.RequestAborted;
+            var deviceState = await _loginDeviceSecurityService.GetStateAsync(
+                request.DeviceId,
+                HttpContext,
+                cancellationToken);
+            if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+            {
+                await WriteAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "login_device_locked",
+                    success: false,
+                    "device_locked",
+                    deviceState.FailedCount,
+                    cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status423Locked,
+                    BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, DateTime.UtcNow));
+            }
+
             var id = request.Identifier.Trim();
             var isEmail = id.Contains("@");
             var user = await _db.Users
                 .Include(u => u.UserAuth)
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .SingleOrDefaultAsync(u => isEmail ? u.Email == id : u.UserName == id);
+                .SingleOrDefaultAsync(u => isEmail ? u.Email == id : u.UserName == id, cancellationToken);
 
             if (user?.UserAuth == null)
             {
+                // Keep the password-work factor closer to the real-account path so the response
+                // does not become a cheap account-enumeration timing oracle.
+                _ = _passwordHasher.HashPassword(new User(), request.Password);
+                deviceState = await _loginDeviceSecurityService.RecordFailureAsync(
+                    request.DeviceId,
+                    HttpContext,
+                    user?.UserId,
+                    cancellationToken);
                 _logger.LogWarning("Dang nhap that bai: khong tim thay tai khoan cho identifier {Identifier}.", MaskIdentifier(id));
                 await WriteAuthAuditAsync(
                     request,
@@ -93,37 +129,21 @@ namespace FreshFarm.Identity.Api.Controllers
                     null,
                     "login_failed",
                     success: false,
-                    "account_not_found");
+                    "account_not_found",
+                    deviceState.FailedCount,
+                    cancellationToken);
+
+                if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                {
+                    return StatusCode(
+                        StatusCodes.Status423Locked,
+                        BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, DateTime.UtcNow));
+                }
+
                 return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
             }
 
             var roleNames = GetRoleNames(user);
-
-            if (!user.IsActive)
-            {
-                _logger.LogWarning("Dang nhap that bai: userId {UserId} dang bi vo hieu hoa.", user.UserId);
-                await WriteAuthAuditAsync(
-                    request,
-                    user,
-                    roleNames,
-                    "login_failed",
-                    success: false,
-                    "user_inactive");
-                return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
-            }
-
-            if (!user.EmailConfirmed)
-            {
-                _logger.LogInformation("Dang nhap bi chan: userId {UserId} chua xac minh email.", user.UserId);
-                await WriteAuthAuditAsync(
-                    request,
-                    user,
-                    roleNames,
-                    "login_failed",
-                    success: false,
-                    "email_not_confirmed");
-                return Unauthorized("Email của bạn chưa được xác minh. Vui lòng kiểm tra hộp thư và xác minh trước khi đăng nhập.");
-            }
 
             var now = DateTime.UtcNow;
             if (user.UserAuth.LockedUntil.HasValue && user.UserAuth.LockedUntil.Value > now)
@@ -139,35 +159,28 @@ namespace FreshFarm.Identity.Api.Controllers
                     "login_locked",
                     success: false,
                     "account_locked",
-                    user.UserAuth.FailedCount);
+                    user.UserAuth.FailedCount,
+                    cancellationToken);
                 return Unauthorized(BuildLockoutResponse(user.UserAuth.LockedUntil.Value, now));
-            }
-
-            if (user.UserAuth.LockedUntil.HasValue && user.UserAuth.LockedUntil.Value <= now)
-            {
-                user.UserAuth.LockedUntil = null;
-                user.UserAuth.FailedCount = 0;
-                user.UserAuth.UpdatedAt = now;
-                await _db.SaveChangesAsync();
             }
 
             var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.UserAuth.PasswordHash, request.Password);
             if (verificationResult == PasswordVerificationResult.Failed)
             {
-                user.UserAuth.FailedCount += 1;
-                user.UserAuth.UpdatedAt = now;
+                deviceState = await _loginDeviceSecurityService.RecordFailureAsync(
+                    request.DeviceId,
+                    HttpContext,
+                    user.UserId,
+                    cancellationToken);
+                var accountFailedCount = deviceState.AccountFailedCount ?? user.UserAuth.FailedCount;
+                var accountLockedUntil = deviceState.AccountLockedUntilUtc;
 
-                if (user.UserAuth.FailedCount >= MaxFailedLoginAttempts)
+                if (accountLockedUntil.HasValue && accountLockedUntil.Value > now)
                 {
-                    user.UserAuth.LockoutLevel = Math.Max(1, user.UserAuth.LockoutLevel + 1);
-                    user.UserAuth.LockedUntil = now.Add(BuildLockoutDuration(user.UserAuth.LockoutLevel));
-                    user.UserAuth.FailedCount = MaxFailedLoginAttempts;
-                    await _db.SaveChangesAsync();
-
                     _logger.LogWarning(
                         "Tai khoan userId {UserId} bi khoa tam thoi den {LockedUntil} do dang nhap sai nhieu lan.",
                         user.UserId,
-                        user.UserAuth.LockedUntil);
+                        accountLockedUntil);
                     await WriteAuthAuditAsync(
                         request,
                         user,
@@ -175,16 +188,26 @@ namespace FreshFarm.Identity.Api.Controllers
                         "login_locked",
                         success: false,
                         "too_many_failed_passwords",
-                        user.UserAuth.FailedCount);
+                        accountFailedCount,
+                        cancellationToken);
 
-                    return Unauthorized(BuildLockoutResponse(user.UserAuth.LockedUntil.Value, now));
+                    if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                    {
+                        return StatusCode(
+                            StatusCodes.Status423Locked,
+                            BuildCombinedLockoutResponse(
+                                accountLockedUntil.Value,
+                                deviceState.LockedUntilUtc.Value,
+                                now));
+                    }
+
+                    return Unauthorized(BuildLockoutResponse(accountLockedUntil.Value, now));
                 }
 
-                await _db.SaveChangesAsync();
                 _logger.LogWarning(
                     "Dang nhap that bai: userId {UserId} sai mat khau lan {FailedCount}/{MaxAttempts}.",
                     user.UserId,
-                    user.UserAuth.FailedCount,
+                    accountFailedCount,
                     MaxFailedLoginAttempts);
                 await WriteAuthAuditAsync(
                     request,
@@ -193,8 +216,23 @@ namespace FreshFarm.Identity.Api.Controllers
                     "login_failed",
                     success: false,
                     "wrong_password",
-                    user.UserAuth.FailedCount);
-                return Unauthorized(BuildRemainingAttemptsMessage(user.UserAuth.FailedCount));
+                    accountFailedCount,
+                    cancellationToken);
+
+                if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                {
+                    return StatusCode(
+                        StatusCodes.Status423Locked,
+                        BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, now));
+                }
+
+                return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
+            }
+
+            if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                user.UserAuth.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+                user.UserAuth.UpdatedAt = now;
             }
 
             if (user.UserAuth.FailedCount > 0 || user.UserAuth.LockedUntil.HasValue || user.UserAuth.LockoutLevel > 0)
@@ -203,12 +241,94 @@ namespace FreshFarm.Identity.Api.Controllers
                 user.UserAuth.LockedUntil = null;
                 user.UserAuth.LockoutLevel = 0;
                 user.UserAuth.UpdatedAt = now;
-                await _db.SaveChangesAsync();
+                await _db.SaveChangesAsync(cancellationToken);
                 _logger.LogInformation("Dang nhap thanh cong va da reset trang thai lockout cho userId {UserId}.", user.UserId);
+            }
+            else if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Da rehash mat khau theo cau hinh hien tai cho userId {UserId}.", user.UserId);
             }
             else
             {
                 _logger.LogInformation("Dang nhap thanh cong cho userId {UserId}.", user.UserId);
+            }
+
+            await _loginDeviceSecurityService.ResetAfterSuccessfulCredentialAsync(
+                request.DeviceId,
+                HttpContext,
+                user.UserId,
+                cancellationToken);
+
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Dang nhap that bai: userId {UserId} dang bi vo hieu hoa.", user.UserId);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    "user_inactive",
+                    cancellationToken: cancellationToken);
+                return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+
+            if (!user.EmailConfirmed)
+            {
+                _logger.LogInformation("Dang nhap bi chan: userId {UserId} chua xac minh email.", user.UserId);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    "email_not_confirmed",
+                    cancellationToken: cancellationToken);
+                return Unauthorized("Email của bạn chưa được xác minh. Vui lòng kiểm tra hộp thư và xác minh trước khi đăng nhập.");
+            }
+
+            if (string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.Equals(request.ClientLane, "Customer", StringComparison.OrdinalIgnoreCase))
+                {
+                    await WriteAuthAuditAsync(
+                        request,
+                        user,
+                        roleNames,
+                        "login_failed",
+                        success: false,
+                        "pending_account_wrong_lane",
+                        cancellationToken: cancellationToken);
+                    return Unauthorized(BuildLaneAccessDeniedMessage(request.ClientLane!));
+                }
+
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_restricted_success",
+                    success: true,
+                    "pending_admin_approval",
+                    cancellationToken: cancellationToken);
+
+                return Ok(CreateToken(user, roleNames));
+            }
+
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase))
+            {
+                var approvalFailureReason = ResolveApprovalFailureReason(user.ApprovalStatus);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    approvalFailureReason,
+                    cancellationToken: cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
             }
 
             if (!IsRoleAllowedForLane(request.ClientLane!, roleNames))
@@ -224,7 +344,8 @@ namespace FreshFarm.Identity.Api.Controllers
                     "login_failed",
                     success: false,
                     "lane_access_denied",
-                    user.UserAuth.FailedCount);
+                    user.UserAuth.FailedCount,
+                    cancellationToken);
                 return Unauthorized(BuildLaneAccessDeniedMessage(request.ClientLane!));
             }
 
@@ -235,7 +356,8 @@ namespace FreshFarm.Identity.Api.Controllers
                 "login_success",
                 success: true,
                 null,
-                user.UserAuth.FailedCount);
+                user.UserAuth.FailedCount,
+                cancellationToken);
 
             if (RequiresTwoFactor(roleNames))
             {
@@ -269,6 +391,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("login/2fa")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> VerifyTwoFactorLogin([FromBody] VerifyTwoFactorLoginRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Ticket) || string.IsNullOrWhiteSpace(request.Code))
@@ -310,6 +434,18 @@ namespace FreshFarm.Identity.Api.Controllers
             {
                 _logger.LogWarning("Xac thuc 2FA bi chan: userId {UserId} chua xac minh email.", user.UserId);
                 return Unauthorized("Email của bạn chưa được xác minh.");
+            }
+
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Xac thuc 2FA bi chan: userId {UserId} co approval status {ApprovalStatus}.",
+                    user.UserId,
+                    user.ApprovalStatus);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
             }
 
             var now = DateTime.UtcNow;
@@ -375,6 +511,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("register")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
@@ -412,8 +550,16 @@ namespace FreshFarm.Identity.Api.Controllers
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình đường dẫn VerifyUrlBase cho email xác minh tài khoản.");
             }
 
-            var roleName = string.IsNullOrEmpty(request.RoleName) ? "Customer" : request.RoleName.Trim();
-            var role = await _db.Roles.SingleOrDefaultAsync(r => r.RoleName == roleName);
+            const string roleName = "Customer";
+            if (!string.IsNullOrWhiteSpace(request.RoleName)
+                && !string.Equals(request.RoleName.Trim(), roleName, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Public register da gui role khong hop le {RequestedRole}; he thong ep ve Customer.",
+                    request.RoleName.Trim());
+            }
+
+            var role = await _db.Roles.SingleOrDefaultAsync(r => r.RoleName == roleName && r.IsActive);
             if (role == null)
             {
                 return BadRequest($"Vai trò {roleName} không tìm thấy.");
@@ -430,6 +576,10 @@ namespace FreshFarm.Identity.Api.Controllers
                     Phone = normalizedPhone,
                     EmailConfirmed = false,
                     EmailConfirmedAt = null,
+                    ApprovalStatus = AccountApprovalStatus.Pending,
+                    ApprovedAt = null,
+                    ApprovedByUserId = null,
+                    ApprovalStatusChangedAt = DateTime.UtcNow,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -461,7 +611,7 @@ namespace FreshFarm.Identity.Api.Controllers
                     .SingleAsync(x => x.UserId == user.UserId);
 
                 var verificationEmailSent = false;
-                var verificationMessage = "Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.";
+                var verificationMessage = "Tài khoản đã được tạo. Vui lòng xác minh email; sau đó bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt.";
 
                 try
                 {
@@ -494,6 +644,8 @@ namespace FreshFarm.Identity.Api.Controllers
                     user.Email,
                     role.RoleName,
                     EmailVerificationRequired = true,
+                    AdminApprovalRequired = true,
+                    ApprovalStatus = user.ApprovalStatus,
                     VerificationEmailSent = verificationEmailSent,
                     Message = verificationMessage
                 });
@@ -512,6 +664,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("external-login")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ExternalLogin([FromBody] ExternalLoginRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -529,7 +683,7 @@ namespace FreshFarm.Identity.Api.Controllers
             }
 
             var provider = request.Provider.Trim();
-            if (!provider.Equals("Google", StringComparison.OrdinalIgnoreCase))
+            if (!provider.Equals(GoogleExternalLoginProvider, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("External login that bai: provider {Provider} khong duoc ho tro.", provider);
                 await WriteExternalAuthAuditAsync(
@@ -543,6 +697,26 @@ namespace FreshFarm.Identity.Api.Controllers
                 return BadRequest("Hiện tại hệ thống chỉ hỗ trợ đăng nhập Google.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.ProviderSubject))
+            {
+                return BadRequest("Thiếu định danh tài khoản từ nhà cung cấp đăng nhập.");
+            }
+
+            if (!request.EmailVerified)
+            {
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "unverified_provider_email",
+                    cancellationToken: cancellationToken);
+                return BadRequest("Google chưa xác minh địa chỉ email này.");
+            }
+
+            provider = GoogleExternalLoginProvider;
+            var providerSubject = request.ProviderSubject.Trim();
             var normalizedEmail = request.Email.Trim();
             var normalizedFullName = request.FullName.Trim();
             var normalizedAvatar = string.IsNullOrWhiteSpace(request.AvatarUrl)
@@ -553,7 +727,21 @@ namespace FreshFarm.Identity.Api.Controllers
                 .Include(u => u.UserAuth)
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .SingleOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(
+                    u => u.UserAuth != null
+                         && u.UserAuth.ExternalLoginProvider == provider
+                         && u.UserAuth.ExternalLoginSubject == providerSubject,
+                    cancellationToken);
+            var hasBoundExternalLogin = user is not null;
+
+            if (user is null)
+            {
+                user = await _db.Users
+                    .Include(u => u.UserAuth)
+                    .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                    .SingleOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+            }
 
             if (user is not null && !user.IsActive)
             {
@@ -607,6 +795,10 @@ namespace FreshFarm.Identity.Api.Controllers
                         Avatar = normalizedAvatar,
                         EmailConfirmed = true,
                         EmailConfirmedAt = now,
+                        ApprovalStatus = AccountApprovalStatus.Pending,
+                        ApprovedAt = null,
+                        ApprovedByUserId = null,
+                        ApprovalStatusChangedAt = now,
                         IsActive = true,
                         CreatedAt = now
                     };
@@ -620,6 +812,8 @@ namespace FreshFarm.Identity.Api.Controllers
                         UserId = user.UserId,
                         PasswordHash = _passwordHasher.HashPassword(user, randomPassword),
                         FailedCount = 0,
+                        ExternalLoginProvider = provider,
+                        ExternalLoginSubject = providerSubject,
                         UpdatedAt = now
                     });
 
@@ -648,6 +842,53 @@ namespace FreshFarm.Identity.Api.Controllers
             else
             {
                 var shouldSave = false;
+                if (!hasBoundExternalLogin)
+                {
+                    if (user.UserAuth is null)
+                    {
+                        _logger.LogError("Khong the rang buoc Google login vi userId {UserId} khong co UserAuth.", user.UserId);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Tài khoản hiện tại chưa thể liên kết đăng nhập Google. Vui lòng liên hệ quản trị viên.");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(user.UserAuth.ExternalLoginProvider)
+                        || !string.IsNullOrWhiteSpace(user.UserAuth.ExternalLoginSubject))
+                    {
+                        await WriteExternalAuthAuditAsync(
+                            request,
+                            user,
+                            user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                            "external_login_failed",
+                            success: false,
+                            failureReason: "external_identity_mismatch",
+                            cancellationToken: cancellationToken);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Email này đã được liên kết với một tài khoản Google khác.");
+                    }
+
+                    if (!CanAutomaticallyLinkGoogleAccountByEmail(normalizedEmail, request.HostedDomain))
+                    {
+                        await WriteExternalAuthAuditAsync(
+                            request,
+                            user,
+                            user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                            "external_login_failed",
+                            success: false,
+                            failureReason: "unsafe_legacy_email_link",
+                            cancellationToken: cancellationToken);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Không thể tự động liên kết tài khoản Google dùng email bên thứ ba. Vui lòng đăng nhập bằng mật khẩu hoặc liên hệ quản trị viên.");
+                    }
+
+                    user.UserAuth.ExternalLoginProvider = provider;
+                    user.UserAuth.ExternalLoginSubject = providerSubject;
+                    user.UserAuth.UpdatedAt = DateTime.UtcNow;
+                    shouldSave = true;
+                }
+
                 if (!string.IsNullOrWhiteSpace(normalizedFullName) && !string.Equals(user.FullName, normalizedFullName, StringComparison.Ordinal))
                 {
                     user.FullName = normalizedFullName;
@@ -681,19 +922,42 @@ namespace FreshFarm.Identity.Api.Controllers
                 roleNames.Add("Customer");
             }
 
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "external_login_blocked",
+                    success: false,
+                    failureReason: ResolveApprovalFailureReason(user.ApprovalStatus),
+                    cancellationToken: cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
+            }
+
+            var isPendingApproval = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Pending,
+                StringComparison.OrdinalIgnoreCase);
+
             await WriteExternalAuthAuditAsync(
                 request,
                 user,
                 roleNames,
-                "external_login_success",
+                isPendingApproval ? "external_login_restricted_success" : "external_login_success",
                 success: true,
-                failureReason: null,
+                failureReason: isPendingApproval ? "pending_admin_approval" : null,
                 cancellationToken: cancellationToken);
 
             return Ok(CreateToken(user, roleNames));
         }
 
         [HttpPost("resend-email-verification")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ResendEmailVerification([FromBody] ResendEmailVerificationRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -753,6 +1017,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("verify-email")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -776,7 +1042,10 @@ namespace FreshFarm.Identity.Api.Controllers
                 {
                     success = true,
                     alreadyConfirmed = true,
-                    message = "Email của bạn đã được xác minh trước đó."
+                    approvalStatus = user.ApprovalStatus,
+                    message = string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                        ? "Email của bạn đã được xác minh trước đó và tài khoản đã được phê duyệt."
+                        : "Email của bạn đã được xác minh trước đó. Tài khoản vẫn đang chờ quản trị viên phê duyệt."
                 });
             }
 
@@ -798,11 +1067,16 @@ namespace FreshFarm.Identity.Api.Controllers
             return Ok(new
             {
                 success = true,
-                message = "Xác minh email thành công. Bạn có thể đăng nhập."
+                approvalStatus = user.ApprovalStatus,
+                message = string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                    ? "Xác minh email thành công. Tài khoản đã được phê duyệt và có thể đăng nhập."
+                    : "Xác minh email thành công. Bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt."
             });
         }
 
         [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -827,6 +1101,18 @@ namespace FreshFarm.Identity.Api.Controllers
 
             if (user is not null && user.IsActive)
             {
+                if (user.UserAuth is null)
+                {
+                    _logger.LogWarning("Khong the tao reset token vi userId {UserId} khong co UserAuth.", user.UserId);
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu."
+                    });
+                }
+
+                user.UserAuth.PasswordResetNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                await _db.SaveChangesAsync(cancellationToken);
                 var token = _passwordResetTokenService.GenerateToken(user, user.UserAuth);
                 var resetUrl = QueryHelpers.AddQueryString(resetUrlBase, new Dictionary<string, string?>
                 {
@@ -858,6 +1144,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("reset-password")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -868,6 +1156,7 @@ namespace FreshFarm.Identity.Api.Controllers
             var normalizedEmail = request.Email.Trim();
             var user = await _db.Users
                 .Include(x => x.UserAuth)
+                .Include(x => x.UserSessions)
                 .SingleOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
 
             if (user is null || !user.IsActive)
@@ -902,10 +1191,19 @@ namespace FreshFarm.Identity.Api.Controllers
             userAuth.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
             userAuth.FailedCount = 0;
             userAuth.LockedUntil = null;
+            userAuth.LockoutLevel = 0;
+            userAuth.TokenVersion += 1;
+            userAuth.PasswordResetNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             userAuth.UpdatedAt = now;
             user.UpdatedAt = now;
 
+            if (user.UserSessions.Count > 0)
+            {
+                _db.UserSessions.RemoveRange(user.UserSessions);
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
+            await _loginDeviceSecurityService.UnlockForUserAsync(user.UserId, cancellationToken);
 
             _logger.LogInformation("Đã đặt lại mật khẩu cho userId {UserId}.", user.UserId);
             return Ok(new
@@ -944,14 +1242,38 @@ namespace FreshFarm.Identity.Api.Controllers
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            var isPendingApproval = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Pending,
+                StringComparison.OrdinalIgnoreCase);
+            var isApproved = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Approved,
+                StringComparison.OrdinalIgnoreCase);
+            if (!isPendingApproval && !isApproved)
+            {
+                throw new InvalidOperationException("Không thể phát token cho tài khoản chưa đủ điều kiện.");
+            }
+
+            var accountAccess = isPendingApproval ? "pending" : "full";
+            var effectiveRoles = isPendingApproval
+                ? new[] { "Guest" }
+                : roles
+                    .Where(role => !string.IsNullOrWhiteSpace(role))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim("username", user.UserName ?? string.Empty)
+                new Claim("username", user.UserName ?? string.Empty),
+                new Claim("token_version", (user.UserAuth?.TokenVersion ?? 0).ToString()),
+                new Claim("approval_status", user.ApprovalStatus),
+                new Claim("account_access", accountAccess)
             };
 
-            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+            claims.AddRange(effectiveRoles.Select(role => new Claim(ClaimTypes.Role, role)));
             var expires = DateTime.UtcNow.AddHours(1);
             var jwt = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
@@ -963,8 +1285,32 @@ namespace FreshFarm.Identity.Api.Controllers
             return new AuthResponse
             {
                 AccessToken = new JwtSecurityTokenHandler().WriteToken(jwt),
-                ExpiredAtUtc = expires
+                ExpiredAtUtc = expires,
+                AccountAccess = accountAccess,
+                ApprovalStatus = user.ApprovalStatus,
+                IsPendingApproval = isPendingApproval,
+                AccountStatusMessage = isPendingApproval
+                    ? "Tài khoản của bạn đang chờ quản trị viên phê duyệt. Bạn đã đăng nhập với quyền Khách nhưng chưa thể sử dụng các chức năng của hệ thống."
+                    : null
             };
+        }
+
+        [HttpGet("session-status")]
+        [Authorize(
+            AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme,
+            Policy = "AnyAuthenticated")]
+        public IActionResult GetSessionStatus()
+        {
+            return Ok(new
+            {
+                Authenticated = true,
+                AccountAccess = User.FindFirstValue("account_access"),
+                ApprovalStatus = User.FindFirstValue("approval_status"),
+                IsPendingApproval = string.Equals(
+                    User.FindFirstValue("account_access"),
+                    "pending",
+                    StringComparison.Ordinal)
+            });
         }
 
         [HttpGet("profile")]
@@ -1301,6 +1647,7 @@ namespace FreshFarm.Identity.Api.Controllers
         private List<string> GetRoleNames(User user)
         {
             return user.UserRoles
+                .Where(ur => ur.Role?.IsActive == true)
                 .Select(ur => ur.Role?.RoleName)
                 .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
                 .Select(roleName => roleName!)
@@ -1512,6 +1859,16 @@ namespace FreshFarm.Identity.Api.Controllers
             return candidate;
         }
 
+        private static bool CanAutomaticallyLinkGoogleAccountByEmail(string email, string? hostedDomain)
+        {
+            if (email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return !string.IsNullOrWhiteSpace(hostedDomain);
+        }
+
         private async Task<string> GeneratePlaceholderPhoneAsync(CancellationToken cancellationToken)
         {
             for (var attempt = 0; attempt < 20; attempt++)
@@ -1532,14 +1889,42 @@ namespace FreshFarm.Identity.Api.Controllers
             => new
             {
                 message = BuildLockoutMessage(lockedUntilUtc, nowUtc),
-                lockedUntilUtc
+                lockedUntilUtc,
+                lockScope = "account"
             };
+
+        private static object BuildDeviceLockoutResponse(DateTime lockedUntilUtc, DateTime nowUtc)
+            => new
+            {
+                message = BuildDeviceLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc,
+                lockScope = "device"
+            };
+
+        private static object BuildCombinedLockoutResponse(
+            DateTime accountLockedUntilUtc,
+            DateTime deviceLockedUntilUtc,
+            DateTime nowUtc)
+        {
+            var lockedUntilUtc = accountLockedUntilUtc >= deviceLockedUntilUtc
+                ? accountLockedUntilUtc
+                : deviceLockedUntilUtc;
+
+            return new
+            {
+                message = BuildCombinedLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc,
+                accountLockedUntilUtc,
+                deviceLockedUntilUtc,
+                lockScope = "account_and_device"
+            };
+        }
 
         private static TimeSpan BuildLockoutDuration(int lockoutLevel)
         {
-            var normalizedLevel = Math.Max(1, lockoutLevel);
+            var normalizedLevel = Math.Clamp(lockoutLevel, 1, 16);
             var multiplier = Math.Pow(2, normalizedLevel - 1);
-            return TimeSpan.FromMinutes(BaseLockoutDurationMinutes * multiplier);
+            return TimeSpan.FromMinutes(Math.Min(60, BaseLockoutDurationMinutes * multiplier));
         }
 
         private static string BuildLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
@@ -1553,6 +1938,54 @@ namespace FreshFarm.Identity.Api.Controllers
             var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
             return $"Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau {roundedMinutes} phút.";
         }
+
+        private static string BuildDeviceLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
+        {
+            var remaining = lockedUntilUtc - nowUtc;
+            var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            return $"Thiết bị này đang bị khóa đăng nhập tạm thời do có quá nhiều lần thử sai. Vui lòng thử lại sau {roundedMinutes} phút hoặc liên hệ quản trị viên.";
+        }
+
+        private static string BuildCombinedLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
+        {
+            var remaining = lockedUntilUtc - nowUtc;
+            var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            return $"Tài khoản và thiết bị này đang bị khóa đăng nhập tạm thời. Vui lòng thử lại sau {roundedMinutes} phút hoặc liên hệ quản trị viên.";
+        }
+
+        private static object BuildApprovalBlockedResponse(string? approvalStatus, string? approvalNote)
+        {
+            var normalizedStatus = string.IsNullOrWhiteSpace(approvalStatus)
+                ? AccountApprovalStatus.Pending
+                : approvalStatus.Trim();
+            var code = normalizedStatus.Equals(AccountApprovalStatus.Rejected, StringComparison.OrdinalIgnoreCase)
+                ? "account_rejected"
+                : normalizedStatus.Equals(AccountApprovalStatus.Suspended, StringComparison.OrdinalIgnoreCase)
+                    ? "account_suspended"
+                    : "account_pending_approval";
+            var message = code switch
+            {
+                "account_rejected" => "Tài khoản chưa được quản trị viên chấp thuận. Vui lòng liên hệ hỗ trợ nếu bạn cần xem lại quyết định.",
+                "account_suspended" => "Tài khoản đã bị tạm đình chỉ. Vui lòng liên hệ quản trị viên.",
+                _ => "Email đã được xác minh nhưng tài khoản vẫn đang chờ quản trị viên phê duyệt."
+            };
+
+            return new
+            {
+                code,
+                message,
+                approvalStatus = normalizedStatus,
+                approvalNote = string.IsNullOrWhiteSpace(approvalNote) ? null : approvalNote
+            };
+        }
+
+        private static string ResolveApprovalFailureReason(string? approvalStatus)
+            => approvalStatus?.Trim().ToLowerInvariant() switch
+            {
+                "rejected" => "account_rejected",
+                "suspended" => "account_suspended",
+                _ => "account_pending_approval"
+            };
 
         private static string BuildRemainingAttemptsMessage(int failedCount)
         {

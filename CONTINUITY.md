@@ -1,78 +1,65 @@
 # Continuity Ledger
 
 - **Goal** (incl. success criteria):
-  - Implement the agreed Admin/Seller shipping business-flow correction in FreshFarm.
-  - Success means removing the incorrect Admin delivery-dispatch flow, upgrading Admin/Seller Shipping Management with proper marketplace responsibilities, and verifying with automated tests plus real browser UI checks.
+  - Hoàn thiện luồng xác thực FreshFarm: đăng ký theo giao diện hiện có, CAPTCHA Cloudflare/reCAPTCHA, email xác minh, đăng nhập Google, quên/đặt lại mật khẩu, tài khoản mới đăng nhập ở quyền Khách chờ admin duyệt, mọi chức năng nghiệp vụ chỉ dành cho tài khoản đã duyệt, và khóa đăng nhập sau 5 lần sai.
+  - Thành công khi các cổng email/admin được tách riêng, trạng thái chờ duyệt hiển thị nổi bật ngay màn đăng nhập, kiểm soát truy cập thực thi phía server, migration an toàn, và có kiểm thử tự động + browser QA.
+  - Điều tra phản hồi mới rằng người chưa đăng nhập vẫn dùng được app; thành công khi bản chạy thật không dùng nhầm QA artifact, cookie cũ bị vô hiệu một lần, đăng nhập Customer mặc định không còn persistent nếu chưa có lựa chọn Remember me, và request không cookie luôn bị chuyển về đăng nhập/401.
 - **Constraints/Assumptions**:
-  - Reply in Vietnamese with ledger snapshot at the start of every reply.
-  - Workspace: `D:\NCKH\DOAN\NCKH-FRESH-FARM`.
-  - Temporary Codex artifacts must go under `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM`.
-  - Do not create temporary/build/test/browser artifacts in repository root.
-  - Do not revert user changes.
-  - Use actual local source code as evidence; mark uncertain items as `UNCONFIRMED`.
-  - The current audit is based on source files for Admin/Seller dashboard, sidebar, controllers, models, and selected business views rather than screenshots. Screenshots were not provided in the thread. UNCONFIRMED.
+  - Trả lời bằng tiếng Việt và mở đầu mọi phản hồi bằng Ledger Snapshot.
+  - Workspace: `D:\NCKH\DOAN\NCKH-FRESH-FARM`; branch hiện tại `feature/bff-cart-mvp` có nhiều thay đổi người dùng không liên quan, không được hoàn tác hoặc ghi đè.
+  - Artifact tạm chỉ đặt dưới `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM`.
+  - Không lưu SMTP, CAPTCHA, Google OAuth, internal-service key, JWT key hoặc certificate thật trong Git.
+  - Các quyết định bảo mật được đối chiếu tài liệu chính thức ASP.NET Core, EF Core, Cloudflare, Google và OWASP.
+  - Không stage/commit/push vì người dùng chưa yêu cầu.
 - **Key decisions**:
-  - Treat Admin as platform operations/dashboard for the whole marketplace.
-  - Treat Seller as seller-center dashboard focused on shop operations, orders, inventory, fulfilment, reviews, finance, and support.
-  - Separate source-backed findings from screenshot-only visual judgments that remain UNCONFIRMED.
-  - Treat Admin "Điều phối giao hàng" as a high-priority business-flow defect because Admin should not assign shipper per seller order in a marketplace model.
-  - Treat shipper/carrier selection, pickup readiness, packing, and handoff as Seller/fulfillment responsibilities; Admin should monitor SLA, carrier config, disputes, exceptions, and policy compliance.
-  - Merge useful delivery handoff actions into Shipping Management; remove the separate Delivery Dispatch surface unless a distinct Logistics role is introduced.
-  - Keep Admin COD reconciliation in Shipping Management because platform/admin finance can own COD oversight.
-  - Remove Seller COD reconciliation, shipping delete, and delivery-staff assignment from Seller Shipping because these are unsafe/self-serving seller powers.
+  - EmailConfirmed và admin ApprovalStatus là hai cổng độc lập. Tài khoản Pending đã xác minh email nhận JWT/cookie với role `Guest` và claim `account_access=pending`; chỉ Approved mới nhận `account_access=full`.
+  - Default/fallback authorization ở BFF, Identity, Catalog và Ordering yêu cầu đăng nhập + `account_access=full`; Pending chỉ được xem trạng thái đăng nhập và đăng xuất. Health/auth bootstrap/callback nội bộ có kiểm tra riêng là các ngoại lệ có chủ đích.
+  - Đăng ký công khai luôn tạo Customer/Pending; client không thể tự chọn Admin/Seller. Google yêu cầu `email_verified=true` và liên kết bằng `provider + sub`, không dùng email làm khóa định danh.
+  - Thiết bị web được đại diện bằng cookie định danh ngẫu nhiên đã ký bằng Data Protection. Năm lần sai khóa tạm cả tài khoản và thiết bị, tăng dần từ 15 phút đến tối đa 24 giờ; admin có thể mở khóa. Đây không phải khóa phần cứng và xóa cookie/đổi trình duyệt có thể đổi định danh thiết bị, nên vẫn cần account lockout + rate limiting.
+  - Mỗi môi trường chỉ dùng một bot challenge: Cloudflare Turnstile mặc định production, Google reCAPTCHA là phương án chuyển đổi, Local SVG chỉ Development. Xác minh phía server bắt buộc action khớp chính xác và hostname thuộc allowlist.
+  - Thay đổi trạng thái duyệt, mật khẩu hoặc hồ sơ nhạy cảm tăng TokenVersion; BFF/Catalog/Ordering xác minh phiên trực tiếp với Identity và fail closed.
+  - Data Protection production phải dùng certificate bảo vệ key at rest. KYC được lưu ngoài webroot và chỉ tải qua endpoint có xác thực/quyền sở hữu.
+  - Customer cookie dùng tên version `FreshFarm.Bff.Auth.v2` để vô hiệu ticket cũ một lần và là session-only vì form Customer chưa có lựa chọn Remember me; Admin/Seller vẫn chỉ persistent khi người dùng chủ động chọn.
+  - Local start script phải build source hiện tại và xác minh đúng process owner của từng cổng; không được coi một `/health` từ QA/stale binary là bản app cần chạy.
 - **State**:
   - *Done*:
-    - Located Admin and Seller areas in `src\Web\FreshFarm.Web.Bff\Areas`.
-    - Read Admin/Seller dashboards, sidebars, dashboard models, layout files, and theme CSS.
-    - Confirmed Admin dashboard pulls platform/order KPI and user metrics.
-    - Confirmed Seller dashboard pulls seller-scoped data through ordering admin-style endpoints protected by seller/admin policy.
-    - Confirmed Admin Delivery renders the Seller Delivery view and calls `/api/orders/admin/reports/shipping` plus `/api/orders/admin/{orderId}/status`.
-    - Confirmed Delivery "assign" does not persist an assignment; it changes order status to `Shipped`.
-    - Confirmed report shipping staff names are generated from fixed/demo names by order ID rather than real persisted delivery assignment.
-    - Confirmed Admin and Seller both already have "Quản lý vận chuyển" menu entries.
-    - Confirmed Admin sidebar also has a separate "Điều phối giao hàng" menu entry that duplicates/conflicts with shipping management.
-    - Confirmed Seller Shipping has a valid "MarkReadyForPickup" flow, but also exposes delete shipping, COD reconcile/unreconcile, and delivery-staff selection.
-    - Confirmed backend shipping payload returns empty delivery staff/assignment data, so delivery-staff UI is not backed by real persisted assignment.
-    - Added `ShippingManagementUxContractTests` guard tests for Admin/Seller shipping UX/business contracts.
-    - Deleted the separate Admin/Seller Delivery controllers and Seller Delivery view.
-    - Removed the Admin sidebar entry for "Điều phối giao hàng".
-    - Upgraded Admin Shipping copy/status labels to platform monitoring/SLAs/COD oversight and removed delivery-staff/delete UI/actions.
-    - Upgraded Seller Shipping to focus on handoff, waybill creation, pickup readiness, and read-only COD status; removed delete, COD reconcile/unreconcile, and delivery-staff selection.
-    - Removed leftover staff filters/columns/query DTOs from Admin/Seller Shipping after visual QA exposed the residual "Nhân viên giao hàng" wording.
-    - Verified targeted shipping guard tests pass.
-    - Verified shipping-related BFF tests pass.
-    - Verified BFF project builds from an external artifact output path.
-    - Verified Admin/Seller Shipping visually in Chromium/Playwright at desktop and mobile sizes; screenshots saved under `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual`.
-    - Confirmed the temporary BFF server is running on `http://localhost:5112` with PID `35544`.
-    - Removed the "Nhận tại cửa hàng" / store-pickup UI and form branches from Admin/Seller Shipping because FreshFarm is modeled as a marketplace shipping flow, not in-store pickup.
-    - Forced Admin/Seller Shipping Create/Edit payloads to send `isStorePickup = false` and `storeAddress = null` from these management screens.
-    - Added guard-test coverage so `Nhận tại cửa hàng`, `IsStorePickup`, and `StoreAddress` cannot reappear in Shipping Management views.
-    - Re-verified targeted shipping guard tests and shipping-related tests after removing store pickup.
-    - Restarted the temporary BFF server on `http://localhost:5112` with PID `28168`.
+    - Hoàn tất đăng ký, gửi/xác minh lại email, quên/đặt lại mật khẩu bằng nonce một lần, đăng nhập password/Google, Pending Guest, cảnh báo chờ duyệt ngay màn đăng nhập, admin approve/reject/suspend/reopen/unlock và audit lịch sử.
+    - Hoàn tất signed-device lock sau 5 lần sai; đường SQL Server dùng transaction Serializable + khóa hàng/key-range và đã qua harness 20 request đồng thời với đúng 5 lần đếm, một hàng thiết bị và một lần khóa.
+    - Hoàn tất fallback access gate, live session revocation, Google binding, Turnstile/reCAPTCHA allowlist/action validation, auth/IP rate limiting, internal BFF key, KYC private storage và Data Protection production fail-closed.
+    - Migration `20260719201330_AccountApprovalAndLoginSecurity` backfill tài khoản cũ thành Approved rồi đặt default mới là Pending; migration `20260719214507_GoogleExternalLoginBinding` thêm unique external binding. EF đã báo không còn model change chưa có migration.
+    - SQL idempotent: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\migrations\identity-account-approval-login-security.sql`, 24,961 byte, chứa cả hai migration và không có DROP TABLE/DELETE FROM/TRUNCATE TABLE.
+    - Final current-code tests: Identity 77/77, Catalog 11/11, Ordering live-session 6/6, BFF auth/security 92/92; cả bốn project được biên dịch Release từ mã hiện tại dưới `dotnet-final-review`.
+    - Browser QA desktop/mobile đạt: không console/page error, không tràn ngang, CTA contrast 6.01:1, focus bàn phím hiển thị, Pending bị chuyển khỏi `/cart`, Turnstile signup/forgot tạo token đúng action và hiển thị `Đã xác minh bảo mật.`. Report: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\playwright\auth-ui-qa-report.json`.
+    - Hai server QA tạm trên cổng 5088/5099 đã dừng; không còn listener.
+    - Scoped `git diff --check` cho auth/security pass. Global check chỉ còn trailing whitespace trong thay đổi người dùng không liên quan tại `Areas/Admin/Views/CatalogModeration/Index.cshtml:109`.
+    - Full-suite failures ngoài phạm vi đã quan sát trước đó: BFF 5 lỗi recommendation/campaign/finance và Ordering 4 lỗi FinancePayout do InMemory provider gọi ExecuteSqlRaw; không do auth slice.
+    - Điều tra phản hồi anonymous access: QA artifact chạy bằng `dotnet ...\playwright\bff-out\FreshFarm.Web.Bff.dll` đã chiếm cổng chuẩn 7085; stop script cũ chỉ tìm process tên `FreshFarm.*`, còn start script cũ thấy `/health` nên bỏ qua bản Release mới.
+    - Đã sửa `start-local-core.ps1`: build Release từ source theo mặc định, kiểm tra executable/DLL thực sự giữ HTTPS port, và fail rõ nếu cổng bị process khác chiếm. `stop-local-core.ps1` nay dừng cả apphost và `dotnet <FreshFarm.*.dll>` trên đúng các cổng core. Ba script PowerShell parse 0 lỗi; stop script đã chạy thực tế khi không có service.
+    - Đã đổi Customer auth cookie sang `FreshFarm.Bff.Auth.v2`, đặt `IsPersistent=false`, giữ JWT expiry phía server và thay checkbox Remember me bị vô hiệu bằng thông báo “Đóng trình duyệt sẽ kết thúc phiên đăng nhập”. Test ghi nhận AuthenticationProperties không persistent.
+    - BFF auth/security sau bản vá pass 92/92. Browser QA bằng context sạch và cả cookie cũ `FreshFarm.Bff.Auth=legacy-ticket` đều bị chặn: `/`, `/products`, `/shop`, `/cart`, `/checkout`, `/account/profile`, `/bff/products` trả 302 về signin; `/api/recommendation-events` và `/api/cart` trả 401.
+    - Browser QA đăng nhập Pending xác nhận chỉ cookie `FreshFarm.Bff.Auth.v2` được dùng và không có thuộc tính expires (session cookie); snapshot cuối hiển thị đúng thông báo kết thúc phiên khi đóng trình duyệt. Mọi BFF/mock QA process đã dừng, các cổng 5088/5099/7085/5199 đã được giải phóng.
+    - Đã restart local core từ đúng source Release hiện tại. Lần khởi động đầu phát hiện BFF fail-fast vì reCAPTCHA Development có credentials từ cấu hình riêng nhưng thiếu hostname allowlist; đã thêm `localhost` vào `appsettings.Development.json`, build lại và khởi động thành công.
+    - Runtime smoke test sau restart: Identity/Catalog/Ordering/BFF đều `/health` 200 trên 7140/7245/7018/7085 và đúng apphost trong source tree giữ cổng. Anonymous `/`, `/products`, `/cart`, `/checkout` trả 302 về signin; `/api/cart` trả 401.
+    - Đã cấu hình cùng một khóa nội bộ local cho `InternalBff:SharedKey` của Identity và `Services:Identity:InternalServiceKey` của BFF bằng .NET User Secrets (không ghi secret vào Git), rồi restart core. Identity `/auth/login` không key trả 401 và với key đúng trả 400 do payload rỗng, chứng minh request đã vượt qua cổng `InternalBffOnly` và lỗi 503 “chưa được cấu hình” đã hết.
   - *Now*:
-    - Summarizing the store-pickup removal and verification results for the user.
+    - Bốn local service đang chạy healthy; FreshFarm mở tại `https://localhost:7085` và access gate đã được xác nhận trên runtime thật.
+    - Nhiệm vụ phụ đang mở: giúp user viết bullet CV từ dự án. Đã khảo sát `src/` bằng Explore agent (báo cáo: 4 app + 4 test project, 405 test, DB-per-service 3 DB/20 migrations, ML.NET MatrixFactorization trong Ordering, rerank Redis trong BFF, GHN/VNPay, không Docker/Polly/Serilog; monolith legacy không còn trong working tree).
+    - Đã clone và đọc repo GitHub `thayvo/SachOnline` (bản sao tại `codex-artifacts\...\tmp\SachOnline`): web bán sách cá nhân bằng ASP.NET MVC 5 (.NET Framework 4.7.2) + EF6 Database-First EDMX + SQL Server; session cart, CRUD admin (AJAX/Modal menu đa cấp, PagedList, CKEditor), thanh toán COD + VNPay (tự viết VnPayLibrary) + MoMo v2 (HMAC SHA256, payUrl, IPN); mật khẩu lưu plain text, auth bằng session — không ghi "secure auth" cho dự án này trong CV.
   - *Next*:
-    - User can open the running URL and test Admin/Seller Shipping manually.
+    - Người dùng có thể mở app và đăng nhập lại; cookie v1 không còn được đọc.
+    - Khi deploy: chạy migration, nạp SMTP/URL email, Turnstile hoặc reCAPTCHA credentials + hostname, Google OAuth, JWT/internal keys, Data Protection certificate, và `Services__Identity__BaseUrl` cho Catalog/Ordering; sau đó chạy live smoke test email/CAPTCHA/OAuth.
+    - Xác nhận reverse proxy có thể chèn `X-Webhook-Secret` cho GHN. Nếu chạy nhiều BFF replica, chuyển idempotency webhook sang Redis/DB.
+    - Cân nhắc rewrite Git history và rotate Data Protection/KYC-related secrets vì các blob nhạy cảm cũ vẫn tồn tại trong lịch sử; việc này cần phê duyệt riêng vì ảnh hưởng cộng tác và làm vô hiệu phiên/link cũ.
 - **Open questions** (UNCONFIRMED if needed):
-  - Full BFF test project still has 7 unrelated failures in seller-notification wording and catalog similar-products seasonal reason assertions.
+  - Nếu hiện tượng còn lặp lại sau restart và cửa sổ riêng tư, URL/tab cụ thể là UNCONFIRMED và cần được ghi lại; hiện không còn bằng chứng bypass ở origin/source mới.
+  - SMTP provider, public BFF hostname, Turnstile/reCAPTCHA production credentials, Google OAuth credentials và certificate thumbprint thật là UNCONFIRMED; mã hiện fail closed khi thiếu.
+  - Khả năng GHN trực tiếp gửi custom header là UNCONFIRMED; phương án triển khai an toàn là reverse proxy tin cậy chèn header.
 - **Working set** (files/ids/commands):
-  - Admin dashboard: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Home\Dashboard.cshtml`.
-  - Admin sidebar: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Shared\_SideBar.cshtml`.
-  - Admin controller/model: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\HomeController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Admin\Models\AdminDashboardModels.cs`.
-  - Seller dashboard: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Home\Dashboard.cshtml`.
-  - Seller sidebar: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Shared\_SideBar.cshtml`.
-  - Seller controller/model: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Controllers\HomeController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Seller\Models\HomeSellerModels.cs`.
-  - Shared styling: `src\Web\FreshFarm.Web.Bff\wwwroot\admin\css\theme.css`, `src\Web\FreshFarm.Web.Bff\wwwroot\seller\css\style.css`.
-  - Delivery dispatch Admin: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\DeliveryController.cs`.
-  - Delivery dispatch Seller shared view: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Delivery\Index.cshtml`.
-  - Admin shipping: `src\Web\FreshFarm.Web.Bff\Areas\Admin\Controllers\ShippingController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Admin\Views\Shipping\ManageShipping.cshtml`.
-  - Seller shipping: `src\Web\FreshFarm.Web.Bff\Areas\Seller\Controllers\ShippingController.cs`, `src\Web\FreshFarm.Web.Bff\Areas\Seller\Views\Shipping\ManageShipping.cshtml`.
-  - Shipping guard tests: `src\Tests\FreshFarm.Web.Bff.Tests\ShippingManagementUxContractTests.cs`.
-  - Local visual-test BFF URL: `http://localhost:5112`.
-  - Visual screenshots: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\admin-shipping-desktop-final-fresh-login.png`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\seller-shipping-desktop-final.png`.
-  - Store-pickup removal screenshot: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\screenshots\shipping-visual\admin-edit-shipping-no-store-pickup.png`.
-  - Test results: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-ux-final\shipping-ux-final.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-final\shipping-final.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\web-bff-full-final\web-bff-full-final.trx`.
-  - Store-pickup removal test results: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-ux-no-store-pickup\shipping-ux-no-store-pickup.trx`, `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\test-results\shipping-no-store-pickup\shipping-no-store-pickup.trx`.
-  - Shipping report backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ReportsAdminController.cs`.
-  - Shipping backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\ShippingAdminController.cs`.
-  - Order status transition backend: `src\Services\Ordering\FreshFarm.Ordering.Api\Controllers\OrdersController.cs`.
+  - Identity auth: `src\Services\Identity\FreshFarm.Identity.API\Controllers\AuthController.cs`.
+  - Approval admin: `src\Services\Identity\FreshFarm.Identity.API\Controllers\AdminUsersController.cs`.
+  - Device security: `src\Services\Identity\FreshFarm.Identity.API\Services\LoginDeviceSecurityService.cs`.
+  - BFF flow/UI: `src\Web\FreshFarm.Web.Bff\Controllers\AccountController.cs`, `Views\Account`, `wwwroot\css\account-auth.css`.
+  - Local runtime scripts: `scripts\start-local-core.ps1`, `scripts\stop-local-core.ps1`, `scripts\restart-local-core.ps1`.
+  - Access gates: BFF/Identity/Catalog/Ordering `Program.cs` and Catalog/Ordering `Security\IdentitySessionValidation.cs`.
+  - Migrations: `src\Services\Identity\FreshFarm.Identity.API\Migrations\20260719201330_AccountApprovalAndLoginSecurity.cs`, `20260719214507_GoogleExternalLoginBinding.cs`.
+  - Final artifacts: `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM\dotnet-final-review`, `test-results\final-review-current`, `playwright`, `migrations`.

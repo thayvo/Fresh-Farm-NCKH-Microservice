@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using FreshFarm.Web.Bff.Areas.Admin.Models;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,15 +18,19 @@ public sealed class MerchantController : LegacySellerControllerBase
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
 
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ISellerKycStorageService _sellerKycStorageService;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public MerchantController(IHttpClientFactory httpClientFactory)
+    public MerchantController(
+        IHttpClientFactory httpClientFactory,
+        ISellerKycStorageService sellerKycStorageService)
     {
         _httpClientFactory = httpClientFactory;
+        _sellerKycStorageService = sellerKycStorageService;
     }
 
     [HttpGet]
@@ -127,6 +132,39 @@ public sealed class MerchantController : LegacySellerControllerBase
         }
 
         return View(model);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> KycDocument(int sellerId, string? reference)
+    {
+        if (sellerId <= 0 || string.IsNullOrWhiteSpace(SellerKycPaths.NormalizeStoredFileName(reference)))
+        {
+            return NotFound();
+        }
+
+        var client = CreateIdentityClient();
+        var response = await client.GetAsync($"/auth/admin/merchants/{sellerId}");
+        if (!response.IsSuccessStatusCode)
+        {
+            return NotFound();
+        }
+
+        var merchant = await response.Content.ReadFromJsonAsync<MerchantDetailApiDto>(JsonOptions);
+        if (merchant is null || !IsMerchantKycReference(merchant, reference))
+        {
+            return NotFound();
+        }
+
+        var storedFile = _sellerKycStorageService.OpenRead(reference);
+        if (storedFile is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+        var downloadFileName = SellerKycPaths.NormalizeStoredFileName(reference)!;
+        return File(storedFile.Content, storedFile.ContentType, downloadFileName, enableRangeProcessing: true);
     }
 
     [HttpPost]
@@ -402,6 +440,18 @@ public sealed class MerchantController : LegacySellerControllerBase
             RecommendedAction = item.RecommendedAction ?? string.Empty,
             IssueCount = item.IssueCount
         };
+    }
+
+    private static bool IsMerchantKycReference(MerchantDetailApiDto merchant, string? requestedReference)
+    {
+        return new[]
+        {
+            merchant.CitizenIdFrontUrl,
+            merchant.CitizenIdBackUrl,
+            merchant.BusinessLicenseUrl,
+            merchant.AdditionalDocumentUrl
+        }.Any(storedReference =>
+            SellerKycPaths.AreEquivalentStoredReferences(storedReference, requestedReference));
     }
 
     private static List<MerchantListItemViewModel> BuildMerchantList(IEnumerable<MerchantListItemApiDto>? merchants)

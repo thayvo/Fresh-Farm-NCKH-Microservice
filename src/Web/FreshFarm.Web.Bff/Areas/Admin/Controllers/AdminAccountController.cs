@@ -219,8 +219,10 @@ public sealed class AdminAccountController : LegacySellerControllerBase
             .Select(c => c.Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var accountAccess = jwt.Claims.FirstOrDefault(c => c.Type == "account_access")?.Value;
 
-        if (!roleValues.Contains("Admin", StringComparer.OrdinalIgnoreCase))
+        if (!string.Equals(accountAccess, "full", StringComparison.Ordinal)
+            || !roleValues.Contains("Admin", StringComparer.OrdinalIgnoreCase))
         {
             TempData["ErrorMessage"] = "Bạn không có quyền truy cập khu vực quản trị.";
             return RedirectToAction(nameof(Login), new { area = "Admin", returnUrl });
@@ -284,6 +286,17 @@ public sealed class AdminAccountController : LegacySellerControllerBase
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
+
+        foreach (var claimType in new[] { "account_access", "approval_status", "token_version" })
+        {
+            var claimValue = jwt.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(claimValue))
+            {
+                claims.Add(new Claim(claimType, claimValue));
+            }
+        }
+
+        claims.Add(new Claim("session_checked_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
 
         var email = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value;
         if (!string.IsNullOrWhiteSpace(email))

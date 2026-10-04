@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace FreshFarm.Web.Bff.Dtos
 {
@@ -12,6 +13,10 @@ namespace FreshFarm.Web.Bff.Dtos
         [StringLength(100, ErrorMessage = "Mật khẩu tối đa 100 ký tự.")]
         public string Password { get; set; } = string.Empty; // Mat khau.
         public string? ClientLane { get; set; } // Buyer/Seller/Admin lane khoi tao request.
+
+        [BindNever]
+        [StringLength(128)]
+        public string? DeviceId { get; set; } // Chi duoc gan server-side tu cookie Data Protection cua BFF.
     }
 
     public sealed class RegisterRequestDto // Payload gui den Identity /auth/register.
@@ -49,7 +54,7 @@ namespace FreshFarm.Web.Bff.Dtos
 
         public string CaptchaCode { get; set; } = string.Empty;
 
-        public string RecaptchaToken { get; set; } = string.Empty;
+        public string BotChallengeToken { get; set; } = string.Empty;
     }
 
     public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.
@@ -58,6 +63,10 @@ namespace FreshFarm.Web.Bff.Dtos
         [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
         [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
         public string Email { get; set; } = string.Empty;
+
+        public string CaptchaCode { get; set; } = string.Empty;
+
+        public string BotChallengeToken { get; set; } = string.Empty;
     }
 
     public sealed class ResetPasswordRequestDto // Payload dat lai mat khau tu email reset.
@@ -71,7 +80,8 @@ namespace FreshFarm.Web.Bff.Dtos
         public string Token { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu mới phải từ 6 đến 100 ký tự.")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu mới phải từ 8 đến 100 ký tự.")]
+        [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).+$", ErrorMessage = "Mật khẩu mới phải có ít nhất một chữ cái và một chữ số.")]
         public string NewPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Xác nhận mật khẩu không được để trống.")]
@@ -91,6 +101,10 @@ namespace FreshFarm.Web.Bff.Dtos
         public string? AuthenticatorIssuer { get; set; }
         public string? AuthenticatorAccountName { get; set; }
         public string? ChallengeMessage { get; set; }
+        public string AccountAccess { get; set; } = "full";
+        public string ApprovalStatus { get; set; } = string.Empty;
+        public bool IsPendingApproval { get; set; }
+        public string? AccountStatusMessage { get; set; }
     }
 
     public sealed class VerifyTwoFactorLoginRequestDto
@@ -131,7 +145,10 @@ namespace FreshFarm.Web.Bff.Dtos
     public sealed class ExternalLoginExchangeRequestDto
     {
         public string Provider { get; set; } = string.Empty;
+        public string ProviderSubject { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public bool EmailVerified { get; set; }
+        public string? HostedDomain { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string? AvatarUrl { get; set; }
     }

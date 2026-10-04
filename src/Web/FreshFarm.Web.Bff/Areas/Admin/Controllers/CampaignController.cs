@@ -44,8 +44,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             var client = CreateOrderingClient();
             var overviewTask = client.GetAsync("/api/orders/admin/campaigns/overview");
             var listTask = client.GetAsync(BuildListEndpoint(model));
-            var adsOverviewTask = client.GetAsync($"/api/orders/admin/campaigns/ads/overview?status=all&q={Uri.EscapeDataString(model.AdsTopupEditor.SellerId > 0 ? model.AdsTopupEditor.SellerId.ToString() : string.Empty)}");
-            await Task.WhenAll(overviewTask, listTask, adsOverviewTask);
+            await Task.WhenAll(overviewTask, listTask);
 
             var overviewResponse = await overviewTask;
             if (overviewResponse.IsSuccessStatusCode)
@@ -75,22 +74,11 @@ public sealed class CampaignController : LegacySellerControllerBase
                 model.Status = payload.Filters?.Status ?? model.Status;
                 model.Type = payload.Filters?.Type ?? model.Type;
                 model.StatusOptions = DeduplicateOptions(payload.StatusOptions).Select(MapOption).ToList();
-                model.TypeOptions = DeduplicateOptions(payload.TypeOptions).Select(MapOption).ToList();
+                model.TypeOptions = DeduplicateOptions(payload.TypeOptions)
+                    .Where(option => !string.Equals(option.Value, "livestream", StringComparison.OrdinalIgnoreCase))
+                    .Select(MapOption)
+                    .ToList();
                 model.Campaigns = DeduplicateCampaignRows(payload.Rows).Select(MapCampaignListItem).ToList();
-            }
-
-            var adsOverviewResponse = await adsOverviewTask;
-            if (adsOverviewResponse.IsSuccessStatusCode)
-            {
-                var adsPayload = await adsOverviewResponse.Content.ReadFromJsonAsync<AdsOverviewApiResponse>(JsonOptions);
-                if (adsPayload is not null)
-                {
-                    MapAdsOverview(model, adsPayload);
-                }
-            }
-            else
-            {
-                ViewBag.AdsError = await ReadApiErrorAsync(adsOverviewResponse, "Khong the tai ads wallet overview.");
             }
 
             if (campaignId.HasValue)
@@ -454,8 +442,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             new CampaignOptionViewModel { Value = "all", Text = "Tất cả" },
             new CampaignOptionViewModel { Value = "flash_sale", Text = "Flash sale" },
             new CampaignOptionViewModel { Value = "voucher_boost", Text = "Đẩy voucher" },
-            new CampaignOptionViewModel { Value = "seasonal", Text = "Theo mùa" },
-            new CampaignOptionViewModel { Value = "livestream", Text = "Livestream" }
+            new CampaignOptionViewModel { Value = "seasonal", Text = "Theo mùa" }
         ];
 
         model.WalletStatusOptions =

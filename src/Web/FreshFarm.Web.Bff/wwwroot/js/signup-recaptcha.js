@@ -1,13 +1,13 @@
 document.addEventListener("DOMContentLoaded", function () {
-    var form = document.getElementById("signUpForm");
-    var tokenInput = document.getElementById("RecaptchaToken");
+    var form = document.querySelector("[data-bot-challenge-form]");
+    var tokenInput = form ? form.querySelector("[data-bot-challenge-token]") : null;
 
     if (!form || !tokenInput) {
         return;
     }
 
-    var siteKey = form.getAttribute("data-recaptcha-site-key") || "";
-    var action = form.getAttribute("data-recaptcha-action") || "signup";
+    var siteKey = form.getAttribute("data-bot-challenge-site-key") || "";
+    var action = form.getAttribute("data-bot-challenge-action") || "";
     var isSubmittingWithToken = false;
 
     form.addEventListener("submit", function (event) {

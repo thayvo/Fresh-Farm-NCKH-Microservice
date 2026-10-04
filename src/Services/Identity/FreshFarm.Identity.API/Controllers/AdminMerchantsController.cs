@@ -639,9 +639,14 @@ public sealed class AdminMerchantsController : ControllerBase
             DaysSinceLastLogin = daysSinceLastLogin,
             QueueBucket = DetermineQueueBucket(row, flags, profileScore),
             RecommendedAction = BuildRecommendedAction(row, flags, profileScore),
-            IssueCount = flags.Count,
+            IssueCount = CountActionableFlags(flags),
             PriorityScore = CalculatePriorityScore(row, flags, profileScore)
         };
+    }
+
+    private static int CountActionableFlags(IEnumerable<MerchantFlagDto> flags)
+    {
+        return flags.Count(flag => !string.Equals(flag.Tone, "neutral", StringComparison.OrdinalIgnoreCase));
     }
 
     private static MerchantProjection SelectPreferredMerchantProjection(IEnumerable<MerchantProjection> rows)
@@ -711,9 +716,10 @@ public sealed class AdminMerchantsController : ControllerBase
 
     private static string DetermineQueueBucket(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
     {
+        var reviewStatus = NormalizeReviewStatus(row.ReviewStatus, row.IsSellerApproved);
         if (!row.IsSellerApproved)
         {
-            return "approval";
+            return reviewStatus == "rejected" ? "profile_fix" : "approval";
         }
 
         if (!row.IsActive)
@@ -764,15 +770,15 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (flags.Any(f => f.Code == "stale-login"))
         {
-            return "Liên hệ nhà bán hàng để xác nhận cửa hàng còn hoạt động trước khi duyệt chiến dịch hoặc phân bổ lượt truy cập.";
+            return "Liên hệ nhà bán hàng để xác nhận cửa hàng còn hoạt động trước khi đưa vào chương trình khuyến mãi hoặc phân bổ lượt truy cập.";
         }
 
         if (profileScore >= 80)
         {
-            return "Có thể đưa vào nhóm ưu tiên cho chương trình tăng trưởng hoặc chiến dịch nội bộ.";
+            return "Có thể đưa vào nhóm ưu tiên cho chương trình tăng trưởng hoặc chương trình khuyến mãi nội bộ.";
         }
 
-        return "Rà soát thủ công hồ sơ nhà bán hàng trước khi mở rộng quyền hoặc chiến dịch.";
+        return "Rà soát thủ công hồ sơ nhà bán hàng trước khi mở rộng quyền hoặc chương trình khuyến mãi.";
     }
 
     private static int CalculatePriorityScore(MerchantProjection row, IReadOnlyCollection<MerchantFlagDto> flags, int profileScore)
@@ -978,7 +984,7 @@ public sealed class AdminMerchantsController : ControllerBase
             return "suspended";
         }
 
-        if (profileScore < 70 || flags.Any(f => f.Code is "missing-phone" or "missing-address" or "stale-login" or "missing-store-name" or "missing-store-email" or "missing-store-phone" or "missing-kyc-core" or "missing-identity-files"))
+        if (profileScore < 70 || flags.Any(f => f.Code is "missing-phone" or "missing-address" or "missing-store-name" or "missing-store-email" or "missing-store-phone" or "missing-kyc-core" or "missing-identity-files"))
         {
             return "review";
         }
@@ -1039,9 +1045,13 @@ public sealed class AdminMerchantsController : ControllerBase
 
     private static string BuildAddressSummary(MerchantProjection row)
     {
+        if (!string.IsNullOrWhiteSpace(row.StoreAddress))
+        {
+            return row.StoreAddress.Trim();
+        }
+
         var parts = new[]
         {
-            row.StoreAddress,
             row.AddressDetail,
             row.Ward,
             row.District,
@@ -1133,7 +1143,7 @@ public sealed class AdminMerchantsController : ControllerBase
 
         if (steps.Count == 0 && string.Equals(card.QueueBucket, "approval", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("Có thể đưa nhà bán hàng vào nhóm ưu tiên cho chiến dịch hoặc quy trình hướng dẫn nâng cao.");
+            steps.Add("Có thể đưa nhà bán hàng vào nhóm ưu tiên cho chương trình khuyến mãi hoặc quy trình hướng dẫn nâng cao.");
         }
 
         if (steps.Count == 0)

@@ -10,6 +10,10 @@ namespace FreshFarm.Ordering.Api.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public sealed class PlatformAdminController : ControllerBase
 {
+    private static readonly string[] ReconciliationBlockedOrderStatuses = ["cancelled", "canceled", "expired", "refunded", "returned"];
+    private static readonly string[] RefundFailedStatuses = ["failed", "rejected", "cancelled", "canceled", "error"];
+    private static readonly string[] ReturnRejectedStatuses = ["rejected", "cancelled", "canceled", "denied"];
+
     private readonly FreshFarmOrderingDBContext _db;
 
     public PlatformAdminController(FreshFarmOrderingDBContext db)
@@ -40,15 +44,15 @@ public sealed class PlatformAdminController : ControllerBase
 
         try
         {
-            var totalOrdersTask = _db.Orders
+            var totalOrders = await _db.Orders
                 .AsNoTracking()
                 .CountAsync(cancellationToken);
 
-            var newOrdersTodayTask = _db.Orders
+            var newOrdersToday = await _db.Orders
                 .AsNoTracking()
                 .CountAsync(o => o.OrderDate >= todayStart && o.OrderDate < nextDay, cancellationToken);
 
-            var cancelledOrdersTask = _db.Orders
+            var cancelledOrders = await _db.Orders
                 .AsNoTracking()
                 .CountAsync(o =>
                         o.Status == "Canceled"
@@ -57,43 +61,35 @@ public sealed class PlatformAdminController : ControllerBase
                      || o.Status == "Returned",
                     cancellationToken);
 
-            var gmvTask = _db.Orders
-                .AsNoTracking()
-                .SumAsync(o => (decimal?)o.TotalAmount, cancellationToken);
+            var commissionEstimateSellerOrdersQuery = BuildCommissionEstimateSellerOrdersQuery();
+            var gmv = await commissionEstimateSellerOrdersQuery.SumAsync(
+                x => (decimal?)(x.SellerEarning + x.CommissionAmount),
+                cancellationToken) ?? 0m;
 
-            var realtimeTransactionsTask = _db.Orders
+            var platformRevenue = await commissionEstimateSellerOrdersQuery
+                .SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
+
+            var realtimeTransactions = await _db.Orders
                 .AsNoTracking()
                 .CountAsync(o => o.OrderDate >= now.AddMinutes(-15), cancellationToken);
 
-            var groupedSevenDaysTask = _db.Orders
+            var groupedSevenDays = await commissionEstimateSellerOrdersQuery
                 .AsNoTracking()
-                .Where(o => o.OrderDate >= sevenDaysStart && o.OrderDate < nextDay)
-                .GroupBy(o => o.OrderDate.Date)
+                .Where(x => x.Order != null && x.Order.OrderDate >= sevenDaysStart && x.Order.OrderDate < nextDay)
+                .GroupBy(x => x.Order!.OrderDate.Date)
                 .Select(g => new
                 {
                     Day = g.Key,
                     Orders = g.Count(),
-                    Gmv = g.Sum(x => x.TotalAmount)
+                    Gmv = g.Sum(x => x.SellerEarning + x.CommissionAmount)
                 })
                 .ToListAsync(cancellationToken);
 
-            await Task.WhenAll(
-                totalOrdersTask,
-                newOrdersTodayTask,
-                cancelledOrdersTask,
-                gmvTask,
-                realtimeTransactionsTask,
-                groupedSevenDaysTask);
-
-            var totalOrders = totalOrdersTask.Result;
-            var cancelledOrders = cancelledOrdersTask.Result;
-            var gmv = gmvTask.Result ?? 0m;
-            var platformRevenue = gmv > 0m ? decimal.Round(gmv * 0.03m, 2) : 0m;
             var cancelRate = totalOrders > 0
                 ? decimal.Round(cancelledOrders * 100m / totalOrders, 2)
                 : 0m;
 
-            var groupedLookup = groupedSevenDaysTask.Result
+            var groupedLookup = groupedSevenDays
                 .ToDictionary(x => x.Day, x => (x.Orders, x.Gmv));
 
             for (var i = 0; i < 7; i++)
@@ -111,10 +107,10 @@ public sealed class PlatformAdminController : ControllerBase
                 gmv,
                 platformRevenue,
                 totalOrders,
-                newOrdersToday = newOrdersTodayTask.Result,
+                newOrdersToday,
                 cancelledOrders,
                 cancelRate,
-                realtimeTransactions = realtimeTransactionsTask.Result,
+                realtimeTransactions,
                 trendLabels,
                 trendOrders,
                 trendGmv,
@@ -139,5 +135,26 @@ public sealed class PlatformAdminController : ControllerBase
                 warnings
             });
         }
+    }
+
+    private IQueryable<SellerOrder> BuildCommissionEstimateSellerOrdersQuery()
+    {
+        var refundedOrderIdsQuery = _db.RefundTransactions
+            .AsNoTracking()
+            .Where(x => !RefundFailedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.PaymentTxn.OrderId);
+        var returnBlockedSellerOrderIdsQuery = _db.ReturnRequests
+            .AsNoTracking()
+            .Where(x => !ReturnRejectedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.SellerOrderItem.SellerOrderId);
+
+        return _db.SellerOrders
+            .AsNoTracking()
+            .Where(x =>
+                x.Order != null &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.Order.Status ?? string.Empty).ToLower()) &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.SellerStatus ?? string.Empty).ToLower()) &&
+                !refundedOrderIdsQuery.Contains(x.OrderId) &&
+                !returnBlockedSellerOrderIdsQuery.Contains(x.SellerOrderId));
     }
 }

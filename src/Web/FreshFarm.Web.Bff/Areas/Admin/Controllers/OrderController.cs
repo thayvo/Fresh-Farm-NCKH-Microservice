@@ -60,7 +60,7 @@ public class OrderController : LegacySellerControllerBase
     [HttpGet]
     public async Task<JsonResult> GetAllOrders()
     {
-        var response = await GetOrdersFromApiAsync(page: 1, pageSize: 500, null, null, null);
+        var response = await GetOrdersFromApiAsync(page: 1, pageSize: 500, null, null, null, null);
         if (response is null)
         {
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
@@ -183,9 +183,9 @@ public class OrderController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<JsonResult> GetOrdersPaged(int page = 1, int pageSize = 10)
+    public async Task<JsonResult> GetOrdersPaged(int page = 1, int pageSize = 10, int? shopFilter = null)
     {
-        var response = await GetOrdersFromApiAsync(page, pageSize, null, null, null);
+        var response = await GetOrdersFromApiAsync(page, pageSize, null, null, null, shopFilter);
         if (response is null)
         {
             return Json(new { success = false, message = "Lỗi khi tải danh sách đơn hàng." });
@@ -209,9 +209,9 @@ public class OrderController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<JsonResult> SearchOrders(string searchTerm, string statusFilter, string dateFilter)
+    public async Task<JsonResult> SearchOrders(string searchTerm, string statusFilter, string dateFilter, int? shopFilter = null)
     {
-        var response = await GetOrdersFromApiAsync(page: 1, pageSize: 100, searchTerm, statusFilter, dateFilter);
+        var response = await GetOrdersFromApiAsync(page: 1, pageSize: 100, searchTerm, statusFilter, dateFilter, shopFilter);
         if (response is null)
         {
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
@@ -228,9 +228,9 @@ public class OrderController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<JsonResult> SearchOrdersPaged(string searchTerm, string statusFilter, string dateFilter, int page = 1, int pageSize = 10)
+    public async Task<JsonResult> SearchOrdersPaged(string searchTerm, string statusFilter, string dateFilter, int? shopFilter = null, int page = 1, int pageSize = 10)
     {
-        var response = await GetOrdersFromApiAsync(page, pageSize, searchTerm, statusFilter, dateFilter);
+        var response = await GetOrdersFromApiAsync(page, pageSize, searchTerm, statusFilter, dateFilter, shopFilter);
         if (response is null)
         {
             return Json(new { success = false, message = "Lỗi khi tìm kiếm đơn hàng." });
@@ -294,6 +294,20 @@ public class OrderController : LegacySellerControllerBase
                 cancelRate = string.Format("{0:0.##}%", d.cancelRate)
             }
         });
+    }
+
+    [HttpGet]
+    public async Task<JsonResult> GetShopFilterOptions()
+    {
+        var client = CreateOrderingClient();
+        var response = await client.GetAsync("/api/orders/admin/shops");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return Json(new { success = false, message = await ReadApiErrorAsync(response, "Lỗi khi tải danh sách shop.") });
+        }
+
+        return await ToJsonResultAsync(response, "Lỗi khi tải danh sách shop.");
     }
 
     [HttpPost]
@@ -390,7 +404,8 @@ public class OrderController : LegacySellerControllerBase
         int pageSize,
         string? searchTerm,
         string? statusFilter,
-        string? dateFilter)
+        string? dateFilter,
+        int? shopFilter)
     {
         var query = new List<string>
         {
@@ -411,6 +426,11 @@ public class OrderController : LegacySellerControllerBase
         if (!string.IsNullOrWhiteSpace(dateFilter))
         {
             query.Add($"dateFilter={Uri.EscapeDataString(dateFilter)}");
+        }
+
+        if (shopFilter is > 0)
+        {
+            query.Add($"shopFilter={shopFilter.Value}");
         }
 
         var client = CreateOrderingClient();
@@ -558,6 +578,9 @@ public class OrderController : LegacySellerControllerBase
                 ["OrderID"] = orderId,
                 ["OrderCode"] = orderCode ?? BuildOrderCodeFromId(orderId),
                 ["CustomerName"] = GetRowValue(row, "CustomerName", "customerName", "buyerFullName"),
+                ["ShopName"] = GetRowValue(row, "ShopName", "shopName"),
+                ["ShopNames"] = GetRowValue(row, "ShopNames", "shopNames"),
+                ["SellerIds"] = GetRowValue(row, "SellerIds", "sellerIds"),
                 ["OrderDate"] = GetRowValue(row, "OrderDate", "orderDate"),
                 ["TotalAmount"] = GetRowValue(row, "TotalAmount", "totalAmount", "total"),
                 ["Status"] = status,
@@ -601,6 +624,8 @@ public class OrderController : LegacySellerControllerBase
 
         score += HasMeaningfulValue(GetRowValue(row, "OrderCode", "orderCode")) ? 3 : 0;
         score += HasMeaningfulValue(GetRowValue(row, "CustomerName", "customerName", "buyerFullName")) ? 3 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "ShopName", "shopName")) ? 3 : 0;
+        score += HasMeaningfulValue(GetRowValue(row, "ShopNames", "shopNames")) ? 3 : 0;
         score += HasMeaningfulValue(GetRowValue(row, "OrderDate", "orderDate")) ? 2 : 0;
         score += HasMeaningfulValue(GetRowValue(row, "TotalAmount", "totalAmount", "total")) ? 2 : 0;
         score += HasMeaningfulValue(GetRowValue(row, "Status", "status")) ? 2 : 0;
@@ -616,6 +641,8 @@ public class OrderController : LegacySellerControllerBase
         {
             GetRowValue(row, "OrderCode", "orderCode"),
             GetRowValue(row, "CustomerName", "customerName", "buyerFullName"),
+            GetRowValue(row, "ShopName", "shopName"),
+            GetRowValue(row, "ShopNames", "shopNames"),
             GetRowValue(row, "OrderDate", "orderDate"),
             GetRowValue(row, "TotalAmount", "totalAmount", "total"),
             GetRowValue(row, "Status", "status"),

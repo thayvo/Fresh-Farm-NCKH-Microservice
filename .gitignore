@@ -48,6 +48,9 @@ starttest.txt
 
 # User secrets / local files
 **/secrets.json
+**/App_Data/DataProtectionKeys/*.xml
+**/App_Data/SellerKyc/**
+**/wwwroot/uploads/seller-kyc/**
 
 # ===== Node (if any later) =====
 node_modules/
@@ -74,3 +77,6 @@ BaoCao/*.doc
 # Local report generation helpers
 scripts/generate_freshfarm_nghiemthu_report.py
 scripts/generate_freshfarm_report.py
+
+# Local JWT scratch file (contains real signing key)
+tmp-jwt.cs

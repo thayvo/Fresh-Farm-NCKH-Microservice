@@ -42,6 +42,8 @@ public partial class FreshFarmOrderingDBContext
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
     {
+        ConfigureSellerWithdrawals(modelBuilder);
+
         modelBuilder.Entity<RecommendationImpression>(entity =>
         {
             entity.HasKey(e => e.Id);

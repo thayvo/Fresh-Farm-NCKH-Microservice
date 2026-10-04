@@ -26,6 +26,22 @@ public sealed class CartSummaryDto // DTO trả cho màn hình cart/checkout sum
     public decimal SubTotal { get; set; } // Tổng tiền hàng chưa tính ship.
     public decimal ShippingFee { get; set; } // Phí vận chuyển.
     public decimal GrandTotal { get; set; } // Tổng thanh toán cuối cùng.
+    public List<CartRecommendationDto> Recommendations { get; set; } = new(); // Gợi ý mua kèm dựa trên sản phẩm trong giỏ.
+}
+
+public sealed class CartRecommendationDto
+{
+    public int ProductId { get; set; }
+    public int SellerId { get; set; }
+    public string SellerName { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string ImageFileName { get; set; } = string.Empty;
+    public decimal UnitPrice { get; set; }
+    public string UnitSymbol { get; set; } = "đơn vị";
+    public int SeedProductId { get; set; }
+    public int CoPurchaseOrderCount { get; set; }
+    public double BasketScore { get; set; }
+    public string Label { get; set; } = "Hay mua cùng sản phẩm trong giỏ";
 }
 
 public sealed class AddToCartRequestDto // Payload khi thêm sản phẩm vào giỏ.

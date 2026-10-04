@@ -475,7 +475,7 @@ public sealed class OrdersController : ControllerBase
         return await FinalizeVnPayPaymentCore(orderId, request, userId.Value, false, cancellationToken);
     }
 
-    [AllowAnonymous]
+    [AllowAnonymous] // Internal payment callback: authenticated with X-Internal-Service-Key inside the action.
     [HttpPost("internal/{orderId:int}/payments/vnpay/finalize")]
     public async Task<IActionResult> FinalizeVnPayPaymentInternal(
         int orderId,
@@ -891,6 +891,7 @@ public sealed class OrdersController : ControllerBase
         [FromQuery] string? searchTerm = null,
         [FromQuery] string? statusFilter = null,
         [FromQuery] string? dateFilter = null,
+        [FromQuery] int? shopFilter = null,
         CancellationToken cancellationToken = default)
     {
         await _orderReservationService.ExpireStaleReservationsAsync(cancellationToken);
@@ -913,6 +914,13 @@ public sealed class OrdersController : ControllerBase
         }
 
         var query = ApplySellerScopeToAdminOrders(_db.Orders.AsNoTracking().AsQueryable(), sellerId, isAdmin);
+
+        if (isAdmin && shopFilter is > 0)
+        {
+            query = query.Where(o => o.SellerOrders.Any(so =>
+                so.SellerId == shopFilter.Value &&
+                so.SellerOrderItems.Any()));
+        }
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -955,6 +963,12 @@ public sealed class OrdersController : ControllerBase
             })
             .ToListAsync(cancellationToken);
 
+        var shopLookup = await BuildOrderShopLookupAsync(
+            pageRows.Select(x => x.OrderID),
+            isAdmin,
+            sellerId,
+            cancellationToken);
+
         Dictionary<int, decimal>? sellerAmountLookup = null;
         if (!isAdmin && sellerId.HasValue && pageRows.Count > 0)
         {
@@ -981,6 +995,9 @@ public sealed class OrdersController : ControllerBase
             row.OrderCode,
             row.CustomerName,
             row.OrderDate,
+            ShopName = shopLookup.GetValueOrDefault(row.OrderID)?.ShopName ?? string.Empty,
+            ShopNames = shopLookup.GetValueOrDefault(row.OrderID)?.ShopNames ?? Array.Empty<string>(),
+            SellerIds = shopLookup.GetValueOrDefault(row.OrderID)?.SellerIds ?? Array.Empty<int>(),
             TotalAmount = isAdmin
                 ? row.TotalAmount
                 : sellerAmountLookup?.GetValueOrDefault(row.OrderID) ?? 0m,
@@ -1012,6 +1029,58 @@ public sealed class OrdersController : ControllerBase
         {
             success = true,
             data = orderIds
+        });
+    }
+
+    [Authorize(Policy = "SellerOrAdmin")]
+    [HttpGet("admin/shops")]
+    public async Task<IActionResult> GetAdminOrderShops(CancellationToken cancellationToken = default)
+    {
+        var isAdmin = IsAdminUser();
+        var sellerId = isAdmin ? (int?)null : TryGetSellerIdFromToken();
+        if (!isAdmin && !sellerId.HasValue)
+        {
+            return Unauthorized(new { message = "Không xác định được seller từ token." });
+        }
+
+        var query = _db.SellerOrders
+            .AsNoTracking()
+            .Where(so => so.SellerOrderItems.Any());
+
+        if (!isAdmin && sellerId.HasValue)
+        {
+            query = query.Where(so => so.SellerId == sellerId.Value);
+        }
+
+        var rows = await query
+            .SelectMany(so => so.SellerOrderItems.Select(item => new
+            {
+                so.SellerId,
+                item.SnapshotAttributes
+            }))
+            .ToListAsync(cancellationToken);
+
+        var shops = rows
+            .GroupBy(x => x.SellerId)
+            .Select(group =>
+            {
+                var name = group
+                    .Select(x => TryReadSellerName(x.SnapshotAttributes))
+                    .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+                return new
+                {
+                    sellerId = group.Key,
+                    shopName = string.IsNullOrWhiteSpace(name) ? $"Shop #{group.Key}" : name
+                };
+            })
+            .OrderBy(x => x.shopName)
+            .ToList();
+
+        return Ok(new
+        {
+            success = true,
+            data = shops
         });
     }
 
@@ -1111,6 +1180,9 @@ public sealed class OrdersController : ControllerBase
             userId = order.UserId,
             customerName = string.IsNullOrWhiteSpace(order.BuyerFullName) ? $"U{order.UserId}" : order.BuyerFullName,
             customerEmail = order.BuyerEmail,
+            shopName = BuildShopName(scopedSellerOrders),
+            shopNames = BuildShopNames(scopedSellerOrders),
+            sellerIds = scopedSellerOrders.Select(x => x.SellerId).Distinct().OrderBy(x => x).ToList(),
             buyerFullName = order.BuyerFullName,
             buyerPhone = order.BuyerPhone,
             buyerEmail = order.BuyerEmail,
@@ -1681,6 +1753,116 @@ public sealed class OrdersController : ControllerBase
             so.SellerId == sellerId.Value &&
             so.SellerOrderItems.Any());
     }
+
+    private async Task<Dictionary<int, OrderShopSummary>> BuildOrderShopLookupAsync(
+        IEnumerable<int> orderIds,
+        bool isAdmin,
+        int? sellerId,
+        CancellationToken cancellationToken)
+    {
+        var ids = orderIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<int, OrderShopSummary>();
+        }
+
+        var query = _db.SellerOrders
+            .AsNoTracking()
+            .Where(so => ids.Contains(so.OrderId));
+
+        if (!isAdmin && sellerId.HasValue)
+        {
+            query = query.Where(so => so.SellerId == sellerId.Value);
+        }
+
+        var rows = await query
+            .SelectMany(so => so.SellerOrderItems.Select(item => new
+            {
+                so.OrderId,
+                so.SellerId,
+                item.SnapshotAttributes
+            }))
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.OrderId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var shops = group
+                        .GroupBy(x => x.SellerId)
+                        .Select(sellerGroup =>
+                        {
+                            var name = sellerGroup
+                                .Select(x => TryReadSellerName(x.SnapshotAttributes))
+                                .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+                            return new OrderShopInfo(
+                                sellerGroup.Key,
+                                string.IsNullOrWhiteSpace(name) ? $"Shop #{sellerGroup.Key}" : name);
+                        })
+                        .OrderBy(x => x.ShopName)
+                        .ToList();
+
+                    return new OrderShopSummary(
+                        shops.FirstOrDefault()?.ShopName ?? string.Empty,
+                        shops.Select(x => x.ShopName).ToArray(),
+                        shops.Select(x => x.SellerId).ToArray());
+                });
+    }
+
+    private static string BuildShopName(IEnumerable<SellerOrder> sellerOrders)
+    {
+        return BuildShopNames(sellerOrders).FirstOrDefault() ?? string.Empty;
+    }
+
+    private static List<string> BuildShopNames(IEnumerable<SellerOrder> sellerOrders)
+    {
+        return sellerOrders
+            .Where(so => so.SellerOrderItems.Any())
+            .Select(so =>
+            {
+                var name = so.SellerOrderItems
+                    .Select(item => TryReadSellerName(item.SnapshotAttributes))
+                    .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+                return string.IsNullOrWhiteSpace(name) ? $"Shop #{so.SellerId}" : name;
+            })
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name)
+            .ToList();
+    }
+
+    private static string? TryReadSellerName(string? snapshotAttributes)
+    {
+        if (string.IsNullOrWhiteSpace(snapshotAttributes))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(snapshotAttributes);
+            if (document.RootElement.TryGetProperty("sellerName", out var sellerNameElement) &&
+                sellerNameElement.ValueKind == JsonValueKind.String)
+            {
+                var sellerName = sellerNameElement.GetString()?.Trim();
+                return string.IsNullOrWhiteSpace(sellerName) ? null : sellerName;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private sealed record OrderShopInfo(int SellerId, string ShopName);
+
+    private sealed record OrderShopSummary(string ShopName, string[] ShopNames, int[] SellerIds);
 
     public sealed class UpdateAdminOrderStatusRequest
     {

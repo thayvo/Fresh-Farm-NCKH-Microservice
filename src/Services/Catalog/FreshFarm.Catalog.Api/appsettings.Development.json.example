@@ -5,6 +5,14 @@
       "Microsoft.AspNetCore": "Warning"
     }
   },
+  "Services": {
+    "Identity": {
+      "BaseUrl": "https://localhost:7140"
+    },
+    "Internal": {
+      "ServiceKey": ""
+    }
+  },
   "AllowedHosts": "*",
   "ConnectionStrings": {
     "FreshFarmCatalogDB": "Server=localhost;Database=FreshFarmCatalogDB;Trusted_Connection=True;TrustServerCertificate=True"

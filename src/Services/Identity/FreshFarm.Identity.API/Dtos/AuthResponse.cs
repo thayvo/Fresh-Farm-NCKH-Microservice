@@ -12,6 +12,10 @@ namespace FreshFarm.Identity.Api.Dtos
         public string? AuthenticatorIssuer { get; set; }
         public string? AuthenticatorAccountName { get; set; }
         public string? ChallengeMessage { get; set; }
+        public string AccountAccess { get; set; } = "full";
+        public string ApprovalStatus { get; set; } = string.Empty;
+        public bool IsPendingApproval { get; set; }
+        public string? AccountStatusMessage { get; set; }
     }
 
     public sealed class VerifyTwoFactorLoginRequest

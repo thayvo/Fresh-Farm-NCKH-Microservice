@@ -1,7 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using FreshFarm.Web.Bff.Areas.Admin.Controllers;
 using FreshFarm.Web.Bff.Areas.Admin.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
@@ -12,6 +15,57 @@ namespace FreshFarm.Web.Bff.Tests;
 
 public sealed class MerchantControllerTests
 {
+    [Fact]
+    public async Task KycDocument_ReturnsOnlyDocumentReferencedBySelectedMerchant()
+    {
+        const string storedReference = "seller-kyc:business-license-0123456789abcdef.pdf";
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    sellerId = 91,
+                    businessLicenseUrl = storedReference
+                })
+            });
+        var storage = new FakeSellerKycStorageService
+        {
+            StoredFileToReturn = new SellerKycStoredFile(
+                new MemoryStream("%PDF-test"u8.ToArray()),
+                "application/pdf")
+        };
+        var controller = CreateController(handler, storage);
+
+        var result = await controller.KycDocument(91, storedReference);
+
+        var file = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("business-license-0123456789abcdef.pdf", file.FileDownloadName);
+        Assert.Equal(storedReference, Assert.Single(storage.OpenedReferences));
+    }
+
+    [Fact]
+    public async Task KycDocument_DoesNotOpenUnreferencedMerchantDocument()
+    {
+        const string ownedReference = "seller-kyc:business-license-0123456789abcdef.pdf";
+        const string requestedReference = "seller-kyc:cccd-front-fedcba9876543210.jpg";
+        var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    sellerId = 91,
+                    businessLicenseUrl = ownedReference
+                })
+            });
+        var storage = new FakeSellerKycStorageService();
+        var controller = CreateController(handler, storage);
+
+        var result = await controller.KycDocument(91, requestedReference);
+
+        Assert.IsType<NotFoundResult>(result);
+        Assert.Empty(storage.OpenedReferences);
+    }
+
     [Fact]
     public async Task Index_ForwardsReviewFiltersToIdentity()
     {
@@ -217,7 +271,9 @@ public sealed class MerchantControllerTests
         Assert.Equal("Thiếu ảnh CCCD mặt sau.", json.RootElement.GetProperty("reason").GetString());
     }
 
-    private static MerchantController CreateController(RecordingHttpMessageHandler handler)
+    private static MerchantController CreateController(
+        RecordingHttpMessageHandler handler,
+        FakeSellerKycStorageService? sellerKycStorageService = null)
     {
         var token = CreateAccessToken("7");
         var client = new HttpClient(handler)
@@ -236,7 +292,9 @@ public sealed class MerchantControllerTests
             new Claim("ff_access_token", token)
         ], "TestAuth"));
 
-        return new MerchantController(new StaticHttpClientFactory(client))
+        return new MerchantController(
+            new StaticHttpClientFactory(client),
+            sellerKycStorageService ?? new FakeSellerKycStorageService())
         {
             ControllerContext = new ControllerContext
             {
@@ -244,6 +302,33 @@ public sealed class MerchantControllerTests
             },
             TempData = new TempDataDictionary(httpContext, new TestTempDataProvider())
         };
+    }
+
+    private sealed class FakeSellerKycStorageService : ISellerKycStorageService
+    {
+        public List<string> OpenedReferences { get; } = new();
+
+        public SellerKycStoredFile? StoredFileToReturn { get; set; }
+
+        public (bool isValid, string errorMessage) Validate(IFormFile file, bool allowPdf = false) =>
+            (true, string.Empty);
+
+        public string Save(IFormFile file, string prefix, bool allowPdf = false) =>
+            throw new NotSupportedException();
+
+        public SellerKycStoredFile? OpenRead(string? storedReference)
+        {
+            if (!string.IsNullOrWhiteSpace(storedReference))
+            {
+                OpenedReferences.Add(storedReference);
+            }
+
+            return StoredFileToReturn;
+        }
+
+        public void Delete(string? requestPath)
+        {
+        }
     }
 
     private static string CreateAccessToken(string userId)

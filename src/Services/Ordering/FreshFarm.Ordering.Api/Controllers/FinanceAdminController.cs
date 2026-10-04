@@ -75,6 +75,8 @@ public sealed class FinanceAdminController : ControllerBase
             sellerId = null;
         }
 
+        await EnsureSellerWithdrawalsSchemaAsync(cancellationToken);
+
         var sellerOrdersQuery = BuildScopedSellerOrdersQuery(sellerId);
         if (sellerOrdersQuery is null)
         {
@@ -86,22 +88,27 @@ public sealed class FinanceAdminController : ControllerBase
         var returnsQuery = BuildScopedReturnsQuery(sellerId)!;
         var paymentTransactionsQuery = BuildScopedPaymentTransactionsQuery(sellerId)!;
 
-        var grossMerchandiseValue = await sellerOrdersQuery.SumAsync(
+        var commissionEstimateSellerOrdersQuery = BuildCommissionEstimateSellerOrdersQuery(sellerOrdersQuery);
+        var grossMerchandiseValue = await commissionEstimateSellerOrdersQuery.SumAsync(
             x => (decimal?)((x.SellerEarning) + (x.CommissionAmount)),
             cancellationToken) ?? 0m;
-        var platformCommission = await sellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
-        var sellerEarning = await sellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
+        var platformCommission = await commissionEstimateSellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
+        var sellerEarning = await commissionEstimateSellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
         var reconciliationSellerOrdersQuery = BuildReconciliationEligibleSellerOrdersQuery(sellerOrdersQuery);
         var reconciliationGrossMerchandiseValue = await reconciliationSellerOrdersQuery.SumAsync(
             x => (decimal?)((x.SellerEarning) + (x.CommissionAmount)),
             cancellationToken) ?? 0m;
         var reconciliationPlatformCommission = await reconciliationSellerOrdersQuery.SumAsync(x => (decimal?)x.CommissionAmount, cancellationToken) ?? 0m;
         var reconciliationSellerEarning = await reconciliationSellerOrdersQuery.SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
-        var withdrawableAmount = await reconciliationSellerOrdersQuery
-            .Where(x => !x.PayoutItems.Any(item =>
-                item.Payout != null &&
-                !PayoutFailedStatuses.Contains((item.Payout.Status ?? string.Empty).ToLower())))
-            .SumAsync(x => (decimal?)x.SellerEarning, cancellationToken) ?? 0m;
+        var paidPayoutAmount = await payoutsQuery
+            .Where(x => x.PaidAt.HasValue || PayoutPaidStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .SumAsync(x => (decimal?)(x.AmountNet ?? (x.AmountGross - x.FeeAmount)), cancellationToken) ?? 0m;
+        var withdrawnAmount = await BuildScopedSellerWithdrawalsQuery(sellerId)!
+            .Where(x => (x.Status ?? string.Empty).ToLower() == "completed")
+            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var pendingSellerPayoutAmount = Math.Max(0m, reconciliationSellerEarning - paidPayoutAmount);
+        var remainingWithdrawableAmount = Math.Max(0m, paidPayoutAmount - withdrawnAmount);
+        var withdrawableAmount = remainingWithdrawableAmount;
         var capturedPayments = await paymentTransactionsQuery
             .Where(x => x.PaidAt.HasValue || PayoutPaidStatuses.Contains((x.Status ?? string.Empty).ToLower()))
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
@@ -119,6 +126,67 @@ public sealed class FinanceAdminController : ControllerBase
         var openRefunds = await refundsQuery
             .CountAsync(x => RefundOpenStatuses.Contains((x.Status ?? string.Empty).ToLower()), cancellationToken);
         var sellerCount = await sellerOrdersQuery.Select(x => x.SellerId).Distinct().CountAsync(cancellationToken);
+        var sellerBreakdownRaw = await commissionEstimateSellerOrdersQuery
+            .GroupBy(x => x.SellerId)
+            .Select(x => new
+            {
+                sellerId = x.Key,
+                orderCount = x.Count(),
+                grossMerchandiseValue = x.Sum(item => item.SellerEarning + item.CommissionAmount),
+                platformCommission = x.Sum(item => item.CommissionAmount),
+                sellerEarning = x.Sum(item => item.SellerEarning)
+            })
+            .OrderByDescending(x => x.sellerEarning)
+            .ThenBy(x => x.sellerId)
+            .ToListAsync(cancellationToken);
+        var sellerPaidAmounts = await _db.PayoutItems
+            .AsNoTracking()
+            .Where(x =>
+                x.Payout != null &&
+                x.SellerOrder != null &&
+                x.SellerOrder.Order != null &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.SellerOrder.Order.Status ?? string.Empty).ToLower()) &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.SellerOrder.SellerStatus ?? string.Empty).ToLower()) &&
+                (x.Payout.PaidAt.HasValue ||
+                    PayoutPaidStatuses.Contains((x.Payout.Status ?? string.Empty).ToLower())))
+            .GroupBy(x => x.SellerOrder!.SellerId)
+            .Select(x => new
+            {
+                sellerId = x.Key,
+                paidAmount = x.Sum(item => item.Amount)
+            })
+            .ToDictionaryAsync(x => x.sellerId, x => x.paidAmount, cancellationToken);
+        var sellerPendingAmounts = await _db.PayoutItems
+            .AsNoTracking()
+            .Where(x =>
+                x.Payout != null &&
+                x.SellerOrder != null &&
+                x.SellerOrder.Order != null &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.SellerOrder.Order.Status ?? string.Empty).ToLower()) &&
+                !ReconciliationBlockedOrderStatuses.Contains((x.SellerOrder.SellerStatus ?? string.Empty).ToLower()) &&
+                !x.Payout.PaidAt.HasValue &&
+                PayoutPendingStatuses.Contains((x.Payout.Status ?? string.Empty).ToLower()))
+            .GroupBy(x => x.SellerOrder!.SellerId)
+            .Select(x => new
+            {
+                sellerId = x.Key,
+                pendingAmount = x.Sum(item => item.Amount)
+            })
+            .ToDictionaryAsync(x => x.sellerId, x => x.pendingAmount, cancellationToken);
+        var sellerBreakdown = sellerBreakdownRaw
+            .Select(x => new
+            {
+                x.sellerId,
+                sellerLabel = $"Seller #{x.sellerId}",
+                x.orderCount,
+                x.grossMerchandiseValue,
+                x.platformCommission,
+                x.sellerEarning,
+                paidAmount = sellerPaidAmounts.TryGetValue(x.sellerId, out var paidAmount) ? paidAmount : 0m,
+                pendingAmount = sellerPendingAmounts.TryGetValue(x.sellerId, out var pendingAmount) ? pendingAmount : 0m,
+                unpaidAmount = Math.Max(0m, x.sellerEarning - (sellerPaidAmounts.TryGetValue(x.sellerId, out var paid) ? paid : 0m))
+            })
+            .ToList();
 
         var payoutCount = await payoutsQuery.CountAsync(cancellationToken);
         var refundCount = await refundsQuery.CountAsync(cancellationToken);
@@ -215,6 +283,10 @@ public sealed class FinanceAdminController : ControllerBase
                 reconciliationPlatformCommission,
                 reconciliationSellerEarning,
                 withdrawableAmount,
+                pendingSellerPayoutAmount,
+                paidPayoutAmount,
+                withdrawnAmount,
+                remainingWithdrawableAmount,
                 pendingPayoutAmount,
                 refundedAmount,
                 openReturns,
@@ -224,6 +296,7 @@ public sealed class FinanceAdminController : ControllerBase
                 dueSoonFollowUps,
                 noFollowUpCount
             },
+            sellerBreakdown,
             sectionCounts = new
             {
                 payouts = payoutCount,
@@ -246,18 +319,119 @@ public sealed class FinanceAdminController : ControllerBase
 
     [HttpPost("payouts/generate")]
     [Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> GeneratePayouts([FromQuery] int? sellerId = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GeneratePayouts([FromQuery] int? sellerId = null, [FromQuery] bool releaseNow = false, CancellationToken cancellationToken = default)
     {
         var result = await _payoutGenerationService.GeneratePendingPayoutsAsync(sellerId, cancellationToken);
+        var releasedPayoutCount = 0;
+        var releasedAmountNet = 0m;
+
+        if (releaseNow)
+        {
+            var pendingPayoutsQuery = _db.Payouts
+                .Where(x => PayoutPendingStatuses.Contains((x.Status ?? string.Empty).ToLower()));
+
+            if (sellerId.HasValue && sellerId.Value > 0)
+            {
+                pendingPayoutsQuery = pendingPayoutsQuery.Where(x => x.SellerId == sellerId.Value);
+            }
+
+            var pendingPayouts = await pendingPayoutsQuery.ToListAsync(cancellationToken);
+            var now = DateTime.UtcNow;
+            foreach (var payout in pendingPayouts)
+            {
+                var amountNet = payout.AmountNet ?? (payout.AmountGross - payout.FeeAmount);
+                if (amountNet <= 0m)
+                {
+                    continue;
+                }
+
+                payout.Status = "paid";
+                payout.PaidAt = now;
+                releasedPayoutCount++;
+                releasedAmountNet += amountNet;
+            }
+
+            if (releasedPayoutCount > 0)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
         return Ok(new
         {
             success = true,
-            message = $"Da tao {result.CreatedPayoutCount} payout pending voi {result.CreatedPayoutItemCount} seller order.",
+            message = releaseNow
+                ? $"Da chi tra {releasedPayoutCount} payout voi tong tien {releasedAmountNet:#,0}."
+                : $"Da tao {result.CreatedPayoutCount} payout pending voi {result.CreatedPayoutItemCount} seller order.",
             result.CreatedPayoutCount,
             result.CreatedPayoutItemCount,
             result.AmountGross,
             result.FeeAmount,
-            result.AmountNet
+            result.AmountNet,
+            releasedPayoutCount,
+            releasedAmountNet
+        });
+    }
+
+    [HttpPost("seller-withdrawals")]
+    [Authorize(Policy = "SellerOrAdmin")]
+    public async Task<IActionResult> CreateSellerWithdrawal([FromBody] SellerWithdrawalRequest? request, CancellationToken cancellationToken = default)
+    {
+        await EnsureSellerWithdrawalsSchemaAsync(cancellationToken);
+
+        var sellerId = User.IsInRole("Seller") ? TryGetSellerIdFromToken() : request?.SellerId;
+        if (!sellerId.HasValue || sellerId.Value <= 0)
+        {
+            return Unauthorized(new { success = false, message = "Khong xac dinh duoc seller de rut tien." });
+        }
+
+        var amount = request?.Amount ?? 0m;
+        if (amount <= 0m)
+        {
+            return BadRequest(new { success = false, message = "So tien rut phai lon hon 0." });
+        }
+
+        var paidPayoutAmount = await _db.Payouts
+            .AsNoTracking()
+            .Where(x =>
+                x.SellerId == sellerId.Value &&
+                (x.PaidAt.HasValue || PayoutPaidStatuses.Contains((x.Status ?? string.Empty).ToLower())))
+            .SumAsync(x => (decimal?)(x.AmountNet ?? (x.AmountGross - x.FeeAmount)), cancellationToken) ?? 0m;
+        var withdrawnAmount = await _db.SellerWithdrawals
+            .AsNoTracking()
+            .Where(x => x.SellerId == sellerId.Value && (x.Status ?? string.Empty).ToLower() == "completed")
+            .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var remainingAmount = Math.Max(0m, paidPayoutAmount - withdrawnAmount);
+
+        if (amount > remainingAmount)
+        {
+            return BadRequest(new { success = false, message = $"So tien rut vuot qua so du kha dung ({remainingAmount:#,0} đ)." });
+        }
+
+        var now = DateTime.UtcNow;
+        var withdrawal = new SellerWithdrawal
+        {
+            SellerId = sellerId.Value,
+            Amount = amount,
+            BankName = TrimOrDefault(request?.BankName, "Vietcombank"),
+            BankAccountName = TrimOrDefault(request?.BankAccountName, $"FreshFarm Seller {sellerId.Value}"),
+            BankAccountNumber = TrimOrDefault(request?.BankAccountNumber, $"970436{sellerId.Value:000000}"),
+            Status = "completed",
+            Note = TrimOrNull(request?.Note),
+            CreatedAt = now,
+            CompletedAt = now
+        };
+
+        _db.SellerWithdrawals.Add(withdrawal);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Da ghi nhan seller nhan tien.",
+            withdrawal.SellerWithdrawalId,
+            withdrawal.Amount,
+            remainingAmount = Math.Max(0m, remainingAmount - amount)
         });
     }
 
@@ -543,9 +717,41 @@ public sealed class FinanceAdminController : ControllerBase
                     (ReconciliationPaidPaymentStatuses.Contains((t.Status ?? string.Empty).ToLower()) || t.PaidAt.HasValue))));
     }
 
+    private IQueryable<SellerOrder> BuildCommissionEstimateSellerOrdersQuery(IQueryable<SellerOrder> sellerOrdersQuery)
+    {
+        var refundedOrderIdsQuery = _db.RefundTransactions
+            .AsNoTracking()
+            .Where(x => !RefundFailedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.PaymentTxn.OrderId);
+        var returnBlockedSellerOrderIdsQuery = _db.ReturnRequests
+            .AsNoTracking()
+            .Where(x => !ReturnRejectedStatuses.Contains((x.Status ?? string.Empty).ToLower()))
+            .Select(x => x.SellerOrderItem.SellerOrderId);
+
+        return sellerOrdersQuery.Where(x =>
+            x.Order != null &&
+            !ReconciliationBlockedOrderStatuses.Contains((x.Order.Status ?? string.Empty).ToLower()) &&
+            !ReconciliationBlockedOrderStatuses.Contains((x.SellerStatus ?? string.Empty).ToLower()) &&
+            !refundedOrderIdsQuery.Contains(x.OrderId) &&
+            !returnBlockedSellerOrderIdsQuery.Contains(x.SellerOrderId));
+    }
+
     private IQueryable<Payout>? BuildScopedPayoutsQuery(int? sellerId)
     {
         var query = _db.Payouts.AsNoTracking().AsQueryable();
+
+        if (User.IsInRole("Admin"))
+        {
+            return sellerId.HasValue ? query.Where(x => x.SellerId == sellerId.Value) : query;
+        }
+
+        var scopedSellerId = TryGetSellerIdFromToken();
+        return scopedSellerId.HasValue ? query.Where(x => x.SellerId == scopedSellerId.Value) : null;
+    }
+
+    private IQueryable<SellerWithdrawal>? BuildScopedSellerWithdrawalsQuery(int? sellerId)
+    {
+        var query = _db.SellerWithdrawals.AsNoTracking().AsQueryable();
 
         if (User.IsInRole("Admin"))
         {
@@ -1439,6 +1645,43 @@ public sealed class FinanceAdminController : ControllerBase
         return trimmed.Length <= 1000 ? trimmed : trimmed[..1000];
     }
 
+    private static string TrimOrDefault(string? value, string fallback)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? fallback : trimmed;
+    }
+
+    private static string? TrimOrNull(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
+    }
+
+    private async Task EnsureSellerWithdrawalsSchemaAsync(CancellationToken cancellationToken)
+    {
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            IF OBJECT_ID(N'[dbo].[SellerWithdrawals]', N'U') IS NULL
+            BEGIN
+                CREATE TABLE [dbo].[SellerWithdrawals] (
+                    [SellerWithdrawalID] INT IDENTITY(1,1) NOT NULL CONSTRAINT [PK_SellerWithdrawals] PRIMARY KEY,
+                    [SellerID] INT NOT NULL,
+                    [Amount] DECIMAL(18,2) NOT NULL,
+                    [BankName] NVARCHAR(160) NOT NULL,
+                    [BankAccountName] NVARCHAR(160) NOT NULL,
+                    [BankAccountNumber] NVARCHAR(80) NOT NULL,
+                    [Status] NVARCHAR(30) NOT NULL CONSTRAINT [DF_SellerWithdrawals_Status] DEFAULT N'completed',
+                    [Note] NVARCHAR(500) NULL,
+                    [CreatedAt] DATETIME NOT NULL CONSTRAINT [DF_SellerWithdrawals_CreatedAt] DEFAULT GETUTCDATE(),
+                    [CompletedAt] DATETIME NULL
+                );
+                CREATE INDEX [IX_SellerWithdrawals_Seller_CreatedAt]
+                    ON [dbo].[SellerWithdrawals] ([SellerID], [CreatedAt] DESC);
+            END
+            """,
+            cancellationToken);
+    }
+
     private static string AppendAuditMarker(string? note, string marker)
     {
         var trimmed = TrimNote(note);
@@ -1670,6 +1913,16 @@ public sealed class FinanceAdminController : ControllerBase
         public string? Note { get; set; }
         public string? AssigneeLabel { get; set; }
         public DateTime? FollowUpAt { get; set; }
+    }
+
+    public sealed class SellerWithdrawalRequest
+    {
+        public int? SellerId { get; set; }
+        public decimal Amount { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccountName { get; set; }
+        public string? BankAccountNumber { get; set; }
+        public string? Note { get; set; }
     }
 
     private sealed class FinanceConsoleRowPayload

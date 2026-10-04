@@ -8,5 +8,7 @@ public interface ISellerKycStorageService
 
     string Save(IFormFile file, string prefix, bool allowPdf = false);
 
+    SellerKycStoredFile? OpenRead(string? storedReference);
+
     void Delete(string? requestPath);
 }

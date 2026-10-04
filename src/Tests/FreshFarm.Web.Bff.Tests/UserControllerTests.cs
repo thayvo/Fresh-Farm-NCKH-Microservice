@@ -56,6 +56,25 @@ public sealed class UserControllerTests
     }
 
     [Fact]
+    public void AdminManageUsers_ApprovalFormCarriesConcurrencyVersion()
+    {
+        var view = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "User",
+            "ManageUsers.cshtml"));
+
+        Assert.Contains("data-approval-version", view, StringComparison.Ordinal);
+        Assert.Contains("name=\"expectedApprovalVersion\"", view, StringComparison.Ordinal);
+        Assert.Contains("#a_expectedApprovalVersion", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ManageUsers_DedupesDuplicateUsersAndRoles_FromIdentity()
     {
         var handler = new RecordingHttpMessageHandler(request =>
@@ -148,6 +167,7 @@ public sealed class UserControllerTests
                       "email": "buyer72@example.com",
                       "phone": "0900000072",
                       "roleId": 3,
+                      "approvalVersion": 12,
                       "role": {
                         "roleId": 3,
                         "roleName": "Customer",
@@ -174,7 +194,64 @@ public sealed class UserControllerTests
         Assert.True(document.RootElement.GetProperty("success").GetBoolean());
         Assert.Equal(72, data.GetProperty("userId").GetInt32());
         Assert.Equal(3, data.GetProperty("roleId").GetInt32());
+        Assert.Equal(12, data.GetProperty("approvalVersion").GetInt64());
         Assert.Equal("buyer72", data.GetProperty("userName").GetString());
+    }
+
+    [Fact]
+    public async Task ChangeApproval_ForwardsExpectedVersionToIdentity()
+    {
+        long? forwardedVersion = null;
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72/approval")
+            {
+                var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                using var document = JsonDocument.Parse(body);
+                forwardedVersion = document.RootElement.GetProperty("expectedApprovalVersion").GetInt64();
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.ChangeApproval(72, "Approved", null, expectedApprovalVersion: 17);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var response = JsonDocument.Parse(serialized);
+        Assert.True(response.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(17, forwardedVersion);
+    }
+
+    [Fact]
+    public async Task ChangeApproval_PropagatesIdentityConflict()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72/approval")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Conflict)
+                {
+                    Content = new StringContent("""
+                    { "code": "approval_conflict", "message": "Tài khoản đã được quản trị viên khác cập nhật." }
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.ChangeApproval(72, "Approved", null, expectedApprovalVersion: 3);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var response = JsonDocument.Parse(serialized);
+        Assert.Equal(StatusCodes.Status409Conflict, controller.Response.StatusCode);
+        Assert.False(response.RootElement.GetProperty("success").GetBoolean());
+        Assert.Contains("quản trị viên khác", response.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
     }
 
     private static UserController CreateController(RecordingHttpMessageHandler handler)

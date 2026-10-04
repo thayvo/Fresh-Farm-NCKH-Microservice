@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FreshFarm.Ordering.Api.Test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FreshFarm.Identity.Api.Tests", "..\Tests\FreshFarm.Identity.Api.Tests\FreshFarm.Identity.Api.Tests.csproj", "{72932B09-22F5-4CEA-8727-169A20688EEB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FreshFarm.Catalog.Api.Tests", "..\Tests\FreshFarm.Catalog.Api.Tests\FreshFarm.Catalog.Api.Tests.csproj", "{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +127,18 @@ Global
 		{72932B09-22F5-4CEA-8727-169A20688EEB}.Release|x64.Build.0 = Release|Any CPU
 		{72932B09-22F5-4CEA-8727-169A20688EEB}.Release|x86.ActiveCfg = Release|Any CPU
 		{72932B09-22F5-4CEA-8727-169A20688EEB}.Release|x86.Build.0 = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|x64.Build.0 = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Debug|x86.Build.0 = Debug|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|x64.ActiveCfg = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|x64.Build.0 = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|x86.ActiveCfg = Release|Any CPU
+		{B6C6E566-0A63-4E6A-A42D-8FC071E3EA5B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

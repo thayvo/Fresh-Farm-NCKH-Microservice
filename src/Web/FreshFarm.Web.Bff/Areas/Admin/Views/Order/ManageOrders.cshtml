@@ -402,7 +402,7 @@
     var currentPage = 1;
     var totalItems = 0;
     window.usingSearch = false;
-    window.currentFilters = { searchTerm: '', statusFilter: '', dateFilter: '' };
+    window.currentFilters = { searchTerm: '', statusFilter: '', dateFilter: '', shopFilter: '' };
     window._ordersCurrentPage = currentPage; // sync ra global cho chỗ khác xài
 
     function updatePaginationInfo(total, page, pageSize) {
@@ -449,7 +449,7 @@
         window.usingSearch = false;
         $.ajax({
             url: '@Url.Action("GetOrdersPaged", "Order", new { area = "Admin" })',
-            type: 'GET', dataType: 'json', data: { page: currentPage, pageSize: PAGE_SIZE },
+            type: 'GET', dataType: 'json', data: { page: currentPage, pageSize: PAGE_SIZE, shopFilter: window.currentFilters.shopFilter },
             success: function (data) {
                 if (data?.success) {
                     totalItems = data.total || 0;
@@ -472,6 +472,7 @@
                 searchTerm: window.currentFilters.searchTerm,
                 statusFilter: window.currentFilters.statusFilter,
                 dateFilter: window.currentFilters.dateFilter,
+                shopFilter: window.currentFilters.shopFilter,
                 page: currentPage, pageSize: PAGE_SIZE
             },
             success: function (data) {
@@ -479,7 +480,7 @@
                     totalItems = data.total || 0; var items = data.data || [];
                     if (items.length === 0) {
                         const tb = document.getElementById('orders-table-body');
-                        tb.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">🔍</div><p>Không tìm thấy kết quả</p></div></td></tr>';
+                        tb.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">🔍</div><p>Không tìm thấy kết quả</p></div></td></tr>';
                     } else { renderTable(items); }
                     renderPagination(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
                     updatePaginationInfo(totalItems, data.page || currentPage, data.pageSize || PAGE_SIZE);
@@ -493,14 +494,16 @@
             window.currentFilters.searchTerm = $('#searchInput').val().trim();
             window.currentFilters.statusFilter = $('#statusFilter').val();
             window.currentFilters.dateFilter = $('#dateFilter').val();
+            window.currentFilters.shopFilter = $('#shopFilter').val();
             searchOrders(1);
         });
         $('#statusFilter').off('change').on('change', function () { window.currentFilters.statusFilter = this.value; searchOrders(1); });
         $('#dateFilter').off('change').on('change', function () { window.currentFilters.dateFilter = this.value; searchOrders(1); });
+        $('#shopFilter').off('change').on('change', function () { window.currentFilters.shopFilter = this.value; searchOrders(1); });
         $('#searchInput').off('input').on('input', function () {
             if (this.value.trim() === '') {
                 window.currentFilters.searchTerm = '';
-                if (!window.currentFilters.statusFilter && !window.currentFilters.dateFilter) { window.usingSearch = false; loadOrders(1); }
+                if (!window.currentFilters.statusFilter && !window.currentFilters.dateFilter && !window.currentFilters.shopFilter) { window.usingSearch = false; loadOrders(1); }
             }
         });
         $('#searchInput').off('keypress').on('keypress', function (e) { if (e.key === 'Enter') $('#searchBtn').click(); });
@@ -523,7 +526,33 @@
             }
         } catch (e) { console.warn(e); }
 
+        loadShopFilterOptions();
         loadOrders(1);
+    }
+
+    function loadShopFilterOptions() {
+        var shopSelect = document.getElementById('shopFilter');
+        if (!shopSelect || !window.jQuery) return;
+
+        $.ajax({
+            url: '@Url.Action("GetShopFilterOptions", "Order", new { area = "Admin" })',
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                if (!data?.success) return;
+                var shops = data.data || [];
+                shops.forEach(function (shop) {
+                    var sellerId = shop.sellerId ?? shop.SellerId;
+                    var shopName = shop.shopName ?? shop.ShopName;
+                    if (!sellerId || !shopName) return;
+
+                    var option = document.createElement('option');
+                    option.value = sellerId;
+                    option.textContent = shopName;
+                    shopSelect.appendChild(option);
+                });
+            }
+        });
     }
     if (window.jQuery) { $(__bindOrderHandlers); }
     else { window.addEventListener('load', __bindOrderHandlers); }
@@ -567,14 +596,14 @@
             <h5 class="mb-0 fw-bold text-primary-blue">Bộ lọc tìm kiếm</h5>
         </div>
         <div class="row g-3">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <div class="search-icon-wrapper">
                     <i class="bi bi-search"></i>
                     <input type="text" class="form-control" id="searchInput"
                            placeholder="Tìm theo mã đơn hàng, tên khách hàng..." />
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <select class="form-select" id="statusFilter">
                     <option value="">Lọc theo trạng thái</option>
                     <option value="All">Tất cả</option>
@@ -584,6 +613,11 @@
                     <option value="Shipped">Đang giao hàng</option>
                     <option value="Delivered">Đã giao hàng</option>
                     <option value="Canceled">Đã hủy</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="shopFilter">
+                    <option value="">Lọc theo shop</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -604,6 +638,7 @@
                     <tr>
                         <th>Mã ĐH</th>
                         <th>Khách hàng</th>
+                        <th>Shop</th>
                         <th>Ngày đặt</th>
                         <th class="text-end">Tổng tiền</th>
                         <th>Trạng thái</th>
@@ -612,7 +647,7 @@
                 </thead>
                 <tbody id="orders-table-body">
                     <tr>
-                        <td colspan="6" class="text-center py-4">
+                        <td colspan="7" class="text-center py-4">
                             <div class="spinner-border" role="status">
                                 <span class="visually-hidden">Đang tải...</span>
                             </div>
@@ -741,7 +776,7 @@ function showNotification(message, type = 'info') {
 
 function showError(message) {
     const tableBody = document.getElementById('orders-table-body');
-    tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><div class="empty-state"><div class="empty-state-icon">⚠️</div><p>${message}</p></div></td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger"><div class="empty-state"><div class="empty-state-icon">⚠️</div><p>${message}</p></div></td></tr>`;
     showNotification(message, 'danger');
 }
 
@@ -761,7 +796,7 @@ function renderTable(ordersToShow) {
     const tableBody = document.getElementById('orders-table-body');
 
     if (!ordersToShow || ordersToShow.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">📦</div><p>Không có đơn hàng</p></div></td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4"><div class="empty-state"><div class="empty-state-icon">📦</div><p>Không có đơn hàng</p></div></td></tr>';
         return;
     }
 
@@ -770,6 +805,7 @@ function renderTable(ordersToShow) {
         const orderId = o.OrderID ?? o.orderID ?? o.orderId ?? o.id ?? '';
         const orderCode = o.OrderCode ?? o.orderCode ?? '';
         const customerName = o.CustomerName ?? o.customerName ?? o.buyerFullName ?? '';
+        const shopName = getShopNamesText(o);
         const orderDate = o.OrderDate ?? o.orderDate ?? '';
         const totalAmount = o.TotalAmount ?? o.totalAmount ?? o.total ?? 0;
         const status = o.Status ?? o.status ?? '';
@@ -788,6 +824,7 @@ function renderTable(ordersToShow) {
             <tr data-order-id="${orderId}">
                 <td><span class="fw-semibold text-primary-blue">${orderCode}</span></td>
                 <td>${customerName}</td>
+                <td>${shopName || '<span class="text-muted">Chưa có shop</span>'}</td>
                 <td>${fmtDate(orderDate)}</td>
                 <td class="text-end"><strong>${vnd(totalAmount)}</strong></td>
                 <td><span class="badge badge-status ${badgeClass}">${getStatusText(status)}</span></td>
@@ -836,6 +873,15 @@ function normalizePaymentMethod(value) {
     return normalized;
 }
 
+function getShopNamesText(data) {
+    const shopNames = data?.ShopNames ?? data?.shopNames;
+    if (Array.isArray(shopNames) && shopNames.length) {
+        return shopNames.join(', ');
+    }
+
+    return data?.ShopName ?? data?.shopName ?? '';
+}
+
 window.viewOrderDetail = function (orderId) {
     currentViewingOrderId = orderId;
     const modalBody = document.getElementById('detailModalBody');
@@ -869,6 +915,7 @@ window.viewOrderDetail = function (orderId) {
                         </div>
                         <div class="col-md-6">
                             <h6 class="fw-bold mb-2">Thông tin đơn hàng</h6>
+                            <p class="mb-1"><strong>Shop:</strong> ${safeText(getShopNamesText(data))}</p>
                             <p class="mb-1"><strong>Ngày đặt:</strong> ${fmtDate(data.orderDate)}</p>
                             <p class="mb-1"><strong>Trạng thái:</strong> ${safeText(data.status)}</p>
                             <p class="mb-1"><strong>Thanh toán:</strong> ${normalizePaymentMethod(data.paymentMethod)}</p>

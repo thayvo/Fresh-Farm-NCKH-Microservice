@@ -22,6 +22,52 @@ namespace FreshFarm.Identity.Api.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("FreshFarm.Identity.Api.Models.AccountApprovalEvent", b =>
+                {
+                    b.Property<long>("AccountApprovalEventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AccountApprovalEventId"));
+
+                    b.Property<int>("ActorUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FromStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)")
+                        .HasDefaultValueSql("(sysutcdatetime())")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_AccountApprovalEvent_OccurredAt");
+
+                    b.Property<string>("ToStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("AccountApprovalEventId");
+
+                    b.HasIndex(new[] { "ActorUserId", "OccurredAt" }, "IX_AccountApprovalEvent_ActorUserId_OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.HasIndex(new[] { "UserId", "OccurredAt" }, "IX_AccountApprovalEvent_UserId_OccurredAt")
+                        .IsDescending(false, true);
+
+                    b.ToTable("AccountApprovalEvent", (string)null);
+                });
+
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.AddressBook", b =>
                 {
                     b.Property<int>("AddressId")
@@ -219,6 +265,63 @@ namespace FreshFarm.Identity.Api.Migrations
                         .IsDescending(false, true);
 
                     b.ToTable("AuthAuditLog", (string)null);
+                });
+
+            modelBuilder.Entity("FreshFarm.Identity.Api.Models.LoginDeviceSecurityState", b =>
+                {
+                    b.Property<long>("LoginDeviceSecurityStateId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("LoginDeviceSecurityStateId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.Property<string>("DeviceKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("FailedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime?>("LastFailedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)");
+
+                    b.Property<int?>("LastUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("LockedUntil")
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)");
+
+                    b.Property<int>("LockoutLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)")
+                        .HasDefaultValueSql("(sysutcdatetime())");
+
+                    b.HasKey("LoginDeviceSecurityStateId");
+
+                    b.HasIndex(new[] { "LastUserId", "LockedUntil" }, "IX_LoginDeviceSecurityState_LastUserId_LockedUntil");
+
+                    b.HasIndex(new[] { "DeviceKeyHash" }, "UX_LoginDeviceSecurityState_DeviceKeyHash")
+                        .IsUnique();
+
+                    b.ToTable("LoginDeviceSecurityState", (string)null);
                 });
 
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.Permission", b =>
@@ -695,6 +798,36 @@ namespace FreshFarm.Identity.Api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
 
+                    b.Property<string>("ApprovalNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ApprovalStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending")
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_ApprovalStatus");
+
+                    b.Property<DateTime?>("ApprovalStatusChangedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)");
+
+                    b.Property<long>("ApprovalVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_ApprovalVersion");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasPrecision(0)
+                        .HasColumnType("datetime2(0)");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Avatar")
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
@@ -748,6 +881,8 @@ namespace FreshFarm.Identity.Api.Migrations
 
                     b.HasKey("UserId");
 
+                    b.HasIndex(new[] { "ApprovalStatus", "CreatedAt" }, "IX_Users_ApprovalStatus_CreatedAt");
+
                     b.HasIndex(new[] { "Email" }, "UQ_Users_Email")
                         .IsUnique();
 
@@ -764,6 +899,14 @@ namespace FreshFarm.Identity.Api.Migrations
                 {
                     b.Property<int>("UserId")
                         .HasColumnType("int");
+
+                    b.Property<string>("ExternalLoginProvider")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ExternalLoginSubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("FailedCount")
                         .HasColumnType("int")
@@ -789,6 +932,17 @@ namespace FreshFarm.Identity.Api.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<string>("PasswordResetNonce")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<int>("TokenVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_TokenVersion");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(0)
@@ -797,6 +951,10 @@ namespace FreshFarm.Identity.Api.Migrations
                         .HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_UpdatedAt");
 
                     b.HasKey("UserId");
+
+                    b.HasIndex(new[] { "ExternalLoginProvider", "ExternalLoginSubject" }, "UX_UserAuth_ExternalLogin")
+                        .IsUnique()
+                        .HasFilter("[ExternalLoginProvider] IS NOT NULL AND [ExternalLoginSubject] IS NOT NULL");
 
                     b.ToTable("UserAuth", (string)null);
                 });
@@ -864,11 +1022,28 @@ namespace FreshFarm.Identity.Api.Migrations
                     b.ToTable("UserSessions");
                 });
 
+            modelBuilder.Entity("FreshFarm.Identity.Api.Models.AccountApprovalEvent", b =>
+                {
+                    b.HasOne("FreshFarm.Identity.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_AccountApprovalEvent_Users_ActorUserId");
+
+                    b.HasOne("FreshFarm.Identity.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_AccountApprovalEvent_Users_UserId");
+                });
+
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.AddressBook", b =>
                 {
                     b.HasOne("FreshFarm.Identity.Api.Models.User", "User")
                         .WithMany("AddressBooks")
-                        .HasForeignKey("FreshFarm.Identity.Api.Models.AddressBook", "UserId")
+                        .HasForeignKey("UserId")
                         .IsRequired()
                         .HasConstraintName("FK_AddressBook_Users");
 
@@ -882,6 +1057,15 @@ namespace FreshFarm.Identity.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("FK_AuthAuditLog_Users");
+                });
+
+            modelBuilder.Entity("FreshFarm.Identity.Api.Models.LoginDeviceSecurityState", b =>
+                {
+                    b.HasOne("FreshFarm.Identity.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("LastUserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("FK_LoginDeviceSecurityState_Users_LastUserId");
                 });
 
             modelBuilder.Entity("FreshFarm.Identity.Api.Models.RolePermission", b =>

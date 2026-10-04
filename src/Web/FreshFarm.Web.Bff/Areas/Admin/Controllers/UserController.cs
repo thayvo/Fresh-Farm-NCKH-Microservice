@@ -32,34 +32,34 @@ public sealed class UserController : LegacySellerControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageUsers(string? userType = "all", string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
+    public async Task<IActionResult> ManageUsers(string? userType = "all", string? searchTerm = null, bool? isActive = null, string? approvalStatus = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, userType, isActive, createdFrom, createdTo, page, pageSize);
+        return await RenderManageUsersAsync(searchTerm, userType, isActive, approvalStatus, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageAdmins(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
+    public async Task<IActionResult> ManageAdmins(string? searchTerm = null, bool? isActive = null, string? approvalStatus = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "admin", isActive, createdFrom, createdTo, page, pageSize);
+        return await RenderManageUsersAsync(searchTerm, "admin", isActive, approvalStatus, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageSellers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
+    public async Task<IActionResult> ManageSellers(string? searchTerm = null, bool? isActive = null, string? approvalStatus = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "seller", isActive, createdFrom, createdTo, page, pageSize);
+        return await RenderManageUsersAsync(searchTerm, "seller", isActive, approvalStatus, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
-    public async Task<IActionResult> ManageBuyers(string? searchTerm = null, bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
+    public async Task<IActionResult> ManageBuyers(string? searchTerm = null, bool? isActive = null, string? approvalStatus = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, "buyer", isActive, createdFrom, createdTo, page, pageSize);
+        return await RenderManageUsersAsync(searchTerm, "buyer", isActive, approvalStatus, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SearchUsers(string? searchTerm, string? userType = "all", bool? isActive = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
+    public async Task<IActionResult> SearchUsers(string? searchTerm, string? userType = "all", bool? isActive = null, string? approvalStatus = null, DateTime? createdFrom = null, DateTime? createdTo = null, int page = 1, int pageSize = DefaultUserPageSize)
     {
-        return await RenderManageUsersAsync(searchTerm, userType, isActive, createdFrom, createdTo, page, pageSize);
+        return await RenderManageUsersAsync(searchTerm, userType, isActive, approvalStatus, createdFrom, createdTo, page, pageSize);
     }
 
     [HttpGet]
@@ -160,10 +160,84 @@ public sealed class UserController : LegacySellerControllerBase
         return Json(new { success = true, message = "Da vo hieu hoa tai khoan nguoi dung." });
     }
 
-    private async Task<IActionResult> RenderManageUsersAsync(string? searchTerm, string? userType, bool? isActive, DateTime? createdFrom, DateTime? createdTo, int page, int pageSize)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> ChangeApproval(int userId, string status, string? note, long? expectedApprovalVersion)
+    {
+        var normalizedStatus = NormalizeApprovalStatus(status, allowAll: false);
+        if (normalizedStatus is null)
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return Json(new { success = false, message = "Trạng thái phê duyệt không hợp lệ." });
+        }
+
+        var normalizedNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        if (normalizedNote?.Length > 500)
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return Json(new { success = false, message = "Lý do không được vượt quá 500 ký tự." });
+        }
+
+        if ((normalizedStatus is "Rejected" or "Suspended") && string.IsNullOrWhiteSpace(normalizedNote))
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return Json(new { success = false, message = "Vui lòng nhập lý do từ chối hoặc đình chỉ tài khoản." });
+        }
+
+        if (expectedApprovalVersion is null || expectedApprovalVersion < 0)
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return Json(new { success = false, message = "Phiên bản phê duyệt không hợp lệ. Vui lòng tải lại danh sách." });
+        }
+
+        var client = CreateAuthorizedClient("Identity");
+        var response = await client.PostAsJsonAsync(
+            $"/auth/admin/users/{userId}/approval",
+            new AdminChangeApprovalApiRequest
+            {
+                Status = normalizedStatus,
+                Note = normalizedNote,
+                ExpectedApprovalVersion = expectedApprovalVersion.Value
+            });
+        if (!response.IsSuccessStatusCode)
+        {
+            Response.StatusCode = (int)response.StatusCode;
+            var message = await ReadApiErrorAsync(response, "Không cập nhật được trạng thái phê duyệt.");
+            return Json(new { success = false, message });
+        }
+
+        var successMessage = normalizedStatus switch
+        {
+            "Approved" => "Đã duyệt tài khoản. Người dùng sẽ có đầy đủ quyền sau lần đăng nhập tiếp theo.",
+            "Pending" => "Đã chuyển tài khoản về trạng thái chờ duyệt và giới hạn ở vai trò Khách.",
+            "Rejected" => "Đã từ chối tài khoản.",
+            "Suspended" => "Đã đình chỉ tài khoản.",
+            _ => "Đã cập nhật trạng thái phê duyệt."
+        };
+        return Json(new { success = true, message = successMessage, approvalStatus = normalizedStatus });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<JsonResult> UnlockLogin(int userId)
+    {
+        var client = CreateAuthorizedClient("Identity");
+        var response = await client.PostAsync($"/auth/admin/users/{userId}/unlock-login", content: null);
+        if (!response.IsSuccessStatusCode)
+        {
+            Response.StatusCode = (int)response.StatusCode;
+            var message = await ReadApiErrorAsync(response, "Không mở khóa đăng nhập được cho tài khoản.");
+            return Json(new { success = false, message });
+        }
+
+        return Json(new { success = true, message = "Đã mở khóa đăng nhập cho tài khoản và các thiết bị liên quan." });
+    }
+
+    private async Task<IActionResult> RenderManageUsersAsync(string? searchTerm, string? userType, bool? isActive, string? approvalStatus, DateTime? createdFrom, DateTime? createdTo, int page, int pageSize)
     {
         var normalizedUserType = NormalizeUserType(userType);
-        var usersTask = GetUsersAsync(searchTerm, normalizedUserType, isActive, createdFrom, createdTo);
+        var normalizedApprovalStatus = NormalizeApprovalStatus(approvalStatus, allowAll: true) ?? "all";
+        var usersTask = GetUsersAsync(searchTerm, normalizedUserType, isActive, normalizedApprovalStatus, createdFrom, createdTo);
         var rolesTask = GetRolesAsync(normalizedUserType);
 
         await Task.WhenAll(usersTask, rolesTask);
@@ -183,6 +257,7 @@ public sealed class UserController : LegacySellerControllerBase
             UserType = normalizedUserType,
             SearchTerm = searchTerm?.Trim() ?? string.Empty,
             IsActive = isActive,
+            ApprovalStatus = normalizedApprovalStatus,
             CreatedFrom = createdFrom?.Date,
             CreatedTo = createdTo?.Date,
             Roles = rolesTask.Result,
@@ -193,7 +268,11 @@ public sealed class UserController : LegacySellerControllerBase
             ActiveUsers = allUsers.Count(x => x.IsActive),
             AdminUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Admin", StringComparison.OrdinalIgnoreCase)),
             SellerUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Seller", StringComparison.OrdinalIgnoreCase)),
-            BuyerUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Customer", StringComparison.OrdinalIgnoreCase))
+            BuyerUsers = allUsers.Count(x => string.Equals(x.Role?.RoleName, "Customer", StringComparison.OrdinalIgnoreCase)),
+            PendingUsers = allUsers.Count(x => string.Equals(x.ApprovalStatus, "Pending", StringComparison.OrdinalIgnoreCase)),
+            ApprovedUsers = allUsers.Count(x => string.Equals(x.ApprovalStatus, "Approved", StringComparison.OrdinalIgnoreCase)),
+            RejectedUsers = allUsers.Count(x => string.Equals(x.ApprovalStatus, "Rejected", StringComparison.OrdinalIgnoreCase)),
+            SuspendedUsers = allUsers.Count(x => string.Equals(x.ApprovalStatus, "Suspended", StringComparison.OrdinalIgnoreCase))
         };
 
         return View("ManageUsers", model);
@@ -209,7 +288,7 @@ public sealed class UserController : LegacySellerControllerBase
         return Math.Min(pageSize, MaxUserPageSize);
     }
 
-    private async Task<List<AdminUserViewModel>> GetUsersAsync(string? searchTerm, string userType, bool? isActive, DateTime? createdFrom, DateTime? createdTo)
+    private async Task<List<AdminUserViewModel>> GetUsersAsync(string? searchTerm, string userType, bool? isActive, string approvalStatus, DateTime? createdFrom, DateTime? createdTo)
     {
         var client = CreateAuthorizedClient("Identity");
 
@@ -225,6 +304,10 @@ public sealed class UserController : LegacySellerControllerBase
         if (isActive.HasValue)
         {
             query += "&isActive=" + (isActive.Value ? "true" : "false");
+        }
+        if (!string.Equals(approvalStatus, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            query += "&approvalStatus=" + Uri.EscapeDataString(approvalStatus);
         }
         if (createdFrom.HasValue)
         {
@@ -257,6 +340,24 @@ public sealed class UserController : LegacySellerControllerBase
 
         var normalized = userType.Trim().ToLowerInvariant();
         return normalized is "all" or "admin" or "seller" or "buyer" ? normalized : "all";
+    }
+
+    private static string? NormalizeApprovalStatus(string? approvalStatus, bool allowAll)
+    {
+        if (string.IsNullOrWhiteSpace(approvalStatus))
+        {
+            return allowAll ? "all" : null;
+        }
+
+        return approvalStatus.Trim().ToLowerInvariant() switch
+        {
+            "all" when allowAll => "all",
+            "pending" => "Pending",
+            "approved" => "Approved",
+            "rejected" => "Rejected",
+            "suspended" => "Suspended",
+            _ => null
+        };
     }
 
     private async Task<List<AdminRoleViewModel>> GetRolesAsync(string userType)
@@ -326,6 +427,14 @@ public sealed class UserController : LegacySellerControllerBase
                     IsActive = dto.role.isActive
                 },
             IsActive = dto.isActive,
+            EmailConfirmed = dto.emailConfirmed,
+            EmailConfirmedAt = dto.emailConfirmedAt,
+            ApprovalStatus = string.IsNullOrWhiteSpace(dto.approvalStatus) ? "Pending" : dto.approvalStatus,
+            ApprovalVersion = dto.approvalVersion,
+            ApprovedAt = dto.approvedAt,
+            ApprovedByUserId = dto.approvedByUserId,
+            ApprovalNote = dto.approvalNote,
+            ApprovalStatusChangedAt = dto.approvalStatusChangedAt,
             LastLogin = dto.lastLogin,
             CreatedDate = dto.created,
             UpdatedDate = dto.updated
@@ -353,6 +462,14 @@ public sealed class UserController : LegacySellerControllerBase
                     isActive = user.Role.IsActive
                 },
             isActive = user.IsActive,
+            emailConfirmed = user.EmailConfirmed,
+            emailConfirmedAt = user.EmailConfirmedAt,
+            approvalStatus = user.ApprovalStatus,
+            approvalVersion = user.ApprovalVersion,
+            approvedAt = user.ApprovedAt,
+            approvedByUserId = user.ApprovedByUserId,
+            approvalNote = user.ApprovalNote,
+            approvalStatusChangedAt = user.ApprovalStatusChangedAt,
             lastLogin = user.LastLogin,
             created = user.CreatedDate,
             updated = user.UpdatedDate
@@ -486,6 +603,22 @@ public sealed class UserController : LegacySellerControllerBase
 
         public bool isActive { get; set; }
 
+        public bool emailConfirmed { get; set; }
+
+        public DateTime? emailConfirmedAt { get; set; }
+
+        public string? approvalStatus { get; set; }
+
+        public long approvalVersion { get; set; }
+
+        public DateTime? approvedAt { get; set; }
+
+        public int? approvedByUserId { get; set; }
+
+        public string? approvalNote { get; set; }
+
+        public DateTime? approvalStatusChangedAt { get; set; }
+
         public DateTime? lastLogin { get; set; }
 
         public DateTime created { get; set; }
@@ -538,5 +671,14 @@ public sealed class UserController : LegacySellerControllerBase
         public bool? IsActive { get; set; }
 
         public int? RoleId { get; set; }
+    }
+
+    private sealed class AdminChangeApprovalApiRequest
+    {
+        public string Status { get; set; } = string.Empty;
+
+        public string? Note { get; set; }
+
+        public long ExpectedApprovalVersion { get; set; }
     }
 }

@@ -34,9 +34,17 @@ public sealed class FinanceConsolePageViewModel
 
     public List<FinanceConsoleRowViewModel> Rows { get; set; } = new();
 
+    public List<FinanceSellerBreakdownViewModel> SellerBreakdown { get; set; } = new();
+
     public List<FinanceOwnerSummaryViewModel> OwnerSummary { get; set; } = new();
 
     public string BulkActionName { get; set; } = string.Empty;
+
+    public string BankName { get; set; } = "Vietcombank";
+
+    public string BankAccountName { get; set; } = "FreshFarm Seller";
+
+    public string BankAccountNumber { get; set; } = "970436000001";
 }
 
 public sealed class FinanceConsoleStatsViewModel
@@ -56,6 +64,14 @@ public sealed class FinanceConsoleStatsViewModel
     public decimal ReconciliationSellerEarning { get; set; }
 
     public decimal WithdrawableAmount { get; set; }
+
+    public decimal PendingSellerPayoutAmount { get; set; }
+
+    public decimal PaidPayoutAmount { get; set; }
+
+    public decimal WithdrawnAmount { get; set; }
+
+    public decimal RemainingWithdrawableAmount { get; set; }
 
     public decimal PendingPayoutAmount { get; set; }
 
@@ -101,6 +117,27 @@ public sealed class FinanceOwnerSummaryViewModel
     public int DueSoonCount { get; set; }
 
     public int NoFollowUpCount { get; set; }
+}
+
+public sealed class FinanceSellerBreakdownViewModel
+{
+    public int SellerId { get; set; }
+
+    public string SellerLabel { get; set; } = string.Empty;
+
+    public int OrderCount { get; set; }
+
+    public decimal GrossMerchandiseValue { get; set; }
+
+    public decimal PlatformCommission { get; set; }
+
+    public decimal SellerEarning { get; set; }
+
+    public decimal PaidAmount { get; set; }
+
+    public decimal PendingAmount { get; set; }
+
+    public decimal UnpaidAmount { get; set; }
 }
 
 public sealed class FinanceConsoleRowViewModel
@@ -192,6 +229,8 @@ internal sealed class FinanceConsoleApiResponse
 
     public List<FinanceConsoleRowApiDto>? Rows { get; set; }
 
+    public List<FinanceSellerBreakdownApiDto>? SellerBreakdown { get; set; }
+
     public List<FinanceOwnerSummaryApiDto>? OwnerSummary { get; set; }
 }
 
@@ -212,6 +251,14 @@ internal sealed class FinanceConsoleStatsApiDto
     public decimal ReconciliationSellerEarning { get; set; }
 
     public decimal WithdrawableAmount { get; set; }
+
+    public decimal PendingSellerPayoutAmount { get; set; }
+
+    public decimal PaidPayoutAmount { get; set; }
+
+    public decimal WithdrawnAmount { get; set; }
+
+    public decimal RemainingWithdrawableAmount { get; set; }
 
     public decimal PendingPayoutAmount { get; set; }
 
@@ -272,6 +319,27 @@ internal sealed class FinanceOwnerSummaryApiDto
     public int DueSoonCount { get; set; }
 
     public int NoFollowUpCount { get; set; }
+}
+
+internal sealed class FinanceSellerBreakdownApiDto
+{
+    public int SellerId { get; set; }
+
+    public string? SellerLabel { get; set; }
+
+    public int OrderCount { get; set; }
+
+    public decimal GrossMerchandiseValue { get; set; }
+
+    public decimal PlatformCommission { get; set; }
+
+    public decimal SellerEarning { get; set; }
+
+    public decimal PaidAmount { get; set; }
+
+    public decimal PendingAmount { get; set; }
+
+    public decimal UnpaidAmount { get; set; }
 }
 
 internal sealed class FinanceConsoleRowApiDto

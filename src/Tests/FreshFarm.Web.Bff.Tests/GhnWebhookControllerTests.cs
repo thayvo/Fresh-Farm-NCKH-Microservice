@@ -1,4 +1,5 @@
 using System.Net;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using FreshFarm.Web.Bff.Controllers;
 using FreshFarm.Web.Bff.Options;
@@ -14,6 +15,81 @@ namespace FreshFarm.Web.Bff.Tests;
 
 public sealed class GhnWebhookControllerTests
 {
+    [Fact]
+    public async Task ReceiveOrderStatus_ReturnsUnauthorized_WhenEnabledButSecretMissing()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var controller = CreateController(
+            orderingHandler,
+            new OrderingServiceOptions
+            {
+                BaseUrl = "https://ordering.test",
+                InternalServiceKey = "internal-key"
+            },
+            new GhnOrderStatusWebhookOptions
+            {
+                Enabled = true,
+                Secret = "   ",
+                DeduplicationWindowSeconds = 300
+            });
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext(string.Empty)
+        };
+
+        var result = await controller.ReceiveOrderStatus(new GhnWebhookController.GhnOrderStatusWebhookRequest
+        {
+            OrderCode = "ORDER-1",
+            Status = "picking",
+            Type = "switch_status",
+            Time = JsonDocument.Parse("\"2026-07-20T10:15:00Z\"").RootElement.Clone()
+        }, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Empty(orderingHandler.Requests);
+    }
+
+    [Fact]
+    public void OptionsValidation_RejectsEnabledWebhookWithoutSecret()
+    {
+        var options = new GhnOrderStatusWebhookOptions
+        {
+            Enabled = true,
+            Secret = "   "
+        };
+        var results = new List<ValidationResult>();
+
+        var isValid = Validator.TryValidateObject(
+            options,
+            new ValidationContext(options),
+            results,
+            validateAllProperties: true);
+
+        Assert.False(isValid);
+        Assert.Contains(results, result => result.MemberNames.Contains(nameof(GhnOrderStatusWebhookOptions.Secret)));
+    }
+
+    [Fact]
+    public void OptionsValidation_AllowsDisabledWebhookWithoutSecret()
+    {
+        var options = new GhnOrderStatusWebhookOptions
+        {
+            Enabled = false,
+            Secret = string.Empty
+        };
+        var results = new List<ValidationResult>();
+
+        var isValid = Validator.TryValidateObject(
+            options,
+            new ValidationContext(options),
+            results,
+            validateAllProperties: true);
+
+        Assert.True(isValid);
+        Assert.Empty(results);
+    }
+
     [Fact]
     public async Task ReceiveOrderStatus_ReturnsUnauthorized_WhenSecretInvalid()
     {
@@ -34,7 +110,7 @@ public sealed class GhnWebhookControllerTests
 
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = BuildHttpContext("?secret=wrong-secret")
+            HttpContext = BuildHttpContext(string.Empty, "wrong-secret")
         };
 
         var result = await controller.ReceiveOrderStatus(new GhnWebhookController.GhnOrderStatusWebhookRequest
@@ -47,6 +123,41 @@ public sealed class GhnWebhookControllerTests
 
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Equal(401, unauthorized.StatusCode);
+        Assert.Empty(orderingHandler.Requests);
+    }
+
+    [Fact]
+    public async Task ReceiveOrderStatus_ReturnsUnauthorized_WhenCorrectSecretIsOnlyInQueryString()
+    {
+        var orderingHandler = new RecordingHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var controller = CreateController(
+            orderingHandler,
+            new OrderingServiceOptions
+            {
+                BaseUrl = "https://ordering.test",
+                InternalServiceKey = "internal-key"
+            },
+            new GhnOrderStatusWebhookOptions
+            {
+                Enabled = true,
+                Secret = "expected-secret",
+                DeduplicationWindowSeconds = 300
+            });
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext("?secret=expected-secret")
+        };
+
+        var result = await controller.ReceiveOrderStatus(new GhnWebhookController.GhnOrderStatusWebhookRequest
+        {
+            OrderCode = "ORDER-QUERY-SECRET",
+            Status = "picking",
+            Type = "switch_status",
+            Time = JsonDocument.Parse("\"2026-07-20T10:15:00Z\"").RootElement.Clone()
+        }, CancellationToken.None);
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
         Assert.Empty(orderingHandler.Requests);
     }
 
@@ -84,7 +195,7 @@ public sealed class GhnWebhookControllerTests
 
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = BuildHttpContext("?secret=expected-secret")
+            HttpContext = BuildHttpContext(string.Empty, "expected-secret")
         };
 
         var firstResult = await controller.ReceiveOrderStatus(payload, CancellationToken.None);
@@ -104,10 +215,107 @@ public sealed class GhnWebhookControllerTests
         Assert.Contains("internal-key", keyValues);
     }
 
+    [Fact]
+    public async Task ReceiveOrderStatus_AllowsRetryAfterPersistenceFailure_ThenDeduplicatesAfterSuccess()
+    {
+        var attempt = 0;
+        var orderingHandler = new RecordingHttpMessageHandler(_ =>
+        {
+            attempt++;
+            return new HttpResponseMessage(attempt == 1
+                ? HttpStatusCode.ServiceUnavailable
+                : HttpStatusCode.OK)
+            {
+                Content = new StringContent(attempt == 1
+                    ? "temporary failure"
+                    : "{\"success\":true}")
+            };
+        });
+        var controller = CreateController(
+            orderingHandler,
+            new OrderingServiceOptions
+            {
+                BaseUrl = "https://ordering.test",
+                InternalServiceKey = "internal-key"
+            },
+            new GhnOrderStatusWebhookOptions
+            {
+                Enabled = true,
+                Secret = "expected-secret",
+                DeduplicationWindowSeconds = 300
+            });
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext(string.Empty, "expected-secret")
+        };
+        var payload = new GhnWebhookController.GhnOrderStatusWebhookRequest
+        {
+            OrderCode = $"ORDER-RETRY-{Guid.NewGuid():N}",
+            Status = "picking",
+            Type = "switch_status",
+            Time = JsonDocument.Parse("\"2026-07-20T10:15:00Z\"").RootElement.Clone()
+        };
+
+        var failedResult = await controller.ReceiveOrderStatus(payload, CancellationToken.None);
+        var successfulRetry = await controller.ReceiveOrderStatus(payload, CancellationToken.None);
+        var duplicateRetry = await controller.ReceiveOrderStatus(payload, CancellationToken.None);
+
+        var failure = Assert.IsType<ObjectResult>(failedResult);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, failure.StatusCode);
+        Assert.False(ReadBooleanProperty(Assert.IsType<OkObjectResult>(successfulRetry).Value, "duplicate"));
+        Assert.True(ReadBooleanProperty(Assert.IsType<OkObjectResult>(duplicateRetry).Value, "duplicate"));
+        Assert.Equal(2, orderingHandler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ReceiveOrderStatus_SerializesConcurrentCopies_AndPersistsOnlyOnce()
+    {
+        using var sharedCache = new MemoryCache(new MemoryCacheOptions());
+        var orderingHandler = new DelayedCountingHttpMessageHandler();
+        var orderingOptions = new OrderingServiceOptions
+        {
+            BaseUrl = "https://ordering.test",
+            InternalServiceKey = "internal-key"
+        };
+        var webhookOptions = new GhnOrderStatusWebhookOptions
+        {
+            Enabled = true,
+            Secret = "expected-secret",
+            DeduplicationWindowSeconds = 300
+        };
+        var firstController = CreateController(orderingHandler, orderingOptions, webhookOptions, sharedCache);
+        var secondController = CreateController(orderingHandler, orderingOptions, webhookOptions, sharedCache);
+        firstController.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext(string.Empty, "expected-secret")
+        };
+        secondController.ControllerContext = new ControllerContext
+        {
+            HttpContext = BuildHttpContext(string.Empty, "expected-secret")
+        };
+        var payload = new GhnWebhookController.GhnOrderStatusWebhookRequest
+        {
+            OrderCode = $"ORDER-CONCURRENT-{Guid.NewGuid():N}",
+            Status = "picking",
+            Type = "switch_status",
+            Time = JsonDocument.Parse("\"2026-07-20T10:15:00Z\"").RootElement.Clone()
+        };
+
+        var results = await Task.WhenAll(
+            firstController.ReceiveOrderStatus(payload, CancellationToken.None),
+            secondController.ReceiveOrderStatus(payload, CancellationToken.None));
+
+        Assert.Equal(1, orderingHandler.RequestCount);
+        var okResults = results.Select(Assert.IsType<OkObjectResult>).ToArray();
+        Assert.Single(okResults, result => !ReadBooleanProperty(result.Value, "duplicate"));
+        Assert.Single(okResults, result => ReadBooleanProperty(result.Value, "duplicate"));
+    }
+
     private static GhnWebhookController CreateController(
-        RecordingHttpMessageHandler orderingHandler,
+        HttpMessageHandler orderingHandler,
         OrderingServiceOptions orderingOptions,
-        GhnOrderStatusWebhookOptions webhookOptions)
+        GhnOrderStatusWebhookOptions webhookOptions,
+        IMemoryCache? memoryCache = null)
     {
         var orderingClient = new HttpClient(orderingHandler)
         {
@@ -119,14 +327,19 @@ public sealed class GhnWebhookControllerTests
             new FakeGhnSandboxService(),
             new StaticOptionsMonitor<OrderingServiceOptions>(orderingOptions),
             new StaticOptionsMonitor<GhnOrderStatusWebhookOptions>(webhookOptions),
-            new MemoryCache(new MemoryCacheOptions()),
+            memoryCache ?? new MemoryCache(new MemoryCacheOptions()),
             NullLogger<GhnWebhookController>.Instance);
     }
 
-    private static DefaultHttpContext BuildHttpContext(string queryString)
+    private static DefaultHttpContext BuildHttpContext(string queryString, string? headerSecret = null)
     {
         var context = new DefaultHttpContext();
         context.Request.QueryString = new QueryString(queryString);
+        if (!string.IsNullOrWhiteSpace(headerSecret))
+        {
+            context.Request.Headers["X-Webhook-Secret"] = headerSecret;
+        }
+
         return context;
     }
 
@@ -205,6 +418,25 @@ public sealed class GhnWebhookControllerTests
             }
 
             return clone;
+        }
+    }
+
+    private sealed class DelayedCountingHttpMessageHandler : HttpMessageHandler
+    {
+        private int _requestCount;
+
+        public int RequestCount => Volatile.Read(ref _requestCount);
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _requestCount);
+            await Task.Delay(75, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"success\":true}")
+            };
         }
     }
 }

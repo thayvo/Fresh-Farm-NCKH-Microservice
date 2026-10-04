@@ -56,6 +56,75 @@ public sealed class AuthControllerTests
     }
 
     [Fact]
+    public async Task Login_ReturnsRestrictedGuestToken_WhenConfirmedAccountIsPendingApproval()
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(
+            db,
+            userId: 31,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: true,
+            approvalStatus: AccountApprovalStatus.Pending);
+        var controller = CreateController(db);
+
+        var result = await controller.Login(new LoginRequest
+        {
+            Identifier = "customer31",
+            Password = "Secret123!",
+            ClientLane = "Customer",
+            DeviceId = "pending-device-31"
+        });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthResponse>(ok.Value);
+        Assert.Equal("pending", response.AccountAccess);
+        Assert.Equal(AccountApprovalStatus.Pending, response.ApprovalStatus);
+        Assert.True(response.IsPendingApproval);
+        Assert.Contains("chờ quản trị viên phê duyệt", response.AccountStatusMessage);
+
+        var jwt = new JsonWebToken(response.AccessToken);
+        Assert.Equal("pending", jwt.Claims.Single(x => x.Type == "account_access").Value);
+        Assert.Equal(AccountApprovalStatus.Pending, jwt.Claims.Single(x => x.Type == "approval_status").Value);
+        var roles = jwt.Claims
+            .Where(x => x.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Value)
+            .ToArray();
+        Assert.Equal(new[] { "Guest" }, roles);
+        Assert.DoesNotContain("Customer", roles);
+    }
+
+    [Theory]
+    [InlineData(AccountApprovalStatus.Rejected, "account_rejected")]
+    [InlineData(AccountApprovalStatus.Suspended, "account_suspended")]
+    public async Task Login_ReturnsForbidden_WhenAccountApprovalStatusBlocksAccess(string approvalStatus, string expectedCode)
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(
+            db,
+            userId: approvalStatus == AccountApprovalStatus.Rejected ? 32 : 33,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: true,
+            approvalStatus: approvalStatus);
+        var controller = CreateController(db);
+
+        var result = await controller.Login(new LoginRequest
+        {
+            Identifier = approvalStatus == AccountApprovalStatus.Rejected ? "customer32" : "customer33",
+            Password = "Secret123!",
+            ClientLane = "Customer",
+            DeviceId = $"blocked-{approvalStatus.ToLowerInvariant()}"
+        });
+
+        var forbidden = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status403Forbidden, forbidden.StatusCode);
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(forbidden.Value));
+        Assert.Equal(expectedCode, json.RootElement.GetProperty("code").GetString());
+        Assert.Equal(approvalStatus, json.RootElement.GetProperty("approvalStatus").GetString());
+    }
+
+    [Fact]
     public async Task Login_ReturnsUnauthorized_WhenLaneAccessDenied()
     {
         await using var db = CreateDbContext();
@@ -74,7 +143,7 @@ public sealed class AuthControllerTests
     }
 
     [Fact]
-    public async Task Login_ReturnsUnauthorized_WithRemainingAttempts_WhenPasswordIncorrect()
+    public async Task Login_ReturnsGenericUnauthorized_WhenPasswordIncorrect()
     {
         await using var db = CreateDbContext();
         await SeedUserAsync(db, userId: 3, roleName: "Customer", password: "Secret123!", emailConfirmed: true);
@@ -88,11 +157,29 @@ public sealed class AuthControllerTests
         });
 
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
-        Assert.Equal("Tài khoản hoặc mật khẩu không đúng. Bạn còn 4 lần thử trước khi tài khoản bị khóa tạm thời.", unauthorized.Value);
+        Assert.Equal("Tài khoản hoặc mật khẩu không đúng.", unauthorized.Value);
 
         var userAuth = await db.UserAuths.SingleAsync(x => x.UserId == 3);
         Assert.Equal(1, userAuth.FailedCount);
         Assert.Null(userAuth.LockedUntil);
+    }
+
+    [Fact]
+    public async Task Login_ReturnsSameGenericUnauthorized_WhenAccountDoesNotExist()
+    {
+        await using var db = CreateDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.Login(new LoginRequest
+        {
+            Identifier = "missing-user@example.test",
+            Password = "WrongPassword!",
+            ClientLane = "Customer"
+        });
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result);
+        Assert.Equal("Tài khoản hoặc mật khẩu không đúng.", unauthorized.Value);
+        Assert.Equal(1, await db.LoginDeviceSecurityStates.Select(x => x.FailedCount).SingleAsync());
     }
 
     [Fact]
@@ -127,6 +214,60 @@ public sealed class AuthControllerTests
         Assert.Equal(5, userAuth.FailedCount);
         Assert.Equal(1, userAuth.LockoutLevel);
         Assert.True(userAuth.LockedUntil > DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task Login_LocksDeviceAndAccount_OnFifthBadPassword()
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(db, userId: 34, roleName: "Customer", password: "Secret123!", emailConfirmed: true);
+        var controller = CreateController(db);
+        const string deviceId = "stable-device-34";
+
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            var attemptResult = await controller.Login(new LoginRequest
+            {
+                Identifier = "customer34",
+                Password = "WrongPassword!",
+                ClientLane = "Customer",
+                DeviceId = deviceId
+            });
+
+            Assert.IsType<UnauthorizedObjectResult>(attemptResult);
+        }
+
+        var fifthResult = await controller.Login(new LoginRequest
+        {
+            Identifier = "customer34",
+            Password = "WrongPassword!",
+            ClientLane = "Customer",
+            DeviceId = deviceId
+        });
+
+        var locked = Assert.IsType<ObjectResult>(fifthResult);
+        Assert.Equal(StatusCodes.Status423Locked, locked.StatusCode);
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(locked.Value));
+        Assert.Equal("account_and_device", json.RootElement.GetProperty("lockScope").GetString());
+
+        var userAuth = await db.UserAuths.SingleAsync(x => x.UserId == 34);
+        Assert.Equal(5, userAuth.FailedCount);
+        Assert.True(userAuth.LockedUntil > DateTime.UtcNow);
+
+        var deviceState = await db.LoginDeviceSecurityStates.SingleAsync();
+        Assert.Equal(5, deviceState.FailedCount);
+        Assert.Equal(34, deviceState.LastUserId);
+        Assert.True(deviceState.LockedUntil > DateTime.UtcNow);
+
+        var blockedBeforePasswordCheck = await controller.Login(new LoginRequest
+        {
+            Identifier = "customer34",
+            Password = "Secret123!",
+            ClientLane = "Customer",
+            DeviceId = deviceId
+        });
+        var stillLocked = Assert.IsType<ObjectResult>(blockedBeforePasswordCheck);
+        Assert.Equal(StatusCodes.Status423Locked, stillLocked.StatusCode);
     }
 
     [Theory]
@@ -302,7 +443,8 @@ public sealed class AuthControllerTests
         using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
         Assert.True(json.RootElement.GetProperty("success").GetBoolean());
         Assert.True(json.RootElement.GetProperty("alreadyConfirmed").GetBoolean());
-        Assert.Equal("Email của bạn đã được xác minh trước đó.", json.RootElement.GetProperty("message").GetString());
+        Assert.Equal(AccountApprovalStatus.Approved, json.RootElement.GetProperty("approvalStatus").GetString());
+        Assert.Equal("Email của bạn đã được xác minh trước đó và tài khoản đã được phê duyệt.", json.RootElement.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -404,7 +546,13 @@ public sealed class AuthControllerTests
     public async Task VerifyEmail_ConfirmsEmail_WhenTokenValid()
     {
         await using var db = CreateDbContext();
-        await SeedUserAsync(db, userId: 13, roleName: "Customer", password: "Secret123!", emailConfirmed: false);
+        await SeedUserAsync(
+            db,
+            userId: 13,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: false,
+            approvalStatus: AccountApprovalStatus.Pending);
         var controller = CreateController(db);
 
         var result = await controller.VerifyEmail(new VerifyEmailRequest
@@ -416,7 +564,8 @@ public sealed class AuthControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
         Assert.True(json.RootElement.GetProperty("success").GetBoolean());
-        Assert.Equal("Xác minh email thành công. Bạn có thể đăng nhập.", json.RootElement.GetProperty("message").GetString());
+        Assert.Equal(AccountApprovalStatus.Pending, json.RootElement.GetProperty("approvalStatus").GetString());
+        Assert.Equal("Xác minh email thành công. Bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt.", json.RootElement.GetProperty("message").GetString());
 
         var user = await db.Users.SingleAsync(x => x.UserId == 13);
         Assert.True(user.EmailConfirmed);
@@ -645,7 +794,7 @@ public sealed class AuthControllerTests
     }
 
     [Fact]
-    public async Task Register_CreatesUserAndSendsVerificationEmail_WhenRequestValid()
+    public async Task Register_IgnoresRequestedAdminRoleAndCreatesPendingCustomerWithVerificationEmail()
     {
         await using var db = CreateDbContext();
         await SeedRoleAsync(db, roleId: 100, roleName: "Customer");
@@ -667,26 +816,34 @@ public sealed class AuthControllerTests
             Phone = "0912345678",
             Password = "Secret123!",
             ConfirmPassword = "Secret123!",
-            RoleName = "Customer"
+            RoleName = "Admin"
         });
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
         Assert.True(json.RootElement.GetProperty("EmailVerificationRequired").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("AdminApprovalRequired").GetBoolean());
+        Assert.Equal(AccountApprovalStatus.Pending, json.RootElement.GetProperty("ApprovalStatus").GetString());
         Assert.True(json.RootElement.GetProperty("VerificationEmailSent").GetBoolean());
-        Assert.Equal("Tài khoản đã được tạo. Vui lòng kiểm tra email để xác minh trước khi đăng nhập.", json.RootElement.GetProperty("Message").GetString());
+        Assert.Equal("Tài khoản đã được tạo. Vui lòng xác minh email; sau đó bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt.", json.RootElement.GetProperty("Message").GetString());
         Assert.Equal("newcustomer@example.com", json.RootElement.GetProperty("Email").GetString());
         Assert.Equal("newcustomer", json.RootElement.GetProperty("UserName").GetString());
         Assert.Equal("Customer", json.RootElement.GetProperty("RoleName").GetString());
 
-        var user = await db.Users.Include(x => x.UserAuth).Include(x => x.UserRoles).SingleAsync(x => x.Email == "newcustomer@example.com");
+        var user = await db.Users
+            .Include(x => x.UserAuth)
+            .Include(x => x.UserRoles)
+            .ThenInclude(x => x.Role)
+            .SingleAsync(x => x.Email == "newcustomer@example.com");
         Assert.Equal("newcustomer", user.UserName);
         Assert.Equal("New Customer", user.FullName);
         Assert.Equal("0912345678", user.Phone);
         Assert.False(user.EmailConfirmed);
+        Assert.Equal(AccountApprovalStatus.Pending, user.ApprovalStatus);
         Assert.True(user.IsActive);
         Assert.Single(user.UserRoles);
         Assert.Equal(100, user.UserRoles.Single().RoleId);
+        Assert.Equal("Customer", user.UserRoles.Single().Role.RoleName);
         Assert.NotNull(user.UserAuth);
 
         Assert.Equal("newcustomer@example.com", emailSender.LastVerificationEmailTo);
@@ -766,6 +923,7 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = string.Empty,
+            ProviderSubject = "google-sub-invalid-provider",
             Email = "user@example.com",
             FullName = "External User"
         }, CancellationToken.None);
@@ -784,12 +942,33 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Facebook",
+            ProviderSubject = "facebook-sub-1",
             Email = "user@example.com",
             FullName = "External User"
         }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Hiện tại hệ thống chỉ hỗ trợ đăng nhập Google.", badRequest.Value);
+    }
+
+    [Fact]
+    public async Task ExternalLogin_ReturnsBadRequest_WhenGoogleEmailIsNotVerified()
+    {
+        await using var db = CreateDbContext();
+        var controller = CreateController(db);
+
+        var result = await controller.ExternalLogin(new ExternalLoginRequest
+        {
+            Provider = "Google",
+            ProviderSubject = "google-sub-unverified",
+            Email = "unverified@example.com",
+            EmailVerified = false,
+            FullName = "Unverified Google User"
+        }, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Google chưa xác minh địa chỉ email này.", badRequest.Value);
+        Assert.False(await db.Users.AnyAsync());
     }
 
     [Fact]
@@ -801,7 +980,9 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Google",
+            ProviderSubject = "google-sub-role-missing",
             Email = "google-new@example.com",
+            EmailVerified = true,
             FullName = "Google New User",
             AvatarUrl = "https://avatar.test/google-new.png"
         }, CancellationToken.None);
@@ -821,7 +1002,9 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Google",
+            ProviderSubject = "google-sub-create",
             Email = "google-create@example.com",
+            EmailVerified = true,
             FullName = "Google Create User",
             AvatarUrl = "https://avatar.test/google-create.png"
         }, CancellationToken.None);
@@ -830,14 +1013,19 @@ public sealed class AuthControllerTests
         var response = Assert.IsType<AuthResponse>(ok.Value);
         Assert.False(response.RequiresTwoFactor);
         Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
+        Assert.Equal("pending", response.AccountAccess);
+        Assert.True(response.IsPendingApproval);
 
         var user = await db.Users.Include(x => x.UserAuth).Include(x => x.UserRoles).SingleAsync(x => x.Email == "google-create@example.com");
         Assert.Equal("Google Create User", user.FullName);
         Assert.Equal("https://avatar.test/google-create.png", user.Avatar);
         Assert.True(user.EmailConfirmed);
+        Assert.Equal(AccountApprovalStatus.Pending, user.ApprovalStatus);
         Assert.NotNull(user.EmailConfirmedAt);
         Assert.True(user.IsActive);
         Assert.NotNull(user.UserAuth);
+        Assert.Equal("Google", user.UserAuth.ExternalLoginProvider);
+        Assert.Equal("google-sub-create", user.UserAuth.ExternalLoginSubject);
         Assert.Single(user.UserRoles);
         Assert.Equal(105, user.UserRoles.Single().RoleId);
         Assert.Matches(@"^0\d{9}$", user.Phone);
@@ -860,7 +1048,9 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Google",
+            ProviderSubject = "google-sub-inactive",
             Email = "customer22@example.com",
+            EmailVerified = true,
             FullName = "Inactive Google User"
         }, CancellationToken.None);
 
@@ -884,7 +1074,9 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Google",
+            ProviderSubject = "google-sub-locked",
             Email = "customer23@example.com",
+            EmailVerified = true,
             FullName = "Locked Google User"
         }, CancellationToken.None);
 
@@ -910,7 +1102,10 @@ public sealed class AuthControllerTests
         var result = await controller.ExternalLogin(new ExternalLoginRequest
         {
             Provider = "Google",
+            ProviderSubject = "google-sub-existing",
             Email = "customer24@example.com",
+            EmailVerified = true,
+            HostedDomain = "example.com",
             FullName = "Google Updated Name",
             AvatarUrl = "https://avatar.test/customer24.png"
         }, CancellationToken.None);
@@ -919,13 +1114,106 @@ public sealed class AuthControllerTests
         var response = Assert.IsType<AuthResponse>(ok.Value);
         Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
 
-        var user = await db.Users.Include(x => x.UserRoles).SingleAsync(x => x.UserId == 24);
+        var user = await db.Users.Include(x => x.UserAuth).Include(x => x.UserRoles).SingleAsync(x => x.UserId == 24);
         Assert.Equal("Google Updated Name", user.FullName);
         Assert.Equal("https://avatar.test/customer24.png", user.Avatar);
         Assert.True(user.EmailConfirmed);
         Assert.NotNull(user.EmailConfirmedAt);
         Assert.NotNull(user.UpdatedAt);
+        Assert.Equal("Google", user.UserAuth.ExternalLoginProvider);
+        Assert.Equal("google-sub-existing", user.UserAuth.ExternalLoginSubject);
         Assert.Single(user.UserRoles);
+    }
+
+    [Fact]
+    public async Task ExternalLogin_ResolvesExistingAccountByBoundSubject_NotIncomingEmail()
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(
+            db,
+            userId: 25,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: true);
+        var userAuth = await db.UserAuths.SingleAsync(x => x.UserId == 25);
+        userAuth.ExternalLoginProvider = "Google";
+        userAuth.ExternalLoginSubject = "google-sub-stable";
+        await db.SaveChangesAsync();
+        var controller = CreateController(db);
+
+        var result = await controller.ExternalLogin(new ExternalLoginRequest
+        {
+            Provider = "Google",
+            ProviderSubject = "google-sub-stable",
+            Email = "changed-address@example.net",
+            EmailVerified = true,
+            FullName = "Same Google User"
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<AuthResponse>(ok.Value);
+        var jwt = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler().ReadJwtToken(response.AccessToken);
+        Assert.Equal("25", jwt.Claims.Single(x => x.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub).Value);
+        Assert.Single(await db.Users.ToListAsync());
+        Assert.Equal("customer25@example.com", (await db.Users.SingleAsync()).Email);
+    }
+
+    [Fact]
+    public async Task ExternalLogin_ReturnsConflict_WhenEmailIsBoundToDifferentGoogleSubject()
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(
+            db,
+            userId: 26,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: true);
+        var userAuth = await db.UserAuths.SingleAsync(x => x.UserId == 26);
+        userAuth.ExternalLoginProvider = "Google";
+        userAuth.ExternalLoginSubject = "google-sub-original";
+        await db.SaveChangesAsync();
+        var controller = CreateController(db);
+
+        var result = await controller.ExternalLogin(new ExternalLoginRequest
+        {
+            Provider = "Google",
+            ProviderSubject = "google-sub-attacker",
+            Email = "customer26@example.com",
+            EmailVerified = true,
+            HostedDomain = "example.com",
+            FullName = "Different Google User"
+        }, CancellationToken.None);
+
+        var conflict = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
+        Assert.Equal("Email này đã được liên kết với một tài khoản Google khác.", conflict.Value);
+        Assert.Equal("google-sub-original", (await db.UserAuths.SingleAsync(x => x.UserId == 26)).ExternalLoginSubject);
+    }
+
+    [Fact]
+    public async Task ExternalLogin_DoesNotAutoLinkLegacyThirdPartyEmailWithoutHostedDomain()
+    {
+        await using var db = CreateDbContext();
+        await SeedUserAsync(
+            db,
+            userId: 27,
+            roleName: "Customer",
+            password: "Secret123!",
+            emailConfirmed: true);
+        var controller = CreateController(db);
+
+        var result = await controller.ExternalLogin(new ExternalLoginRequest
+        {
+            Provider = "Google",
+            ProviderSubject = "google-sub-third-party",
+            Email = "customer27@example.com",
+            EmailVerified = true,
+            FullName = "Third Party Email User"
+        }, CancellationToken.None);
+
+        var conflict = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
+        Assert.Null((await db.UserAuths.SingleAsync(x => x.UserId == 27)).ExternalLoginSubject);
     }
 
     [Fact]
@@ -1002,7 +1290,7 @@ public sealed class AuthControllerTests
     }
 
     [Fact]
-    public async Task Register_ReturnsBadRequest_WhenRoleNotFound()
+    public async Task Register_ReturnsBadRequest_WhenServerControlledCustomerRoleNotFound()
     {
         await using var db = CreateDbContext();
         var controller = CreateController(db);
@@ -1019,7 +1307,7 @@ public sealed class AuthControllerTests
         });
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("Vai trò Seller không tìm thấy.", badRequest.Value);
+        Assert.Equal("Vai trò Customer không tìm thấy.", badRequest.Value);
         Assert.False(await db.Users.AnyAsync(x => x.Email == "missingrole@example.com"));
     }
 
@@ -1042,11 +1330,16 @@ public sealed class AuthControllerTests
         Assert.False(response.RequiresTwoFactor);
         Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
         Assert.True(response.ExpiredAtUtc > DateTime.UtcNow);
+        Assert.Equal("full", response.AccountAccess);
+        Assert.Equal(AccountApprovalStatus.Approved, response.ApprovalStatus);
+        Assert.False(response.IsPendingApproval);
 
         var jwt = new JsonWebToken(response.AccessToken);
         Assert.Equal("16", jwt.Subject);
         Assert.Equal("customer16@example.com", jwt.Claims.Single(x => x.Type == JwtRegisteredClaimNames.Email).Value);
         Assert.Equal("customer16", jwt.Claims.Single(x => x.Type == "username").Value);
+        Assert.Equal("full", jwt.Claims.Single(x => x.Type == "account_access").Value);
+        Assert.Equal(AccountApprovalStatus.Approved, jwt.Claims.Single(x => x.Type == "approval_status").Value);
         Assert.Contains("Customer", jwt.Claims.Where(x => x.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase)).Select(x => x.Value));
     }
 
@@ -1070,6 +1363,7 @@ public sealed class AuthControllerTests
             twoFactorLoginTicketService ?? new FakeTwoFactorLoginTicketService(),
             accountEmailSender ?? new FakeAccountEmailSender(),
             new FakeAuthAuditService(),
+            new LoginDeviceSecurityService(db),
             Microsoft.Extensions.Options.Options.Create(new PasswordResetOptions
             {
                 ResetUrlBase = passwordResetUrlBase ?? string.Empty,
@@ -1122,7 +1416,8 @@ public sealed class AuthControllerTests
         string? mfaSecret = null,
         bool isActive = true,
         string? fullName = null,
-        string? avatar = null)
+        string? avatar = null,
+        string approvalStatus = AccountApprovalStatus.Approved)
     {
         var role = new Role
         {
@@ -1141,6 +1436,7 @@ public sealed class AuthControllerTests
             Email = $"customer{userId}@example.com",
             Phone = $"01234567{userId:00}",
             EmailConfirmed = emailConfirmed,
+            ApprovalStatus = approvalStatus,
             IsActive = isActive,
             Avatar = avatar,
             CreatedAt = DateTime.UtcNow
@@ -1311,6 +1607,9 @@ public sealed class AuthControllerTests
             LastVerificationExpiresInMinutes = expiresInMinutes;
             return Task.CompletedTask;
         }
+
+        public Task SendAccountApprovalResultAsync(string toEmail, string? toName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
 
         public Task SendSellerApplicationReviewAsync(string toEmail, string? toName, string? storeName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default)
         {

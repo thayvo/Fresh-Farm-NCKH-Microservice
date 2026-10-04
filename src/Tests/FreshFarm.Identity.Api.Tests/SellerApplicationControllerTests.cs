@@ -162,7 +162,7 @@ public sealed class SellerApplicationControllerTests
         var result = await controller.ApproveSeller(203, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("Hồ sơ KYC chưa đầy đủ. Cần đủ thông tin CCCD và ảnh CCCD hai mặt trước khi duyệt người bán.", badRequest.Value);
+        Assert.Equal("Hồ sơ người bán chưa đầy đủ. Cần đủ thông tin cửa hàng, thông tin CCCD và ảnh CCCD hai mặt trước khi duyệt người bán.", badRequest.Value);
         Assert.False(await db.UserRoles.AnyAsync(x => x.UserId == 203 && x.RoleId == 2));
     }
 
@@ -557,6 +557,9 @@ public sealed class SellerApplicationControllerTests
             => Task.CompletedTask;
 
         public Task SendEmailVerificationAsync(string toEmail, string? toName, string verifyUrl, int expiresInMinutes, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task SendAccountApprovalResultAsync(string toEmail, string? toName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
         public Task SendSellerApplicationReviewAsync(string toEmail, string? toName, string? storeName, bool isApproved, string? reviewNote, CancellationToken cancellationToken = default)
