@@ -1,0 +1,354 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Runtime.CompilerServices;
+using System.Security.Claims;
+using System.Text.Json;
+using FreshFarm.Web.Bff.Areas.Admin.Controllers;
+using FreshFarm.Web.Bff.Areas.Admin.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
+using Xunit;
+
+namespace FreshFarm.Web.Bff.Tests;
+
+public sealed class UserControllerTests
+{
+    [Fact]
+    public void AdminSidebar_ExposesOnlyUnifiedUserManagementMenu()
+    {
+        var sidebar = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "Shared",
+            "_SideBar.cshtml"));
+
+        Assert.Contains("Quản lý người dùng", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageAdmins", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageSellers", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageBuyers", sidebar, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageCustomers", sidebar, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminManageUsers_ExposesViewDetailsAction()
+    {
+        var view = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "User",
+            "ManageUsers.cshtml"));
+
+        Assert.Contains("js-view", view, StringComparison.Ordinal);
+        Assert.Contains("bi bi-eye", view, StringComparison.Ordinal);
+        Assert.Contains("viewUserModal", view, StringComparison.Ordinal);
+        Assert.Contains("Chi tiết tài khoản", view, StringComparison.Ordinal);
+        Assert.Contains("GetUserById", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminManageUsers_ApprovalFormCarriesConcurrencyVersion()
+    {
+        var view = File.ReadAllText(Path.Combine(
+            WorkspaceRoot,
+            "src",
+            "Web",
+            "FreshFarm.Web.Bff",
+            "Areas",
+            "Admin",
+            "Views",
+            "User",
+            "ManageUsers.cshtml"));
+
+        Assert.Contains("data-approval-version", view, StringComparison.Ordinal);
+        Assert.Contains("name=\"expectedApprovalVersion\"", view, StringComparison.Ordinal);
+        Assert.Contains("#a_expectedApprovalVersion", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ManageUsers_DedupesDuplicateUsersAndRoles_FromIdentity()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""
+                    [
+                      {
+                        "userId": 18,
+                        "userName": "",
+                        "fullName": "",
+                        "email": "",
+                        "phone": "",
+                        "roleId": 2,
+                        "created": "2026-03-24T00:00:00Z"
+                      },
+                      {
+                        "userId": 18,
+                        "userName": "seller18",
+                        "fullName": "Seller 18",
+                        "email": "seller18@example.com",
+                        "phone": "0912345678",
+                        "roleId": 2,
+                        "role": {
+                          "roleId": 2,
+                          "roleName": "Seller",
+                          "isActive": true
+                        },
+                        "isActive": true,
+                        "created": "2026-03-24T00:00:00Z",
+                        "updated": "2026-03-24T01:00:00Z"
+                      }
+                    ]
+                    """)
+                };
+            }
+
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/roles")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""
+                    [
+                      { "roleId": 2, "roleName": "", "isActive": false },
+                      { "roleId": 2, "roleName": "Seller", "isActive": true }
+                    ]
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.ManageUsers(userType: "seller");
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<AdminUserManagementPageViewModel>(view.Model);
+        var user = Assert.Single(model.Users);
+        var role = Assert.Single(model.Roles);
+
+        Assert.Equal(18, user.AdminID);
+        Assert.Equal("seller18", user.UserName);
+        Assert.Equal("Seller 18", user.FullName);
+        Assert.Equal("seller18@example.com", user.Email);
+        Assert.Equal("Seller", user.Role?.RoleName);
+
+        Assert.Equal(2, role.RoleID);
+        Assert.Equal("Seller", role.RoleName);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task GetUserById_ReturnsUserIdAndRoleId_ForEditForm()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""
+                    {
+                      "userId": 72,
+                      "userName": "buyer72",
+                      "fullName": "Buyer 72",
+                      "email": "buyer72@example.com",
+                      "phone": "0900000072",
+                      "roleId": 3,
+                      "approvalVersion": 12,
+                      "role": {
+                        "roleId": 3,
+                        "roleName": "Customer",
+                        "isActive": true
+                      },
+                      "isActive": true,
+                      "created": "2026-03-24T00:00:00Z"
+                    }
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.GetUserById(72);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var document = JsonDocument.Parse(serialized);
+        var data = document.RootElement.GetProperty("data");
+
+        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(72, data.GetProperty("userId").GetInt32());
+        Assert.Equal(3, data.GetProperty("roleId").GetInt32());
+        Assert.Equal(12, data.GetProperty("approvalVersion").GetInt64());
+        Assert.Equal("buyer72", data.GetProperty("userName").GetString());
+    }
+
+    [Fact]
+    public async Task ChangeApproval_ForwardsExpectedVersionToIdentity()
+    {
+        long? forwardedVersion = null;
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72/approval")
+            {
+                var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                using var document = JsonDocument.Parse(body);
+                forwardedVersion = document.RootElement.GetProperty("expectedApprovalVersion").GetInt64();
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.ChangeApproval(72, "Approved", null, expectedApprovalVersion: 17);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var response = JsonDocument.Parse(serialized);
+        Assert.True(response.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(17, forwardedVersion);
+    }
+
+    [Fact]
+    public async Task ChangeApproval_PropagatesIdentityConflict()
+    {
+        var handler = new RecordingHttpMessageHandler(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/auth/admin/users/72/approval")
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Conflict)
+                {
+                    Content = new StringContent("""
+                    { "code": "approval_conflict", "message": "Tài khoản đã được quản trị viên khác cập nhật." }
+                    """)
+                };
+            }
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        var controller = CreateController(handler);
+
+        var result = await controller.ChangeApproval(72, "Approved", null, expectedApprovalVersion: 3);
+
+        var json = Assert.IsType<JsonResult>(result);
+        var serialized = JsonSerializer.Serialize(json.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var response = JsonDocument.Parse(serialized);
+        Assert.Equal(StatusCodes.Status409Conflict, controller.Response.StatusCode);
+        Assert.False(response.RootElement.GetProperty("success").GetBoolean());
+        Assert.Contains("quản trị viên khác", response.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    private static UserController CreateController(RecordingHttpMessageHandler handler)
+    {
+        var token = CreateAccessToken("7");
+        var client = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://identity.test")
+        };
+
+        var httpContext = new DefaultHttpContext();
+        httpContext.Features.Set<ISessionFeature>(new SessionFeature
+        {
+            Session = new TestSession()
+        });
+        httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.NameIdentifier, "7"),
+            new Claim("ff_access_token", token)
+        ], "TestAuth"));
+
+        return new UserController(new StaticHttpClientFactory(client))
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+    }
+
+    private static string CreateAccessToken(string userId)
+    {
+        var jwt = new JwtSecurityToken(
+            issuer: "FreshFarm.Tests",
+            audience: "FreshFarm.Tests",
+            claims:
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, userId)
+            ]);
+
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
+    }
+
+    private static string WorkspaceRoot { get; } = FindWorkspaceRoot(SourceFilePath());
+
+    private static string SourceFilePath([CallerFilePath] string path = "") => path;
+
+    private static string FindWorkspaceRoot(string startPath)
+    {
+        var current = new FileInfo(startPath).Directory;
+        while (current is not null)
+        {
+            var candidate = Path.Combine(current.FullName, "src", "Web", "FreshFarm.Web.Bff", "FreshFarm.Web.Bff.csproj");
+            if (File.Exists(candidate))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate FreshFarm workspace root.");
+    }
+
+    private sealed class StaticHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
+    {
+        public List<HttpRequestMessage> Requests { get; } = new();
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(new HttpRequestMessage(request.Method, request.RequestUri));
+            return Task.FromResult(responder(request));
+        }
+    }
+
+    private sealed class SessionFeature : ISessionFeature
+    {
+        public ISession Session { get; set; } = null!;
+    }
+
+    private sealed class TestSession : ISession
+    {
+        private readonly Dictionary<string, byte[]> _store = new(StringComparer.Ordinal);
+
+        public IEnumerable<string> Keys => _store.Keys;
+        public string Id { get; } = Guid.NewGuid().ToString("N");
+        public bool IsAvailable => true;
+        public void Clear() => _store.Clear();
+        public Task CommitAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task LoadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public void Remove(string key) => _store.Remove(key);
+        public void Set(string key, byte[] value) => _store[key] = value;
+        public bool TryGetValue(string key, out byte[] value) => _store.TryGetValue(key, out value!);
+    }
+}

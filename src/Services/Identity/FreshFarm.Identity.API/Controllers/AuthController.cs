@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using FreshFarm.Identity.Api.Dtos;
+using FreshFarm.Identity.Api.Infrastructure;
 using FreshFarm.Identity.Api.Models;
 using FreshFarm.Identity.Api.Options;
 using FreshFarm.Identity.Api.Services;
@@ -14,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace FreshFarm.Identity.Api.Controllers
 {
@@ -21,12 +23,23 @@ namespace FreshFarm.Identity.Api.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
+        private const int MaxFailedLoginAttempts = 5;
+        private const int BaseLockoutDurationMinutes = 5;
+        private const string GoogleExternalLoginProvider = "Google";
+        private static readonly Regex VietnamPhoneRegex = new(@"^(0\d{9}|\+84\d{9})$", RegexOptions.Compiled);
+
         private readonly FreshFarmIdentityDBContext _db;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly IConfiguration _config;
         private readonly IPasswordResetTokenService _passwordResetTokenService;
+        private readonly IEmailVerificationTokenService _emailVerificationTokenService;
+        private readonly ITotpService _totpService;
+        private readonly ITwoFactorLoginTicketService _twoFactorLoginTicketService;
         private readonly IAccountEmailSender _accountEmailSender;
+        private readonly IAuthAuditService _authAuditService;
+        private readonly ILoginDeviceSecurityService _loginDeviceSecurityService;
         private readonly PasswordResetOptions _passwordResetOptions;
+        private readonly EmailVerificationOptions _emailVerificationOptions;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(
@@ -34,25 +47,61 @@ namespace FreshFarm.Identity.Api.Controllers
             IPasswordHasher<User> passwordHasher,
             IConfiguration config,
             IPasswordResetTokenService passwordResetTokenService,
+            IEmailVerificationTokenService emailVerificationTokenService,
+            ITotpService totpService,
+            ITwoFactorLoginTicketService twoFactorLoginTicketService,
             IAccountEmailSender accountEmailSender,
+            IAuthAuditService authAuditService,
+            ILoginDeviceSecurityService loginDeviceSecurityService,
             IOptions<PasswordResetOptions> passwordResetOptions,
+            IOptions<EmailVerificationOptions> emailVerificationOptions,
             ILogger<AuthController> logger)
         {
             _db = db;
             _passwordHasher = passwordHasher;
             _config = config;
             _passwordResetTokenService = passwordResetTokenService;
+            _emailVerificationTokenService = emailVerificationTokenService;
+            _totpService = totpService;
+            _twoFactorLoginTicketService = twoFactorLoginTicketService;
             _accountEmailSender = accountEmailSender;
+            _authAuditService = authAuditService;
+            _loginDeviceSecurityService = loginDeviceSecurityService;
             _passwordResetOptions = passwordResetOptions.Value;
+            _emailVerificationOptions = emailVerificationOptions.Value;
             _logger = logger;
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password))
+            if (!TryValidateLoginRequest(request, out var validationProblem))
             {
-                return BadRequest("Vui lòng nhập đầy đủ Email/Username và Mật khẩu");
+                _logger.LogWarning("Tu choi login do thieu du lieu bat buoc.");
+                return validationProblem!;
+            }
+
+            var cancellationToken = HttpContext.RequestAborted;
+            var deviceState = await _loginDeviceSecurityService.GetStateAsync(
+                request.DeviceId,
+                HttpContext,
+                cancellationToken);
+            if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+            {
+                await WriteAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "login_device_locked",
+                    success: false,
+                    "device_locked",
+                    deviceState.FailedCount,
+                    cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status423Locked,
+                    BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, DateTime.UtcNow));
             }
 
             var id = request.Identifier.Trim();
@@ -61,40 +110,414 @@ namespace FreshFarm.Identity.Api.Controllers
                 .Include(u => u.UserAuth)
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .SingleOrDefaultAsync(u => isEmail ? u.Email == id : u.UserName == id);
+                .SingleOrDefaultAsync(u => isEmail ? u.Email == id : u.UserName == id, cancellationToken);
 
             if (user?.UserAuth == null)
             {
+                // Keep the password-work factor closer to the real-account path so the response
+                // does not become a cheap account-enumeration timing oracle.
+                _ = _passwordHasher.HashPassword(new User(), request.Password);
+                deviceState = await _loginDeviceSecurityService.RecordFailureAsync(
+                    request.DeviceId,
+                    HttpContext,
+                    user?.UserId,
+                    cancellationToken);
+                _logger.LogWarning("Dang nhap that bai: khong tim thay tai khoan cho identifier {Identifier}.", MaskIdentifier(id));
+                await WriteAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "login_failed",
+                    success: false,
+                    "account_not_found",
+                    deviceState.FailedCount,
+                    cancellationToken);
+
+                if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                {
+                    return StatusCode(
+                        StatusCodes.Status423Locked,
+                        BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, DateTime.UtcNow));
+                }
+
                 return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
             }
 
-            if (!user.IsActive)
+            var roleNames = GetRoleNames(user);
+
+            var now = DateTime.UtcNow;
+            if (user.UserAuth.LockedUntil.HasValue && user.UserAuth.LockedUntil.Value > now)
             {
-                return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
+                _logger.LogWarning(
+                    "Dang nhap bi chan: userId {UserId} dang khoa tam thoi den {LockedUntil}.",
+                    user.UserId,
+                    user.UserAuth.LockedUntil.Value);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_locked",
+                    success: false,
+                    "account_locked",
+                    user.UserAuth.FailedCount,
+                    cancellationToken);
+                return Unauthorized(BuildLockoutResponse(user.UserAuth.LockedUntil.Value, now));
             }
 
             var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.UserAuth.PasswordHash, request.Password);
             if (verificationResult == PasswordVerificationResult.Failed)
             {
+                deviceState = await _loginDeviceSecurityService.RecordFailureAsync(
+                    request.DeviceId,
+                    HttpContext,
+                    user.UserId,
+                    cancellationToken);
+                var accountFailedCount = deviceState.AccountFailedCount ?? user.UserAuth.FailedCount;
+                var accountLockedUntil = deviceState.AccountLockedUntilUtc;
+
+                if (accountLockedUntil.HasValue && accountLockedUntil.Value > now)
+                {
+                    _logger.LogWarning(
+                        "Tai khoan userId {UserId} bi khoa tam thoi den {LockedUntil} do dang nhap sai nhieu lan.",
+                        user.UserId,
+                        accountLockedUntil);
+                    await WriteAuthAuditAsync(
+                        request,
+                        user,
+                        roleNames,
+                        "login_locked",
+                        success: false,
+                        "too_many_failed_passwords",
+                        accountFailedCount,
+                        cancellationToken);
+
+                    if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                    {
+                        return StatusCode(
+                            StatusCodes.Status423Locked,
+                            BuildCombinedLockoutResponse(
+                                accountLockedUntil.Value,
+                                deviceState.LockedUntilUtc.Value,
+                                now));
+                    }
+
+                    return Unauthorized(BuildLockoutResponse(accountLockedUntil.Value, now));
+                }
+
+                _logger.LogWarning(
+                    "Dang nhap that bai: userId {UserId} sai mat khau lan {FailedCount}/{MaxAttempts}.",
+                    user.UserId,
+                    accountFailedCount,
+                    MaxFailedLoginAttempts);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_failed",
+                    success: false,
+                    "wrong_password",
+                    accountFailedCount,
+                    cancellationToken);
+
+                if (deviceState.IsLocked && deviceState.LockedUntilUtc.HasValue)
+                {
+                    return StatusCode(
+                        StatusCodes.Status423Locked,
+                        BuildDeviceLockoutResponse(deviceState.LockedUntilUtc.Value, now));
+                }
+
                 return Unauthorized("Tài khoản hoặc mật khẩu không đúng.");
             }
 
-            var roleNames = user.UserRoles.Select(ur => ur.Role.RoleName).ToList();
+            if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                user.UserAuth.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
+                user.UserAuth.UpdatedAt = now;
+            }
+
+            if (user.UserAuth.FailedCount > 0 || user.UserAuth.LockedUntil.HasValue || user.UserAuth.LockoutLevel > 0)
+            {
+                user.UserAuth.FailedCount = 0;
+                user.UserAuth.LockedUntil = null;
+                user.UserAuth.LockoutLevel = 0;
+                user.UserAuth.UpdatedAt = now;
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Dang nhap thanh cong va da reset trang thai lockout cho userId {UserId}.", user.UserId);
+            }
+            else if (verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Da rehash mat khau theo cau hinh hien tai cho userId {UserId}.", user.UserId);
+            }
+            else
+            {
+                _logger.LogInformation("Dang nhap thanh cong cho userId {UserId}.", user.UserId);
+            }
+
+            await _loginDeviceSecurityService.ResetAfterSuccessfulCredentialAsync(
+                request.DeviceId,
+                HttpContext,
+                user.UserId,
+                cancellationToken);
+
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Dang nhap that bai: userId {UserId} dang bi vo hieu hoa.", user.UserId);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    "user_inactive",
+                    cancellationToken: cancellationToken);
+                return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+
+            if (!user.EmailConfirmed)
+            {
+                _logger.LogInformation("Dang nhap bi chan: userId {UserId} chua xac minh email.", user.UserId);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    "email_not_confirmed",
+                    cancellationToken: cancellationToken);
+                return Unauthorized("Email của bạn chưa được xác minh. Vui lòng kiểm tra hộp thư và xác minh trước khi đăng nhập.");
+            }
+
+            if (string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.Equals(request.ClientLane, "Customer", StringComparison.OrdinalIgnoreCase))
+                {
+                    await WriteAuthAuditAsync(
+                        request,
+                        user,
+                        roleNames,
+                        "login_failed",
+                        success: false,
+                        "pending_account_wrong_lane",
+                        cancellationToken: cancellationToken);
+                    return Unauthorized(BuildLaneAccessDeniedMessage(request.ClientLane!));
+                }
+
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_restricted_success",
+                    success: true,
+                    "pending_admin_approval",
+                    cancellationToken: cancellationToken);
+
+                return Ok(CreateToken(user, roleNames));
+            }
+
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase))
+            {
+                var approvalFailureReason = ResolveApprovalFailureReason(user.ApprovalStatus);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_blocked",
+                    success: false,
+                    approvalFailureReason,
+                    cancellationToken: cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
+            }
+
+            if (!IsRoleAllowedForLane(request.ClientLane!, roleNames))
+            {
+                _logger.LogWarning(
+                    "Dang nhap bi tu choi: userId {UserId} khong co quyen vao lane {ClientLane}.",
+                    user.UserId,
+                    request.ClientLane);
+                await WriteAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "login_failed",
+                    success: false,
+                    "lane_access_denied",
+                    user.UserAuth.FailedCount,
+                    cancellationToken);
+                return Unauthorized(BuildLaneAccessDeniedMessage(request.ClientLane!));
+            }
+
+            await WriteAuthAuditAsync(
+                request,
+                user,
+                roleNames,
+                "login_success",
+                success: true,
+                null,
+                user.UserAuth.FailedCount,
+                cancellationToken);
+
+            if (RequiresTwoFactor(roleNames))
+            {
+                var requiresSetup = string.IsNullOrWhiteSpace(user.UserAuth.Mfasecret);
+                var setupSecret = requiresSetup ? _totpService.GenerateSecret() : null;
+                var twoFactorTicket = _twoFactorLoginTicketService.CreateTicket(user.UserId, requiresSetup, setupSecret);
+                var accountName = BuildTwoFactorAccountName(user);
+
+                _logger.LogInformation(
+                    "Dang nhap buoc 1 thanh cong cho userId {UserId}; yeu cau {Mode} 2FA.",
+                    user.UserId,
+                    requiresSetup ? "thiet lap" : "xac minh");
+
+                return Ok(new AuthResponse
+                {
+                    RequiresTwoFactor = true,
+                    RequiresTwoFactorSetup = requiresSetup,
+                    TwoFactorTicket = twoFactorTicket,
+                    ManualEntryKey = requiresSetup ? _totpService.FormatManualEntryKey(setupSecret!) : null,
+                    OtpAuthUri = requiresSetup ? _totpService.BuildOtpAuthUri("FreshFarm", accountName, setupSecret!) : null,
+                    AuthenticatorIssuer = "FreshFarm",
+                    AuthenticatorAccountName = accountName,
+                    ChallengeMessage = requiresSetup
+                        ? "Vui lòng thêm mã bảo mật vào ứng dụng xác thực rồi nhập mã 6 số để hoàn tất đăng nhập."
+                        : "Vui lòng nhập mã 6 số từ ứng dụng xác thực để tiếp tục đăng nhập."
+                });
+            }
+
             var token = CreateToken(user, roleNames);
             return Ok(token);
         }
 
+        [HttpPost("login/2fa")]
+        [AllowAnonymous]
+        [InternalBffOnly]
+        public async Task<IActionResult> VerifyTwoFactorLogin([FromBody] VerifyTwoFactorLoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.Ticket) || string.IsNullOrWhiteSpace(request.Code))
+            {
+                if (string.IsNullOrWhiteSpace(request.Ticket))
+                {
+                    ModelState.AddModelError(nameof(request.Ticket), "Phiên xác thực hai bước là bắt buộc.");
+                }
+
+                if (string.IsNullOrWhiteSpace(request.Code))
+                {
+                    ModelState.AddModelError(nameof(request.Code), "Mã xác thực 6 số là bắt buộc.");
+                }
+
+                return ValidationProblem(ModelState);
+            }
+
+            if (!_twoFactorLoginTicketService.TryReadTicket(request.Ticket, out var twoFactorTicket) || twoFactorTicket is null)
+            {
+                _logger.LogWarning("Xac thuc 2FA that bai: ticket khong hop le hoac da het han.");
+                return Unauthorized("Phiên xác thực hai bước đã hết hạn. Vui lòng đăng nhập lại.");
+            }
+
+            var user = await _db.Users
+                .Include(u => u.UserAuth)
+                .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+                .SingleOrDefaultAsync(u => u.UserId == twoFactorTicket.UserId);
+
+            if (user?.UserAuth is null || !user.IsActive)
+            {
+                _logger.LogWarning("Xac thuc 2FA that bai: khong tim thay user hop le cho ticket userId {UserId}.", twoFactorTicket.UserId);
+                return Unauthorized("Tài khoản không còn hợp lệ. Vui lòng đăng nhập lại.");
+            }
+
+            var roleNames = GetRoleNames(user);
+
+            if (!user.EmailConfirmed)
+            {
+                _logger.LogWarning("Xac thuc 2FA bi chan: userId {UserId} chua xac minh email.", user.UserId);
+                return Unauthorized("Email của bạn chưa được xác minh.");
+            }
+
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Xac thuc 2FA bi chan: userId {UserId} co approval status {ApprovalStatus}.",
+                    user.UserId,
+                    user.ApprovalStatus);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
+            }
+
+            var now = DateTime.UtcNow;
+            if (user.UserAuth.LockedUntil.HasValue && user.UserAuth.LockedUntil.Value > now)
+            {
+                _logger.LogWarning(
+                    "Xac thuc 2FA bi chan: userId {UserId} dang khoa tam thoi den {LockedUntil}.",
+                    user.UserId,
+                    user.UserAuth.LockedUntil.Value);
+                await WriteAuthAuditAsync(
+                    new LoginRequest { Identifier = user.UserName, ClientLane = ResolveClientLane(roleNames) },
+                    user,
+                    roleNames,
+                    "login_locked",
+                    success: false,
+                    "account_locked",
+                    user.UserAuth.FailedCount);
+                return Unauthorized(BuildLockoutMessage(user.UserAuth.LockedUntil.Value, now));
+            }
+
+            if (!RequiresTwoFactor(roleNames))
+            {
+                _logger.LogInformation("Xac thuc 2FA bo qua vi userId {UserId} khong thuoc lane Seller/Admin.", user.UserId);
+                return Ok(CreateToken(user, roleNames));
+            }
+
+            var secret = twoFactorTicket.RequiresSetup
+                ? (string.IsNullOrWhiteSpace(user.UserAuth.Mfasecret) ? twoFactorTicket.SetupSecret : user.UserAuth.Mfasecret)
+                : user.UserAuth.Mfasecret;
+
+            if (string.IsNullOrWhiteSpace(secret) || !_totpService.VerifyCode(secret, request.Code, now))
+            {
+                _logger.LogWarning("Xac thuc 2FA that bai cho userId {UserId}: ma OTP khong hop le.", user.UserId);
+                await WriteAuthAuditAsync(
+                    new LoginRequest { Identifier = user.UserName, ClientLane = ResolveClientLane(roleNames) },
+                    user,
+                    roleNames,
+                    "two_factor_failed",
+                    success: false,
+                    "invalid_otp");
+                return Unauthorized("Mã xác thực hai bước không đúng hoặc đã hết hạn.");
+            }
+
+            if (twoFactorTicket.RequiresSetup && string.IsNullOrWhiteSpace(user.UserAuth.Mfasecret))
+            {
+                user.UserAuth.Mfasecret = secret;
+                user.UserAuth.UpdatedAt = now;
+                user.UpdatedAt = now;
+                await _db.SaveChangesAsync();
+
+                _logger.LogInformation("Da kich hoat 2FA cho userId {UserId}.", user.UserId);
+            }
+
+            _logger.LogInformation("Xac thuc 2FA thanh cong cho userId {UserId}.", user.UserId);
+            await WriteAuthAuditAsync(
+                new LoginRequest { Identifier = user.UserName, ClientLane = ResolveClientLane(roleNames) },
+                user,
+                roleNames,
+                "two_factor_success",
+                success: true,
+                null);
+            return Ok(CreateToken(user, roleNames));
+        }
+
         [HttpPost("register")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.Email) ||
-                string.IsNullOrWhiteSpace(request.UserName) ||
-                string.IsNullOrWhiteSpace(request.FullName) ||
-                string.IsNullOrWhiteSpace(request.Password) ||
-                string.IsNullOrWhiteSpace(request.Phone) ||
-                string.IsNullOrWhiteSpace(request.ConfirmPassword))
+            if (!ModelState.IsValid)
             {
-                return BadRequest("Toàn bộ thông tin là bắt buộc nhập.");
+                return ValidationProblem(ModelState);
             }
 
             var existingUser = await _db.Users.AnyAsync(u =>
@@ -112,8 +535,31 @@ namespace FreshFarm.Identity.Api.Controllers
                 return BadRequest("Mật khẩu xác nhận không khớp.");
             }
 
-            var roleName = string.IsNullOrEmpty(request.RoleName) ? "Customer" : request.RoleName.Trim();
-            var role = await _db.Roles.SingleOrDefaultAsync(r => r.RoleName == roleName);
+            if (!TryNormalizeVietnamPhone(request.Phone, out var normalizedPhone, out var phoneValidationError))
+            {
+                return BadRequest(phoneValidationError);
+            }
+
+            if (!_accountEmailSender.IsConfigured)
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình email xác minh tài khoản. Vui lòng thử lại sau.");
+            }
+
+            if (!TryBuildVerifyUrlBase(out var verifyUrlBase))
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình đường dẫn VerifyUrlBase cho email xác minh tài khoản.");
+            }
+
+            const string roleName = "Customer";
+            if (!string.IsNullOrWhiteSpace(request.RoleName)
+                && !string.Equals(request.RoleName.Trim(), roleName, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "Public register da gui role khong hop le {RequestedRole}; he thong ep ve Customer.",
+                    request.RoleName.Trim());
+            }
+
+            var role = await _db.Roles.SingleOrDefaultAsync(r => r.RoleName == roleName && r.IsActive);
             if (role == null)
             {
                 return BadRequest($"Vai trò {roleName} không tìm thấy.");
@@ -127,7 +573,13 @@ namespace FreshFarm.Identity.Api.Controllers
                     Email = request.Email.Trim(),
                     UserName = request.UserName.Trim(),
                     FullName = request.FullName.Trim(),
-                    Phone = request.Phone.Trim(),
+                    Phone = normalizedPhone,
+                    EmailConfirmed = false,
+                    EmailConfirmedAt = null,
+                    ApprovalStatus = AccountApprovalStatus.Pending,
+                    ApprovedAt = null,
+                    ApprovedByUserId = null,
+                    ApprovalStatusChangedAt = DateTime.UtcNow,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -153,29 +605,118 @@ namespace FreshFarm.Identity.Api.Controllers
 
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
-                return Ok(new { user.UserId, user.UserName, user.Email, role.RoleName });
+
+                var persistedUserForVerification = await _db.Users
+                    .AsNoTracking()
+                    .SingleAsync(x => x.UserId == user.UserId);
+
+                var verificationEmailSent = false;
+                var verificationMessage = "Tài khoản đã được tạo. Vui lòng xác minh email; sau đó bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt.";
+
+                try
+                {
+                    var token = _emailVerificationTokenService.GenerateToken(persistedUserForVerification);
+                    var verifyUrl = QueryHelpers.AddQueryString(verifyUrlBase, new Dictionary<string, string?>
+                    {
+                        ["email"] = persistedUserForVerification.Email,
+                        ["token"] = token
+                    });
+
+                    await _accountEmailSender.SendEmailVerificationAsync(
+                        persistedUserForVerification.Email,
+                        persistedUserForVerification.FullName,
+                        verifyUrl,
+                        ResolveEmailVerificationTokenLifetimeMinutes());
+
+                    verificationEmailSent = true;
+                    _logger.LogInformation("Da tao tai khoan userId {UserId} va gui email xac minh.", user.UserId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Da tao tai khoan userId {UserId} nhung gui email xac minh that bai.", user.UserId);
+                    verificationMessage = "Tài khoản đã được tạo nhưng chưa gửi được email xác minh. Vui lòng dùng chức năng gửi lại email xác minh.";
+                }
+
+                return Ok(new
+                {
+                    user.UserId,
+                    user.UserName,
+                    user.Email,
+                    role.RoleName,
+                    EmailVerificationRequired = true,
+                    AdminApprovalRequired = true,
+                    ApprovalStatus = user.ApprovalStatus,
+                    VerificationEmailSent = verificationEmailSent,
+                    Message = verificationMessage
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+                _logger.LogError(
+                    ex,
+                    "Dang ky that bai cho email {Email}, userName {UserName}, phone {Phone}.",
+                    MaskIdentifier(request.Email),
+                    request.UserName?.Trim(),
+                    request.Phone?.Trim());
                 return StatusCode(500, "Có lỗi xảy ra khi đăng kí, vui lòng thử lại");
             }
         }
 
         [HttpPost("external-login")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ExternalLogin([FromBody] ExternalLoginRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
             {
+                _logger.LogWarning("External login that bai do request model khong hop le.");
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "invalid_request",
+                    cancellationToken: cancellationToken);
                 return ValidationProblem(ModelState);
             }
 
             var provider = request.Provider.Trim();
-            if (!provider.Equals("Google", StringComparison.OrdinalIgnoreCase))
+            if (!provider.Equals(GoogleExternalLoginProvider, StringComparison.OrdinalIgnoreCase))
             {
+                _logger.LogWarning("External login that bai: provider {Provider} khong duoc ho tro.", provider);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "unsupported_provider",
+                    cancellationToken: cancellationToken);
                 return BadRequest("Hiện tại hệ thống chỉ hỗ trợ đăng nhập Google.");
             }
 
+            if (string.IsNullOrWhiteSpace(request.ProviderSubject))
+            {
+                return BadRequest("Thiếu định danh tài khoản từ nhà cung cấp đăng nhập.");
+            }
+
+            if (!request.EmailVerified)
+            {
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    null,
+                    null,
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "unverified_provider_email",
+                    cancellationToken: cancellationToken);
+                return BadRequest("Google chưa xác minh địa chỉ email này.");
+            }
+
+            provider = GoogleExternalLoginProvider;
+            var providerSubject = request.ProviderSubject.Trim();
             var normalizedEmail = request.Email.Trim();
             var normalizedFullName = request.FullName.Trim();
             var normalizedAvatar = string.IsNullOrWhiteSpace(request.AvatarUrl)
@@ -186,11 +727,51 @@ namespace FreshFarm.Identity.Api.Controllers
                 .Include(u => u.UserAuth)
                 .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-                .SingleOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+                .SingleOrDefaultAsync(
+                    u => u.UserAuth != null
+                         && u.UserAuth.ExternalLoginProvider == provider
+                         && u.UserAuth.ExternalLoginSubject == providerSubject,
+                    cancellationToken);
+            var hasBoundExternalLogin = user is not null;
+
+            if (user is null)
+            {
+                user = await _db.Users
+                    .Include(u => u.UserAuth)
+                    .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                    .SingleOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
+            }
 
             if (user is not null && !user.IsActive)
             {
+                _logger.LogWarning("Google external login that bai: userId {UserId} dang bi vo hieu hoa.", user.UserId);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                    "external_login_failed",
+                    success: false,
+                    failureReason: "inactive_account",
+                    cancellationToken: cancellationToken);
                 return Unauthorized("Tài khoản của bạn đã bị vô hiệu hóa.");
+            }
+
+            if (user?.UserAuth?.LockedUntil.HasValue == true && user.UserAuth.LockedUntil.Value > DateTime.UtcNow)
+            {
+                _logger.LogWarning(
+                    "Google external login bi chan: userId {UserId} dang khoa tam thoi den {LockedUntil}.",
+                    user.UserId,
+                    user.UserAuth.LockedUntil.Value);
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                    "login_locked",
+                    success: false,
+                    failureReason: "account_locked",
+                    cancellationToken: cancellationToken);
+                return Unauthorized(BuildLockoutMessage(user.UserAuth.LockedUntil.Value, DateTime.UtcNow));
             }
 
             if (user is null)
@@ -212,6 +793,12 @@ namespace FreshFarm.Identity.Api.Controllers
                         UserName = await GenerateUniqueUserNameAsync(normalizedEmail, cancellationToken),
                         Phone = await GeneratePlaceholderPhoneAsync(cancellationToken),
                         Avatar = normalizedAvatar,
+                        EmailConfirmed = true,
+                        EmailConfirmedAt = now,
+                        ApprovalStatus = AccountApprovalStatus.Pending,
+                        ApprovedAt = null,
+                        ApprovedByUserId = null,
+                        ApprovalStatusChangedAt = now,
                         IsActive = true,
                         CreatedAt = now
                     };
@@ -225,6 +812,8 @@ namespace FreshFarm.Identity.Api.Controllers
                         UserId = user.UserId,
                         PasswordHash = _passwordHasher.HashPassword(user, randomPassword),
                         FailedCount = 0,
+                        ExternalLoginProvider = provider,
+                        ExternalLoginSubject = providerSubject,
                         UpdatedAt = now
                     });
 
@@ -253,6 +842,53 @@ namespace FreshFarm.Identity.Api.Controllers
             else
             {
                 var shouldSave = false;
+                if (!hasBoundExternalLogin)
+                {
+                    if (user.UserAuth is null)
+                    {
+                        _logger.LogError("Khong the rang buoc Google login vi userId {UserId} khong co UserAuth.", user.UserId);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Tài khoản hiện tại chưa thể liên kết đăng nhập Google. Vui lòng liên hệ quản trị viên.");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(user.UserAuth.ExternalLoginProvider)
+                        || !string.IsNullOrWhiteSpace(user.UserAuth.ExternalLoginSubject))
+                    {
+                        await WriteExternalAuthAuditAsync(
+                            request,
+                            user,
+                            user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                            "external_login_failed",
+                            success: false,
+                            failureReason: "external_identity_mismatch",
+                            cancellationToken: cancellationToken);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Email này đã được liên kết với một tài khoản Google khác.");
+                    }
+
+                    if (!CanAutomaticallyLinkGoogleAccountByEmail(normalizedEmail, request.HostedDomain))
+                    {
+                        await WriteExternalAuthAuditAsync(
+                            request,
+                            user,
+                            user.UserRoles.Select(x => x.Role?.RoleName).Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().ToArray(),
+                            "external_login_failed",
+                            success: false,
+                            failureReason: "unsafe_legacy_email_link",
+                            cancellationToken: cancellationToken);
+                        return StatusCode(
+                            StatusCodes.Status409Conflict,
+                            "Không thể tự động liên kết tài khoản Google dùng email bên thứ ba. Vui lòng đăng nhập bằng mật khẩu hoặc liên hệ quản trị viên.");
+                    }
+
+                    user.UserAuth.ExternalLoginProvider = provider;
+                    user.UserAuth.ExternalLoginSubject = providerSubject;
+                    user.UserAuth.UpdatedAt = DateTime.UtcNow;
+                    shouldSave = true;
+                }
+
                 if (!string.IsNullOrWhiteSpace(normalizedFullName) && !string.Equals(user.FullName, normalizedFullName, StringComparison.Ordinal))
                 {
                     user.FullName = normalizedFullName;
@@ -263,6 +899,14 @@ namespace FreshFarm.Identity.Api.Controllers
                 {
                     user.Avatar = normalizedAvatar;
                     shouldSave = true;
+                }
+
+                if (!user.EmailConfirmed)
+                {
+                    user.EmailConfirmed = true;
+                    user.EmailConfirmedAt = DateTime.UtcNow;
+                    shouldSave = true;
+                    _logger.LogInformation("Da tu dong xac minh email cho userId {UserId} qua Google external login.", user.UserId);
                 }
 
                 if (shouldSave)
@@ -278,10 +922,161 @@ namespace FreshFarm.Identity.Api.Controllers
                 roleNames.Add("Customer");
             }
 
+            if (!string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(user.ApprovalStatus, AccountApprovalStatus.Pending, StringComparison.OrdinalIgnoreCase))
+            {
+                await WriteExternalAuthAuditAsync(
+                    request,
+                    user,
+                    roleNames,
+                    "external_login_blocked",
+                    success: false,
+                    failureReason: ResolveApprovalFailureReason(user.ApprovalStatus),
+                    cancellationToken: cancellationToken);
+                return StatusCode(
+                    StatusCodes.Status403Forbidden,
+                    BuildApprovalBlockedResponse(user.ApprovalStatus, user.ApprovalNote));
+            }
+
+            var isPendingApproval = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Pending,
+                StringComparison.OrdinalIgnoreCase);
+
+            await WriteExternalAuthAuditAsync(
+                request,
+                user,
+                roleNames,
+                isPendingApproval ? "external_login_restricted_success" : "external_login_success",
+                success: true,
+                failureReason: isPendingApproval ? "pending_admin_approval" : null,
+                cancellationToken: cancellationToken);
+
             return Ok(CreateToken(user, roleNames));
         }
 
+        [HttpPost("resend-email-verification")]
+        [AllowAnonymous]
+        [InternalBffOnly]
+        public async Task<IActionResult> ResendEmailVerification([FromBody] ResendEmailVerificationRequest request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            if (!_accountEmailSender.IsConfigured || !TryBuildVerifyUrlBase(out var verifyUrlBase))
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, "Chưa cấu hình email xác minh tài khoản.");
+            }
+
+            var identifier = request.Identifier.Trim();
+            var isEmail = identifier.Contains("@");
+            var user = await _db.Users
+                .Include(x => x.UserAuth)
+                .SingleOrDefaultAsync(x => isEmail ? x.Email == identifier : x.UserName == identifier, cancellationToken);
+
+            if (user is not null && user.IsActive && !user.EmailConfirmed)
+            {
+                try
+                {
+                    var token = _emailVerificationTokenService.GenerateToken(user);
+                    var verifyUrl = QueryHelpers.AddQueryString(verifyUrlBase, new Dictionary<string, string?>
+                    {
+                        ["email"] = user.Email,
+                        ["token"] = token
+                    });
+
+                    await _accountEmailSender.SendEmailVerificationAsync(
+                        user.Email,
+                        user.FullName,
+                        verifyUrl,
+                        ResolveEmailVerificationTokenLifetimeMinutes(),
+                        cancellationToken);
+
+                    _logger.LogInformation("Da gui lai email xac minh cho userId {UserId}.", user.UserId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Gui lai email xac minh that bai cho identifier {Identifier}.", MaskIdentifier(identifier));
+                    return StatusCode(StatusCodes.Status500InternalServerError, "Không thể gửi lại email xác minh lúc này. Vui lòng thử lại sau.");
+                }
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Nhan yeu cau resend-email-verification cho identifier {Identifier} nhung khong can gui lai.",
+                    MaskIdentifier(identifier));
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Nếu tài khoản tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh."
+            });
+        }
+
+        [HttpPost("verify-email")]
+        [AllowAnonymous]
+        [InternalBffOnly]
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken cancellationToken)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var normalizedEmail = request.Email.Trim();
+            var user = await _db.Users
+                .SingleOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
+
+            if (user is null || !user.IsActive)
+            {
+                _logger.LogWarning("Xac minh email that bai: khong tim thay tai khoan active cho email {Email}.", MaskIdentifier(normalizedEmail));
+                return BadRequest("Liên kết xác minh email không hợp lệ.");
+            }
+
+            if (user.EmailConfirmed)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    alreadyConfirmed = true,
+                    approvalStatus = user.ApprovalStatus,
+                    message = string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                        ? "Email của bạn đã được xác minh trước đó và tài khoản đã được phê duyệt."
+                        : "Email của bạn đã được xác minh trước đó. Tài khoản vẫn đang chờ quản trị viên phê duyệt."
+                });
+            }
+
+            if (!_emailVerificationTokenService.TryValidateToken(request.Token, user, out var tokenError))
+            {
+                _logger.LogWarning(
+                    "Xac minh email that bai cho userId {UserId}. Ly do: {TokenError}",
+                    user.UserId,
+                    tokenError ?? "unknown");
+                return BadRequest(tokenError ?? "Liên kết xác minh email không hợp lệ.");
+            }
+
+            user.EmailConfirmed = true;
+            user.EmailConfirmedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("Da xac minh email cho userId {UserId}.", user.UserId);
+            return Ok(new
+            {
+                success = true,
+                approvalStatus = user.ApprovalStatus,
+                message = string.Equals(user.ApprovalStatus, AccountApprovalStatus.Approved, StringComparison.OrdinalIgnoreCase)
+                    ? "Xác minh email thành công. Tài khoản đã được phê duyệt và có thể đăng nhập."
+                    : "Xác minh email thành công. Bạn có thể đăng nhập với quyền Khách để xem trạng thái chờ quản trị viên phê duyệt."
+            });
+        }
+
         [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -306,6 +1101,18 @@ namespace FreshFarm.Identity.Api.Controllers
 
             if (user is not null && user.IsActive)
             {
+                if (user.UserAuth is null)
+                {
+                    _logger.LogWarning("Khong the tao reset token vi userId {UserId} khong co UserAuth.", user.UserId);
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu."
+                    });
+                }
+
+                user.UserAuth.PasswordResetNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                await _db.SaveChangesAsync(cancellationToken);
                 var token = _passwordResetTokenService.GenerateToken(user, user.UserAuth);
                 var resetUrl = QueryHelpers.AddQueryString(resetUrlBase, new Dictionary<string, string?>
                 {
@@ -322,6 +1129,12 @@ namespace FreshFarm.Identity.Api.Controllers
 
                 _logger.LogInformation("Đã gửi email đặt lại mật khẩu cho userId {UserId}.", user.UserId);
             }
+            else
+            {
+                _logger.LogInformation(
+                    "Nhan yeu cau forgot-password cho email {Email} nhung khong tim thay tai khoan active phu hop.",
+                    MaskIdentifier(normalizedEmail));
+            }
 
             return Ok(new
             {
@@ -331,6 +1144,8 @@ namespace FreshFarm.Identity.Api.Controllers
         }
 
         [HttpPost("reset-password")]
+        [AllowAnonymous]
+        [InternalBffOnly]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
@@ -341,15 +1156,20 @@ namespace FreshFarm.Identity.Api.Controllers
             var normalizedEmail = request.Email.Trim();
             var user = await _db.Users
                 .Include(x => x.UserAuth)
+                .Include(x => x.UserSessions)
                 .SingleOrDefaultAsync(x => x.Email == normalizedEmail, cancellationToken);
 
             if (user is null || !user.IsActive)
             {
+                _logger.LogWarning(
+                    "Reset password that bai: email {Email} khong ton tai hoac tai khoan khong active.",
+                    MaskIdentifier(normalizedEmail));
                 return BadRequest("Liên kết đặt lại mật khẩu không hợp lệ.");
             }
 
             if (!_passwordResetTokenService.TryValidateToken(request.Token, user, user.UserAuth, out var tokenError))
             {
+                _logger.LogWarning("Reset password that bai: token khong hop le cho userId {UserId}.", user.UserId);
                 return BadRequest(tokenError ?? "Liên kết đặt lại mật khẩu không hợp lệ.");
             }
 
@@ -371,10 +1191,19 @@ namespace FreshFarm.Identity.Api.Controllers
             userAuth.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
             userAuth.FailedCount = 0;
             userAuth.LockedUntil = null;
+            userAuth.LockoutLevel = 0;
+            userAuth.TokenVersion += 1;
+            userAuth.PasswordResetNonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
             userAuth.UpdatedAt = now;
             user.UpdatedAt = now;
 
+            if (user.UserSessions.Count > 0)
+            {
+                _db.UserSessions.RemoveRange(user.UserSessions);
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
+            await _loginDeviceSecurityService.UnlockForUserAsync(user.UserId, cancellationToken);
 
             _logger.LogInformation("Đã đặt lại mật khẩu cho userId {UserId}.", user.UserId);
             return Ok(new
@@ -382,6 +1211,24 @@ namespace FreshFarm.Identity.Api.Controllers
                 success = true,
                 message = "Đặt lại mật khẩu thành công."
             });
+        }
+
+        private static bool RequiresTwoFactor(IEnumerable<string> roles)
+        {
+            // 2FA is currently disabled for all roles by product decision.
+            return false;
+        }
+
+        private static string BuildTwoFactorAccountName(User user)
+        {
+            if (!string.IsNullOrWhiteSpace(user.Email))
+            {
+                return user.Email.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(user.UserName)
+                ? $"user-{user.UserId}"
+                : user.UserName.Trim();
         }
 
         private AuthResponse CreateToken(User user, IEnumerable<string> roles)
@@ -395,14 +1242,38 @@ namespace FreshFarm.Identity.Api.Controllers
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            var isPendingApproval = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Pending,
+                StringComparison.OrdinalIgnoreCase);
+            var isApproved = string.Equals(
+                user.ApprovalStatus,
+                AccountApprovalStatus.Approved,
+                StringComparison.OrdinalIgnoreCase);
+            if (!isPendingApproval && !isApproved)
+            {
+                throw new InvalidOperationException("Không thể phát token cho tài khoản chưa đủ điều kiện.");
+            }
+
+            var accountAccess = isPendingApproval ? "pending" : "full";
+            var effectiveRoles = isPendingApproval
+                ? new[] { "Guest" }
+                : roles
+                    .Where(role => !string.IsNullOrWhiteSpace(role))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-                new Claim("username", user.UserName ?? string.Empty)
+                new Claim("username", user.UserName ?? string.Empty),
+                new Claim("token_version", (user.UserAuth?.TokenVersion ?? 0).ToString()),
+                new Claim("approval_status", user.ApprovalStatus),
+                new Claim("account_access", accountAccess)
             };
 
-            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+            claims.AddRange(effectiveRoles.Select(role => new Claim(ClaimTypes.Role, role)));
             var expires = DateTime.UtcNow.AddHours(1);
             var jwt = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
@@ -414,8 +1285,32 @@ namespace FreshFarm.Identity.Api.Controllers
             return new AuthResponse
             {
                 AccessToken = new JwtSecurityTokenHandler().WriteToken(jwt),
-                ExpiredAtUtc = expires
+                ExpiredAtUtc = expires,
+                AccountAccess = accountAccess,
+                ApprovalStatus = user.ApprovalStatus,
+                IsPendingApproval = isPendingApproval,
+                AccountStatusMessage = isPendingApproval
+                    ? "Tài khoản của bạn đang chờ quản trị viên phê duyệt. Bạn đã đăng nhập với quyền Khách nhưng chưa thể sử dụng các chức năng của hệ thống."
+                    : null
             };
+        }
+
+        [HttpGet("session-status")]
+        [Authorize(
+            AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme,
+            Policy = "AnyAuthenticated")]
+        public IActionResult GetSessionStatus()
+        {
+            return Ok(new
+            {
+                Authenticated = true,
+                AccountAccess = User.FindFirstValue("account_access"),
+                ApprovalStatus = User.FindFirstValue("approval_status"),
+                IsPendingApproval = string.Equals(
+                    User.FindFirstValue("account_access"),
+                    "pending",
+                    StringComparison.Ordinal)
+            });
         }
 
         [HttpGet("profile")]
@@ -466,7 +1361,11 @@ namespace FreshFarm.Identity.Api.Controllers
             }
 
             var normalizedEmail = request.Email.Trim();
-            var normalizedPhone = request.Phone.Trim();
+            if (!TryNormalizeVietnamPhone(request.Phone, out var normalizedPhone, out var phoneValidationError))
+            {
+                return BadRequest(phoneValidationError);
+            }
+
             var normalizedFullName = request.FullName.Trim();
 
             var emailExists = await _db.Users.AnyAsync(u => u.UserId != userId && u.Email == normalizedEmail);
@@ -745,6 +1644,151 @@ namespace FreshFarm.Identity.Api.Controllers
             return NoContent();
         }
 
+        private List<string> GetRoleNames(User user)
+        {
+            return user.UserRoles
+                .Where(ur => ur.Role?.IsActive == true)
+                .Select(ur => ur.Role?.RoleName)
+                .Where(roleName => !string.IsNullOrWhiteSpace(roleName))
+                .Select(roleName => roleName!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string ResolveClientLane(IEnumerable<string> roleNames)
+        {
+            if (roleNames.Any(x => string.Equals(x, "Admin", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "Admin";
+            }
+
+            if (roleNames.Any(x => string.Equals(x, "Seller", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "Seller";
+            }
+
+            if (roleNames.Any(x => string.Equals(x, "Customer", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "Customer";
+            }
+
+            return "Unknown";
+        }
+
+        private static bool IsRoleAllowedForLane(string clientLane, IEnumerable<string> roleNames)
+        {
+            if (string.Equals(clientLane, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return roleNames.Any(x => string.Equals(x, "Admin", StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (string.Equals(clientLane, "Seller", StringComparison.OrdinalIgnoreCase))
+            {
+                return roleNames.Any(x =>
+                    string.Equals(x, "Seller", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x, "Admin", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return true;
+        }
+
+        private static string BuildLaneAccessDeniedMessage(string clientLane)
+        {
+            if (string.Equals(clientLane, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Bạn không có quyền truy cập khu vực quản trị.";
+            }
+
+            if (string.Equals(clientLane, "Seller", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Bạn không có quyền truy cập khu vực nhà bán hàng.";
+            }
+
+            return "Bạn không có quyền truy cập khu vực này.";
+        }
+
+        private bool TryValidateLoginRequest(LoginRequest request, out IActionResult? validationProblem)
+        {
+            validationProblem = null;
+
+            if (string.IsNullOrWhiteSpace(request.Identifier))
+            {
+                ModelState.AddModelError(nameof(request.Identifier), "Email hoặc tên đăng nhập là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                ModelState.AddModelError(nameof(request.Password), "Mật khẩu là bắt buộc.");
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ClientLane))
+            {
+                ModelState.AddModelError(nameof(request.ClientLane), "Loại luồng đăng nhập là bắt buộc.");
+            }
+
+            if (ModelState.IsValid)
+            {
+                return true;
+            }
+
+            validationProblem = ValidationProblem(ModelState);
+            return false;
+        }
+
+        private Task WriteAuthAuditAsync(
+            LoginRequest request,
+            User? user,
+            IReadOnlyCollection<string>? roleNames,
+            string eventType,
+            bool success,
+            string? failureReason,
+            int? failedAttemptCount = null,
+            CancellationToken cancellationToken = default)
+        {
+            return _authAuditService.WriteAsync(
+                new AuthAuditWriteRequest
+                {
+                    HttpContext = HttpContext,
+                    ClientLane = request.ClientLane,
+                    User = user,
+                    RoleNames = roleNames,
+                    Identifier = request.Identifier?.Trim() ?? string.Empty,
+                    EventType = eventType,
+                    Success = success,
+                    FailureReason = failureReason,
+                    FailedAttemptCount = failedAttemptCount
+                },
+                cancellationToken);
+        }
+
+        private Task WriteExternalAuthAuditAsync(
+            ExternalLoginRequest request,
+            User? user,
+            IReadOnlyCollection<string>? roleNames,
+            string eventType,
+            bool success,
+            string? failureReason,
+            CancellationToken cancellationToken = default)
+        {
+            return _authAuditService.WriteAsync(
+                new AuthAuditWriteRequest
+                {
+                    HttpContext = HttpContext,
+                    ClientLane = ResolveClientLane(roleNames ?? user?.UserRoles?
+                        .Select(x => x.Role?.RoleName)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Cast<string>()
+                        .ToArray() ?? []),
+                    User = user,
+                    RoleNames = roleNames,
+                    Identifier = request.Email?.Trim() ?? string.Empty,
+                    EventType = eventType,
+                    Success = success,
+                    FailureReason = failureReason
+                },
+                cancellationToken);
+        }
+
         private bool TryGetCurrentUserId(out int userId)
         {
             userId = 0;
@@ -767,11 +1811,29 @@ namespace FreshFarm.Identity.Api.Controllers
             return Uri.TryCreate(resetUrlBase, UriKind.Absolute, out _);
         }
 
+        private bool TryBuildVerifyUrlBase(out string verifyUrlBase)
+        {
+            verifyUrlBase = _emailVerificationOptions.VerifyUrlBase?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(verifyUrlBase))
+            {
+                return false;
+            }
+
+            return Uri.TryCreate(verifyUrlBase, UriKind.Absolute, out _);
+        }
+
         private int ResolveTokenLifetimeMinutes()
         {
             return _passwordResetOptions.TokenLifetimeMinutes <= 0
                 ? 30
                 : _passwordResetOptions.TokenLifetimeMinutes;
+        }
+
+        private int ResolveEmailVerificationTokenLifetimeMinutes()
+        {
+            return _emailVerificationOptions.TokenLifetimeMinutes <= 0
+                ? 60
+                : _emailVerificationOptions.TokenLifetimeMinutes;
         }
 
         private async Task<string> GenerateUniqueUserNameAsync(string email, CancellationToken cancellationToken)
@@ -797,6 +1859,16 @@ namespace FreshFarm.Identity.Api.Controllers
             return candidate;
         }
 
+        private static bool CanAutomaticallyLinkGoogleAccountByEmail(string email, string? hostedDomain)
+        {
+            if (email.EndsWith("@gmail.com", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return !string.IsNullOrWhiteSpace(hostedDomain);
+        }
+
         private async Task<string> GeneratePlaceholderPhoneAsync(CancellationToken cancellationToken)
         {
             for (var attempt = 0; attempt < 20; attempt++)
@@ -811,6 +1883,168 @@ namespace FreshFarm.Identity.Api.Controllers
             }
 
             throw new InvalidOperationException("Không thể tạo số điện thoại tạm duy nhất cho tài khoản Google.");
+        }
+
+        private static object BuildLockoutResponse(DateTime lockedUntilUtc, DateTime nowUtc)
+            => new
+            {
+                message = BuildLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc,
+                lockScope = "account"
+            };
+
+        private static object BuildDeviceLockoutResponse(DateTime lockedUntilUtc, DateTime nowUtc)
+            => new
+            {
+                message = BuildDeviceLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc,
+                lockScope = "device"
+            };
+
+        private static object BuildCombinedLockoutResponse(
+            DateTime accountLockedUntilUtc,
+            DateTime deviceLockedUntilUtc,
+            DateTime nowUtc)
+        {
+            var lockedUntilUtc = accountLockedUntilUtc >= deviceLockedUntilUtc
+                ? accountLockedUntilUtc
+                : deviceLockedUntilUtc;
+
+            return new
+            {
+                message = BuildCombinedLockoutMessage(lockedUntilUtc, nowUtc),
+                lockedUntilUtc,
+                accountLockedUntilUtc,
+                deviceLockedUntilUtc,
+                lockScope = "account_and_device"
+            };
+        }
+
+        private static TimeSpan BuildLockoutDuration(int lockoutLevel)
+        {
+            var normalizedLevel = Math.Clamp(lockoutLevel, 1, 16);
+            var multiplier = Math.Pow(2, normalizedLevel - 1);
+            return TimeSpan.FromMinutes(Math.Min(60, BaseLockoutDurationMinutes * multiplier));
+        }
+
+        private static string BuildLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
+        {
+            var remaining = lockedUntilUtc - nowUtc;
+            if (remaining <= TimeSpan.Zero)
+            {
+                return "Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau.";
+            }
+
+            var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            return $"Tài khoản đang bị khóa tạm thời. Vui lòng thử lại sau {roundedMinutes} phút.";
+        }
+
+        private static string BuildDeviceLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
+        {
+            var remaining = lockedUntilUtc - nowUtc;
+            var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            return $"Thiết bị này đang bị khóa đăng nhập tạm thời do có quá nhiều lần thử sai. Vui lòng thử lại sau {roundedMinutes} phút hoặc liên hệ quản trị viên.";
+        }
+
+        private static string BuildCombinedLockoutMessage(DateTime lockedUntilUtc, DateTime nowUtc)
+        {
+            var remaining = lockedUntilUtc - nowUtc;
+            var roundedMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            return $"Tài khoản và thiết bị này đang bị khóa đăng nhập tạm thời. Vui lòng thử lại sau {roundedMinutes} phút hoặc liên hệ quản trị viên.";
+        }
+
+        private static object BuildApprovalBlockedResponse(string? approvalStatus, string? approvalNote)
+        {
+            var normalizedStatus = string.IsNullOrWhiteSpace(approvalStatus)
+                ? AccountApprovalStatus.Pending
+                : approvalStatus.Trim();
+            var code = normalizedStatus.Equals(AccountApprovalStatus.Rejected, StringComparison.OrdinalIgnoreCase)
+                ? "account_rejected"
+                : normalizedStatus.Equals(AccountApprovalStatus.Suspended, StringComparison.OrdinalIgnoreCase)
+                    ? "account_suspended"
+                    : "account_pending_approval";
+            var message = code switch
+            {
+                "account_rejected" => "Tài khoản chưa được quản trị viên chấp thuận. Vui lòng liên hệ hỗ trợ nếu bạn cần xem lại quyết định.",
+                "account_suspended" => "Tài khoản đã bị tạm đình chỉ. Vui lòng liên hệ quản trị viên.",
+                _ => "Email đã được xác minh nhưng tài khoản vẫn đang chờ quản trị viên phê duyệt."
+            };
+
+            return new
+            {
+                code,
+                message,
+                approvalStatus = normalizedStatus,
+                approvalNote = string.IsNullOrWhiteSpace(approvalNote) ? null : approvalNote
+            };
+        }
+
+        private static string ResolveApprovalFailureReason(string? approvalStatus)
+            => approvalStatus?.Trim().ToLowerInvariant() switch
+            {
+                "rejected" => "account_rejected",
+                "suspended" => "account_suspended",
+                _ => "account_pending_approval"
+            };
+
+        private static string BuildRemainingAttemptsMessage(int failedCount)
+        {
+            var remainingAttempts = Math.Max(0, MaxFailedLoginAttempts - failedCount);
+            if (remainingAttempts <= 0)
+            {
+                return "Tài khoản đã bị khóa tạm thời do nhập sai mật khẩu quá nhiều lần.";
+            }
+
+            return $"Tài khoản hoặc mật khẩu không đúng. Bạn còn {remainingAttempts} lần thử trước khi tài khoản bị khóa tạm thời.";
+        }
+
+        private static string MaskIdentifier(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return "unknown";
+            }
+
+            if (raw.Contains('@'))
+            {
+                var parts = raw.Split('@', 2);
+                var local = parts[0];
+                var domain = parts.Length > 1 ? parts[1] : string.Empty;
+                var visible = local.Length <= 2 ? local : local[..2];
+                return $"{visible}***@{domain}";
+            }
+
+            if (raw.Length <= 2)
+            {
+                return raw;
+            }
+
+            return $"{raw[..2]}***";
+        }
+
+        private static bool TryNormalizeVietnamPhone(string? rawPhone, out string normalizedPhone, out string errorMessage)
+        {
+            normalizedPhone = string.Empty;
+            errorMessage = "Số điện thoại phải đúng định dạng Việt Nam.";
+
+            var trimmed = rawPhone?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                errorMessage = "Số điện thoại không được để trống.";
+                return false;
+            }
+
+            if (!VietnamPhoneRegex.IsMatch(trimmed))
+            {
+                errorMessage = "Số điện thoại phải là số di động Việt Nam hợp lệ gồm 10 số, hoặc bắt đầu bằng +84 và đủ 9 số phía sau.";
+                return false;
+            }
+
+            normalizedPhone = trimmed.StartsWith("+84", StringComparison.Ordinal)
+                ? $"0{trimmed[3..]}"
+                : trimmed;
+
+            return true;
         }
     }
 }

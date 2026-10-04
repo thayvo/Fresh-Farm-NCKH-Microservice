@@ -81,6 +81,14 @@
                         @using (Html.BeginForm("Login", "SellerAccount", new { area = "Seller", returnUrl = ViewBag.ReturnUrl }, FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "needs-validation", novalidate = "novalidate" }))
                         {
                             @Html.AntiForgeryToken()
+                            @if (ViewBag.RateLimitErrorMessage is string rateLimitErrorMessage && !string.IsNullOrWhiteSpace(rateLimitErrorMessage))
+                            {
+                                <div class="alert alert-warning py-2 small mb-3">@rateLimitErrorMessage</div>
+                            }
+                            @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+                            {
+                                <div class="alert alert-danger py-2 small mb-3">@errorMessage</div>
+                            }
                             @Html.ValidationSummary(true, "", new { @class = "text-danger mb-2" })
 
                             <div class="mb-3">

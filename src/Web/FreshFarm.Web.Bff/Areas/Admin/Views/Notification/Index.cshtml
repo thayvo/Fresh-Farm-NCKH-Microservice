@@ -58,21 +58,26 @@
                 <h1 class="fw-bold mb-2">Trung tâm thông báo</h1>
                 <p class="mb-0 opacity-75">Theo dõi thông báo đơn hàng đã gửi cho khách, rà thông báo chưa đọc và xử lý nhanh theo phạm vi toàn sàn.</p>
             </div>
-            <form method="post" action="@Url.Action("MarkAllAsRead", "Notification", new { area = "Admin" })">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="q" value="@Model.Query" />
-                <input type="hidden" name="type" value="@Model.Type" />
-                <input type="hidden" name="userId" value="@Model.UserId" />
-                <input type="hidden" name="orderId" value="@Model.OrderId" />
-                @if (Model.IsRead.HasValue)
-                {
-                    <input type="hidden" name="isRead" value="@Model.IsRead.Value.ToString().ToLowerInvariant()" />
-                }
-                <input type="hidden" name="page" value="@Model.Page" />
-                <button type="submit" class="btn btn-light rounded-pill px-4">
-                    <i class="bi bi-envelope-open me-2"></i>Đánh dấu đã đọc toàn bộ
-                </button>
-            </form>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-light rounded-pill px-4" href="@Url.Action("CreateBroadcast", "Notification", new { area = "Admin" })">
+                    <i class="bi bi-megaphone me-2"></i>Tạo broadcast
+                </a>
+                <form method="post" action="@Url.Action("MarkAllAsRead", "Notification", new { area = "Admin" })">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="q" value="@Model.Query" />
+                    <input type="hidden" name="type" value="@Model.Type" />
+                    <input type="hidden" name="userId" value="@Model.UserId" />
+                    <input type="hidden" name="orderId" value="@Model.OrderId" />
+                    @if (Model.IsRead.HasValue)
+                    {
+                        <input type="hidden" name="isRead" value="@Model.IsRead.Value.ToString().ToLowerInvariant()" />
+                    }
+                    <input type="hidden" name="page" value="@Model.Page" />
+                    <button type="submit" class="btn btn-light rounded-pill px-4">
+                        <i class="bi bi-envelope-open me-2"></i>Đánh dấu đã đọc toàn bộ
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -263,6 +268,10 @@
                                     </td>
                                     <td>
                                         <div>@(item.CreatedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-")</div>
+                                        @if (item.ExpiresAt.HasValue)
+                                        {
+                                            <div class="small text-warning">Hết hạn: @item.ExpiresAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                        }
                                         <div class="small text-muted">Đọc: @(item.ReadAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa")</div>
                                     </td>
                                     <td class="text-end">

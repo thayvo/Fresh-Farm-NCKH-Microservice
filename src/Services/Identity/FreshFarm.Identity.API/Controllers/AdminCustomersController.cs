@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 
 namespace FreshFarm.Identity.Api.Controllers;
@@ -13,6 +14,7 @@ namespace FreshFarm.Identity.Api.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "SellerOrAdmin")]
 public sealed class AdminCustomersController : ControllerBase
 {
+    private const string UserNamePattern = @"^[a-zA-Z0-9._-]+$";
     private static readonly Regex PhoneRegex = new("^\\d{10}$", RegexOptions.Compiled);
 
     private readonly FreshFarmIdentityDBContext _db;
@@ -25,7 +27,10 @@ public sealed class AdminCustomersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] string? keyword = null, [FromQuery] int take = 1000)
+    public async Task<IActionResult> Get(
+        [FromQuery] string? keyword = null,
+        [FromQuery] int take = 1000,
+        [FromQuery] int[]? userIds = null)
     {
         if (take <= 0)
         {
@@ -40,6 +45,17 @@ public sealed class AdminCustomersController : ControllerBase
         var query = _db.Users
             .AsNoTracking()
             .Where(u => u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
+
+        var normalizedUserIds = (userIds ?? Array.Empty<int>())
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(5000)
+            .ToArray();
+
+        if (normalizedUserIds.Length > 0)
+        {
+            query = query.Where(u => normalizedUserIds.Contains(u.UserId));
+        }
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -60,10 +76,15 @@ public sealed class AdminCustomersController : ControllerBase
                 fullName = u.FullName,
                 email = u.Email,
                 phone = u.Phone,
+                avatar = u.Avatar,
                 createdAt = u.CreatedAt,
-                address = u.AddressBook != null && u.AddressBook.IsActive
-                    ? u.AddressBook.AddressDetail
-                    : null
+                address = u.AddressBooks
+                    .Where(a => a.IsActive)
+                    .OrderByDescending(a => a.IsDefault)
+                    .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                    .ThenByDescending(a => a.AddressId)
+                    .Select(a => a.AddressDetail)
+                    .FirstOrDefault()
             })
             .Take(take)
             .ToListAsync();
@@ -84,10 +105,15 @@ public sealed class AdminCustomersController : ControllerBase
                 fullName = u.FullName,
                 email = u.Email,
                 phone = u.Phone,
+                avatar = u.Avatar,
                 createdAt = u.CreatedAt,
-                address = u.AddressBook != null && u.AddressBook.IsActive
-                    ? u.AddressBook.AddressDetail
-                    : null
+                address = u.AddressBooks
+                    .Where(a => a.IsActive)
+                    .OrderByDescending(a => a.IsDefault)
+                    .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                    .ThenByDescending(a => a.AddressId)
+                    .Select(a => a.AddressDetail)
+                    .FirstOrDefault()
             })
             .FirstOrDefaultAsync();
 
@@ -220,7 +246,7 @@ public sealed class AdminCustomersController : ControllerBase
 
         var user = await _db.Users
             .Include(u => u.UserAuth)
-            .Include(u => u.AddressBook)
+            .Include(u => u.AddressBooks)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
@@ -283,7 +309,12 @@ public sealed class AdminCustomersController : ControllerBase
                 return BadRequest(new { message = "Vui long nhap so dien thoai khi cap nhat dia chi." });
             }
 
-            var targetAddress = user.AddressBook;
+            var targetAddress = user.AddressBooks
+                .Where(a => a.IsActive)
+                .OrderByDescending(a => a.IsDefault)
+                .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                .ThenByDescending(a => a.AddressId)
+                .FirstOrDefault();
 
             if (targetAddress is null)
             {
@@ -302,7 +333,6 @@ public sealed class AdminCustomersController : ControllerBase
                 };
 
                 _db.AddressBooks.Add(targetAddress);
-                user.AddressBook = targetAddress;
             }
             else
             {
@@ -326,7 +356,7 @@ public sealed class AdminCustomersController : ControllerBase
             .Include(u => u.UserAuth)
             .Include(u => u.UserRoles)
             .Include(u => u.UserSessions)
-            .Include(u => u.AddressBook)
+            .Include(u => u.AddressBooks)
             .FirstOrDefaultAsync(u => u.UserId == id && u.UserRoles.Any(ur => ur.Role.RoleName == "Customer"));
 
         if (user is null)
@@ -337,9 +367,9 @@ public sealed class AdminCustomersController : ControllerBase
         await using var tran = await _db.Database.BeginTransactionAsync();
         try
         {
-            if (user.AddressBook is not null)
+            if (user.AddressBooks.Count > 0)
             {
-                _db.AddressBooks.Remove(user.AddressBook);
+                _db.AddressBooks.RemoveRange(user.AddressBooks);
             }
 
             if (user.UserSessions.Count > 0)
@@ -382,6 +412,11 @@ public sealed class AdminCustomersController : ControllerBase
         if (string.IsNullOrWhiteSpace(userName))
         {
             return (false, "Ten dang nhap la bat buoc.", userName, fullName, email, phone, password, address);
+        }
+
+        if (!Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", userName, fullName, email, phone, password, address);
         }
 
         if (string.IsNullOrWhiteSpace(fullName))
@@ -445,6 +480,7 @@ public sealed class AdminCustomersController : ControllerBase
 
     public sealed class AdminCreateCustomerRequest
     {
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         public string FullName { get; set; } = string.Empty;

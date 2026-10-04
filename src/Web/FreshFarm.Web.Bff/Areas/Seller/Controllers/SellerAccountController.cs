@@ -1,14 +1,17 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
 using FreshFarm.Web.Bff.Dtos;
+using FreshFarm.Web.Bff.Utilities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 
@@ -18,6 +21,7 @@ namespace FreshFarm.Web.Bff.Areas.Seller.Controllers;
 public class SellerAccountController : LegacySellerControllerBase
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN";
+    private const string TwoFactorChallengeSessionKey = "SELLER_2FA_CHALLENGE";
 
     private readonly IHttpClientFactory _httpClientFactory;
 
@@ -28,21 +32,32 @@ public class SellerAccountController : LegacySellerControllerBase
 
     [HttpGet]
     [AllowAnonymous]
-    public IActionResult Login(string? returnUrl)
+    public IActionResult Login(string? returnUrl, bool rateLimitError = false, string? retryAfter = null)
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        ClearTwoFactorChallenge();
+
         if (User.Identity?.IsAuthenticated == true)
         {
-            return RedirectToLocal(normalizedReturnUrl);
+            if (User.IsInRole("Seller") || User.IsInRole("Admin"))
+            {
+                return RedirectToLocal(normalizedReturnUrl);
+            }
+
+            ModelState.AddModelError(string.Empty, "Tài khoản hiện tại không có quyền Nhà bán. Vui lòng đăng nhập bằng tài khoản Seller.");
         }
 
         ViewBag.ReturnUrl = normalizedReturnUrl;
+        ViewBag.RateLimitErrorMessage = rateLimitError
+            ? BuildRateLimitMessage(retryAfter)
+            : null;
         return View(new SellerLoginViewModel());
     }
 
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> Login(SellerLoginViewModel vm, string? returnUrl)
     {
         return await HandleLoginAsync(vm, returnUrl);
@@ -58,9 +73,84 @@ public class SellerAccountController : LegacySellerControllerBase
     [HttpPost("/Seller/AdminAccount/Login")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> LegacyLoginPost(SellerLoginViewModel vm, string? returnUrl)
     {
         return await HandleLoginAsync(vm, returnUrl);
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public IActionResult TwoFactor()
+    {
+        var challenge = ReadTwoFactorChallenge();
+        if (challenge is null)
+        {
+            return RedirectToAction(nameof(Login), new { area = "Seller" });
+        }
+
+        return View(BuildTwoFactorViewModel(challenge));
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("auth-form")]
+    public async Task<IActionResult> TwoFactor(SellerTwoFactorViewModel vm)
+    {
+        var challenge = ReadTwoFactorChallenge();
+        if (challenge is null)
+        {
+            return RedirectToAction(nameof(Login), new { area = "Seller" });
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(BuildTwoFactorViewModel(challenge, vm.Code));
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        using var verifyHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login/2fa",
+            new VerifyTwoFactorLoginRequestDto
+            {
+                Ticket = challenge.Ticket,
+                Code = vm.Code?.Trim() ?? string.Empty
+            });
+        var response = await identityClient.SendAsync(verifyHttpRequest);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Xác thực 2 bước chưa thành công");
+            ModelState.AddModelError(string.Empty, errorText);
+            return View(BuildTwoFactorViewModel(challenge, vm.Code));
+        }
+
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
+        {
+            ModelState.AddModelError(string.Empty, "Token xác thực không hợp lệ.");
+            return View(BuildTwoFactorViewModel(challenge, vm.Code));
+        }
+
+        ClearTwoFactorChallenge();
+        return await CompleteSellerSignInAsync(auth, challenge.RememberMe, challenge.ReturnUrl);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        return await HandleLogoutAsync();
+    }
+
+    [HttpPost("/Seller/AdminAccount/Logout")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LegacyLogout()
+    {
+        return await HandleLogoutAsync();
     }
 
     private async Task<IActionResult> HandleLoginAsync(SellerLoginViewModel vm, string? returnUrl)
@@ -76,7 +166,8 @@ public class SellerAccountController : LegacySellerControllerBase
         var request = new LoginRequestDto
         {
             Identifier = vm.UserName?.Trim() ?? string.Empty,
-            Password = vm.Password ?? string.Empty
+            Password = vm.Password ?? string.Empty,
+            ClientLane = "Seller"
         };
 
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password))
@@ -86,34 +177,68 @@ public class SellerAccountController : LegacySellerControllerBase
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var loginResponse = await identityClient.PostAsJsonAsync("/auth/login", request);
+        using var loginHttpRequest = FreshFarm.Web.Bff.Utilities.ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login",
+            request);
+        var loginResponse = await identityClient.SendAsync(loginHttpRequest);
         if (!loginResponse.IsSuccessStatusCode)
         {
-            var errorText = await loginResponse.Content.ReadAsStringAsync();
-            ModelState.AddModelError(string.Empty, $"Đăng nhập chưa thành công: {errorText}");
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(loginResponse, "Đăng nhập chưa thành công");
+            ModelState.AddModelError(string.Empty, errorText);
             return View(vm);
         }
 
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
-        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
+        if (auth is null)
         {
-            ModelState.AddModelError(string.Empty, "Đăng nhập chưa thành công: token không hợp lệ.");
+            ModelState.AddModelError(string.Empty, "Phản hồi xác thực không hợp lệ.");
             return View(vm);
         }
 
+        if (auth.RequiresTwoFactor)
+        {
+            SaveTwoFactorChallenge(new TwoFactorChallengeStateDto
+            {
+                Ticket = auth.TwoFactorTicket ?? string.Empty,
+                RememberMe = vm.RememberMe,
+                ReturnUrl = normalizedReturnUrl,
+                RequiresSetup = auth.RequiresTwoFactorSetup,
+                ManualEntryKey = auth.ManualEntryKey,
+                OtpAuthUri = auth.OtpAuthUri,
+                AuthenticatorIssuer = auth.AuthenticatorIssuer,
+                AuthenticatorAccountName = auth.AuthenticatorAccountName,
+                ChallengeMessage = auth.ChallengeMessage
+            });
+
+            return RedirectToAction(nameof(TwoFactor), new { area = "Seller" });
+        }
+
+        if (string.IsNullOrWhiteSpace(auth.AccessToken))
+        {
+            ModelState.AddModelError(string.Empty, "Token xác thực không hợp lệ.");
+            return View(vm);
+        }
+
+        return await CompleteSellerSignInAsync(auth, vm.RememberMe, normalizedReturnUrl);
+    }
+
+    private async Task<IActionResult> CompleteSellerSignInAsync(AuthResponseDto auth, bool rememberMe, string? returnUrl)
+    {
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(auth.AccessToken);
         var roleValues = jwt.Claims
             .Where(c => c.Type == ClaimTypes.Role || c.Type == "role")
             .Select(c => c.Value)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var accountAccess = jwt.Claims.FirstOrDefault(c => c.Type == "account_access")?.Value;
 
         var hasSellerRole = roleValues.Contains("Seller", StringComparer.OrdinalIgnoreCase);
-
-        if (!hasSellerRole)
+        if (!string.Equals(accountAccess, "full", StringComparison.Ordinal) || !hasSellerRole)
         {
-            ModelState.AddModelError(string.Empty, "Tài khoản này không có quyền truy cập Cổng Nhà bán FreshFarm.");
-            return View(vm);
+            TempData["ErrorMessage"] = "Bạn không có quyền truy cập khu vực nhà bán hàng.";
+            return RedirectToAction(nameof(Login), new { area = "Seller", returnUrl });
         }
 
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -126,7 +251,7 @@ public class SellerAccountController : LegacySellerControllerBase
         HttpContext.Session.SetString(AccessTokenSessionKey, auth.AccessToken);
 
         var userIdText = jwt.Subject ?? "0";
-        var userName = jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? request.Identifier;
+        var userName = jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? "seller";
 
         if (!int.TryParse(userIdText, out var adminId))
         {
@@ -146,7 +271,7 @@ public class SellerAccountController : LegacySellerControllerBase
         };
         Response.Cookies.Append("ADMIN_ID", adminId.ToString(), adminCookieOptions);
 
-        if (vm.RememberMe)
+        if (rememberMe)
         {
             var rememberOptions = new CookieOptions
             {
@@ -167,14 +292,24 @@ public class SellerAccountController : LegacySellerControllerBase
             new(JwtRegisteredClaimNames.Sub, userIdText),
             new("sub", userIdText),
             new(ClaimTypes.NameIdentifier, userIdText),
-            new(ClaimTypes.Name, userName),
-            new("ff_access_token", auth.AccessToken)
+            new(ClaimTypes.Name, userName)
         };
 
         foreach (var role in roleValues)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
+
+        foreach (var claimType in new[] { "account_access", "approval_status", "token_version" })
+        {
+            var claimValue = jwt.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(claimValue))
+            {
+                claims.Add(new Claim(claimType, claimValue));
+            }
+        }
+
+        claims.Add(new Claim("session_checked_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
 
         var email = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value;
         if (!string.IsNullOrWhiteSpace(email))
@@ -186,44 +321,31 @@ public class SellerAccountController : LegacySellerControllerBase
         var principal = new ClaimsPrincipal(identity);
         var authProperties = new AuthenticationProperties
         {
-            IsPersistent = vm.RememberMe
+            IsPersistent = rememberMe
         };
 
         if (auth.ExpiredAtUtc > DateTime.UtcNow)
         {
             authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
         }
-        else if (vm.RememberMe)
+        else if (rememberMe)
         {
             authProperties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(7);
         }
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
 
-        if (!string.IsNullOrWhiteSpace(normalizedReturnUrl) && Url.IsLocalUrl(normalizedReturnUrl))
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
         {
-            return Redirect(normalizedReturnUrl);
+            return Redirect(returnUrl);
         }
 
         return RedirectToAction("Dashboard", "Home", new { area = "Seller" });
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Logout()
-    {
-        return await HandleLogoutAsync();
-    }
-
-    [HttpPost("/Seller/AdminAccount/Logout")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LegacyLogout()
-    {
-        return await HandleLogoutAsync();
-    }
-
     private async Task<IActionResult> HandleLogoutAsync()
     {
+        ClearTwoFactorChallenge();
         Session.Clear();
         Session.Abandon();
         HttpContext.Session.Remove(AccessTokenSessionKey);
@@ -264,5 +386,49 @@ public class SellerAccountController : LegacySellerControllerBase
         }
 
         return RedirectToAction("Dashboard", "Home", new { area = "Seller" });
+    }
+
+    private void SaveTwoFactorChallenge(TwoFactorChallengeStateDto challenge)
+    {
+        HttpContext.Session.SetString(TwoFactorChallengeSessionKey, JsonSerializer.Serialize(challenge));
+    }
+
+    private TwoFactorChallengeStateDto? ReadTwoFactorChallenge()
+    {
+        var json = HttpContext.Session.GetString(TwoFactorChallengeSessionKey);
+        return string.IsNullOrWhiteSpace(json)
+            ? null
+            : JsonSerializer.Deserialize<TwoFactorChallengeStateDto>(json);
+    }
+
+    private void ClearTwoFactorChallenge()
+    {
+        HttpContext.Session.Remove(TwoFactorChallengeSessionKey);
+    }
+
+    private static string BuildRateLimitMessage(string? retryAfter)
+    {
+        if (int.TryParse(retryAfter, out var retryAfterSeconds) && retryAfterSeconds > 0)
+        {
+            return $"Bạn thao tác quá nhanh. Vui lòng chờ khoảng {retryAfterSeconds} giây rồi thử lại.";
+        }
+
+        return "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.";
+    }
+
+    private static SellerTwoFactorViewModel BuildTwoFactorViewModel(TwoFactorChallengeStateDto challenge, string? code = null)
+    {
+        return new SellerTwoFactorViewModel
+        {
+            Code = code ?? string.Empty,
+            RequiresSetup = challenge.RequiresSetup,
+            RememberMe = challenge.RememberMe,
+            ManualEntryKey = challenge.ManualEntryKey,
+            OtpAuthUri = challenge.OtpAuthUri,
+            QrCodeImageDataUri = QrCodeDataUriBuilder.BuildSvgDataUri(challenge.OtpAuthUri),
+            AuthenticatorIssuer = challenge.AuthenticatorIssuer,
+            AuthenticatorAccountName = challenge.AuthenticatorAccountName,
+            ChallengeMessage = challenge.ChallengeMessage
+        };
     }
 }

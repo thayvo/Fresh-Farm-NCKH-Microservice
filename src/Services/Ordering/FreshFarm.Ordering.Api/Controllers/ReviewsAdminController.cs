@@ -33,7 +33,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -59,8 +58,13 @@ public sealed class ReviewsAdminController : ControllerBase
             .GroupBy(o => o.UserId)
             .Select(g => g.OrderByDescending(x => x.OrderDate).First())
             .ToDictionaryAsync(x => x.UserId, cancellationToken);
+        var productNamesById = await GetSellerProductNamesAsync(sellerId.Value, sellerProductIds, cancellationToken);
 
-        var rows = reviews.Select(review => MapReview(review, reports.Where(x => x.ReviewId == review.ReviewId).ToList(), latestOrdersByUser));
+        var rows = reviews.Select(review => MapReview(
+            review,
+            reports.Where(x => x.ReviewId == review.ReviewId).ToList(),
+            latestOrdersByUser,
+            productNamesById));
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -101,7 +105,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -127,6 +130,7 @@ public sealed class ReviewsAdminController : ControllerBase
             .GroupBy(o => o.UserId)
             .Select(g => g.OrderByDescending(x => x.OrderDate).First())
             .ToDictionaryAsync(x => x.UserId, cancellationToken);
+        var productNamesById = await GetSellerProductNamesAsync(sellerId.Value, sellerProductIds, cancellationToken);
 
         var rows = openReports
             .GroupBy(x => x.ReviewId)
@@ -141,7 +145,7 @@ public sealed class ReviewsAdminController : ControllerBase
                     openCount = g.Count(),
                     firstReportAt = g.Min(x => x.CreatedAt),
                     customerName = string.IsNullOrWhiteSpace(userOrder?.BuyerFullName) ? $"Khach {review.UserId}" : userOrder!.BuyerFullName,
-                    productName = $"San pham #{review.ProductId}",
+                    productName = ResolveProductName(review.ProductId, productNamesById),
                     productImageFileName = (string?)null,
                     rating = review.Rating,
                     comment = review.Comment,
@@ -164,7 +168,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -254,7 +257,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -299,7 +301,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -329,7 +330,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -364,7 +364,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -431,7 +430,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -472,7 +470,6 @@ public sealed class ReviewsAdminController : ControllerBase
             return Unauthorized(new { message = "Khong xac dinh duoc seller." });
         }
 
-        await EnsureSeedDataAsync(cancellationToken);
         var sellerProductIds = await GetSellerProductIdsAsync(sellerId.Value, cancellationToken);
         if (sellerProductIds.Count == 0)
         {
@@ -527,95 +524,42 @@ public sealed class ReviewsAdminController : ControllerBase
         });
     }
 
-    private async Task EnsureSeedDataAsync(CancellationToken cancellationToken)
+    private async Task<Dictionary<int, string>> GetSellerProductNamesAsync(
+        int sellerId,
+        IReadOnlyCollection<int> productIds,
+        CancellationToken cancellationToken)
     {
-        var hasAnyReview = await _db.Reviews.AsNoTracking().AnyAsync(cancellationToken);
-        if (hasAnyReview)
+        var normalizedIds = productIds
+            .Where(id => id > 0)
+            .Distinct()
+            .ToList();
+        if (normalizedIds.Count == 0)
         {
-            return;
+            return new Dictionary<int, string>();
         }
 
-        var orders = await _db.Orders
+        var rows = await _db.SellerOrderItems
             .AsNoTracking()
-            .OrderByDescending(o => o.OrderDate)
-            .Take(120)
+            .Where(x => x.SellerOrder.SellerId == sellerId)
+            .Where(x => normalizedIds.Contains(x.ProductId))
+            .Where(x => !string.IsNullOrWhiteSpace(x.SnapshotName))
+            .OrderByDescending(x => x.SellerOrderItemId)
             .ToListAsync(cancellationToken);
 
-        var orderIds = orders.Select(x => x.OrderId).ToList();
-        var detailLookup = await _db.OrderDetails
-            .AsNoTracking()
-            .Where(x => orderIds.Contains(x.OrderId))
-            .GroupBy(x => x.OrderId)
-            .Select(g => new { orderId = g.Key, productId = g.OrderBy(d => d.OrderDetailId).Select(d => d.ProductId).FirstOrDefault() })
-            .ToDictionaryAsync(x => x.orderId, x => x.productId, cancellationToken);
-
-        var reviews = new List<Review>();
-        foreach (var order in orders)
-        {
-            var generatedRating = (order.OrderId % 5) + 1;
-            detailLookup.TryGetValue(order.OrderId, out var productId);
-
-            reviews.Add(new Review
-            {
-                ProductId = productId > 0 ? productId : ((order.OrderId % 1000) + 1),
-                UserId = order.UserId,
-                Rating = generatedRating,
-                Comment = $"Danh gia cho don #{order.OrderId:D6}",
-                CreatedAt = order.OrderDate.AddHours(4),
-                IsApproved = generatedRating >= 3,
-                IsEdited = false,
-                IsDeleted = false
-            });
-        }
-
-        _db.Reviews.AddRange(reviews);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        var seededReviews = await _db.Reviews
-            .AsNoTracking()
-            .OrderBy(x => x.ReviewId)
-            .Take(reviews.Count)
-            .ToListAsync(cancellationToken);
-
-        var reports = new List<ReviewReport>();
-        foreach (var review in seededReviews)
-        {
-            if (review.ReviewId % 4 != 0)
-            {
-                continue;
-            }
-
-            reports.Add(new ReviewReport
-            {
-                ReviewId = review.ReviewId,
-                ReporterUserId = Math.Max(1, review.UserId + 1),
-                Reason = "Noi dung khong phu hop",
-                Status = 0,
-                CreatedAt = review.CreatedAt.AddHours(1)
-            });
-
-            if (review.ReviewId % 8 == 0)
-            {
-                reports.Add(new ReviewReport
-                {
-                    ReviewId = review.ReviewId,
-                    ReporterUserId = Math.Max(1, review.UserId + 2),
-                    Reason = "Spam",
-                    Note = "Kiem tra lai",
-                    Status = 0,
-                    CreatedAt = review.CreatedAt.AddHours(2)
-                });
-            }
-        }
-
-        if (reports.Count > 0)
-        {
-            _db.ReviewReports.AddRange(reports);
-            await _db.SaveChangesAsync(cancellationToken);
-        }
+        return rows
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.SnapshotName?.Trim())
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+                    ?? $"San pham #{g.Key}");
     }
 
-    private static dynamic MapReview(Review review, List<ReviewReport> reports, Dictionary<int, Order> latestOrdersByUser)
+    private static dynamic MapReview(
+        Review review,
+        List<ReviewReport> reports,
+        Dictionary<int, Order> latestOrdersByUser,
+        IReadOnlyDictionary<int, string> productNamesById)
     {
         latestOrdersByUser.TryGetValue(review.UserId, out var userOrder);
         var fullName = string.IsNullOrWhiteSpace(userOrder?.BuyerFullName) ? $"Khach {review.UserId}" : userOrder!.BuyerFullName;
@@ -644,7 +588,7 @@ public sealed class ReviewsAdminController : ControllerBase
             product = new
             {
                 productID = review.ProductId,
-                productName = $"San pham #{review.ProductId}",
+                productName = ResolveProductName(review.ProductId, productNamesById),
                 imageFileName = (string?)null
             },
             reviewReports = reports.Select(r => new
@@ -658,6 +602,14 @@ public sealed class ReviewsAdminController : ControllerBase
                 createdAt = r.CreatedAt
             }).ToList()
         };
+    }
+
+    private static string ResolveProductName(int productId, IReadOnlyDictionary<int, string> productNamesById)
+    {
+        return productNamesById.TryGetValue(productId, out var name) &&
+               !string.IsNullOrWhiteSpace(name)
+            ? name
+            : $"San pham #{productId}";
     }
 
     private int? TryGetSellerIdFromToken()

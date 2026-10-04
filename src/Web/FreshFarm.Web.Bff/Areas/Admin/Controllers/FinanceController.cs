@@ -137,6 +137,36 @@ public sealed class FinanceController : LegacySellerControllerBase
         return RedirectToAction(nameof(Index), new { section, q, status, followUpBucket, sellerId, page });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GeneratePayouts(string? q, string? status, string? followUpBucket, int? sellerId, bool releaseNow = false, int page = 1)
+    {
+        try
+        {
+            var client = CreateOrderingClient();
+            var query = new List<string>();
+            if (sellerId.HasValue && sellerId.Value > 0)
+            {
+                query.Add($"sellerId={sellerId.Value}");
+            }
+            if (releaseNow)
+            {
+                query.Add("releaseNow=true");
+            }
+            var endpoint = "/api/orders/admin/finance/payouts/generate" + (query.Count > 0 ? "?" + string.Join("&", query) : string.Empty);
+            var response = await client.PostAsJsonAsync(endpoint, new { });
+
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                await ReadApiErrorAsync(response, response.IsSuccessStatusCode ? "Đã ghi nhận chi trả cho người bán." : "Không thể tạo payout chờ chi trả.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi tạo payout chờ chi trả: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index), new { section = "payouts", q, status, followUpBucket, sellerId, page });
+    }
+
     [HttpGet]
     public async Task<IActionResult> Export(string? section = null, string? q = null, string? status = null, string? followUpBucket = null, int? sellerId = null)
     {
@@ -169,7 +199,7 @@ public sealed class FinanceController : LegacySellerControllerBase
         ViewData["AreaName"] = "Admin";
         ViewData["LayoutPath"] = "~/Areas/Admin/Views/Shared/_LayoutAdmin.cshtml";
         ViewData["FinanceScopeLabel"] = "Toàn sàn";
-        return View("~/Areas/Seller/Views/Finance/Index.cshtml", model);
+        return View("~/Areas/Admin/Views/Finance/Index.cshtml", model);
     }
 
     private HttpClient CreateOrderingClient()
@@ -227,6 +257,15 @@ public sealed class FinanceController : LegacySellerControllerBase
             GrossMerchandiseValue = payload.Stats?.GrossMerchandiseValue ?? 0m,
             CapturedPayments = payload.Stats?.CapturedPayments ?? 0m,
             PlatformCommission = payload.Stats?.PlatformCommission ?? 0m,
+            SellerEarning = payload.Stats?.SellerEarning ?? 0m,
+            ReconciliationGrossMerchandiseValue = payload.Stats?.ReconciliationGrossMerchandiseValue ?? 0m,
+            ReconciliationPlatformCommission = payload.Stats?.ReconciliationPlatformCommission ?? 0m,
+            ReconciliationSellerEarning = payload.Stats?.ReconciliationSellerEarning ?? 0m,
+            WithdrawableAmount = payload.Stats?.WithdrawableAmount ?? 0m,
+            PendingSellerPayoutAmount = payload.Stats?.PendingSellerPayoutAmount ?? 0m,
+            PaidPayoutAmount = payload.Stats?.PaidPayoutAmount ?? 0m,
+            WithdrawnAmount = payload.Stats?.WithdrawnAmount ?? 0m,
+            RemainingWithdrawableAmount = payload.Stats?.RemainingWithdrawableAmount ?? 0m,
             PendingPayoutAmount = payload.Stats?.PendingPayoutAmount ?? 0m,
             RefundedAmount = payload.Stats?.RefundedAmount ?? 0m,
             OpenReturns = payload.Stats?.OpenReturns ?? 0,
@@ -242,21 +281,21 @@ public sealed class FinanceController : LegacySellerControllerBase
             Refunds = payload.SectionCounts?.Refunds ?? 0,
             Returns = payload.SectionCounts?.Returns ?? 0
         };
-        model.SellerOptions = payload.Filters?.SellerOptions?
+        model.SellerOptions = DeduplicateOptions(payload.Filters?.SellerOptions)?
             .Select(x => new FinanceOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
             })
             .ToList() ?? new List<FinanceOptionViewModel>();
-        model.StatusOptions = payload.Filters?.StatusOptions?
+        model.StatusOptions = DeduplicateOptions(payload.Filters?.StatusOptions)?
             .Select(x => new FinanceOptionViewModel
             {
                 Value = x.Value ?? string.Empty,
                 Text = x.Text ?? string.Empty
             })
             .ToList() ?? new List<FinanceOptionViewModel>();
-        model.Rows = payload.Rows?
+        model.Rows = DeduplicateRows(payload.Rows)?
             .Select(x => new FinanceConsoleRowViewModel
             {
                 RecordId = x.RecordId,
@@ -293,7 +332,24 @@ public sealed class FinanceController : LegacySellerControllerBase
                 LastActionSummary = x.LastActionSummary ?? string.Empty
             })
             .ToList() ?? new List<FinanceConsoleRowViewModel>();
-        model.OwnerSummary = payload.OwnerSummary?
+        model.SellerBreakdown = payload.SellerBreakdown?
+            .Where(x => x.SellerId > 0)
+            .Select(x => new FinanceSellerBreakdownViewModel
+            {
+                SellerId = x.SellerId,
+                SellerLabel = string.IsNullOrWhiteSpace(x.SellerLabel) ? $"Seller #{x.SellerId}" : x.SellerLabel.Trim(),
+                OrderCount = x.OrderCount,
+                GrossMerchandiseValue = x.GrossMerchandiseValue,
+                PlatformCommission = x.PlatformCommission,
+                SellerEarning = x.SellerEarning,
+                PaidAmount = x.PaidAmount,
+                PendingAmount = x.PendingAmount,
+                UnpaidAmount = x.UnpaidAmount
+            })
+            .OrderByDescending(x => x.SellerEarning)
+            .ThenBy(x => x.SellerId)
+            .ToList() ?? new List<FinanceSellerBreakdownViewModel>();
+        model.OwnerSummary = DeduplicateOwnerSummary(payload.OwnerSummary)?
             .Select(x => new FinanceOwnerSummaryViewModel
             {
                 OwnerLabel = x.OwnerLabel ?? string.Empty,
@@ -304,6 +360,110 @@ public sealed class FinanceController : LegacySellerControllerBase
             })
             .ToList() ?? new List<FinanceOwnerSummaryViewModel>();
     }
+
+    private static IEnumerable<FinanceOptionApiDto>? DeduplicateOptions(IEnumerable<FinanceOptionApiDto>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First());
+    }
+
+    private static IEnumerable<FinanceConsoleRowApiDto>? DeduplicateRows(IEnumerable<FinanceConsoleRowApiDto>? rows)
+    {
+        return rows?
+            .Where(row => row.RecordId > 0)
+            .GroupBy(row => row.RecordId)
+            .Select(group => group
+                .OrderByDescending(CalculateRowScore)
+                .ThenByDescending(CalculateRowSignalLength)
+                .ThenByDescending(row => row.PaidAt ?? row.ProcessedAt ?? row.ScheduledAt ?? row.CreatedAt)
+                .First());
+    }
+
+    private static IEnumerable<FinanceOwnerSummaryApiDto>? DeduplicateOwnerSummary(IEnumerable<FinanceOwnerSummaryApiDto>? items)
+    {
+        return items?
+            .Where(item => HasMeaningfulValue(item.OwnerLabel))
+            .GroupBy(item => item.OwnerLabel!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateOwnerSummaryScore)
+                .ThenByDescending(CalculateOwnerSummarySignalLength)
+                .First());
+    }
+
+    private static int CalculateOptionSignalLength(FinanceOptionApiDto option)
+        => (option.Value?.Length ?? 0) + (option.Text?.Length ?? 0);
+
+    private static int CalculateRowScore(FinanceConsoleRowApiDto row)
+    {
+        var score = 0;
+        score += row.OrderId.HasValue ? 1 : 0;
+        score += row.SellerId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.SellerLabel) ? 1 : 0;
+        score += row.OrderCount.HasValue ? 1 : 0;
+        score += row.AmountGross.HasValue ? 1 : 0;
+        score += row.FeeAmount.HasValue ? 1 : 0;
+        score += row.AmountNet.HasValue ? 1 : 0;
+        score += row.RefundAmount.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.Status) ? 1 : 0;
+        score += HasMeaningfulValue(row.Method) ? 1 : 0;
+        score += HasMeaningfulValue(row.Provider) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReferenceCode) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReasonCode) ? 1 : 0;
+        score += HasMeaningfulValue(row.Resolution) ? 1 : 0;
+        score += HasMeaningfulValue(row.ItemName) ? 1 : 0;
+        score += HasMeaningfulValue(row.ReconciliationStatus) ? 1 : 0;
+        score += HasMeaningfulValue(row.NextStep) ? 1 : 0;
+        score += HasMeaningfulValue(row.AssignedOwner) ? 1 : 0;
+        score += row.FollowUpAt.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.FollowUpNote) ? 1 : 0;
+        score += row.ReminderSentAt.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.ReminderNote) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityKey) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityLabel) ? 1 : 0;
+        score += HasMeaningfulValue(row.PriorityReason) ? 1 : 0;
+        score += HasMeaningfulValue(row.LastActionSummary) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRowSignalLength(FinanceConsoleRowApiDto row)
+        => (row.SellerLabel?.Length ?? 0)
+        + (row.Status?.Length ?? 0)
+        + (row.Method?.Length ?? 0)
+        + (row.Provider?.Length ?? 0)
+        + (row.ReferenceCode?.Length ?? 0)
+        + (row.ReasonCode?.Length ?? 0)
+        + (row.Resolution?.Length ?? 0)
+        + (row.ItemName?.Length ?? 0)
+        + (row.ReconciliationStatus?.Length ?? 0)
+        + (row.NextStep?.Length ?? 0)
+        + (row.AssignedOwner?.Length ?? 0)
+        + (row.FollowUpNote?.Length ?? 0)
+        + (row.ReminderNote?.Length ?? 0)
+        + (row.PriorityKey?.Length ?? 0)
+        + (row.PriorityLabel?.Length ?? 0)
+        + (row.PriorityReason?.Length ?? 0)
+        + (row.LastActionSummary?.Length ?? 0);
+
+    private static int CalculateOwnerSummaryScore(FinanceOwnerSummaryApiDto item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.OwnerLabel) ? 2 : 0;
+        score += item.ItemCount > 0 ? 1 : 0;
+        score += item.OverdueCount > 0 ? 1 : 0;
+        score += item.DueSoonCount > 0 ? 1 : 0;
+        score += item.NoFollowUpCount > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateOwnerSummarySignalLength(FinanceOwnerSummaryApiDto item)
+        => (item.OwnerLabel?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private static string BuildExportEndpoint(string? section, string? q, string? status, string? followUpBucket, int? sellerId)
     {

@@ -1,0 +1,20 @@
+@model FreshFarm.Web.Bff.Dtos.AccountNotificationsPageViewModel
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <span class="notification-kpi">
+        <i class="bi bi-inbox text-success"></i>
+        @Model.TotalNotifications tổng
+    </span>
+    <span class="notification-kpi danger">
+        <i class="bi bi-circle-fill small"></i>
+        @Model.UnreadNotifications chưa đọc
+    </span>
+    <span class="notification-kpi warning">
+        <i class="bi bi-clock-history"></i>
+        @Model.Recent24hNotifications mới trong 24h
+    </span>
+    <span class="notification-kpi">
+        <i class="bi bi-eye text-success"></i>
+        @Model.Notifications.Count đang hiển thị
+    </span>
+</div>

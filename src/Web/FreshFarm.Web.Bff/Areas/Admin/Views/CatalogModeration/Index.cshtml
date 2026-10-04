@@ -106,10 +106,7 @@
     <div class="hero-card ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4 align-items-lg-center">
             <div>
-                <div class="hero-pill ff-admin-chip mb-3">
-                    <i class="bi bi-shield-check"></i>
-                    <span>Catalog moderation MVP</span>
-                </div>
+        
                 <h1 class="fw-bold mb-2">Kiểm duyệt sản phẩm</h1>
                 <p class="mb-0 opacity-75">Soi nhanh nội dung nhạy cảm, dữ liệu thiếu và quyết định ẩn/mở bán ở scope toàn sàn.</p>
             </div>
@@ -296,7 +293,7 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex gap-3">
-                                    <img class="thumb-box" src="@ProductImagePaths.ResolveRequestPath(row.ImageFileName)" alt="@row.ProductName" />
+                                    <img class="thumb-box" src="@ProductImagePaths.ResolveRequestPath(row.ImageFileName)" alt="@row.ProductName" loading="lazy" decoding="async" />
                                             <div>
                                                 <div class="fw-bold">@row.ProductName</div>
                                                 <div class="text-muted small">SKU: @row.Sku</div>

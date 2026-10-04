@@ -1,10 +1,13 @@
 ﻿using System.IdentityModel.Tokens.Jwt; // Dung de parse JWT claim.
 using System.Security.Claims; // Dung Claim/ClaimsPrincipal.
+using System.Text.Json;
 using FreshFarm.Web.Bff.Dtos; // Dung DTO vua tao.
 using FreshFarm.Web.Bff.Options;
 using FreshFarm.Web.Bff.Services; // Dung service GHN.
+using FreshFarm.Web.Bff.Utilities;
 using Microsoft.AspNetCore.Authentication; // Dung SignInAsync/SignOutAsync.
 using Microsoft.AspNetCore.Authentication.Cookies; // Cookie auth scheme.
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization; // [Authorize], [AllowAnonymous].
 using Microsoft.AspNetCore.Mvc; // Controller, IActionResult.
 using Microsoft.Extensions.Options;
@@ -14,27 +17,58 @@ namespace FreshFarm.Web.Bff.Controllers; // Namespace controller.
 public sealed class AccountController : Controller // MVC controller cho auth/account pages.
 {
     private const string AccessTokenSessionKey = "ACCESS_TOKEN"; // Key luu JWT trong session.
+    private const string SignUpCaptchaSessionKey = "SIGNUP_CAPTCHA_CODE";
+    private const string ForgotPasswordCaptchaSessionKey = "FORGOT_PASSWORD_CAPTCHA_CODE";
+    private const string TwoFactorChallengeSessionKey = "ACCOUNT_2FA_CHALLENGE";
     private readonly IHttpClientFactory _httpClientFactory; // Factory tao HttpClient theo ten.
     private readonly IGhnSandboxService _ghnSandboxService; // Service doc danh muc dia chi GHN.
     private readonly GoogleAuthenticationOptions _googleAuthenticationOptions;
+    private readonly GoogleRecaptchaOptions _googleRecaptchaOptions;
+    private readonly IGoogleRecaptchaService _googleRecaptchaService;
+    private readonly ISignUpCaptchaService _signUpCaptchaService;
+    private readonly IBotChallengeService _botChallengeService;
+    private readonly ISellerKycStorageService _sellerKycStorageService;
 
     public AccountController(
         IHttpClientFactory httpClientFactory,
         IGhnSandboxService ghnSandboxService,
-        IOptions<GoogleAuthenticationOptions> googleAuthenticationOptions) // Inject factory qua DI.
+        IOptions<GoogleAuthenticationOptions> googleAuthenticationOptions,
+        IOptions<GoogleRecaptchaOptions> googleRecaptchaOptions,
+        IGoogleRecaptchaService googleRecaptchaService,
+        ISignUpCaptchaService signUpCaptchaService,
+        IBotChallengeService botChallengeService,
+        ISellerKycStorageService sellerKycStorageService) // Inject factory qua DI.
     {
         _httpClientFactory = httpClientFactory; // Gan vao field.
         _ghnSandboxService = ghnSandboxService;
         _googleAuthenticationOptions = googleAuthenticationOptions.Value;
+        _googleRecaptchaOptions = googleRecaptchaOptions.Value;
+        _googleRecaptchaService = googleRecaptchaService;
+        _signUpCaptchaService = signUpCaptchaService;
+        _botChallengeService = botChallengeService;
+        _sellerKycStorageService = sellerKycStorageService;
     }
 
     [HttpGet("/account/signin")] // Route GET signin.
     [AllowAnonymous] // Chua login van vao duoc.
-    public IActionResult SignIn(string? returnUrl = null, string? externalError = null) // Render view signin.
+    public IActionResult SignIn(string? returnUrl = null, string? externalError = null, bool rateLimitError = false, string? retryAfter = null) // Render view signin.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chuan hoa returnUrl cho redirect an toan.
+        ClearTwoFactorChallenge();
         if (User.Identity?.IsAuthenticated == true) // Neu da dang nhap thi khong can vao form.
         {
+            if (string.Equals(User.FindFirstValue("account_access"), "pending", StringComparison.Ordinal))
+            {
+                PopulateSignInViewData(normalizedReturnUrl, rateLimitError, retryAfter);
+                ViewData["PendingApproval"] = true;
+                ViewData["PendingApprovalMessage"] =
+                    "Tài khoản của bạn đang chờ quản trị viên phê duyệt.";
+                ViewData["PendingAccountName"] = User.FindFirstValue(ClaimTypes.Email)
+                    ?? User.Identity.Name
+                    ?? "Tài khoản FreshFarm";
+                return View(new LoginRequestDto());
+            }
+
             return RedirectToLocal(normalizedReturnUrl); // Quay ve trang truoc hoac fallback.
         }
 
@@ -45,44 +79,119 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
                 : "Đăng nhập Google chưa hoàn tất. Vui lòng thử lại.";
         }
 
-        ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
-        ViewData["ReturnUrl"] = normalizedReturnUrl; // Luu returnUrl de POST redirect dung trang.
+        PopulateSignInViewData(normalizedReturnUrl, rateLimitError, retryAfter);
         return View(); // Views/Account/SignIn.cshtml.
+    }
+
+    private void PopulateSignInViewData(string? normalizedReturnUrl, bool rateLimitError = false, string? retryAfter = null)
+    {
+        ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
+        ViewData["PendingVerificationIdentifier"] = TempData["PendingVerificationIdentifier"] as string;
+        ViewData["ReturnUrl"] = normalizedReturnUrl;
+        ViewData["LockoutExpiresAtUtc"] = null;
+        ViewData["FormErrorMessage"] = null;
+        ViewData["PendingApproval"] = false;
+        ViewData["RateLimitErrorMessage"] = rateLimitError
+            ? BuildRateLimitMessage(retryAfter)
+            : null;
+    }
+
+    private static string BuildRateLimitMessage(string? retryAfter)
+    {
+        if (int.TryParse(retryAfter, out var retryAfterSeconds) && retryAfterSeconds > 0)
+        {
+            return $"Bạn thao tác quá nhanh. Vui lòng chờ khoảng {retryAfterSeconds} giây rồi thử lại.";
+        }
+
+        return "Bạn thao tác quá nhanh. Vui lòng chờ một lát rồi thử lại.";
     }
 
     [HttpPost("/account/signin")] // Route POST signin.
     [ValidateAntiForgeryToken] // Bắt buộc token hợp lệ từ form.
     [AllowAnonymous] // Anonymous submit login.
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> SignIn(LoginRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl); // Chi chap nhan local url de tranh open redirect.
         ViewData["GoogleLoginEnabled"] = _googleAuthenticationOptions.IsConfigured;
         ViewData["ReturnUrl"] = normalizedReturnUrl; // Giu lai de form render lai khi co loi.
+        ViewData["PendingVerificationIdentifier"] = null;
+        ViewData["LockoutExpiresAtUtc"] = null;
+        ViewData["FormErrorMessage"] = null;
+
+        request.ClientLane = "Customer";
 
         if (string.IsNullOrWhiteSpace(request.Identifier) || string.IsNullOrWhiteSpace(request.Password)) // Validate input.
         {
-            ModelState.AddModelError(string.Empty, "Vui long nhap day du thong tin."); // Them loi cho view.
+            ModelState.AddModelError(string.Empty, "Vui lòng nhập đầy đủ thông tin."); // Them loi cho view.
             return View(request); // Render lai form.
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Lay client goi Identity API.
-        var loginResponse = await identityClient.PostAsJsonAsync("/auth/login", request); // Goi login API.
+        using var loginHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login",
+            request);
+        var loginResponse = await identityClient.SendAsync(loginHttpRequest); // Goi login API.
 
         if (!loginResponse.IsSuccessStatusCode) // Neu login fail.
         {
-            var errorText = await loginResponse.Content.ReadAsStringAsync(); // Doc body loi.
-            ModelState.AddModelError(string.Empty, $"Dang nhap that bai: {errorText}"); // Show error.
+            var errorBody = await loginResponse.Content.ReadAsStringAsync();
+            var errorText = ApiErrorMessageParser.ExtractMessage(errorBody, "Đăng nhập chưa thành công"); // Doc body loi.
+            if (RequiresEmailVerification(errorText))
+            {
+                ViewData["PendingVerificationIdentifier"] = request.Identifier.Trim();
+            }
+
+            if (ApiErrorMessageParser.TryExtractLockedUntilUtc(errorBody, out var lockoutExpiresAtUtc))
+            {
+                ViewData["LockoutExpiresAtUtc"] = lockoutExpiresAtUtc.ToString("O");
+                ViewData["FormErrorMessage"] = errorText;
+                return View(request);
+            }
+
+            ModelState.AddModelError(string.Empty, errorText); // Show error.
             return View(request); // O lai form login.
         }
 
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponseDto>(); // Parse body sang DTO.
-        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken)) // Bao ve response xau.
+        if (auth is null)
         {
-            ModelState.AddModelError(string.Empty, "Token tra ve khong hop le."); // Bao loi.
+            ModelState.AddModelError(string.Empty, "Phản hồi xác thực không hợp lệ.");
+            return View(request);
+        }
+
+        if (auth.RequiresTwoFactor)
+        {
+            SaveTwoFactorChallenge(new TwoFactorChallengeStateDto
+            {
+                Ticket = auth.TwoFactorTicket ?? string.Empty,
+                RememberMe = false,
+                ReturnUrl = normalizedReturnUrl,
+                RequiresSetup = auth.RequiresTwoFactorSetup,
+                ManualEntryKey = auth.ManualEntryKey,
+                OtpAuthUri = auth.OtpAuthUri,
+                AuthenticatorIssuer = auth.AuthenticatorIssuer,
+                AuthenticatorAccountName = auth.AuthenticatorAccountName,
+                ChallengeMessage = auth.ChallengeMessage
+            });
+
+            return RedirectToAction(nameof(TwoFactor));
+        }
+
+        if (string.IsNullOrWhiteSpace(auth.AccessToken)) // Bao ve response xau.
+        {
+            ModelState.AddModelError(string.Empty, "Token trả về không hợp lệ."); // Bao loi.
             return View(request); // O lai form.
         }
 
         await SignInWithIdentityTokenAsync(auth, request.Identifier);
+
+        if (auth.IsPendingApproval)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
 
         return RedirectToLocal(normalizedReturnUrl); // Login xong quay ve trang dang dung neu hop le.
     }
@@ -131,39 +240,152 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }
 
+        var emailVerifiedValue = externalAuth.Principal.FindFirstValue(GoogleAuthenticationClaimTypes.EmailVerified);
+        if (!bool.TryParse(emailVerifiedValue, out var emailVerified) || !emailVerified)
+        {
+            await HttpContext.SignOutAsync("GoogleExternal");
+            TempData["ErrorMessage"] = "Google chưa xác minh địa chỉ email này. Vui lòng dùng một tài khoản Google có email đã xác minh.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
         var fullName = externalAuth.Principal.FindFirstValue(ClaimTypes.Name) ?? email;
+        var providerSubject = externalAuth.Principal.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? externalAuth.Principal.FindFirstValue("sub");
+        if (string.IsNullOrWhiteSpace(providerSubject))
+        {
+            await HttpContext.SignOutAsync("GoogleExternal");
+            TempData["ErrorMessage"] = "Google chưa trả về định danh tài khoản hợp lệ. Vui lòng thử lại.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
         var avatarUrl = externalAuth.Principal.FindFirstValue("picture")
             ?? externalAuth.Principal.FindFirstValue("urn:google:picture");
 
         var identityClient = _httpClientFactory.CreateClient("Identity");
-        var exchangeResponse = await identityClient.PostAsJsonAsync("/auth/external-login", new ExternalLoginExchangeRequestDto
-        {
-            Provider = "Google",
-            Email = email,
-            FullName = fullName,
-            AvatarUrl = avatarUrl
-        });
+        using var externalLoginHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/external-login",
+            new ExternalLoginExchangeRequestDto
+            {
+                Provider = "Google",
+                ProviderSubject = providerSubject,
+                Email = email,
+                EmailVerified = true,
+                HostedDomain = externalAuth.Principal.FindFirstValue(GoogleAuthenticationClaimTypes.HostedDomain),
+                FullName = fullName,
+                AvatarUrl = avatarUrl
+            });
+        var exchangeResponse = await identityClient.SendAsync(externalLoginHttpRequest);
 
         await HttpContext.SignOutAsync("GoogleExternal");
 
         if (!exchangeResponse.IsSuccessStatusCode)
         {
-            var errorText = await exchangeResponse.Content.ReadAsStringAsync();
-            TempData["ErrorMessage"] = string.IsNullOrWhiteSpace(errorText)
-                ? "Không thể hoàn tất đăng nhập Google."
-                : $"Đăng nhập Google thất bại: {errorText}";
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(exchangeResponse, "Không thể hoàn tất đăng nhập Google");
+            TempData["ErrorMessage"] = errorText;
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }
 
         var auth = await exchangeResponse.Content.ReadFromJsonAsync<AuthResponseDto>();
-        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
+        if (auth is null)
+        {
+            TempData["ErrorMessage"] = "Identity API trả phản hồi đăng nhập Google không hợp lệ.";
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        if (auth.RequiresTwoFactor)
+        {
+            SaveTwoFactorChallenge(new TwoFactorChallengeStateDto
+            {
+                Ticket = auth.TwoFactorTicket ?? string.Empty,
+                RememberMe = false,
+                ReturnUrl = normalizedReturnUrl,
+                RequiresSetup = auth.RequiresTwoFactorSetup,
+                ManualEntryKey = auth.ManualEntryKey,
+                OtpAuthUri = auth.OtpAuthUri,
+                AuthenticatorIssuer = auth.AuthenticatorIssuer,
+                AuthenticatorAccountName = auth.AuthenticatorAccountName,
+                ChallengeMessage = auth.ChallengeMessage
+            });
+
+            return RedirectToAction(nameof(TwoFactor));
+        }
+
+        if (string.IsNullOrWhiteSpace(auth.AccessToken))
         {
             TempData["ErrorMessage"] = "Identity API trả token đăng nhập Google không hợp lệ.";
             return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
         }
 
         await SignInWithIdentityTokenAsync(auth, email);
+        if (auth.IsPendingApproval)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
+
         return RedirectToLocal(normalizedReturnUrl);
+    }
+
+    [HttpGet("/account/signin/2fa")]
+    [AllowAnonymous]
+    public IActionResult TwoFactor()
+    {
+        var challenge = ReadTwoFactorChallenge();
+        if (challenge is null)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
+
+        return View(BuildTwoFactorViewModel(challenge));
+    }
+
+    [HttpPost("/account/signin/2fa")]
+    [ValidateAntiForgeryToken]
+    [AllowAnonymous]
+    [EnableRateLimiting("auth-form")]
+    public async Task<IActionResult> TwoFactor(AccountTwoFactorViewModel model)
+    {
+        var challenge = ReadTwoFactorChallenge();
+        if (challenge is null)
+        {
+            return RedirectToAction(nameof(SignIn));
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(BuildTwoFactorViewModel(challenge, model.Code));
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        using var verifyHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/login/2fa",
+            new VerifyTwoFactorLoginRequestDto
+            {
+                Ticket = challenge.Ticket,
+                Code = model.Code?.Trim() ?? string.Empty
+            });
+        var response = await identityClient.SendAsync(verifyHttpRequest);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Xác thực 2 bước chưa thành công");
+            ModelState.AddModelError(string.Empty, errorText);
+            return View(BuildTwoFactorViewModel(challenge, model.Code));
+        }
+
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        if (auth is null || string.IsNullOrWhiteSpace(auth.AccessToken))
+        {
+            ModelState.AddModelError(string.Empty, "Token xác thực không hợp lệ.");
+            return View(BuildTwoFactorViewModel(challenge, model.Code));
+        }
+
+        ClearTwoFactorChallenge();
+        await SignInWithIdentityTokenAsync(auth, challenge.AuthenticatorAccountName ?? "customer");
+        return RedirectToLocal(challenge.ReturnUrl);
     }
 
     [HttpGet("/account/signup")] // Route GET signup.
@@ -171,7 +393,24 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     public IActionResult SignUp(string? returnUrl = null) // Render view signup.
     {
         ViewData["ReturnUrl"] = NormalizeReturnUrl(returnUrl);
+        PopulateBotChallengeViewData(BotChallengePurpose.SignUp);
         return View(new RegisterRequestDto()); // Views/Account/SignUp.cshtml.
+    }
+
+    [HttpGet("/account/signup/captcha")]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult SignUpCaptcha()
+    {
+        return RenderLocalCaptcha(BotChallengePurpose.SignUp);
+    }
+
+    [HttpGet("/account/forgot-password/captcha")]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public IActionResult ForgotPasswordCaptcha()
+    {
+        return RenderLocalCaptcha(BotChallengePurpose.ForgotPassword);
     }
 
     [HttpGet("/account/terms")]
@@ -191,16 +430,39 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/signup")] // Route POST signup.
     [ValidateAntiForgeryToken] // Chặn submit giả mạo từ site khác.
     [AllowAnonymous] // Anonymous dang ky.
+    [EnableRateLimiting("auth-form")]
     public async Task<IActionResult> SignUp(RegisterRequestDto request, string? returnUrl = null) // Nhan model form.
     {
         var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
         ViewData["ReturnUrl"] = normalizedReturnUrl;
+        PopulateBotChallengeViewData(BotChallengePurpose.SignUp);
 
         request.FullName = request.FullName?.Trim() ?? string.Empty;
         request.UserName = request.UserName?.Trim() ?? string.Empty;
         request.Email = request.Email?.Trim().ToLowerInvariant() ?? string.Empty;
         request.Phone = request.Phone?.Trim() ?? string.Empty;
         request.RoleName = "Customer";
+        request.CaptchaCode = request.CaptchaCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        request.BotChallengeToken = request.BotChallengeToken?.Trim() ?? string.Empty;
+
+        var challengeResult = await VerifyBotChallengeAsync(
+            BotChallengePurpose.SignUp,
+            request.BotChallengeToken,
+            request.CaptchaCode);
+        ClearSubmittedBotChallenge(
+            nameof(RegisterRequestDto.BotChallengeToken),
+            nameof(RegisterRequestDto.CaptchaCode),
+            () => request.BotChallengeToken = string.Empty,
+            () => request.CaptchaCode = string.Empty);
+        if (!challengeResult.Success)
+        {
+            var fieldName = challengeResult.Provider == BotChallengeProvider.LocalSvg
+                ? nameof(RegisterRequestDto.CaptchaCode)
+                : nameof(RegisterRequestDto.BotChallengeToken);
+            ModelState.AddModelError(
+                fieldName,
+                challengeResult.ErrorMessage ?? "Xác minh bảo mật không hợp lệ. Vui lòng thử lại.");
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
@@ -218,56 +480,299 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         }
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // HttpClient cho Identity.
-        var registerResponse = await identityClient.PostAsJsonAsync("/auth/register", new
-        {
-            request.UserName,
-            request.FullName,
-            request.Email,
-            request.Phone,
-            request.Password,
-            request.ConfirmPassword,
-            request.RoleName
-        }); // Goi register API.
+        using var registerHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/register",
+            new
+            {
+                request.UserName,
+                request.FullName,
+                request.Email,
+                request.Phone,
+                request.Password,
+                request.ConfirmPassword,
+                request.RoleName
+            });
+        var registerResponse = await identityClient.SendAsync(registerHttpRequest); // Goi register API.
 
         if (!registerResponse.IsSuccessStatusCode) // Register fail.
         {
-            var errorText = await registerResponse.Content.ReadAsStringAsync(); // Doc loi.
-            ModelState.AddModelError(
-                string.Empty,
-                string.IsNullOrWhiteSpace(errorText)
-                    ? "Đăng ký chưa thành công. Vui lòng kiểm tra lại thông tin và thử lại."
-                    : errorText); // Show loi.
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(registerResponse, "Đăng ký chưa thành công"); // Doc loi.
+            ModelState.AddModelError(string.Empty, errorText); // Show loi.
             return View(request); // O lai form.
         }
 
-        TempData["SuccessMessage"] = "Đăng ký thành công. Bạn có thể đăng nhập ngay để tiếp tục mua sắm tại FreshFarm.";
+        var registerResult = await registerResponse.Content.ReadFromJsonAsync<RegisterResultDto>()
+                            ?? new RegisterResultDto
+                            {
+                                 Email = request.Email,
+                                 EmailVerificationRequired = true,
+                                 VerificationEmailSent = true,
+                                 Message = "Tài khoản đã được tạo. Vui lòng xác minh email; sau đó bạn có thể đăng nhập để xem trạng thái chờ quản trị viên duyệt."
+                            };
+
+        return RedirectToAction(
+            nameof(VerifyEmailPending),
+            new
+            {
+                email = registerResult.Email,
+                returnUrl = normalizedReturnUrl,
+                message = registerResult.Message
+            });
+    }
+
+    private void PopulateBotChallengeViewData(BotChallengePurpose purpose)
+    {
+        ViewData["BotChallenge"] = _botChallengeService.GetPresentation(purpose);
+    }
+
+    private async Task<BotChallengeVerificationResult> VerifyBotChallengeAsync(
+        BotChallengePurpose purpose,
+        string token,
+        string submittedLocalCode)
+    {
+        var presentation = _botChallengeService.GetPresentation(purpose);
+        string? expectedLocalCode = null;
+        if (presentation.Provider == BotChallengeProvider.LocalSvg)
+        {
+            var sessionKey = GetLocalCaptchaSessionKey(purpose);
+            expectedLocalCode = HttpContext.Session.GetString(sessionKey);
+            HttpContext.Session.Remove(sessionKey);
+        }
+
+        return await _botChallengeService.VerifyAsync(
+            new BotChallengeVerificationRequest
+            {
+                Purpose = purpose,
+                Token = token,
+                RemoteIp = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                ExpectedLocalCode = expectedLocalCode,
+                SubmittedLocalCode = submittedLocalCode
+            },
+            HttpContext.RequestAborted);
+    }
+
+    private IActionResult RenderLocalCaptcha(BotChallengePurpose purpose)
+    {
+        var presentation = _botChallengeService.GetPresentation(purpose);
+        if (!presentation.IsAvailable || presentation.Provider != BotChallengeProvider.LocalSvg)
+        {
+            return NotFound();
+        }
+
+        var captchaCode = _signUpCaptchaService.GenerateCode();
+        HttpContext.Session.SetString(GetLocalCaptchaSessionKey(purpose), captchaCode);
+
+        Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+
+        var svg = _signUpCaptchaService.BuildSvg(captchaCode);
+        return Content(svg, "image/svg+xml; charset=utf-8", System.Text.Encoding.UTF8);
+    }
+
+    private static string GetLocalCaptchaSessionKey(BotChallengePurpose purpose)
+        => purpose == BotChallengePurpose.ForgotPassword
+            ? ForgotPasswordCaptchaSessionKey
+            : SignUpCaptchaSessionKey;
+
+    private void ClearSubmittedBotChallenge(
+        string tokenFieldName,
+        string localCodeFieldName,
+        Action clearToken,
+        Action clearLocalCode)
+    {
+        ModelState.Remove(tokenFieldName);
+        ModelState.Remove(localCodeFieldName);
+        clearToken();
+        clearLocalCode();
+    }
+
+    [HttpGet("/account/verify-email/pending")]
+    [AllowAnonymous]
+    public IActionResult VerifyEmailPending(string? email = null, string? message = null, string? returnUrl = null)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var normalizedEmail = email?.Trim() ?? string.Empty;
+
+        var vm = new EmailVerificationPendingViewModel
+        {
+            Email = normalizedEmail,
+            Message = string.IsNullOrWhiteSpace(message)
+                ? "Chúng tôi đã tạo tài khoản và gửi email xác minh. Vui lòng xác minh email trước khi đăng nhập."
+                : message,
+            ReturnUrl = normalizedReturnUrl,
+            ResendRequest = new ResendEmailVerificationRequestDto
+            {
+                Identifier = normalizedEmail,
+                ReturnUrl = normalizedReturnUrl
+            }
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost("/account/verify-email/resend")]
+    [ValidateAntiForgeryToken]
+    [AllowAnonymous]
+    [EnableRateLimiting("password-recovery")]
+    public async Task<IActionResult> ResendVerificationEmail(ResendEmailVerificationRequestDto request)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(request.ReturnUrl);
+        request.Identifier = request.Identifier?.Trim() ?? string.Empty;
+
+        if (!ModelState.IsValid)
+        {
+            TempData["ErrorMessage"] = "Vui lòng nhập email hoặc tên đăng nhập hợp lệ để gửi lại email xác minh.";
+            TempData["PendingVerificationIdentifier"] = request.Identifier;
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        using var resendHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/resend-email-verification",
+            new
+            {
+                identifier = request.Identifier
+            });
+        var response = await identityClient.SendAsync(resendHttpRequest);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Không thể gửi lại email xác minh lúc này");
+            TempData["ErrorMessage"] = errorText;
+            TempData["PendingVerificationIdentifier"] = request.Identifier;
+            return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+        }
+
+        TempData["SuccessMessage"] = "Nếu tài khoản tồn tại và chưa xác minh, chúng tôi đã gửi lại email xác minh.";
+        TempData["PendingVerificationIdentifier"] = request.Identifier;
+
+        if (request.Identifier.Contains("@", StringComparison.Ordinal))
+        {
+            return RedirectToAction(nameof(VerifyEmailPending), new
+            {
+                email = request.Identifier,
+                returnUrl = normalizedReturnUrl
+            });
+        }
+
         return RedirectToAction(nameof(SignIn), new { returnUrl = normalizedReturnUrl });
+    }
+
+    [HttpGet("/account/verify-email")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifyEmail(string? email = null, string? token = null, string? returnUrl = null)
+    {
+        var normalizedReturnUrl = NormalizeReturnUrl(returnUrl);
+        var normalizedEmail = email?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(normalizedEmail) || string.IsNullOrWhiteSpace(token))
+        {
+            return View("VerifyEmailResult", new EmailVerificationResultViewModel
+            {
+                Success = false,
+                Title = "Liên kết xác minh không hợp lệ",
+                Message = "Liên kết xác minh email bị thiếu dữ liệu hoặc không còn hợp lệ.",
+                ReturnUrl = normalizedReturnUrl,
+                Email = normalizedEmail
+            });
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        using var verifyEmailHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/verify-email",
+            new
+            {
+                email = normalizedEmail,
+                token
+            });
+        var response = await identityClient.SendAsync(verifyEmailHttpRequest);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await response.Content.ReadAsStringAsync();
+            return View("VerifyEmailResult", new EmailVerificationResultViewModel
+            {
+                Success = false,
+                Title = "Xác minh email chưa thành công",
+                Message = string.IsNullOrWhiteSpace(errorText)
+                    ? "Không thể xác minh email lúc này."
+                    : errorText,
+                ReturnUrl = normalizedReturnUrl,
+                Email = normalizedEmail
+            });
+        }
+
+        TempData["SuccessMessage"] = "Xác minh email thành công. Bạn có thể đăng nhập để xem trạng thái chờ duyệt.";
+        return View("VerifyEmailResult", new EmailVerificationResultViewModel
+        {
+            Success = true,
+            Title = "Xác minh email thành công",
+            Message = "Email của bạn đã được xác minh. Bạn có thể đăng nhập với quyền Khách để xem trạng thái; các chức năng sẽ được mở sau khi quản trị viên phê duyệt.",
+            ReturnUrl = normalizedReturnUrl,
+            Email = normalizedEmail
+        });
     }
 
     [HttpGet("/account/forgot-password")] // Route GET quên mật khẩu.
     [AllowAnonymous] // Cho phép user chưa login truy cập.
     public IActionResult ForgotPassword() // Render view forgot password.
     {
+        PopulateBotChallengeViewData(BotChallengePurpose.ForgotPassword);
         return View(new ForgotPasswordRequestDto()); // Trả view với model rỗng.
     }
 
     [HttpPost("/account/forgot-password")] // Route POST gửi yêu cầu reset.
     [ValidateAntiForgeryToken] // Chống CSRF cho form.
     [AllowAnonymous] // Anonymous vẫn dùng được.
+    [EnableRateLimiting("password-recovery")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequestDto request) // Nhận email từ form.
     {
+        PopulateBotChallengeViewData(BotChallengePurpose.ForgotPassword);
+        request.Email = request.Email?.Trim() ?? string.Empty;
+        request.CaptchaCode = request.CaptchaCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        request.BotChallengeToken = request.BotChallengeToken?.Trim() ?? string.Empty;
+
+        var challengeResult = await VerifyBotChallengeAsync(
+            BotChallengePurpose.ForgotPassword,
+            request.BotChallengeToken,
+            request.CaptchaCode);
+        ClearSubmittedBotChallenge(
+            nameof(ForgotPasswordRequestDto.BotChallengeToken),
+            nameof(ForgotPasswordRequestDto.CaptchaCode),
+            () => request.BotChallengeToken = string.Empty,
+            () => request.CaptchaCode = string.Empty);
+        if (!challengeResult.Success)
+        {
+            var fieldName = challengeResult.Provider == BotChallengeProvider.LocalSvg
+                ? nameof(ForgotPasswordRequestDto.CaptchaCode)
+                : nameof(ForgotPasswordRequestDto.BotChallengeToken);
+            ModelState.AddModelError(
+                fieldName,
+                challengeResult.ErrorMessage ?? "Xác minh bảo mật không hợp lệ. Vui lòng thử lại.");
+        }
+
         if (!ModelState.IsValid) // Validate DataAnnotation.
         {
             return View(request); // Render lại form nếu dữ liệu sai.
         }
 
-        request.Email = request.Email.Trim(); // Chuẩn hóa email trước khi gọi API.
-
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
-        var response = await identityClient.PostAsJsonAsync("/auth/forgot-password", new
-        {
-            email = request.Email
-        }); // Gửi yêu cầu quên mật khẩu.
+        using var forgotPasswordHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/forgot-password",
+            new
+            {
+                email = request.Email
+            });
+        var response = await identityClient.SendAsync(forgotPasswordHttpRequest); // Gửi yêu cầu quên mật khẩu.
 
         if (!response.IsSuccessStatusCode) // Nếu API trả lỗi.
         {
@@ -303,6 +808,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
     [HttpPost("/account/reset-password")] // Route POST đặt lại mật khẩu.
     [ValidateAntiForgeryToken] // Chống CSRF cho form.
     [AllowAnonymous] // Anonymous submit reset password.
+    [EnableRateLimiting("password-recovery")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequestDto request) // Nhận email/token/password mới.
     {
         if (!ModelState.IsValid) // Validate DataAnnotation.
@@ -313,13 +819,18 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         request.Email = request.Email.Trim(); // Chuẩn hóa email.
 
         var identityClient = _httpClientFactory.CreateClient("Identity"); // Client gọi Identity API.
-        var response = await identityClient.PostAsJsonAsync("/auth/reset-password", new
-        {
-            email = request.Email,
-            token = request.Token,
-            newPassword = request.NewPassword,
-            confirmPassword = request.ConfirmPassword
-        }); // Gọi API đặt lại mật khẩu.
+        using var resetPasswordHttpRequest = ForwardedAuthRequestBuilder.CreateForwardedJsonRequest(
+            HttpContext,
+            System.Net.Http.HttpMethod.Post,
+            "/auth/reset-password",
+            new
+            {
+                email = request.Email,
+                token = request.Token,
+                newPassword = request.NewPassword,
+                confirmPassword = request.ConfirmPassword
+            });
+        var response = await identityClient.SendAsync(resetPasswordHttpRequest); // Gọi API đặt lại mật khẩu.
 
         if (!response.IsSuccessStatusCode) // Nếu API fail.
         {
@@ -336,7 +847,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
 
     [HttpPost("/account/logout")] // Route POST logout.
     [ValidateAntiForgeryToken] // Logout cũng là state-changing action.
-    [Authorize] // Bat buoc login.
+    [Authorize(Policy = "AnyAuthenticated")] // Guest dang cho duyet van phai co the dang xuat.
     public async Task<IActionResult> Logout() // Xu ly logout.
     {
         HttpContext.Session.Remove(AccessTokenSessionKey); // Xoa JWT khoi session.
@@ -365,9 +876,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return RedirectToAction(nameof(SignIn)); // Ve login.
         }
 
-        var orderingClient = _httpClientFactory.CreateClient("Ordering"); // Client goi Ordering API.
-        orderingClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Gan bearer token.
+        var orderingClient = CreateOrderingClient(token); // Client goi Ordering API.
+        var (sellerApplication, _) = await GetSellerApplicationSummaryAsync(token);
+        ViewData["SellerApplicationSummary"] = sellerApplication;
+        ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
 
         var response = await orderingClient.GetAsync("/api/orders/my"); // Goi API don cua toi.
         if (!response.IsSuccessStatusCode) // API fail.
@@ -393,9 +905,10 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             return RedirectToAction(nameof(SignIn)); // Day user ve trang login.
         }
 
-        var orderingClient = _httpClientFactory.CreateClient("Ordering"); // Tao client goi Ordering API.
-        orderingClient.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token); // Gan bearer token de service auth.
+        var orderingClient = CreateOrderingClient(token); // Tao client goi Ordering API.
+        var (sellerApplication, _) = await GetSellerApplicationSummaryAsync(token);
+        ViewData["SellerApplicationSummary"] = sellerApplication;
+        ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
 
         var response = await orderingClient.GetAsync($"/api/orders/{id}"); // Goi endpoint chi tiet don.
         if (!response.IsSuccessStatusCode) // Neu service tra loi.
@@ -449,6 +962,46 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         return RedirectToAction("Index", "Home"); // Fallback mac dinh ve trang chu buyer-facing.
     }
 
+    private static bool RequiresEmailVerification(string? message)
+    {
+        return !string.IsNullOrWhiteSpace(message) &&
+               message.Contains("chưa được xác minh", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SaveTwoFactorChallenge(TwoFactorChallengeStateDto challenge)
+    {
+        HttpContext.Session.SetString(TwoFactorChallengeSessionKey, JsonSerializer.Serialize(challenge));
+    }
+
+    private TwoFactorChallengeStateDto? ReadTwoFactorChallenge()
+    {
+        var json = HttpContext.Session.GetString(TwoFactorChallengeSessionKey);
+        return string.IsNullOrWhiteSpace(json)
+            ? null
+            : JsonSerializer.Deserialize<TwoFactorChallengeStateDto>(json);
+    }
+
+    private void ClearTwoFactorChallenge()
+    {
+        HttpContext.Session.Remove(TwoFactorChallengeSessionKey);
+    }
+
+    private static AccountTwoFactorViewModel BuildTwoFactorViewModel(TwoFactorChallengeStateDto challenge, string? code = null)
+    {
+        return new AccountTwoFactorViewModel
+        {
+            Code = code ?? string.Empty,
+            RequiresSetup = challenge.RequiresSetup,
+            RememberMe = challenge.RememberMe,
+            ManualEntryKey = challenge.ManualEntryKey,
+            OtpAuthUri = challenge.OtpAuthUri,
+            QrCodeImageDataUri = QrCodeDataUriBuilder.BuildSvgDataUri(challenge.OtpAuthUri),
+            AuthenticatorIssuer = challenge.AuthenticatorIssuer,
+            AuthenticatorAccountName = challenge.AuthenticatorAccountName,
+            ChallengeMessage = challenge.ChallengeMessage
+        };
+    }
+
     // ===== 3) Thay action GET /account/profile bằng bản dùng API thật =====
     [HttpGet("/account/profile")] // Route profile.
     [Authorize] // Chỉ user login mới xem được.
@@ -469,8 +1022,390 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             vm = new ProfilePageViewModel { ReturnUrl = safeReturnUrl }; // Tạo model fallback để view không vỡ.
         }
 
+        ViewData["SellerApplicationSummary"] = vm.SellerApplication;
+        ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
         ViewBag.GhnSandboxConfigured = _ghnSandboxService.IsConfigured;
         return View(vm); // Render view với model.
+    }
+
+    [HttpGet("/account/become-seller")]
+    [Authorize]
+    public async Task<IActionResult> BecomeSeller(string? returnUrl = null)
+    {
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/become-seller" });
+        }
+
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/become-seller";
+        var (summary, error) = await GetSellerApplicationSummaryAsync(token);
+        var model = BuildBecomeSellerPageViewModel(summary, safeReturnUrl);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            ViewBag.Error = error;
+        }
+
+        PopulateSellerApplicationRecaptchaViewData();
+        ViewData["SellerApplicationSummary"] = model.Current;
+        ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
+
+        return View(model);
+    }
+
+    [HttpGet("/account/become-seller/kyc-document")]
+    [Authorize]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> SellerKycDocument(string? reference)
+    {
+        if (string.IsNullOrWhiteSpace(SellerKycPaths.NormalizeStoredFileName(reference)))
+        {
+            return NotFound();
+        }
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = "/account/become-seller" });
+        }
+
+        var (summary, error) = await GetSellerApplicationSummaryAsync(token);
+        if (!string.IsNullOrWhiteSpace(error) || !IsOwnedKycReference(summary.Kyc, reference))
+        {
+            return NotFound();
+        }
+
+        var storedFile = _sellerKycStorageService.OpenRead(reference);
+        if (storedFile is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
+        var downloadFileName = SellerKycPaths.NormalizeStoredFileName(reference)!;
+        return File(storedFile.Content, storedFile.ContentType, downloadFileName, enableRangeProcessing: true);
+    }
+
+    [HttpGet("/account/notifications")]
+    [Authorize]
+    public async Task<IActionResult> Notifications(
+        string? q = null,
+        string? type = null,
+        bool? isRead = null,
+        bool recentOnly = false,
+        string? focusType = null,
+        int page = 1,
+        string? returnUrl = null)
+    {
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/notifications" });
+        }
+
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/notifications";
+        var (vm, error) = await GetAccountNotificationsPageViewModelAsync(
+            token,
+            q,
+            type,
+            isRead,
+            recentOnly,
+            focusType,
+            page,
+            safeReturnUrl);
+        if (vm is null)
+        {
+            ViewBag.Error = error ?? "Không tải được thông báo tài khoản.";
+            vm = new AccountNotificationsPageViewModel { ReturnUrl = safeReturnUrl };
+        }
+
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            ViewBag.Error = error;
+        }
+
+        ViewData["SellerApplicationSummary"] = vm.SellerApplication;
+        ViewData["AccountNotificationSummary"] = AccountNotificationNavSummaryDto.FromPage(vm);
+
+        return View(vm);
+    }
+
+    [HttpPost("/account/notifications/{id:int}/mark-read")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkNotificationAsRead(
+        int id,
+        string? q = null,
+        string? type = null,
+        bool? isRead = null,
+        bool recentOnly = false,
+        string? focusType = null,
+        int page = 1,
+        string? returnUrl = null)
+    {
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/notifications";
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl });
+        }
+
+        if (id <= 0)
+        {
+            TempData["ErrorMessage"] = "ID thông báo không hợp lệ.";
+            return RedirectToNotifications(q, type, isRead, recentOnly, focusType, page, safeReturnUrl);
+        }
+
+        try
+        {
+            var orderingClient = CreateOrderingClient(token);
+            var response = await orderingClient.PostAsync($"/api/orders/notifications/me/{id}/mark-read", content: null);
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                response.IsSuccessStatusCode
+                    ? "Đã đánh dấu đã đọc."
+                    : await ApiErrorMessageParser.ReadMessageAsync(response, "Không thể cập nhật trạng thái thông báo.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật thông báo: " + ex.Message;
+        }
+
+        return RedirectToNotifications(q, type, isRead, recentOnly, focusType, page, safeReturnUrl);
+    }
+
+    [HttpGet("/account/notifications/{id:int}/open")]
+    [Authorize]
+    public async Task<IActionResult> OpenNotification(int id, string? target = null)
+    {
+        var safeTargetUrl = NormalizeReturnUrl(target) ?? "/account/notifications";
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeTargetUrl });
+        }
+
+        if (id > 0)
+        {
+            try
+            {
+                var orderingClient = CreateOrderingClient(token);
+                await orderingClient.PostAsync($"/api/orders/notifications/me/{id}/mark-read", content: null);
+            }
+            catch
+            {
+                // Best effort: user van duoc mo trang dich du Ordering tam loi.
+            }
+        }
+
+        return Redirect(safeTargetUrl);
+    }
+
+    [HttpPost("/account/notifications/mark-all-read")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MarkAllNotificationsAsRead(
+        string? q = null,
+        string? type = null,
+        bool? isRead = null,
+        bool recentOnly = false,
+        string? focusType = null,
+        int page = 1,
+        string? returnUrl = null)
+    {
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl) ?? "/account/notifications";
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl });
+        }
+
+        try
+        {
+            var orderingClient = CreateOrderingClient(token);
+            var response = await orderingClient.PostAsJsonAsync("/api/orders/notifications/me/mark-all-read", new
+            {
+                q,
+                type,
+                isRead,
+                recentOnly
+            });
+            TempData[response.IsSuccessStatusCode ? "SuccessMessage" : "ErrorMessage"] =
+                response.IsSuccessStatusCode
+                    ? await ApiErrorMessageParser.ReadMessageAsync(response, "Đã cập nhật trạng thái thông báo.")
+                    : await ApiErrorMessageParser.ReadMessageAsync(response, "Không thể cập nhật toàn bộ thông báo.");
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = "Lỗi khi cập nhật thông báo: " + ex.Message;
+        }
+
+        return RedirectToNotifications(q, type, isRead, recentOnly, focusType, page, safeReturnUrl);
+    }
+
+    [HttpPost("/account/become-seller")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BecomeSeller(BecomeSellerPageViewModel model, string? returnUrl = null)
+    {
+        var request = model.Form ?? new BecomeSellerRequestDto();
+        var safeReturnUrl = NormalizeReturnUrl(returnUrl)
+            ?? NormalizeReturnUrl(model.ReturnUrl)
+            ?? NormalizeReturnUrl(request.ReturnUrl)
+            ?? "/account/become-seller";
+
+        var token = HttpContext.Session.GetString(AccessTokenSessionKey);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction(nameof(SignIn), new { returnUrl = safeReturnUrl });
+        }
+
+        var (currentSummary, currentSummaryError) = await GetSellerApplicationSummaryAsync(token);
+        if (!string.IsNullOrWhiteSpace(currentSummaryError))
+        {
+            ViewBag.Error = currentSummaryError;
+        }
+
+        PopulateSellerApplicationRecaptchaViewData();
+
+        request.RecaptchaToken = request.RecaptchaToken?.Trim() ?? string.Empty;
+
+        if (_googleRecaptchaOptions.IsConfigured)
+        {
+            var verificationResult = await _googleRecaptchaService.VerifyAsync(
+                request.RecaptchaToken,
+                _googleRecaptchaOptions.SellerApplicationAction,
+                HttpContext.Connection.RemoteIpAddress?.ToString(),
+                HttpContext.RequestAborted);
+            if (!verificationResult.Success)
+            {
+                ModelState.AddModelError(nameof(BecomeSellerRequestDto.RecaptchaToken), verificationResult.ErrorMessage ?? "Xác minh reCAPTCHA không hợp lệ.");
+            }
+        }
+
+        ValidateSellerKycUploads(model, currentSummary);
+
+        if (!ModelState.IsValid)
+        {
+            var invalidModel = BuildBecomeSellerPageViewModel(currentSummary, safeReturnUrl, request);
+            ViewData["SellerApplicationSummary"] = invalidModel.Current;
+            ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
+            return View(invalidModel);
+        }
+
+        request.StoreName = request.StoreName.Trim();
+        request.StoreAddress = request.StoreAddress.Trim();
+        request.StoreEmail = request.StoreEmail.Trim();
+        request.StorePhone = request.StorePhone.Trim();
+        request.BankAccountInfo = request.BankAccountInfo?.Trim();
+        request.BankTransferInstructions = request.BankTransferInstructions?.Trim();
+        request.AdminNotificationEmail = request.AdminNotificationEmail?.Trim();
+        request.PickupName = request.PickupName?.Trim();
+        request.PickupPhone = request.PickupPhone?.Trim();
+        request.PickupAddress = request.PickupAddress?.Trim();
+        request.LegalFullName = request.LegalFullName.Trim();
+        request.IdentityNumber = request.IdentityNumber.Trim();
+        request.IdentityIssuedPlace = request.IdentityIssuedPlace.Trim();
+        request.TaxCode = request.TaxCode?.Trim();
+        request.BusinessLicenseNumber = request.BusinessLicenseNumber?.Trim();
+        request.Notes = request.Notes?.Trim();
+        request.CitizenIdFrontUrl = currentSummary.Kyc.CitizenIdFrontUrl;
+        request.CitizenIdBackUrl = currentSummary.Kyc.CitizenIdBackUrl;
+        request.BusinessLicenseUrl = currentSummary.Kyc.BusinessLicenseUrl;
+        request.AdditionalDocumentUrl = currentSummary.Kyc.AdditionalDocumentUrl;
+
+        var uploadedPaths = new List<string>();
+        try
+        {
+            if (model.CitizenIdFrontFile is not null)
+            {
+                request.CitizenIdFrontUrl = _sellerKycStorageService.Save(model.CitizenIdFrontFile, "cccd-front");
+                uploadedPaths.Add(request.CitizenIdFrontUrl);
+            }
+
+            if (model.CitizenIdBackFile is not null)
+            {
+                request.CitizenIdBackUrl = _sellerKycStorageService.Save(model.CitizenIdBackFile, "cccd-back");
+                uploadedPaths.Add(request.CitizenIdBackUrl);
+            }
+
+            if (model.BusinessLicenseFile is not null)
+            {
+                request.BusinessLicenseUrl = _sellerKycStorageService.Save(model.BusinessLicenseFile, "business-license", allowPdf: true);
+                uploadedPaths.Add(request.BusinessLicenseUrl);
+            }
+
+            if (model.AdditionalDocumentFile is not null)
+            {
+                request.AdditionalDocumentUrl = _sellerKycStorageService.Save(model.AdditionalDocumentFile, "seller-kyc-extra", allowPdf: true);
+                uploadedPaths.Add(request.AdditionalDocumentUrl);
+            }
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError(string.Empty, "Không lưu được file giấy tờ: " + ex.Message);
+            var uploadErrorModel = BuildBecomeSellerPageViewModel(currentSummary, safeReturnUrl, request);
+            ViewData["SellerApplicationSummary"] = uploadErrorModel.Current;
+            ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
+            return View(uploadErrorModel);
+        }
+
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        identityClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await identityClient.PostAsJsonAsync("/auth/seller-application", new
+        {
+            request.StoreName,
+            request.StoreAddress,
+            request.StoreEmail,
+            request.StorePhone,
+            request.BankAccountInfo,
+            request.BankTransferInstructions,
+            request.AdminNotificationEmail,
+            PickupName = request.PickupName,
+            PickupPhone = request.PickupPhone,
+            PickupAddress = request.PickupAddress,
+            request.LegalFullName,
+            request.IdentityNumber,
+            request.IdentityIssuedDate,
+            request.IdentityIssuedPlace,
+            request.TaxCode,
+            request.BusinessLicenseNumber,
+            request.CitizenIdFrontUrl,
+            request.CitizenIdBackUrl,
+            request.BusinessLicenseUrl,
+            request.AdditionalDocumentUrl,
+            request.Notes
+        });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            foreach (var uploadedPath in uploadedPaths)
+            {
+                _sellerKycStorageService.Delete(uploadedPath);
+            }
+
+            var errorText = await ApiErrorMessageParser.ReadMessageAsync(response, "Chưa thể gửi hồ sơ người bán lúc này.");
+            ModelState.AddModelError(string.Empty, errorText);
+            var (summary, _) = await GetSellerApplicationSummaryAsync(token);
+            var apiErrorModel = BuildBecomeSellerPageViewModel(summary, safeReturnUrl, request);
+            ViewData["SellerApplicationSummary"] = apiErrorModel.Current;
+            ViewData["AccountNotificationSummary"] = await GetAccountNotificationNavSummaryAsync(token);
+            return View(apiErrorModel);
+        }
+
+        DeleteReplacedKycFiles(currentSummary, request);
+
+        TempData["SuccessMessage"] = "Đã gửi hồ sơ đăng ký người bán kèm giấy tờ pháp lý. Bạn có thể theo dõi trạng thái ngay trên trang này.";
+        return RedirectToAction(nameof(BecomeSeller), new { returnUrl = safeReturnUrl });
     }
 
     [HttpGet("/account/profile/ghn/provinces")]
@@ -786,8 +1721,7 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         {
             new Claim(ClaimTypes.NameIdentifier, jwt.Subject ?? string.Empty),
             new Claim(ClaimTypes.Name, jwt.Claims.FirstOrDefault(c => c.Type == "username")?.Value ?? fallbackName),
-            new Claim("sub", jwt.Subject ?? string.Empty),
-            new Claim("ff_access_token", auth.AccessToken)
+            new Claim("sub", jwt.Subject ?? string.Empty)
         };
 
         var emailValue = jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email || c.Type == "email")?.Value;
@@ -809,13 +1743,28 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             claims.Add(new Claim(ClaimTypes.Role, roleClaim.Value));
         }
 
+        foreach (var claimType in new[] { "account_access", "approval_status", "token_version" })
+        {
+            var claimValue = jwt.Claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            if (!string.IsNullOrWhiteSpace(claimValue))
+            {
+                claims.Add(new Claim(claimType, claimValue));
+            }
+        }
+
+        claims.Add(new Claim("session_checked_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
-        var authProperties = new AuthenticationProperties();
+        // Customer sign-in has no explicit "Remember me" choice, so keep this as a
+        // browser-session cookie. Admin/Seller flows handle their own opt-in choice.
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = false
+        };
         if (auth.ExpiredAtUtc > DateTime.UtcNow)
         {
             authProperties.ExpiresUtc = new DateTimeOffset(auth.ExpiredAtUtc);
-            authProperties.IsPersistent = true;
         }
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, authProperties);
@@ -861,7 +1810,352 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
             ReturnUrl = returnUrl // Gán returnUrl.
         };
 
+        var (sellerApplication, _) = await GetSellerApplicationSummaryAsync(token);
+        vm.SellerApplication = sellerApplication;
+
         return (vm, null); // Trả model thành công.
+    }
+
+    private async Task<(SellerApplicationSummaryDto Model, string? Error)> GetSellerApplicationSummaryAsync(string token)
+    {
+        var identityClient = _httpClientFactory.CreateClient("Identity");
+        identityClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        var response = await identityClient.GetAsync("/auth/seller-application/me");
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorText = await response.Content.ReadAsStringAsync();
+            return (new SellerApplicationSummaryDto(), string.IsNullOrWhiteSpace(errorText) ? "Không lấy được trạng thái đăng ký người bán." : errorText);
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SellerApplicationBridgeDto>();
+        if (payload is null)
+        {
+            return (new SellerApplicationSummaryDto(), "Không đọc được dữ liệu đăng ký người bán từ Identity API.");
+        }
+
+        return (new SellerApplicationSummaryDto
+        {
+            HasApplication = payload.HasApplication,
+            IsSellerApproved = payload.IsSellerApproved,
+            Status = payload.Status ?? "not_applied",
+            StatusLabel = payload.StatusLabel ?? "Chưa đăng ký",
+            ReviewStatus = payload.ReviewStatus ?? "not_applied",
+            ReviewStatusLabel = payload.ReviewStatusLabel ?? "Chưa có hồ sơ",
+            ReviewNote = payload.ReviewNote ?? string.Empty,
+            ReviewedAtUtc = payload.ReviewedAtUtc,
+            StoreName = payload.StoreName ?? string.Empty,
+            StoreAddress = payload.StoreAddress ?? string.Empty,
+            StoreEmail = payload.StoreEmail ?? string.Empty,
+            StorePhone = payload.StorePhone ?? string.Empty,
+            BankAccountInfo = payload.BankAccountInfo ?? string.Empty,
+            BankTransferInstructions = payload.BankTransferInstructions ?? string.Empty,
+            AdminNotificationEmail = payload.AdminNotificationEmail ?? string.Empty,
+            PickupName = payload.PickupName ?? string.Empty,
+            PickupPhone = payload.PickupPhone ?? string.Empty,
+            PickupAddress = payload.PickupAddress ?? string.Empty,
+            SubmittedAtUtc = payload.SubmittedAtUtc,
+            UpdatedAtUtc = payload.UpdatedAtUtc,
+            Message = payload.Message ?? string.Empty,
+            ReviewHistory = payload.ReviewHistory?
+                .Select(x => new SellerApplicationReviewHistoryItemDto
+                {
+                    Action = x.Action ?? string.Empty,
+                    ReviewStatus = x.ReviewStatus ?? string.Empty,
+                    ReviewStatusLabel = x.ReviewStatusLabel ?? string.Empty,
+                    Note = x.Note ?? string.Empty,
+                    ReviewedAtUtc = x.ReviewedAtUtc,
+                    ReviewedByUserId = x.ReviewedByUserId,
+                    ReviewerUserName = x.ReviewerUserName ?? string.Empty,
+                    ReviewerFullName = x.ReviewerFullName ?? string.Empty
+                })
+                .ToList() ?? new List<SellerApplicationReviewHistoryItemDto>(),
+            Kyc = new SellerKycSummaryDto
+            {
+                HasKycProfile = payload.Kyc?.HasKycProfile ?? false,
+                HasIdentityDocuments = payload.Kyc?.HasIdentityDocuments ?? false,
+                HasBusinessLicense = payload.Kyc?.HasBusinessLicense ?? false,
+                ReviewStatus = payload.Kyc?.ReviewStatus ?? "not_applied",
+                ReviewStatusLabel = payload.Kyc?.ReviewStatusLabel ?? "Chưa có hồ sơ",
+                ReviewNote = payload.Kyc?.ReviewNote ?? string.Empty,
+                ReviewedAtUtc = payload.Kyc?.ReviewedAtUtc,
+                LegalFullName = payload.Kyc?.LegalFullName ?? string.Empty,
+                IdentityNumber = payload.Kyc?.IdentityNumber ?? string.Empty,
+                IdentityNumberMasked = payload.Kyc?.IdentityNumberMasked ?? string.Empty,
+                IdentityIssuedDate = payload.Kyc?.IdentityIssuedDate,
+                IdentityIssuedPlace = payload.Kyc?.IdentityIssuedPlace ?? string.Empty,
+                TaxCode = payload.Kyc?.TaxCode ?? string.Empty,
+                BusinessLicenseNumber = payload.Kyc?.BusinessLicenseNumber ?? string.Empty,
+                CitizenIdFrontUrl = payload.Kyc?.CitizenIdFrontUrl ?? string.Empty,
+                CitizenIdBackUrl = payload.Kyc?.CitizenIdBackUrl ?? string.Empty,
+                BusinessLicenseUrl = payload.Kyc?.BusinessLicenseUrl ?? string.Empty,
+                AdditionalDocumentUrl = payload.Kyc?.AdditionalDocumentUrl ?? string.Empty,
+                Notes = payload.Kyc?.Notes ?? string.Empty
+            }
+        }, null);
+    }
+
+    private static bool IsOwnedKycReference(SellerKycSummaryDto kyc, string? requestedReference)
+    {
+        return new[]
+        {
+            kyc.CitizenIdFrontUrl,
+            kyc.CitizenIdBackUrl,
+            kyc.BusinessLicenseUrl,
+            kyc.AdditionalDocumentUrl
+        }.Any(storedReference =>
+            SellerKycPaths.AreEquivalentStoredReferences(storedReference, requestedReference));
+    }
+
+    private async Task<(AccountNotificationsPageViewModel? Model, string? Error)> GetAccountNotificationsPageViewModelAsync(
+        string token,
+        string? q,
+        string? type,
+        bool? isRead,
+        bool recentOnly,
+        string? focusType,
+        int page,
+        string? returnUrl)
+    {
+        var (sellerApplication, sellerApplicationError) = await GetSellerApplicationSummaryAsync(token);
+        var orderingClient = CreateOrderingClient(token);
+        var query = new List<string>
+        {
+            $"page={Math.Max(page, 1)}",
+            "pageSize=12"
+        };
+
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            query.Add($"q={Uri.EscapeDataString(q.Trim())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            query.Add($"type={Uri.EscapeDataString(type.Trim())}");
+        }
+
+        if (isRead.HasValue)
+        {
+            query.Add($"isRead={isRead.Value.ToString().ToLowerInvariant()}");
+        }
+
+        if (recentOnly)
+        {
+            query.Add("recentOnly=true");
+        }
+
+        var response = await orderingClient.GetAsync("/api/orders/notifications/me?" + string.Join("&", query));
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await ApiErrorMessageParser.ReadMessageAsync(response, "Không tải được thông báo tài khoản.");
+            return (new AccountNotificationsPageViewModel
+            {
+                SellerApplication = sellerApplication,
+                Query = q?.Trim() ?? string.Empty,
+                Type = type?.Trim() ?? string.Empty,
+                IsRead = isRead,
+                RecentOnly = recentOnly,
+                FocusType = focusType?.Trim() ?? string.Empty,
+                Page = Math.Max(page, 1),
+                ReturnUrl = returnUrl
+            }, sellerApplicationError ?? error);
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<AccountNotificationsApiResponseDto>();
+        if (payload is null)
+        {
+            return (new AccountNotificationsPageViewModel
+            {
+                SellerApplication = sellerApplication,
+                Query = q?.Trim() ?? string.Empty,
+                Type = type?.Trim() ?? string.Empty,
+                IsRead = isRead,
+                RecentOnly = recentOnly,
+                FocusType = focusType?.Trim() ?? string.Empty,
+                Page = Math.Max(page, 1),
+                ReturnUrl = returnUrl
+            }, sellerApplicationError ?? "Không đọc được dữ liệu thông báo tài khoản.");
+        }
+
+        return (new AccountNotificationsPageViewModel
+        {
+            SellerApplication = sellerApplication,
+            Query = payload.Filters?.Q ?? q?.Trim() ?? string.Empty,
+            Type = payload.Filters?.Type ?? type?.Trim() ?? string.Empty,
+            IsRead = payload.Filters?.IsRead ?? isRead,
+            RecentOnly = payload.Filters?.RecentOnly ?? recentOnly,
+            FocusType = focusType?.Trim() ?? string.Empty,
+            Page = payload.Page,
+            PageSize = payload.PageSize,
+            Total = payload.Total,
+            TotalPages = payload.TotalPages <= 0 ? 1 : payload.TotalPages,
+            TotalNotifications = payload.Stats?.TotalNotifications ?? 0,
+            UnreadNotifications = payload.Stats?.UnreadNotifications ?? 0,
+            PushNotifications = payload.Stats?.PushNotifications ?? 0,
+            Recent24hNotifications = payload.Stats?.Recent24hNotifications ?? 0,
+            TypeOptions = payload.Filters?.TypeOptions ?? new List<string>(),
+            Notifications = payload.Notifications ?? new List<AccountNotificationListItemDto>(),
+            ReturnUrl = returnUrl
+        }, sellerApplicationError);
+    }
+
+    private async Task<AccountNotificationNavSummaryDto> GetAccountNotificationNavSummaryAsync(string token)
+    {
+        try
+        {
+            var orderingClient = CreateOrderingClient(token);
+            var response = await orderingClient.GetAsync("/api/orders/notifications/me?page=1&pageSize=12");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new AccountNotificationNavSummaryDto();
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<AccountNotificationsApiResponseDto>();
+            var vm = new AccountNotificationsPageViewModel
+            {
+                UnreadNotifications = payload?.Stats?.UnreadNotifications ?? 0,
+                Recent24hNotifications = payload?.Stats?.Recent24hNotifications ?? 0,
+                Notifications = payload?.Notifications ?? new List<AccountNotificationListItemDto>()
+            };
+
+            return AccountNotificationNavSummaryDto.FromPage(vm);
+        }
+        catch
+        {
+            return new AccountNotificationNavSummaryDto();
+        }
+    }
+
+    private HttpClient CreateOrderingClient(string token)
+    {
+        var orderingClient = _httpClientFactory.CreateClient("Ordering");
+        orderingClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        return orderingClient;
+    }
+
+    private RedirectToActionResult RedirectToNotifications(string? q, string? type, bool? isRead, bool recentOnly, string? focusType, int page, string? returnUrl)
+    {
+        return RedirectToAction(nameof(Notifications), new
+        {
+            q,
+            type,
+            isRead,
+            recentOnly,
+            focusType,
+            page = page < 1 ? 1 : page,
+            returnUrl
+        });
+    }
+
+    private void ValidateSellerKycUploads(BecomeSellerPageViewModel model, SellerApplicationSummaryDto currentSummary)
+    {
+        ValidateSellerKycFile(
+            model.CitizenIdFrontFile,
+            "CitizenIdFrontFile",
+            "Cần tải ảnh mặt trước CCCD/CMND.",
+            currentSummary.Kyc.CitizenIdFrontUrl,
+            allowPdf: false);
+
+        ValidateSellerKycFile(
+            model.CitizenIdBackFile,
+            "CitizenIdBackFile",
+            "Cần tải ảnh mặt sau CCCD/CMND.",
+            currentSummary.Kyc.CitizenIdBackUrl,
+            allowPdf: false);
+
+        ValidateSellerKycFile(
+            model.BusinessLicenseFile,
+            "BusinessLicenseFile",
+            null,
+            currentSummary.Kyc.BusinessLicenseUrl,
+            allowPdf: true);
+    }
+
+    private void PopulateSellerApplicationRecaptchaViewData()
+    {
+        ViewData["SellerGoogleRecaptchaEnabled"] = _googleRecaptchaOptions.IsConfigured;
+        ViewData["SellerGoogleRecaptchaSiteKey"] = _googleRecaptchaOptions.SiteKey;
+        ViewData["SellerGoogleRecaptchaAction"] = _googleRecaptchaOptions.SellerApplicationAction;
+    }
+
+    private void ValidateSellerKycFile(IFormFile? file, string modelKey, string? requiredMessage, string? existingPath, bool allowPdf)
+    {
+        if (file is null)
+        {
+            if (!string.IsNullOrWhiteSpace(requiredMessage) && string.IsNullOrWhiteSpace(existingPath))
+            {
+                ModelState.AddModelError(modelKey, requiredMessage);
+            }
+
+            return;
+        }
+
+        var (isValid, errorMessage) = _sellerKycStorageService.Validate(file, allowPdf);
+        if (!isValid)
+        {
+            ModelState.AddModelError(modelKey, errorMessage);
+        }
+    }
+
+    private void DeleteReplacedKycFiles(SellerApplicationSummaryDto currentSummary, BecomeSellerRequestDto request)
+    {
+        DeleteIfReplaced(currentSummary.Kyc.CitizenIdFrontUrl, request.CitizenIdFrontUrl);
+        DeleteIfReplaced(currentSummary.Kyc.CitizenIdBackUrl, request.CitizenIdBackUrl);
+        DeleteIfReplaced(currentSummary.Kyc.BusinessLicenseUrl, request.BusinessLicenseUrl);
+        DeleteIfReplaced(currentSummary.Kyc.AdditionalDocumentUrl, request.AdditionalDocumentUrl);
+    }
+
+    private void DeleteIfReplaced(string? oldPath, string? newPath)
+    {
+        if (string.IsNullOrWhiteSpace(oldPath) || string.IsNullOrWhiteSpace(newPath) || string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _sellerKycStorageService.Delete(oldPath);
+    }
+
+    private static BecomeSellerPageViewModel BuildBecomeSellerPageViewModel(
+        SellerApplicationSummaryDto current,
+        string? returnUrl,
+        BecomeSellerRequestDto? request = null)
+    {
+        var form = request ?? new BecomeSellerRequestDto
+        {
+            StoreName = current.StoreName,
+            StoreAddress = current.StoreAddress,
+            StoreEmail = current.StoreEmail,
+            StorePhone = current.StorePhone,
+            BankAccountInfo = current.BankAccountInfo,
+            BankTransferInstructions = current.BankTransferInstructions,
+            AdminNotificationEmail = current.AdminNotificationEmail,
+            PickupName = current.PickupName,
+            PickupPhone = current.PickupPhone,
+            PickupAddress = current.PickupAddress,
+            LegalFullName = current.Kyc.LegalFullName,
+            IdentityNumber = current.Kyc.IdentityNumber,
+            IdentityIssuedDate = current.Kyc.IdentityIssuedDate,
+            IdentityIssuedPlace = current.Kyc.IdentityIssuedPlace,
+            TaxCode = current.Kyc.TaxCode,
+            BusinessLicenseNumber = current.Kyc.BusinessLicenseNumber,
+            CitizenIdFrontUrl = current.Kyc.CitizenIdFrontUrl,
+            CitizenIdBackUrl = current.Kyc.CitizenIdBackUrl,
+            BusinessLicenseUrl = current.Kyc.BusinessLicenseUrl,
+            AdditionalDocumentUrl = current.Kyc.AdditionalDocumentUrl,
+            Notes = current.Kyc.Notes,
+            ReturnUrl = returnUrl
+        };
+
+        form.ReturnUrl = returnUrl;
+        return new BecomeSellerPageViewModel
+        {
+            Current = current,
+            Form = form,
+            ReturnUrl = returnUrl
+        };
     }
 
     private sealed class ProfileResponseBridgeDto // DTO bridge nội bộ để parse JSON từ Identity API.
@@ -871,6 +2165,68 @@ public sealed class AccountController : Controller // MVC controller cho auth/ac
         public string? FullName { get; set; } // FullName từ API.
         public string? Email { get; set; } // Email từ API.
         public string? Phone { get; set; } // Phone từ API.
+    }
+
+    private sealed class SellerApplicationBridgeDto
+    {
+        public bool HasApplication { get; set; }
+        public bool IsSellerApproved { get; set; }
+        public string? Status { get; set; }
+        public string? StatusLabel { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewStatusLabel { get; set; }
+        public string? ReviewNote { get; set; }
+        public DateTime? ReviewedAtUtc { get; set; }
+        public string? StoreName { get; set; }
+        public string? StoreAddress { get; set; }
+        public string? StoreEmail { get; set; }
+        public string? StorePhone { get; set; }
+        public string? BankAccountInfo { get; set; }
+        public string? BankTransferInstructions { get; set; }
+        public string? AdminNotificationEmail { get; set; }
+        public string? PickupName { get; set; }
+        public string? PickupPhone { get; set; }
+        public string? PickupAddress { get; set; }
+        public DateTime? SubmittedAtUtc { get; set; }
+        public DateTime? UpdatedAtUtc { get; set; }
+        public string? Message { get; set; }
+        public List<SellerApplicationReviewHistoryBridgeDto>? ReviewHistory { get; set; }
+        public SellerKycBridgeDto? Kyc { get; set; }
+    }
+
+    private sealed class SellerApplicationReviewHistoryBridgeDto
+    {
+        public string? Action { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewStatusLabel { get; set; }
+        public string? Note { get; set; }
+        public DateTime ReviewedAtUtc { get; set; }
+        public int? ReviewedByUserId { get; set; }
+        public string? ReviewerUserName { get; set; }
+        public string? ReviewerFullName { get; set; }
+    }
+
+    private sealed class SellerKycBridgeDto
+    {
+        public bool HasKycProfile { get; set; }
+        public bool HasIdentityDocuments { get; set; }
+        public bool HasBusinessLicense { get; set; }
+        public string? ReviewStatus { get; set; }
+        public string? ReviewStatusLabel { get; set; }
+        public string? ReviewNote { get; set; }
+        public DateTime? ReviewedAtUtc { get; set; }
+        public string? LegalFullName { get; set; }
+        public string? IdentityNumber { get; set; }
+        public string? IdentityNumberMasked { get; set; }
+        public DateTime? IdentityIssuedDate { get; set; }
+        public string? IdentityIssuedPlace { get; set; }
+        public string? TaxCode { get; set; }
+        public string? BusinessLicenseNumber { get; set; }
+        public string? CitizenIdFrontUrl { get; set; }
+        public string? CitizenIdBackUrl { get; set; }
+        public string? BusinessLicenseUrl { get; set; }
+        public string? AdditionalDocumentUrl { get; set; }
+        public string? Notes { get; set; }
     }
 
 }

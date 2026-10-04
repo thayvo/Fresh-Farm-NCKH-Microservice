@@ -23,7 +23,13 @@ public partial class CustomerNotification
 
     public bool? IsPushNotification { get; set; }
 
+    public string PopupType { get; set; }
+
+    public string PopupImageUrl { get; set; }
+
     public DateTime? CreatedAt { get; set; }
+
+    public DateTime? ExpiresAt { get; set; }
 
     public DateTime? ReadAt { get; set; }
 }

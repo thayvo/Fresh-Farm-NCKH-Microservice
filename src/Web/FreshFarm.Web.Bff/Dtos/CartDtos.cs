@@ -10,6 +10,8 @@ public sealed class CartItemDto // Mỗi dòng hàng trong giỏ.
     public decimal UnitPrice { get; set; } // Chụp giá tại thời điểm thêm vào giỏ để tính tổng.
     public string UnitSymbol { get; set; } = "đơn vị"; // Ví dụ: kg, hộp, bó.
     public int Quantity { get; set; } = 1; // Mặc định 1 khi thêm mới.
+    public int? RecommendationPosition { get; set; } // Vị trí recommendation nếu item được thêm từ gợi ý.
+    public int? Position { get; set; } // Alias vị trí recommendation cho payload cũ/nhanh.
     public string CartItemKey => BuildCartItemKey(ProductId, SellerId); // Key ổn định cho multi-seller cart.
 
     public static string BuildCartItemKey(int productId, int sellerId)
@@ -24,6 +26,22 @@ public sealed class CartSummaryDto // DTO trả cho màn hình cart/checkout sum
     public decimal SubTotal { get; set; } // Tổng tiền hàng chưa tính ship.
     public decimal ShippingFee { get; set; } // Phí vận chuyển.
     public decimal GrandTotal { get; set; } // Tổng thanh toán cuối cùng.
+    public List<CartRecommendationDto> Recommendations { get; set; } = new(); // Gợi ý mua kèm dựa trên sản phẩm trong giỏ.
+}
+
+public sealed class CartRecommendationDto
+{
+    public int ProductId { get; set; }
+    public int SellerId { get; set; }
+    public string SellerName { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string ImageFileName { get; set; } = string.Empty;
+    public decimal UnitPrice { get; set; }
+    public string UnitSymbol { get; set; } = "đơn vị";
+    public int SeedProductId { get; set; }
+    public int CoPurchaseOrderCount { get; set; }
+    public double BasketScore { get; set; }
+    public string Label { get; set; } = "Hay mua cùng sản phẩm trong giỏ";
 }
 
 public sealed class AddToCartRequestDto // Payload khi thêm sản phẩm vào giỏ.
@@ -36,6 +54,8 @@ public sealed class AddToCartRequestDto // Payload khi thêm sản phẩm vào g
     public decimal UnitPrice { get; set; } // Giá hiện tại từ Home.
     public string UnitSymbol { get; set; } = "đơn vị"; // Đơn vị tính.
     public int Quantity { get; set; } = 1; // Cho phép thêm >1 nếu cần.
+    public int? RecommendationPosition { get; set; } // Vị trí recommendation nếu thêm từ danh sách gợi ý.
+    public int? Position { get; set; } // Alias cho payload JS cũ/nhanh.
 }
 
 public sealed class UpdateCartItemRequestDto // Payload cập nhật số lượng item.

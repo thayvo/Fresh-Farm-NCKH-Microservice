@@ -541,7 +541,7 @@ public sealed class CommunicationsAdminController : ControllerBase
             "refund_opened" => "Refund opened",
             "return_opened" => "Return opened",
             "voucher_drop" => "Voucher drop",
-            "campaign_live" => "Campaign live",
+            "campaign_live" => "Chiến dịch quảng bá",
             "risk_alert" => "Risk alert",
             "fresh_recall" => "Fresh recall",
             _ => string.Join(' ', value.Split('_', StringSplitOptions.RemoveEmptyEntries)

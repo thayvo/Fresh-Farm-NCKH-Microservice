@@ -1,0 +1,69 @@
+name: dotnet-build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+      - 'codex/**'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - src/BuildingBlocks/FreshFarm.Contracts/FreshFarm.Contracts.csproj
+          - src/Services/Catalog/FreshFarm.Catalog.Api/FreshFarm.Catalog.Api.csproj
+          - src/Services/Identity/FreshFarm.Identity.API/FreshFarm.Identity.Api.csproj
+          - src/Services/Ordering/FreshFarm.Ordering.Api/FreshFarm.Ordering.Api.csproj
+          - src/Web/FreshFarm.Web.Bff/FreshFarm.Web.Bff.csproj
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore ${{ matrix.project }}
+        run: dotnet restore ${{ matrix.project }}
+
+      - name: Build ${{ matrix.project }}
+        run: dotnet build ${{ matrix.project }} --configuration Release --no-restore
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore BFF webhook tests
+        run: dotnet restore src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj
+
+      - name: Test BFF webhook tests
+        run: dotnet test src/Tests/FreshFarm.Web.Bff.Tests/FreshFarm.Web.Bff.Tests.csproj --configuration Release --no-restore
+
+      - name: Restore Ordering tests
+        run: dotnet restore src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj
+
+      - name: Test Ordering tests
+        run: dotnet test src/Tests/FreshFarm.Ordering.Api.Tests/FreshFarm.Ordering.Api.Tests.csproj --configuration Release --no-restore
+
+      - name: Restore Identity tests
+        run: dotnet restore src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj
+
+      - name: Test Identity tests
+        run: dotnet test src/Tests/FreshFarm.Identity.Api.Tests/FreshFarm.Identity.Api.Tests.csproj --configuration Release --no-restore

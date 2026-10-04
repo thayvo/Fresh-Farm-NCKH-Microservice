@@ -3,20 +3,32 @@
     var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
     var currentUrl = $"{currentPath}{currentQuery}";
     var displayName = User.Identity?.Name;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isBackofficePath = currentPath.StartsWith("/Seller", StringComparison.OrdinalIgnoreCase)
+        || currentPath.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase);
+    var supportsBuyerWidget = !isBackofficePath;
+    var becomeSellerUrl = "/account/become-seller";
+    var sellerDashboardUrl = Url.Action("Dashboard", "Home", new { area = "Seller" }) ?? "/Seller/Home/Dashboard";
+    var sellerChannelUrl = User.Identity?.IsAuthenticated == true && (User.IsInRole("Seller") || User.IsInRole("Admin"))
+        ? sellerDashboardUrl
+        : becomeSellerUrl;
+    var notificationsUrl = isAuthenticated
+        ? "/account/notifications"
+        : (Url.Action("SignIn", "Account", new { returnUrl = "/account/notifications" }) ?? "/account/signin?returnUrl=%2Faccount%2Fnotifications");
 }
 
 <div class="promo-bar py-2 d-none d-lg-block">
     <div class="container promo-inner d-flex align-items-center justify-content-between">
         <div class="promo-links d-flex align-items-center gap-2">
-            <a href="#">Kênh Người Bán</a>
+            <a href="@sellerChannelUrl">Kênh Người Bán</a>
             <span>|</span>
-            <a href="#">Trở thành Người bán FreshFarm</a>
+            <a href="@becomeSellerUrl">Trở thành Người bán FreshFarm</a>
         </div>
 
         <div class="promo-links d-flex align-items-center gap-2">
-            <a href="#"><i class="bi bi-bell"></i> Thông báo</a>
-            <a href="#"><i class="bi bi-question-circle"></i> Hỗ trợ</a>
-            @if (User.Identity?.IsAuthenticated == true)
+            <a href="@notificationsUrl"><i class="bi bi-bell"></i> Thông báo</a>
+            <a href="@(supportsBuyerWidget ? "#buyerChatWidget" : "/shops")" @(supportsBuyerWidget ? "data-floating-buyer-chat-toggle" : null)><i class="bi bi-question-circle"></i> Hỗ trợ</a>
+            @if (isAuthenticated)
             {
                 <span>|</span>
                 <div class="promo-account-dropdown">
@@ -45,3 +57,5 @@
         </div>
     </div>
 </div>
+
+@await Html.PartialAsync("_FloatingBuyerChat")

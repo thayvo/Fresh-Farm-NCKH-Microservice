@@ -200,7 +200,8 @@ public sealed class CatalogModerationController : LegacySellerControllerBase
             throw new InvalidOperationException(await ReadApiErrorAsync(response, "Không thể tải danh sách sản phẩm."));
         }
 
-        return await response.Content.ReadFromJsonAsync<List<ApiProductDto>>(JsonOptions) ?? new List<ApiProductDto>();
+        return DeduplicateProducts(
+            await response.Content.ReadFromJsonAsync<List<ApiProductDto>>(JsonOptions) ?? new List<ApiProductDto>());
     }
 
     private ProductModerationRowViewModel BuildModerationRow(ApiProductDto product)
@@ -308,6 +309,52 @@ public sealed class CatalogModerationController : LegacySellerControllerBase
         return current == "low" ? candidate : current;
     }
 
+    private static List<ApiProductDto> DeduplicateProducts(IEnumerable<ApiProductDto> products)
+    {
+        return products
+            .Where(product => product.ProductId > 0)
+            .GroupBy(product => product.ProductId)
+            .Select(group => group
+                .OrderByDescending(CalculateProductScore)
+                .ThenByDescending(CalculateProductSignalLength)
+                .ThenByDescending(product => product.UpdatedDate ?? product.CreatedDate)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateProductScore(ApiProductDto product)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(product.ProductName) ? 3 : 0;
+        score += HasMeaningfulValue(product.Sku) ? 2 : 0;
+        score += HasMeaningfulValue(product.CategoryName) ? 2 : 0;
+        score += HasMeaningfulValue(product.ShortDescription) ? 1 : 0;
+        score += HasMeaningfulValue(product.LongDescription) ? 1 : 0;
+        score += HasMeaningfulValue(product.ImageFileName) ? 1 : 0;
+        score += product.Price > 0 ? 1 : 0;
+        score += product.StockQuantity > 0 ? 1 : 0;
+
+        return score;
+    }
+
+    private static int CalculateProductSignalLength(ApiProductDto product)
+    {
+        var values = new[]
+        {
+            product.ProductName,
+            product.Sku,
+            product.CategoryName,
+            product.ShortDescription,
+            product.LongDescription,
+            product.ImageFileName
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
+
     private static string NormalizeState(string state)
     {
         return (state ?? string.Empty).Trim().ToLowerInvariant() switch
@@ -392,6 +439,10 @@ public sealed class CatalogModerationController : LegacySellerControllerBase
         public string? ShortDescription { get; set; }
 
         public string? LongDescription { get; set; }
+
+        public DateTime CreatedDate { get; set; }
+
+        public DateTime? UpdatedDate { get; set; }
 
         public bool IsManuallyDisabled { get; set; }
 

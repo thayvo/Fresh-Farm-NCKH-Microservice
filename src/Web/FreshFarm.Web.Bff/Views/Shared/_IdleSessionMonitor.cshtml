@@ -1,0 +1,98 @@
+@using FreshFarm.Web.Bff.Options
+@using FreshFarm.Web.Bff.Utilities
+@using Microsoft.Extensions.Options
+@inject IOptions<IdleSessionOptions> IdleSessionOptionsAccessor
+@{
+    var options = IdleSessionOptionsAccessor.Value;
+    var cspNonce = Context.Items["CspNonce"] as string ?? string.Empty;
+    if (User.Identity?.IsAuthenticated != true || !options.Enabled)
+    {
+        return;
+    }
+
+    var warningAfterMs = Math.Max(1, options.WarningAfterMinutes) * 60 * 1000;
+    var autoLogoutAfterMs = Math.Max(1, options.AutoLogoutAfterWarningMinutes) * 60 * 1000;
+    var loginUrl = AuthLaneResolver.ResolveLoginPath(User);
+}
+
+<style>
+    .idle-session-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 1.25rem;
+    }
+
+    .idle-session-overlay.is-visible {
+        display: flex;
+    }
+
+    .idle-session-modal {
+        width: min(100%, 440px);
+        border-radius: 18px;
+        background: #fff;
+        color: #0f172a;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+        overflow: hidden;
+    }
+
+    .idle-session-modal-header {
+        padding: 1rem 1.25rem .5rem;
+    }
+
+    .idle-session-modal-title {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .idle-session-modal-body {
+        padding: 0 1.25rem 1rem;
+    }
+
+    .idle-session-modal-footer {
+        padding: 0 1.25rem 1.25rem;
+        display: flex;
+        gap: .75rem;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .idle-session-countdown {
+        font-weight: 700;
+        color: #b42318;
+    }
+</style>
+
+<form id="idleSessionAntiForgeryForm" class="d-none" method="post">
+    @Html.AntiForgeryToken()
+</form>
+
+<div id="idleSessionConfig"
+     data-warning-after-ms="@warningAfterMs"
+     data-auto-logout-after-ms="@autoLogoutAfterMs"
+     data-refresh-url="/api/auth/refresh-session"
+     data-logout-url="/api/auth/logout"
+     data-login-url="@loginUrl"></div>
+
+<div id="idleSessionOverlay" class="idle-session-overlay" aria-hidden="true">
+    <div class="idle-session-modal" role="dialog" aria-modal="true" aria-labelledby="idleSessionTitle">
+        <div class="idle-session-modal-header">
+            <h2 id="idleSessionTitle" class="idle-session-modal-title">Phiên đăng nhập sắp hết hạn</h2>
+        </div>
+        <div class="idle-session-modal-body">
+            <p class="mb-2">Phiên đăng nhập của bạn sắp hết hạn. Bạn có muốn tiếp tục duy trì đăng nhập không?</p>
+            <p class="mb-0 text-muted">Hệ thống sẽ tự động đăng xuất sau <span id="idleSessionCountdown" class="idle-session-countdown">02:00</span> nếu bạn không tiếp tục.</p>
+        </div>
+        <div class="idle-session-modal-footer">
+            <button type="button" id="idleSessionLogoutNowButton" class="btn btn-outline-secondary">Đăng xuất</button>
+            <button type="button" id="idleSessionContinueButton" class="btn btn-success">Tiếp tục</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="@cspNonce" src="~/js/idle-session-monitor.js" asp-append-version="true"></script>

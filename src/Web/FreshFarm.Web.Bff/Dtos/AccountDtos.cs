@@ -1,11 +1,22 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace FreshFarm.Web.Bff.Dtos
 {
     public sealed class LoginRequestDto // Payload gui den Identity /auth/login.
     {
+        [Required(ErrorMessage = "Tên đăng nhập hoặc email không được để trống.")]
+        [StringLength(100, ErrorMessage = "Tên đăng nhập hoặc email tối đa 100 ký tự.")]
         public string Identifier { get; set; } = string.Empty; // Email hoac username.
+
+        [Required(ErrorMessage = "Mật khẩu không được để trống.")]
+        [StringLength(100, ErrorMessage = "Mật khẩu tối đa 100 ký tự.")]
         public string Password { get; set; } = string.Empty; // Mat khau.
+        public string? ClientLane { get; set; } // Buyer/Seller/Admin lane khoi tao request.
+
+        [BindNever]
+        [StringLength(128)]
+        public string? DeviceId { get; set; } // Chi duoc gan server-side tu cookie Data Protection cua BFF.
     }
 
     public sealed class RegisterRequestDto // Payload gui den Identity /auth/register.
@@ -25,7 +36,7 @@ namespace FreshFarm.Web.Bff.Dtos
         public string Email { get; set; } = string.Empty; // Email dang ky.
 
         [Required(ErrorMessage = "Số điện thoại không được để trống.")]
-        [RegularExpression(@"^(0|\+84)(\d){9,10}$", ErrorMessage = "Số điện thoại phải đúng định dạng Việt Nam.")]
+        [RegularExpression(@"^(0\d{9}|\+84\d{9})$", ErrorMessage = "Số điện thoại phải là số di động Việt Nam hợp lệ gồm 10 số, hoặc bắt đầu bằng +84.")]
         public string Phone { get; set; } = string.Empty; // So dien thoai.
 
         [Required(ErrorMessage = "Mật khẩu không được để trống.")]
@@ -40,6 +51,10 @@ namespace FreshFarm.Web.Bff.Dtos
 
         [Range(typeof(bool), "true", "true", ErrorMessage = "Bạn cần đồng ý với điều khoản sử dụng và chính sách quyền riêng tư.")]
         public bool AcceptTerms { get; set; }
+
+        public string CaptchaCode { get; set; } = string.Empty;
+
+        public string BotChallengeToken { get; set; } = string.Empty;
     }
 
     public sealed class ForgotPasswordRequestDto // Payload gui yeu cau quen mat khau.
@@ -48,6 +63,10 @@ namespace FreshFarm.Web.Bff.Dtos
         [EmailAddress(ErrorMessage = "Email không đúng định dạng.")]
         [StringLength(100, ErrorMessage = "Email tối đa 100 ký tự.")]
         public string Email { get; set; } = string.Empty;
+
+        public string CaptchaCode { get; set; } = string.Empty;
+
+        public string BotChallengeToken { get; set; } = string.Empty;
     }
 
     public sealed class ResetPasswordRequestDto // Payload dat lai mat khau tu email reset.
@@ -61,7 +80,8 @@ namespace FreshFarm.Web.Bff.Dtos
         public string Token { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Mật khẩu mới không được để trống.")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Mật khẩu mới phải từ 6 đến 100 ký tự.")]
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "Mật khẩu mới phải từ 8 đến 100 ký tự.")]
+        [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).+$", ErrorMessage = "Mật khẩu mới phải có ít nhất một chữ cái và một chữ số.")]
         public string NewPassword { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "Xác nhận mật khẩu không được để trống.")]
@@ -73,14 +93,101 @@ namespace FreshFarm.Web.Bff.Dtos
     {
         public string AccessToken { get; set; } = string.Empty; // JWT.
         public DateTime ExpiredAtUtc { get; set; } // Han token.
+        public bool RequiresTwoFactor { get; set; }
+        public bool RequiresTwoFactorSetup { get; set; }
+        public string? TwoFactorTicket { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
+        public string AccountAccess { get; set; } = "full";
+        public string ApprovalStatus { get; set; } = string.Empty;
+        public bool IsPendingApproval { get; set; }
+        public string? AccountStatusMessage { get; set; }
+    }
+
+    public sealed class VerifyTwoFactorLoginRequestDto
+    {
+        public string Ticket { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
+    }
+
+    public sealed class TwoFactorChallengeStateDto
+    {
+        public string Ticket { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
+        public string? ReturnUrl { get; set; }
+        public bool RequiresSetup { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
+    }
+
+    public sealed class AccountTwoFactorViewModel
+    {
+        [Required(ErrorMessage = "Vui lòng nhập mã xác thực 6 số.")]
+        [Display(Name = "Mã xác thực 6 số")]
+        public string Code { get; set; } = string.Empty;
+
+        public bool RequiresSetup { get; set; }
+        public bool RememberMe { get; set; }
+        public string? ManualEntryKey { get; set; }
+        public string? OtpAuthUri { get; set; }
+        public string? QrCodeImageDataUri { get; set; }
+        public string? AuthenticatorIssuer { get; set; }
+        public string? AuthenticatorAccountName { get; set; }
+        public string? ChallengeMessage { get; set; }
     }
 
     public sealed class ExternalLoginExchangeRequestDto
     {
         public string Provider { get; set; } = string.Empty;
+        public string ProviderSubject { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public bool EmailVerified { get; set; }
+        public string? HostedDomain { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string? AvatarUrl { get; set; }
+    }
+
+    public sealed class RegisterResultDto
+    {
+        public int UserId { get; set; }
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string RoleName { get; set; } = string.Empty;
+        public bool EmailVerificationRequired { get; set; }
+        public bool VerificationEmailSent { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public sealed class ResendEmailVerificationRequestDto
+    {
+        [Required(ErrorMessage = "Email hoặc tên đăng nhập là bắt buộc.")]
+        [StringLength(100, ErrorMessage = "Thông tin nhận diện tối đa 100 ký tự.")]
+        public string Identifier { get; set; } = string.Empty;
+
+        public string? ReturnUrl { get; set; }
+    }
+
+    public sealed class EmailVerificationPendingViewModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string? Message { get; set; }
+        public string? ReturnUrl { get; set; }
+        public ResendEmailVerificationRequestDto ResendRequest { get; set; } = new();
+    }
+
+    public sealed class EmailVerificationResultViewModel
+    {
+        public bool Success { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string? ReturnUrl { get; set; }
+        public string? Email { get; set; }
     }
 
     public sealed class OrderHistoryItemDto // Item de render lich su don.

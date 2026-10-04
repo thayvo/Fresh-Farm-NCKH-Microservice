@@ -34,3 +34,12 @@ Maintain this exact structure including headings:
   - *Next*:
 - **Open questions** (UNCONFIRMED if needed):
 - **Working set** (files/ids/commands):
+```
+
+## 5. WORKSPACE ARTIFACT POLICY
+- Do not create Codex/test/build/browser artifacts in the repository root.
+- Use `D:\NCKH\DOAN\codex-artifacts\NCKH-FRESH-FARM` for all temporary Codex outputs, including build outputs, test results, runtime logs, Playwright snapshots, screenshots, generated HTML/debug responses, and scratch files.
+- Prefer per-task subfolders under that artifact root, for example `build\`, `test-results\`, `logs\`, `playwright\`, `tmp\`, and `screenshots\`.
+- When running `.NET` commands that need custom output, use an external output/results path under the artifact root.
+- When running Playwright or browser verification, write screenshots, traces, page snapshots, and console logs under the artifact root.
+- Do not add new `.codex-*`, `.codex-*/`, `artifacts/`, `output/`, or `tmp/` paths inside this repo unless the user explicitly asks.

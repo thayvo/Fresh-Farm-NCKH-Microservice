@@ -69,8 +69,8 @@ public partial class FreshFarmIdentityDBContext : DbContext
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
             entity.Property(e => e.Ward).HasMaxLength(100);
 
-            entity.HasOne(d => d.User).WithOne(p => p.AddressBook)
-                .HasForeignKey<AddressBook>(d => d.UserId)
+            entity.HasOne(d => d.User).WithMany(p => p.AddressBooks)
+                .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_AddressBook_Users");
         });
@@ -244,6 +244,10 @@ public partial class FreshFarmIdentityDBContext : DbContext
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())")
                 .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_CreatedAt");
+            entity.Property(e => e.EmailConfirmed)
+                .HasDefaultValue(true)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_Users_EmailConfirmed");
+            entity.Property(e => e.EmailConfirmedAt).HasPrecision(0);
             entity.Property(e => e.Email)
                 .IsRequired()
                 .HasMaxLength(100);
@@ -270,6 +274,9 @@ public partial class FreshFarmIdentityDBContext : DbContext
 
             entity.Property(e => e.UserId).ValueGeneratedNever();
             entity.Property(e => e.FailedCount).HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_FailedCount");
+            entity.Property(e => e.LockoutLevel)
+                .HasDefaultValue(0)
+                .HasAnnotation("Relational:DefaultConstraintName", "DF_UserAuth_LockoutLevel");
             entity.Property(e => e.LockedUntil).HasPrecision(0);
             entity.Property(e => e.Mfasecret)
                 .HasMaxLength(100)

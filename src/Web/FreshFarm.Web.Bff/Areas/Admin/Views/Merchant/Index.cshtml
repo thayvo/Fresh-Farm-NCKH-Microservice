@@ -38,10 +38,41 @@
     {
         "approval" => "Chờ duyệt",
         "profile_fix" => "Bổ sung hồ sơ",
-        "dormant" => "Ngủ đông",
+        "dormant" => "Ít hoạt động",
         "suspended" => "Đang khóa",
-        _ => "Rà soát tay"
+        _ => "Rà soát thủ công"
     };
+
+    string ReviewBadge(string reviewStatus) => (reviewStatus ?? string.Empty).ToLowerInvariant() switch
+    {
+        "approved" => "bg-success-subtle text-success",
+        "rejected" => "bg-danger-subtle text-danger",
+        _ => "bg-warning-subtle text-warning"
+    };
+
+    string ReviewActionText(string action) => (action ?? string.Empty).ToLowerInvariant() switch
+    {
+        "approve" => "Duyệt hồ sơ",
+        "reject" => "Từ chối hồ sơ",
+        "resubmit" => "Gửi lại hồ sơ",
+        "status" => "Cập nhật trạng thái",
+        _ => "Cập nhật hồ sơ"
+    };
+
+    bool HasValue(string? value) => !string.IsNullOrWhiteSpace(value);
+
+    bool CanApprove(FreshFarm.Web.Bff.Areas.Admin.Models.MerchantDetailViewModel merchant) =>
+        !merchant.IsSellerApproved
+        && HasValue(merchant.StoreName)
+        && HasValue(merchant.StoreAddress)
+        && HasValue(merchant.StoreEmail)
+        && HasValue(merchant.StorePhone)
+        && HasValue(merchant.LegalFullName)
+        && HasValue(merchant.IdentityNumberMasked)
+        && merchant.IdentityIssuedDate.HasValue
+        && HasValue(merchant.IdentityIssuedPlace)
+        && HasValue(merchant.CitizenIdFrontUrl)
+        && HasValue(merchant.CitizenIdBackUrl);
 }
 
 <style>
@@ -101,20 +132,50 @@
         gap: 1rem;
     }
 
+    .merchant-requirement-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: .75rem;
+    }
+
+    .merchant-requirement {
+        border: 1px solid #e5e7eb;
+        border-radius: .75rem;
+        padding: .75rem;
+        background: #fff;
+        min-height: 100%;
+    }
+
+    .merchant-requirement.is-done {
+        border-color: rgba(25, 135, 84, .22);
+        background: #f0fdf4;
+    }
+
+    .merchant-requirement.is-missing {
+        border-color: rgba(220, 53, 69, .18);
+        background: #fff7f7;
+    }
+
+    .reject-template-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+
 </style>
 
 <main class="merchant-shell ff-admin-shell">
     <section class="merchant-hero ff-admin-hero mb-4">
         <div class="d-flex flex-column flex-lg-row justify-content-between gap-4">
             <div>
-                <div class="ff-admin-chip mb-3">Sprint C · Vòng đời nhà bán hàng</div>
-                <h1 class="fw-bold mb-2">Vòng đời nhà bán hàng & tuân thủ</h1>
-                <p class="mb-0 opacity-75">Rà nhà bán hàng theo độ đầy đủ hồ sơ, hoạt động gần đây và trạng thái vận hành để chuẩn bị cho các bước tuân thủ sâu hơn.</p>
+                <div class="ff-admin-chip mb-3">Quản trị nhà bán hàng</div>
+                <h1 class="fw-bold mb-2">Hồ sơ và trạng thái nhà bán hàng</h1>
+                <p class="mb-0 opacity-75">Theo dõi hồ sơ đăng ký, trạng thái hoạt động và các mục cần bổ sung trước khi duyệt hoặc tạm khóa nhà bán hàng.</p>
             </div>
             <div class="text-lg-end">
-                <div class="small opacity-75">MVP theo heuristic</div>
-                <div class="fw-semibold">Dựa trên hồ sơ Identity hiện có</div>
-                <div class="small opacity-75">Chưa có bảng KYC riêng hoặc luồng phê duyệt nhiều bước</div>
+                <div class="small opacity-75">Nguồn dữ liệu</div>
+                <div class="fw-semibold">Tài khoản, hồ sơ cửa hàng và hồ sơ pháp lý</div>
+                <div class="small opacity-75">Duyệt thủ công theo điều kiện bắt buộc</div>
             </div>
         </div>
     </section>
@@ -136,10 +197,10 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng nhà bán hàng</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tổng hồ sơ người bán</div><div class="display-6 fw-bold">@Model.Stats.TotalSellers</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Tài khoản đang hoạt động</div><div class="display-6 fw-bold text-success">@Model.Stats.ActiveSellers</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Cần rà soát</div><div class="display-6 fw-bold text-warning">@Model.Stats.ReviewNeeded</div></div></div>
@@ -151,24 +212,24 @@
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Thiếu địa chỉ</div><div class="display-6 fw-bold text-primary">@Model.Stats.MissingAddress</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Hàng chờ duyệt</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Chờ duyệt mới</div><div class="display-6 fw-bold text-success">@Model.Stats.ApprovalQueue</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
             <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Bổ sung hồ sơ</div><div class="display-6 fw-bold text-warning">@Model.Stats.ProfileFixQueue</div></div></div>
         </div>
         <div class="col-md-6 col-xl">
-            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Nhà bán hàng ngủ đông</div><div class="display-6 fw-bold text-secondary">@Model.Stats.DormantQueue</div></div></div>
+            <div class="card merchant-card"><div class="card-body"><div class="text-muted small">Ít hoạt động</div><div class="display-6 fw-bold text-secondary">@Model.Stats.DormantQueue</div></div></div>
         </div>
     </div>
 
     <div class="card merchant-filter-card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
-                <div class="col-lg-7">
+                <div class="col-lg-4">
                     <label class="form-label fw-semibold">Tìm kiếm nhà bán hàng</label>
-                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tên shop, username, email, số điện thoại..." />
+                    <input type="text" class="form-control" name="q" value="@Model.Query" placeholder="Tên cửa hàng, tên đăng nhập, email, số điện thoại..." />
                 </div>
-                <div class="col-md-4 col-lg-2">
+                <div class="col-md-6 col-lg-2">
                     <label class="form-label fw-semibold">Trạng thái tuân thủ</label>
                     <select class="form-select" name="status">
                         @foreach (var option in Model.StatusOptions)
@@ -184,8 +245,8 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-4 col-lg-2">
-                    <label class="form-label fw-semibold">Queue vận hành</label>
+                <div class="col-md-6 col-lg-2">
+                    <label class="form-label fw-semibold">Hàng xử lý</label>
                     <select class="form-select" name="queue">
                         @foreach (var option in Model.QueueOptions)
                         {
@@ -200,7 +261,39 @@
                         }
                     </select>
                 </div>
-                <div class="col-md-4 col-lg-1 d-flex gap-2">
+                <div class="col-md-6 col-lg-2">
+                    <label class="form-label fw-semibold">Trạng thái thẩm định</label>
+                    <select class="form-select" name="reviewStatus">
+                        @foreach (var option in Model.ReviewStatusOptions)
+                        {
+                            if (string.Equals(option.Value, Model.ReviewStatus, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6 col-lg-1">
+                    <label class="form-label fw-semibold">Thời gian thẩm định</label>
+                    <select class="form-select" name="reviewWindow">
+                        @foreach (var option in Model.ReviewWindowOptions)
+                        {
+                            if (string.Equals(option.Value, Model.ReviewWindow, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <option value="@option.Value" selected>@option.Text</option>
+                            }
+                            else
+                            {
+                                <option value="@option.Value">@option.Text</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-12 col-lg-1 d-flex gap-2">
                     <button type="submit" class="btn btn-primary rounded-pill px-4 flex-fill">
                         <i class="bi bi-funnel me-2"></i>Lọc
                     </button>
@@ -234,11 +327,11 @@
                             {
                                 var selected = Model.SelectedSellerId == merchant.SellerId;
                                 <a class="merchant-row text-decoration-none text-reset p-3 @(selected ? "is-selected" : string.Empty)"
-                                   href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, page = Model.Page, selectedSellerId = merchant.SellerId })">
+                                   href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, reviewStatus = Model.ReviewStatus, reviewWindow = Model.ReviewWindow, page = Model.Page, selectedSellerId = merchant.SellerId })">
                                     <div class="d-flex gap-3">
                                         @if (!string.IsNullOrWhiteSpace(merchant.Avatar))
                                         {
-                                            <img src="@merchant.Avatar" alt="@merchant.ShopName" class="merchant-avatar" />
+                                            <img src="@merchant.Avatar" alt="@merchant.ShopName" class="merchant-avatar" loading="lazy" decoding="async" />
                                         }
                                         else
                                         {
@@ -253,11 +346,16 @@
                                                 </div>
                                                 <div class="d-flex gap-2 align-items-center">
                                                     <span class="badge rounded-pill @QueueBadge(merchant.QueueBucket)">@QueueText(merchant.QueueBucket)</span>
+                                                    <span class="badge rounded-pill @ReviewBadge(merchant.ReviewStatus)">@merchant.ReviewStatusLabel</span>
                                                     <span class="badge rounded-pill @ComplianceBadge(merchant.ComplianceStatus)">@ComplianceText(merchant.ComplianceStatus)</span>
                                                     <span class="merchant-score">@merchant.ProfileScore</span>
                                                 </div>
                                             </div>
                                             <div class="small mt-2 text-muted">@merchant.Email · @(string.IsNullOrWhiteSpace(merchant.Phone) ? "Chưa có SĐT" : merchant.Phone)</div>
+                                            @if (!merchant.IsSellerApproved && !string.IsNullOrWhiteSpace(merchant.StoreEmail))
+                                            {
+                                                <div class="small text-muted">Hồ sơ store: @merchant.StoreEmail · @(string.IsNullOrWhiteSpace(merchant.StorePhone) ? "Chưa có SĐT cửa hàng" : merchant.StorePhone)</div>
+                                            }
                                             <div class="small text-muted">@merchant.AddressSummary</div>
                                             <div class="small text-muted mt-1">Số cờ rà soát: <strong>@merchant.IssueCount</strong></div>
                                             <div class="merchant-flags mt-2">
@@ -283,7 +381,7 @@
                                     @for (var i = 1; i <= Model.TotalPages; i++)
                                     {
                                         <li class="page-item @(i == Model.Page ? "active" : string.Empty)">
-                                            <a class="page-link" href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, page = i, selectedSellerId = Model.SelectedSellerId })">@i</a>
+                                            <a class="page-link" href="@Url.Action("Index", "Merchant", new { area = "Admin", q = Model.Query, status = Model.Status, queue = Model.Queue, reviewStatus = Model.ReviewStatus, reviewWindow = Model.ReviewWindow, page = i, selectedSellerId = Model.SelectedSellerId })">@i</a>
                                         </li>
                                     }
                                 </ul>
@@ -305,14 +403,29 @@
                     }
                     else if (Model.Details is null)
                     {
-                        <div class="alert alert-light border mb-0">Chọn một nhà bán hàng để xem chi tiết.</div>
+                                <div class="alert alert-light border mb-0">Chọn một nhà bán hàng để xem hồ sơ, điều kiện duyệt và lịch sử thẩm định.</div>
                     }
                     else
                     {
+                        var approvalReady = CanApprove(Model.Details);
+                        var requirements = new[]
+                        {
+                            new { Label = "Tên cửa hàng", Done = HasValue(Model.Details.StoreName) },
+                            new { Label = "Địa chỉ hoạt động", Done = HasValue(Model.Details.StoreAddress) },
+                            new { Label = "Email cửa hàng", Done = HasValue(Model.Details.StoreEmail) },
+                            new { Label = "Số điện thoại cửa hàng", Done = HasValue(Model.Details.StorePhone) },
+                            new { Label = "Họ tên pháp lý", Done = HasValue(Model.Details.LegalFullName) },
+                            new { Label = "Số CCCD", Done = HasValue(Model.Details.IdentityNumberMasked) },
+                            new { Label = "Ngày cấp CCCD", Done = Model.Details.IdentityIssuedDate.HasValue },
+                            new { Label = "Nơi cấp CCCD", Done = HasValue(Model.Details.IdentityIssuedPlace) },
+                            new { Label = "Ảnh CCCD mặt trước", Done = HasValue(Model.Details.CitizenIdFrontUrl) },
+                            new { Label = "Ảnh CCCD mặt sau", Done = HasValue(Model.Details.CitizenIdBackUrl) }
+                        };
+
                         <div class="d-flex gap-3 align-items-center mb-3">
                             @if (!string.IsNullOrWhiteSpace(Model.Details.Avatar))
                             {
-                                <img src="@Model.Details.Avatar" alt="@Model.Details.ShopName" class="merchant-avatar" />
+                                <img src="@Model.Details.Avatar" alt="@Model.Details.ShopName" class="merchant-avatar" loading="lazy" decoding="async" />
                             }
                             else
                             {
@@ -322,6 +435,7 @@
                                 <div class="fw-bold fs-5">@Model.Details.ShopName</div>
                                 <div class="text-muted small">@Model.Details.UserName · Mã nhà bán hàng #@Model.Details.SellerId</div>
                                 <span class="badge rounded-pill mt-2 @QueueBadge(Model.Details.QueueBucket)">@QueueText(Model.Details.QueueBucket)</span>
+                                <span class="badge rounded-pill mt-2 @ReviewBadge(Model.Details.ReviewStatus)">@Model.Details.ReviewStatusLabel</span>
                                 <span class="badge rounded-pill mt-2 @ComplianceBadge(Model.Details.ComplianceStatus)">@ComplianceText(Model.Details.ComplianceStatus)</span>
                             </div>
                         </div>
@@ -348,6 +462,80 @@
                             <div>@(string.IsNullOrWhiteSpace(Model.Details.Phone) ? "Chưa có số điện thoại" : Model.Details.Phone)</div>
                         </div>
 
+                        @if (!string.IsNullOrWhiteSpace(Model.Details.StoreName) || !string.IsNullOrWhiteSpace(Model.Details.StoreEmail))
+                        {
+                            <div class="mb-3">
+                                <div class="text-muted small mb-1">Thông tin hồ sơ người bán</div>
+                                <div class="fw-semibold">@(string.IsNullOrWhiteSpace(Model.Details.StoreName) ? "Chưa có tên cửa hàng" : Model.Details.StoreName)</div>
+                                <div>@(string.IsNullOrWhiteSpace(Model.Details.StoreEmail) ? "Chưa có email cửa hàng" : Model.Details.StoreEmail)</div>
+                                <div>@(string.IsNullOrWhiteSpace(Model.Details.StorePhone) ? "Chưa có SĐT cửa hàng" : Model.Details.StorePhone)</div>
+                                @if (Model.Details.ApplicationSubmittedAt.HasValue)
+                                {
+                                    <div class="small text-muted mt-1">Gửi hồ sơ: @Model.Details.ApplicationSubmittedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <div class="text-muted small mb-1">Hồ sơ pháp lý</div>
+                            <div class="fw-semibold">@(string.IsNullOrWhiteSpace(Model.Details.LegalFullName) ? "Chưa có họ tên pháp lý" : Model.Details.LegalFullName)</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Details.IdentityNumberMasked) ? "Chưa có số CCCD" : $"CCCD: {Model.Details.IdentityNumberMasked}")</div>
+                            <div>@(string.IsNullOrWhiteSpace(Model.Details.IdentityIssuedPlace) ? "Chưa có nơi cấp" : $"Nơi cấp: {Model.Details.IdentityIssuedPlace}")</div>
+                            @if (Model.Details.IdentityIssuedDate.HasValue)
+                            {
+                                <div>Ngày cấp: @Model.Details.IdentityIssuedDate.Value.ToString("dd/MM/yyyy")</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(Model.Details.TaxCode) || !string.IsNullOrWhiteSpace(Model.Details.BusinessLicenseNumber))
+                            {
+                                <div class="small text-muted mt-1">
+                                    MST: @(string.IsNullOrWhiteSpace(Model.Details.TaxCode) ? "Chưa có" : Model.Details.TaxCode)
+                                    · GPKD: @(string.IsNullOrWhiteSpace(Model.Details.BusinessLicenseNumber) ? "Chưa có" : Model.Details.BusinessLicenseNumber)
+                                </div>
+                            }
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.CitizenIdFrontUrl))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.CitizenIdFrontUrl })" target="_blank" rel="noopener">Xem CCCD mặt trước</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.CitizenIdBackUrl))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.CitizenIdBackUrl })" target="_blank" rel="noopener">Xem CCCD mặt sau</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.BusinessLicenseUrl))
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.BusinessLicenseUrl })" target="_blank" rel="noopener">Xem giấy phép kinh doanh</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(Model.Details.AdditionalDocumentUrl))
+                                {
+                                    <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("KycDocument", "Merchant", new { area = "Admin", sellerId = Model.Details.SellerId, reference = Model.Details.AdditionalDocumentUrl })" target="_blank" rel="noopener">Xem chứng từ bổ sung</a>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(Model.Details.KycNotes))
+                            {
+                                <div class="small text-muted mt-2">@Model.Details.KycNotes</div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="text-muted small">Điều kiện duyệt người bán</div>
+                                <span class="badge rounded-pill @(approvalReady ? "text-bg-success" : "text-bg-warning")">
+                                    @(approvalReady ? "Đủ điều kiện" : "Cần bổ sung")
+                                </span>
+                            </div>
+                            <div class="merchant-requirement-grid">
+                                @foreach (var item in requirements)
+                                {
+                                    <div class="merchant-requirement @(item.Done ? "is-done" : "is-missing")">
+                                        <div class="d-flex gap-2 align-items-center">
+                                            <i class="bi @(item.Done ? "bi-check-circle-fill text-success" : "bi-exclamation-circle-fill text-danger")"></i>
+                                            <span class="small fw-semibold">@item.Label</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
                         <div class="mb-3">
                             <div class="text-muted small mb-1">Địa chỉ hoạt động</div>
                             <div>@Model.Details.AddressSummary</div>
@@ -362,7 +550,7 @@
                                 }
                                 @if (Model.Details.Flags.Count == 0)
                                 {
-                                    <span class="badge rounded-pill text-bg-success">Không có cờ đỏ ở mức MVP</span>
+                                    <span class="badge rounded-pill text-bg-success">Không có cờ rủi ro</span>
                                 }
                             </div>
                         </div>
@@ -371,6 +559,18 @@
                             <div class="fw-semibold mb-1">Kết luận hiện tại</div>
                             <div>@Model.Details.ComplianceSummary</div>
                         </div>
+
+                        @if (!string.IsNullOrWhiteSpace(Model.Details.ReviewNote))
+                        {
+                            <div class="alert alert-warning border-0">
+                                <div class="fw-semibold mb-1">Lý do từ chối / cần bổ sung</div>
+                                <div>@Model.Details.ReviewNote</div>
+                                @if (Model.Details.ReviewedAt.HasValue)
+                                {
+                                    <div class="small mt-2 text-muted">Quản trị viên cập nhật: @Model.Details.ReviewedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                }
+                            </div>
+                        }
 
                         <div class="p-3 bg-light rounded-4 mb-3">
                             <div class="text-muted small mb-1">Khuyến nghị vận hành</div>
@@ -390,23 +590,130 @@
                             </div>
                         </div>
 
-                        <form method="post" action="@Url.Action("UpdateStatus", "Merchant", new { area = "Admin" })" class="d-grid gap-2">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
-                            <input type="hidden" name="q" value="@Model.Query" />
-                            <input type="hidden" name="status" value="@Model.Status" />
-                            <input type="hidden" name="queue" value="@Model.Queue" />
-                            <input type="hidden" name="page" value="@Model.Page" />
-                            <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
-                            <input type="hidden" name="isActive" value="@((!Model.Details.IsActive).ToString().ToLowerInvariant())" />
-                            <button type="submit" class="btn @(Model.Details.IsActive ? "btn-outline-danger" : "btn-success") rounded-pill">
-                                <i class="bi @(Model.Details.IsActive ? "bi-pause-circle" : "bi-play-circle") me-2"></i>
-                                @(Model.Details.IsActive ? "Tạm khóa nhà bán hàng" : "Mở lại nhà bán hàng")
-                            </button>
-                        </form>
+                        <div class="mb-3">
+                            <div class="text-muted small mb-2">Lịch sử thẩm định gần đây</div>
+                            @if (Model.Details.ReviewHistory.Count == 0)
+                            {
+                                <div class="small text-muted">Chưa có sự kiện thẩm định nào được ghi nhận.</div>
+                            }
+                            else
+                            {
+                                <div class="d-flex flex-column gap-2">
+                                    @foreach (var review in Model.Details.ReviewHistory)
+                                    {
+                                        <div class="border rounded-4 p-3">
+                                            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                                <div>
+                                                    <span class="badge rounded-pill @ReviewBadge(review.ReviewStatus)">@review.ReviewStatusLabel</span>
+                                                    <span class="small text-muted ms-2">@ReviewActionText(review.Action)</span>
+                                                </div>
+                                                <div class="small text-muted">@review.ReviewedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                                            </div>
+                                            <div class="small mt-2">
+                                                Người thẩm định:
+                                                <strong>@(string.IsNullOrWhiteSpace(review.ReviewerFullName) ? (string.IsNullOrWhiteSpace(review.ReviewerUserName) ? "Hệ thống" : review.ReviewerUserName) : review.ReviewerFullName)</strong>
+                                                @if (!string.IsNullOrWhiteSpace(review.ReviewerUserName) && !string.Equals(review.ReviewerFullName, review.ReviewerUserName, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    <span class="text-muted">(@review.ReviewerUserName)</span>
+                                                }
+                                            </div>
+                                            @if (!string.IsNullOrWhiteSpace(review.Note))
+                                            {
+                                                <div class="small mt-2 text-muted">@review.Note</div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            @if (!Model.Details.IsSellerApproved)
+                            {
+                                <form method="post" action="@Url.Action("Approve", "Merchant", new { area = "Admin" })">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
+                                    <input type="hidden" name="q" value="@Model.Query" />
+                                    <input type="hidden" name="status" value="@Model.Status" />
+                                    <input type="hidden" name="queue" value="@Model.Queue" />
+                                    <input type="hidden" name="reviewStatus" value="@Model.ReviewStatus" />
+                                    <input type="hidden" name="reviewWindow" value="@Model.ReviewWindow" />
+                                    <input type="hidden" name="page" value="@Model.Page" />
+                                    <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
+                                    <button type="submit" class="btn btn-success rounded-pill w-100" disabled="@(!approvalReady)">
+                                        <i class="bi bi-check2-circle me-2"></i>Duyệt và cấp quyền người bán
+                                    </button>
+                                    @if (!approvalReady)
+                                    {
+                                        <div class="small text-danger mt-2">Chỉ duyệt được khi hồ sơ cửa hàng và hồ sơ pháp lý có đủ các mục bắt buộc.</div>
+                                    }
+                                </form>
+                                <form method="post" action="@Url.Action("Reject", "Merchant", new { area = "Admin" })" class="border rounded-4 p-3 bg-light">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
+                                    <input type="hidden" name="q" value="@Model.Query" />
+                                    <input type="hidden" name="status" value="@Model.Status" />
+                                    <input type="hidden" name="queue" value="@Model.Queue" />
+                                    <input type="hidden" name="reviewStatus" value="@Model.ReviewStatus" />
+                                    <input type="hidden" name="reviewWindow" value="@Model.ReviewWindow" />
+                                    <input type="hidden" name="page" value="@Model.Page" />
+                                    <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
+                                    <label class="form-label fw-semibold">Lý do từ chối / yêu cầu bổ sung</label>
+                                    @if (Model.RejectReasonTemplates.Count > 0)
+                                    {
+                                        <div class="reject-template-list mb-3">
+                                            @foreach (var template in Model.RejectReasonTemplates)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-secondary js-reject-template" data-template="@template">@template</button>
+                                            }
+                                        </div>
+                                    }
+                                    <textarea name="reason" class="form-control mb-3 js-reject-reason" rows="3" maxlength="1000" placeholder="Ví dụ: thiếu ảnh CCCD mặt sau, địa chỉ hoạt động chưa rõ, cần bổ sung giấy phép kinh doanh...">@Model.Details.RejectReasonDraft</textarea>
+                                    <button type="submit" class="btn btn-outline-danger rounded-pill w-100">
+                                        <i class="bi bi-x-circle me-2"></i>Từ chối và yêu cầu bổ sung
+                                    </button>
+                                </form>
+                            }
+                            <form method="post" action="@Url.Action("UpdateStatus", "Merchant", new { area = "Admin" })">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="sellerId" value="@Model.Details.SellerId" />
+                                <input type="hidden" name="q" value="@Model.Query" />
+                                <input type="hidden" name="status" value="@Model.Status" />
+                                <input type="hidden" name="queue" value="@Model.Queue" />
+                                <input type="hidden" name="reviewStatus" value="@Model.ReviewStatus" />
+                                <input type="hidden" name="reviewWindow" value="@Model.ReviewWindow" />
+                                <input type="hidden" name="page" value="@Model.Page" />
+                                <input type="hidden" name="selectedSellerId" value="@Model.Details.SellerId" />
+                                <input type="hidden" name="isActive" value="@((!Model.Details.IsActive).ToString().ToLowerInvariant())" />
+                                <button type="submit" class="btn @(Model.Details.IsActive ? "btn-outline-danger" : "btn-success") rounded-pill w-100">
+                                    <i class="bi @(Model.Details.IsActive ? "bi-pause-circle" : "bi-play-circle") me-2"></i>
+                                    @(Model.Details.IsActive ? "Tạm khóa nhà bán hàng" : "Mở lại nhà bán hàng")
+                                </button>
+                            </form>
+                        </div>
                     }
                 </div>
             </div>
         </div>
     </div>
 </main>
+
+<script>
+    document.addEventListener("click", function (event) {
+        var button = event.target.closest(".js-reject-template");
+        if (!button) {
+            return;
+        }
+
+        var container = button.closest("form");
+        var textarea = container ? container.querySelector(".js-reject-reason") : null;
+        if (!textarea) {
+            return;
+        }
+
+        var value = button.getAttribute("data-template") || "";
+        textarea.value = value;
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+</script>

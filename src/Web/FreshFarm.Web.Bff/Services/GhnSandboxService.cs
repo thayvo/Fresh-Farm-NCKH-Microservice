@@ -756,9 +756,18 @@ public sealed class GhnSandboxService : IGhnSandboxService
             Status = trackingPayload.Data.Status?.Trim() ?? string.Empty,
             StatusLabel = TranslateStatus(trackingPayload.Data.Status),
             ServiceName = trackingPayload.Data.ServiceTypeName?.Trim() ?? string.Empty,
+            FromName = trackingPayload.Data.FromName?.Trim() ?? string.Empty,
+            FromPhone = trackingPayload.Data.FromPhone?.Trim() ?? string.Empty,
+            FromAddress = BuildAddress(trackingPayload.Data.FromAddress, trackingPayload.Data.FromWardName, trackingPayload.Data.FromDistrictName, trackingPayload.Data.FromProvinceName),
             ToName = trackingPayload.Data.ToName?.Trim() ?? string.Empty,
             ToPhone = trackingPayload.Data.ToPhone?.Trim() ?? string.Empty,
             ToAddress = BuildAddress(trackingPayload.Data.ToAddress, trackingPayload.Data.WardName, trackingPayload.Data.DistrictName, trackingPayload.Data.ProvinceName),
+            CurrentWarehouseId = trackingPayload.Data.CurrentWarehouseId ?? ExtractWarehouseId(trackingPayload.Data.CurrentWarehouseRaw),
+            CurrentWarehouseName = ExtractWarehouseName(trackingPayload.Data.CurrentWarehouseName, trackingPayload.Data.CurrentWarehouseRaw),
+            Weight = trackingPayload.Data.Weight,
+            Length = trackingPayload.Data.Length,
+            Width = trackingPayload.Data.Width,
+            Height = trackingPayload.Data.Height,
             CodAmount = trackingPayload.Data.CodAmount,
             TotalFee = trackingPayload.Data.TotalFee,
             CreatedDate = ToDateTimeOffset(trackingPayload.Data.CreatedDateRaw),
@@ -769,7 +778,9 @@ public sealed class GhnSandboxService : IGhnSandboxService
                 {
                     Status = log.Status?.Trim() ?? string.Empty,
                     StatusLabel = TranslateStatus(log.Status),
-                    UpdatedAt = ToDateTimeOffset(log.UpdatedDateRaw)
+                    UpdatedAt = ToDateTimeOffset(log.UpdatedDateRaw),
+                    WarehouseId = log.WarehouseId ?? ExtractWarehouseId(log.WarehouseRaw),
+                    WarehouseName = ExtractWarehouseName(log.WarehouseName, log.WarehouseRaw)
                 })
                 .ToList(),
             Message = "Tra cứu đơn GHN sandbox thành công."
@@ -910,6 +921,70 @@ public sealed class GhnSandboxService : IGhnSandboxService
         }
 
         return DateTimeOffset.FromUnixTimeSeconds(unixTime.Value);
+    }
+
+    private static int? ExtractWarehouseId(JsonElement warehouse)
+    {
+        if (warehouse.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var propertyName in new[] { "warehouse_id", "id", "WarehouseID" })
+        {
+            if (warehouse.TryGetProperty(propertyName, out var value))
+            {
+                var id = ToInt(value);
+                if (id.HasValue)
+                {
+                    return id;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string ExtractWarehouseName(string? directName, JsonElement warehouse)
+    {
+        if (!string.IsNullOrWhiteSpace(directName))
+        {
+            return directName.Trim();
+        }
+
+        if (warehouse.ValueKind == JsonValueKind.String)
+        {
+            return warehouse.GetString()?.Trim() ?? string.Empty;
+        }
+
+        if (warehouse.ValueKind != JsonValueKind.Object)
+        {
+            return string.Empty;
+        }
+
+        foreach (var propertyName in new[] { "warehouse_name", "name", "WarehouseName" })
+        {
+            if (warehouse.TryGetProperty(propertyName, out var value))
+            {
+                var name = value.ValueKind == JsonValueKind.String ? value.GetString() : value.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    return name.Trim();
+                }
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static int? ToInt(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+            JsonValueKind.String when int.TryParse(value.GetString(), out var number) => number,
+            _ => null
+        };
     }
 
     private static string TranslateStatus(string? status)
@@ -1133,6 +1208,24 @@ public sealed class GhnSandboxService : IGhnSandboxService
         [JsonPropertyName("service_type_name")]
         public string? ServiceTypeName { get; set; }
 
+        [JsonPropertyName("from_name")]
+        public string? FromName { get; set; }
+
+        [JsonPropertyName("from_phone")]
+        public string? FromPhone { get; set; }
+
+        [JsonPropertyName("from_address")]
+        public string? FromAddress { get; set; }
+
+        [JsonPropertyName("from_ward_name")]
+        public string? FromWardName { get; set; }
+
+        [JsonPropertyName("from_district_name")]
+        public string? FromDistrictName { get; set; }
+
+        [JsonPropertyName("from_province_name")]
+        public string? FromProvinceName { get; set; }
+
         [JsonPropertyName("to_name")]
         public string? ToName { get; set; }
 
@@ -1150,6 +1243,32 @@ public sealed class GhnSandboxService : IGhnSandboxService
 
         [JsonPropertyName("province_name")]
         public string? ProvinceName { get; set; }
+
+        [JsonPropertyName("current_warehouse_id")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? CurrentWarehouseId { get; set; }
+
+        [JsonPropertyName("current_warehouse_name")]
+        public string? CurrentWarehouseName { get; set; }
+
+        [JsonPropertyName("current_warehouse")]
+        public JsonElement CurrentWarehouseRaw { get; set; }
+
+        [JsonPropertyName("weight")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? Weight { get; set; }
+
+        [JsonPropertyName("length")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? Length { get; set; }
+
+        [JsonPropertyName("width")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? Width { get; set; }
+
+        [JsonPropertyName("height")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? Height { get; set; }
 
         [JsonPropertyName("cod_amount")]
         [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
@@ -1179,5 +1298,15 @@ public sealed class GhnSandboxService : IGhnSandboxService
 
         [JsonPropertyName("updated_date")]
         public JsonElement UpdatedDateRaw { get; set; }
+
+        [JsonPropertyName("warehouse_id")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public int? WarehouseId { get; set; }
+
+        [JsonPropertyName("warehouse_name")]
+        public string? WarehouseName { get; set; }
+
+        [JsonPropertyName("warehouse")]
+        public JsonElement WarehouseRaw { get; set; }
     }
 }

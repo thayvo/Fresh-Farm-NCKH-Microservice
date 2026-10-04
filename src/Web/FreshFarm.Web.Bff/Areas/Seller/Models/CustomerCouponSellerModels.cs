@@ -35,6 +35,7 @@ public sealed class CreateCustomerViewModel
 {
     [Required(ErrorMessage = "Tên đăng nhập là bắt buộc")]
     [StringLength(100, ErrorMessage = "Tên đăng nhập tối đa 100 ký tự")]
+    [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Tên đăng nhập chỉ được chứa chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang")]
     public string UserName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Họ và tên là bắt buộc")]
@@ -107,6 +108,8 @@ public sealed class CustomerSearchResultDto
     public decimal TotalSpent { get; set; }
 
     public int OrderCount { get; set; }
+
+    public string AvatarUrl { get; set; } = string.Empty;
 }
 
 public sealed class Coupon

@@ -17,6 +17,10 @@ public partial class User
 
     public string Phone { get; set; }
 
+    public bool EmailConfirmed { get; set; } = true;
+
+    public DateTime? EmailConfirmedAt { get; set; }
+
     public bool IsActive { get; set; }
 
     public DateTime CreatedAt { get; set; }
@@ -25,7 +29,7 @@ public partial class User
 
     public string Avatar { get; set; }
 
-    public virtual AddressBook AddressBook { get; set; }
+    public virtual ICollection<AddressBook> AddressBooks { get; set; } = new List<AddressBook>();
 
     public virtual SellerStoreSetting SellerStoreSetting { get; set; }
 

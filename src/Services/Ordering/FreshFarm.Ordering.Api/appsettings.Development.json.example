@@ -6,6 +6,11 @@
     }
   },
   "AllowedHosts": "*",
+  "Services": {
+    "Identity": {
+      "BaseUrl": "https://localhost:7140"
+    }
+  },
   "ConnectionStrings": {
     "FreshFarmOrderingDB": "Server=localhost;Database=FreshFarmOrderingDB;Trusted_Connection=True;TrustServerCertificate=True"
   },

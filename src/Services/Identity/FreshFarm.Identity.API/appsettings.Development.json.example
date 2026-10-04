@@ -6,6 +6,9 @@
     }
   },
   "AllowedHosts": "*",
+  "DataProtection": {
+    "CertificateThumbprint": ""
+  },
   "ConnectionStrings": {
     "IdentityDB": "Server=localhost;Database=FreshFarmIdentityDB;Trusted_Connection=True;TrustServerCertificate=True"
   },
@@ -13,5 +16,26 @@
     "Issuer": "FreshFarm.Identity",
     "Audience": "FreshFarm",
     "Key": "yourkey(Min: 32 characters)"
+  },
+  "InternalBff": {
+    "HeaderName": "X-FreshFarm-Internal-Key",
+    "SharedKey": ""
+  },
+  "Smtp": {
+    "Host": "",
+    "Port": 587,
+    "UserName": "",
+    "Password": "",
+    "EnableSsl": true,
+    "FromEmail": "",
+    "FromName": "FreshFarm"
+  },
+  "PasswordReset": {
+    "TokenLifetimeMinutes": 30,
+    "ResetUrlBase": "https://localhost:7001/account/reset-password"
+  },
+  "EmailVerification": {
+    "TokenLifetimeMinutes": 60,
+    "VerifyUrlBase": "https://localhost:7001/account/verify-email"
   }
 }

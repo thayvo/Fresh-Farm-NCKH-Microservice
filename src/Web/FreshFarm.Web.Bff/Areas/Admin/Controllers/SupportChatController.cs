@@ -33,7 +33,6 @@ public sealed class SupportChatController : LegacySellerControllerBase
         ViewData["PageTitle"] = "Hỗ trợ khách hàng";
         ViewData["ScopeLabel"] = "Toàn sàn";
         ViewData["OrderPageUrl"] = Url.Action("ManageOrders", "Order", new { area = "Admin" }) ?? "/Admin/Order/ManageOrders";
-        ViewData["ForcePolling"] = true;
 
         return View("~/Areas/Seller/Views/SupportChat/Index.cshtml");
     }

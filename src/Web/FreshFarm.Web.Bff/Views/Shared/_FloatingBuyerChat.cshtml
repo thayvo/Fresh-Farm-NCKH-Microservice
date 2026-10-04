@@ -1,0 +1,126 @@
+@{
+    var currentPath = Context.Request.Path.HasValue ? Context.Request.Path.Value! : "/";
+    var currentQuery = Context.Request.QueryString.HasValue ? Context.Request.QueryString.Value : string.Empty;
+    var currentUrl = $"{currentPath}{currentQuery}";
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isBackofficePath = currentPath.StartsWith("/Seller", StringComparison.OrdinalIgnoreCase)
+        || currentPath.StartsWith("/Admin", StringComparison.OrdinalIgnoreCase);
+    var canUseFloatingChat = !isBackofficePath;
+    var isChatEligible = isAuthenticated && canUseFloatingChat;
+    var shouldRenderWidget = canUseFloatingChat;
+    var signInUrl = Url.Action("SignIn", "Account", new { returnUrl = currentUrl }) ?? $"/account/signin?returnUrl={Uri.EscapeDataString(currentUrl)}";
+}
+
+@if (shouldRenderWidget)
+{
+    <div id="floatingBuyerChat"
+         class="floating-chat-widget"
+         data-is-authenticated="@isAuthenticated.ToString().ToLowerInvariant()"
+         data-is-buyer-eligible="@isChatEligible.ToString().ToLowerInvariant()"
+         data-sign-in-url="@signInUrl"
+         data-summaries-url="/bff/support-chat/summaries"
+         data-conversation-by-seller-url-template="/bff/support-chat/sellers/__SELLER_ID__/conversation"
+         data-messages-url-template="/bff/support-chat/conversations/__CONVERSATION_ID__/messages"
+         data-send-message-url-template="/bff/support-chat/conversations/__CONVERSATION_ID__/messages"
+         data-mark-read-url-template="/bff/support-chat/conversations/__CONVERSATION_ID__/mark-read"
+         data-hub-url="/hubs/support-chat"
+         data-discover-shops-url="/shops">
+        <button type="button"
+                class="floating-chat-launcher"
+                data-floating-chat-launcher
+                aria-expanded="false"
+                aria-controls="floatingChatPanel">
+            <span class="floating-chat-launcher-icon"><i class="bi bi-chat-dots-fill"></i></span>
+            <span class="floating-chat-launcher-copy">
+                <strong>Chat với shop</strong>
+                <span data-floating-chat-launcher-subtitle>Hỗ trợ mua hàng</span>
+            </span>
+            <span class="floating-chat-launcher-badge d-none" data-floating-chat-launcher-badge>0</span>
+        </button>
+
+        <section id="floatingChatPanel"
+                 class="floating-chat-panel"
+                 aria-hidden="true">
+            <header class="floating-chat-panel-header">
+                <div>
+                    <div class="floating-chat-panel-title">Hỗ trợ & chat với shop</div>
+                    <div class="floating-chat-panel-subtitle" data-floating-chat-panel-subtitle>Danh sách shop bạn đã trò chuyện gần đây.</div>
+                </div>
+                <div class="floating-chat-panel-actions">
+                    <button type="button" class="floating-chat-icon-btn" data-floating-chat-refresh title="Tải lại danh sách chat">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <button type="button" class="floating-chat-icon-btn" data-floating-chat-close title="Thu gọn">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="floating-chat-panel-body">
+                <aside class="floating-chat-sidebar">
+                    <div class="floating-chat-sidebar-toolbar">
+                        <label class="floating-chat-search">
+                            <i class="bi bi-search"></i>
+                            <input type="search" placeholder="Tìm shop đã chat" data-floating-chat-search />
+                        </label>
+                        <div class="floating-chat-filters">
+                            <button type="button" class="is-active" data-floating-chat-filter="all">Tất cả</button>
+                            <button type="button" data-floating-chat-filter="unread">Chưa đọc</button>
+                        </div>
+                    </div>
+                    <div class="floating-chat-conversation-list" data-floating-chat-conversation-list>
+                        <div class="floating-chat-list-state">Đang tải lịch sử chat...</div>
+                    </div>
+                </aside>
+
+                <section class="floating-chat-detail">
+                    <div class="floating-chat-detail-empty" data-floating-chat-empty-state>
+                        <div class="floating-chat-empty-icon"><i class="bi bi-shop-window"></i></div>
+                        <h3>Bắt đầu từ một shop cụ thể</h3>
+                        <p>Widget này sẽ hiện các shop bạn đã chat. Khi cần mở cuộc trò chuyện mới, bạn chỉ cần vào trang shop và bấm nhắn tin như hiện tại.</p>
+                        <a class="floating-chat-empty-action" href="/shops">Khám phá shop đang mở bán</a>
+                    </div>
+
+                    <div class="floating-chat-thread d-none" data-floating-chat-thread>
+                        <div class="floating-chat-thread-header">
+                            <div class="floating-chat-thread-shop">
+                                <div class="floating-chat-thread-avatar" data-floating-chat-thread-avatar>F</div>
+                                <div>
+                                    <div class="floating-chat-thread-name" data-floating-chat-thread-name>FreshFarm Seller</div>
+                                    <div class="floating-chat-thread-meta" data-floating-chat-thread-meta>Đang tải thông tin hội thoại...</div>
+                                </div>
+                            </div>
+                            <div class="floating-chat-thread-status" data-floating-chat-thread-status>Đang mở</div>
+                        </div>
+
+                        <div class="floating-chat-thread-messages" data-floating-chat-thread-messages></div>
+                        <div class="floating-chat-typing d-none" data-floating-chat-typing>Shop đang nhập tin nhắn...</div>
+
+                        <div class="floating-chat-thread-composer">
+                            <textarea rows="2"
+                                      placeholder="Nhập tin nhắn cho shop..."
+                                      data-floating-chat-input></textarea>
+                            <div class="floating-chat-thread-composer-actions">
+                                <div class="floating-chat-compose-hint" data-floating-chat-compose-hint>Realtime khi mở đúng hội thoại, badge sẽ tự cập nhật theo polling.</div>
+                                <button type="button" class="floating-chat-send-btn" data-floating-chat-send>Gửi</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="floating-chat-guest-state d-none" data-floating-chat-guest-state>
+                        <div class="floating-chat-empty-icon"><i class="bi bi-person-lock"></i></div>
+                        <h3>Đăng nhập để xem chat với shop</h3>
+                        <p>Sau khi đăng nhập bằng tài khoản mua hàng, widget sẽ hiển thị các shop bạn đã nhắn và cho phép trả lời ngay tại đây.</p>
+                        <a class="floating-chat-empty-action" href="@signInUrl">Đăng nhập ngay</a>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <form id="floatingBuyerChatAntiForgeryForm" class="d-none" method="post">
+            @Html.AntiForgeryToken()
+        </form>
+    </div>
+
+    <script src="~/js/floating-buyer-chat.js" asp-append-version="true"></script>
+}

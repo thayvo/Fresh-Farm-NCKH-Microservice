@@ -1,0 +1,28 @@
+@model FreshFarm.Web.Bff.Dtos.AccountNotificationsPageViewModel
+
+@if (Model.PrioritySection is not null)
+{
+    <div class="border rounded-3 p-3 mb-3 bg-success-subtle">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="d-flex gap-3 align-items-start">
+                <div class="notification-icon success">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                </div>
+                <div>
+                    <div class="small text-uppercase text-success-emphasis fw-semibold mb-1">Cần chú ý</div>
+                    <div class="fw-bold mb-1">@Model.PrioritySection.PriorityHeadline</div>
+                    <div class="small text-muted">@Model.PrioritySection.PrioritySummary</div>
+                </div>
+            </div>
+            <div class="text-lg-end">
+                <a href="@Model.BuildNotificationsUrl(Model.PrioritySection.NotificationType, Model.PrioritySection.UnreadCount > 0 ? false : null, Model.PrioritySection.UnreadCount > 0 ? false : Model.PrioritySection.RecentCount > 0, Model.PrioritySection.NotificationType)"
+                   class="btn btn-success btn-sm"
+                   data-open-notification-section
+                   data-section-key="@Model.PrioritySection.SectionKey"
+                   data-section-target="@($"{Model.PrioritySection.SectionKey}-body")">
+                    <i class="bi bi-arrow-down-right-circle me-2"></i>Mở nhóm
+                </a>
+            </div>
+        </div>
+    </div>
+}

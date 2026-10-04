@@ -245,8 +245,9 @@ public sealed class CouponController : LegacySellerControllerBase
                 return Json(new { error = await ReadApiErrorAsync(response, "Khong the tai danh sach khach hang") });
             }
 
-            var customers = await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
-                ?? new List<IdentityCustomerDto>();
+            var customers = DeduplicateCustomers(
+                await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
+                ?? new List<IdentityCustomerDto>());
 
             var result = customers.Select(c => new
             {
@@ -433,8 +434,9 @@ public sealed class CouponController : LegacySellerControllerBase
             return new List<int>();
         }
 
-        var customers = await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
-            ?? new List<IdentityCustomerDto>();
+        var customers = DeduplicateCustomers(
+            await response.Content.ReadFromJsonAsync<List<IdentityCustomerDto>>(JsonOptions)
+            ?? new List<IdentityCustomerDto>());
 
         return customers
             .Select(x => x.userId)
@@ -528,6 +530,48 @@ public sealed class CouponController : LegacySellerControllerBase
             UpdatedDate = dto.updatedDate
         };
     }
+
+    private static List<IdentityCustomerDto> DeduplicateCustomers(IEnumerable<IdentityCustomerDto> customers)
+    {
+        return customers
+            .Where(customer => customer.userId > 0)
+            .GroupBy(customer => customer.userId)
+            .Select(group => SelectPreferredCustomer(group))
+            .ToList();
+    }
+
+    private static IdentityCustomerDto SelectPreferredCustomer(IEnumerable<IdentityCustomerDto> customers)
+    {
+        return customers
+            .OrderByDescending(CalculateCustomerScore)
+            .ThenByDescending(CalculateCustomerSignalLength)
+            .First();
+    }
+
+    private static int CalculateCustomerScore(IdentityCustomerDto customer)
+    {
+        var score = 0;
+
+        score += HasMeaningfulValue(customer.fullName) ? 3 : 0;
+        score += HasMeaningfulValue(customer.email) ? 3 : 0;
+        score += HasMeaningfulValue(customer.phone) ? 2 : 0;
+
+        return score;
+    }
+
+    private static int CalculateCustomerSignalLength(IdentityCustomerDto customer)
+    {
+        var values = new[]
+        {
+            customer.fullName,
+            customer.email,
+            customer.phone
+        };
+
+        return values.Sum(value => value?.Length ?? 0);
+    }
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
 
     private HttpClient CreateAuthorizedClient(string clientName)
     {

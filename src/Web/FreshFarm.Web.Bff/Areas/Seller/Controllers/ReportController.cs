@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -44,9 +45,12 @@ public class ReportController : LegacySellerControllerBase
         model.RegisterToDate = registerToDate;
         model.CustomerSegment = string.IsNullOrWhiteSpace(model.CustomerSegment) ? "all" : model.CustomerSegment;
 
+        var avatarsByUserId = await GetCustomerAvatarUrlsAsync(model.TopCustomers.Select(customer => customer.UserID));
         foreach (var customer in model.TopCustomers)
         {
-            customer.AvatarUrl = Url.Action("AvatarById", "Account", new { area = "", id = customer.UserID }) ?? string.Empty;
+            customer.AvatarUrl = avatarsByUserId.TryGetValue(customer.UserID, out var avatarUrl)
+                ? avatarUrl
+                : AvatarImagePaths.FallbackImageRequestPath;
         }
 
         return View(model);
@@ -166,6 +170,19 @@ public class ReportController : LegacySellerControllerBase
         model.Page = model.Page <= 0 ? 1 : model.Page;
         model.PageSize = model.PageSize <= 0 ? 10 : model.PageSize;
         model.TotalPages = model.TotalPages <= 0 ? 1 : model.TotalPages;
+
+        var avatarsByUserId = await GetCustomerAvatarUrlsAsync(
+            model.RecentReviews
+                .Select(review => review.UserID ?? 0)
+                .Where(userId => userId > 0));
+
+        foreach (var review in model.RecentReviews)
+        {
+            review.AvatarUrl = review.UserID.HasValue &&
+                               avatarsByUserId.TryGetValue(review.UserID.Value, out var avatarUrl)
+                ? avatarUrl
+                : AvatarImagePaths.FallbackImageRequestPath;
+        }
 
         ViewBag.Page = model.Page;
         ViewBag.PageSize = model.PageSize;
@@ -358,9 +375,52 @@ public class ReportController : LegacySellerControllerBase
         }
     }
 
-    private HttpClient CreateAuthorizedClient()
+    private async Task<Dictionary<int, string>> GetCustomerAvatarUrlsAsync(IEnumerable<int> userIds)
     {
-        var client = _httpClientFactory.CreateClient("Ordering");
+        var normalizedIds = userIds
+            .Where(userId => userId > 0)
+            .Distinct()
+            .ToList();
+
+        if (normalizedIds.Count == 0)
+        {
+            return new Dictionary<int, string>();
+        }
+
+        try
+        {
+            var client = CreateAuthorizedClient("Identity");
+            var query = string.Join("&", normalizedIds.Select(userId => $"userIds={userId}"));
+            var response = await client.GetAsync($"/auth/admin/customers?{query}&take={Math.Min(normalizedIds.Count, 5000)}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            var customers = await response.Content.ReadFromJsonAsync<List<CustomerAvatarApiDto>>(JsonOptions)
+                ?? new List<CustomerAvatarApiDto>();
+
+            return customers
+                .Select(customer => new
+                {
+                    customer.userId,
+                    AvatarUrl = AvatarImagePaths.ResolveRequestPath(customer.avatar)
+                })
+                .Where(customer => customer.userId > 0 && !string.IsNullOrWhiteSpace(customer.AvatarUrl))
+                .GroupBy(customer => customer.userId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.First().AvatarUrl!);
+        }
+        catch
+        {
+            return new Dictionary<int, string>();
+        }
+    }
+
+    private HttpClient CreateAuthorizedClient(string clientName = "Ordering")
+    {
+        var client = _httpClientFactory.CreateClient(clientName);
 
         client.DefaultRequestHeaders.Remove("Authorization");
         var token = GetAccessToken(AccessTokenSessionKey);
@@ -424,5 +484,12 @@ public class ReportController : LegacySellerControllerBase
         public bool Success { get; set; }
 
         public string? Message { get; set; }
+    }
+
+    private sealed class CustomerAvatarApiDto
+    {
+        public int userId { get; set; }
+
+        public string? avatar { get; set; }
     }
 }

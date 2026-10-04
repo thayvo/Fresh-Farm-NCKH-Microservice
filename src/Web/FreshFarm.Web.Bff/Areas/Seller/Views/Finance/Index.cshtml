@@ -1,8 +1,9 @@
 @model FreshFarm.Web.Bff.Areas.Admin.Models.FinanceConsolePageViewModel
 @{
     ViewBag.Title = "Tài chính & đối soát";
-    var areaName = (ViewData["AreaName"]?.ToString() ?? "Seller").Trim();
-    var scopeLabel = ViewData["FinanceScopeLabel"]?.ToString() ?? (areaName == "Admin" ? "Toàn sàn" : "Cửa hàng của tôi");
+    var areaName = "Seller";
+    var isAdminFinance = false;
+    var scopeLabel = ViewData["FinanceScopeLabel"]?.ToString() ?? "Cửa hàng của tôi";
     var controllerName = "Finance";
 
     string BuildSectionLink(string section, int? page = null)
@@ -22,6 +23,18 @@
     string FormatMoney(decimal? value) => string.Format(System.Globalization.CultureInfo.GetCultureInfo("vi-VN"), "{0:#,0} đ", value ?? 0m);
     string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "-";
     bool IsOverdue(DateTime? value) => value.HasValue && value.Value < DateTime.UtcNow;
+    bool CanReleasePayout(FreshFarm.Web.Bff.Areas.Admin.Models.FinanceConsoleRowViewModel row)
+    {
+        var normalized = (row.Status ?? string.Empty).Trim().ToLowerInvariant();
+        var amountNet = row.AmountNet ?? ((row.AmountGross ?? 0m) - (row.FeeAmount ?? 0m));
+        return Model.Section == "payouts"
+            && amountNet > 0m
+            && (normalized == "pending"
+                || normalized == "queued"
+                || normalized == "scheduled"
+                || normalized == "processing"
+                || normalized == "waiting");
+    }
 }
 
 <style>
@@ -69,6 +82,13 @@
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: .04em;
+    }
+
+    .finance-stat-hint {
+        color: #64748b;
+        font-size: .78rem;
+        margin-top: .35rem;
+        line-height: 1.35;
     }
 
     .finance-section-link {
@@ -180,71 +200,234 @@
 
     <div class="row g-3 mb-4">
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
-                    <div class="finance-stat-label">GMV theo đơn của người bán</div>
+                    <div class="finance-stat-label">Tổng tiền hàng</div>
                     <div class="fs-3 fw-bold">@FormatMoney(Model.Stats.GrossMerchandiseValue)</div>
+                    <div class="finance-stat-hint">Không tính phí ship; chỉ tính các đơn chưa hủy, chưa hết hạn và chưa phát sinh hoàn/đổi trả.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
-                <div class="card-body">
-                    <div class="finance-stat-label">Thanh toán đã ghi nhận</div>
-                    <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.CapturedPayments)</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
                     <div class="finance-stat-label">Hoa hồng nền tảng</div>
                     <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.PlatformCommission)</div>
+                    <div class="finance-stat-hint">Tính theo tỷ lệ hoa hồng đang lưu trên từng đơn của người bán.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
-                    <div class="finance-stat-label">Chi trả chờ xử lý</div>
-                    <div class="fs-3 fw-bold text-warning">@FormatMoney(Model.Stats.PendingPayoutAmount)</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
-                <div class="card-body">
-                    <div class="finance-stat-label">Giá trị hoàn tiền</div>
+                    <div class="finance-stat-label">Hoàn tiền cho khách</div>
                     <div class="fs-3 fw-bold text-danger">@FormatMoney(Model.Stats.RefundedAmount)</div>
+                    <div class="finance-stat-hint">Các khoản cần hoàn tiền cho khách sau khi đối chiếu đơn hàng và thanh toán.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
-                    <div class="finance-stat-label">Yêu cầu đổi trả đang mở</div>
-                    <div class="fs-3 fw-bold">@Model.Stats.OpenReturns</div>
+                    <div class="finance-stat-label">Tiền thực nhận</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.PaidPayoutAmount)</div>
+                    <div class="finance-stat-hint">Số tiền admin đã chi trả, seller có thể nhận/rút.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
-                    <div class="finance-stat-label">Yêu cầu hoàn tiền đang mở</div>
-                    <div class="fs-3 fw-bold">@Model.Stats.OpenRefunds</div>
+                    <div class="finance-stat-label">Tiền chờ chi trả</div>
+                    <div class="fs-3 fw-bold text-warning">@FormatMoney(Model.Stats.PendingSellerPayoutAmount)</div>
+                    <div class="finance-stat-hint">Đơn đã đủ điều kiện nhưng admin chưa ghi nhận chi trả.</div>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-xl-3">
-            <div class="card finance-card">
+            <div class="card finance-card h-100">
                 <div class="card-body">
-                    <div class="finance-stat-label">Người bán trong phạm vi</div>
-                    <div class="fs-3 fw-bold">@Model.Stats.SellerCount</div>
+                    <div class="finance-stat-label">Tiền đã nhận</div>
+                    <div class="fs-3 fw-bold text-primary">@FormatMoney(Model.Stats.WithdrawnAmount)</div>
+                    <div class="finance-stat-hint">Tổng số tiền seller đã bấm nhận/rút và được lưu lại.</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <div class="card finance-card h-100">
+                <div class="card-body d-flex flex-column">
+                    <div class="finance-stat-label">Số tiền còn lại</div>
+                    <div class="fs-3 fw-bold text-success">@FormatMoney(Model.Stats.RemainingWithdrawableAmount)</div>
+                    <div class="finance-stat-hint">Tiền thực nhận trừ tiền đã nhận.</div>
+                    @if (!isAdminFinance)
+                    {
+                        if (Model.Stats.RemainingWithdrawableAmount > 0m)
+                        {
+                            <button type="button"
+                                    class="btn btn-primary rounded-pill mt-auto"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#sellerWithdrawModal">
+                                Nhận tiền
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-secondary rounded-pill mt-auto" disabled>
+                                Chưa có tiền nhận
+                            </button>
+                        }
+                    }
                 </div>
             </div>
         </div>
     </div>
 
+    @if (!isAdminFinance)
+    {
+        <div class="modal fade" id="sellerWithdrawModal" tabindex="-1" aria-labelledby="sellerWithdrawModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 rounded-4">
+                    <form method="post" action="@Url.Action("Withdraw", controllerName, new { area = areaName })">
+                        @Html.AntiForgeryToken()
+                        <div class="modal-header border-0">
+                            <h5 class="modal-title" id="sellerWithdrawModalLabel">Thông tin nhận tiền</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                        </div>
+                        <div class="modal-body pt-0">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Ngân hàng</label>
+                                <input type="text" class="form-control" name="bankName" value="@Model.BankName" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Tên tài khoản</label>
+                                <input type="text" class="form-control" name="bankAccountName" value="@Model.BankAccountName" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Số tài khoản</label>
+                                <input type="text" class="form-control" name="bankAccountNumber" value="@Model.BankAccountNumber" required />
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Số tiền muốn nhận</label>
+                                <input type="number"
+                                       class="form-control"
+                                       name="amount"
+                                       min="1000"
+                                       step="1000"
+                                       max="@Model.Stats.RemainingWithdrawableAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                       value="@Model.Stats.RemainingWithdrawableAmount.ToString("0", System.Globalization.CultureInfo.InvariantCulture)"
+                                       required />
+                                <div class="form-text">Có thể nhận tối đa @FormatMoney(Model.Stats.RemainingWithdrawableAmount).</div>
+                            </div>
+                            <div>
+                                <label class="form-label fw-semibold">Ghi chú</label>
+                                <textarea class="form-control" name="note" rows="2" placeholder="Ví dụ: rút tiền đợt này..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0">
+                            <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Hủy</button>
+                            <button type="submit" class="btn btn-primary rounded-pill">Xác nhận nhận tiền</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isAdminFinance && Model.SellerBreakdown.Count > 0)
+    {
+        <div class="card finance-table-card mb-4">
+            <div class="card-body">
+                <div class="finance-stat-label mb-3">Theo người bán</div>
+                <div class="row g-3 align-items-end mb-3" id="seller-finance-filters">
+                    <div class="col-md-6 col-xl-3">
+                        <label class="form-label fw-semibold">Shop</label>
+                        <input type="text" class="form-control" id="sellerFinanceSearch" placeholder="Tên hoặc ID seller" />
+                    </div>
+                    <div class="col-md-6 col-xl-2">
+                        <label class="form-label fw-semibold">Từ tiền</label>
+                        <input type="number" min="0" step="1000" class="form-control" id="sellerFinanceMin" placeholder="0" />
+                    </div>
+                    <div class="col-md-6 col-xl-2">
+                        <label class="form-label fw-semibold">Đến tiền</label>
+                        <input type="number" min="0" step="1000" class="form-control" id="sellerFinanceMax" placeholder="Không giới hạn" />
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <label class="form-label fw-semibold">Chi trả</label>
+                        <select class="form-select" id="sellerFinancePaymentFilter">
+                            <option value="all">Tất cả</option>
+                            <option value="unpaid">Còn chưa chi trả</option>
+                            <option value="paid">Đã chi trả hết</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-xl-2">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill w-100" id="sellerFinanceReset">Đặt lại</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="sellerFinanceTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Người bán</th>
+                                <th class="text-end">Số đơn</th>
+                                <th class="text-end">Tổng tiền hàng</th>
+                                <th class="text-end">Hoa hồng nền tảng</th>
+                                <th class="text-end">Tiền thực nhận</th>
+                                <th class="text-end">Đã chi trả</th>
+                                <th class="text-end">Chưa chi trả</th>
+                                <th class="text-end">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var seller in Model.SellerBreakdown)
+                            {
+                                <tr class="seller-finance-row"
+                                    data-seller-id="@seller.SellerId"
+                                    data-seller-label="@seller.SellerLabel.ToLowerInvariant()"
+                                    data-net="@seller.SellerEarning.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                    data-unpaid="@seller.UnpaidAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                    <td>
+                                        <div class="fw-semibold">@seller.SellerLabel</div>
+                                        <div class="small text-muted">ID @seller.SellerId</div>
+                                    </td>
+                                    <td class="text-end">@seller.OrderCount</td>
+                                    <td class="text-end">@FormatMoney(seller.GrossMerchandiseValue)</td>
+                                    <td class="text-end text-success">@FormatMoney(seller.PlatformCommission)</td>
+                                    <td class="text-end fw-bold text-success">@FormatMoney(seller.SellerEarning)</td>
+                                    <td class="text-end">@FormatMoney(seller.PaidAmount)</td>
+                                    <td class="text-end fw-bold @(seller.UnpaidAmount > 0m ? "text-warning" : "text-success")">@FormatMoney(seller.UnpaidAmount)</td>
+                                    <td class="text-end">
+                                        @if (seller.UnpaidAmount <= 0m)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" disabled>Đã chi trả</button>
+                                        }
+                                        else
+                                        {
+                                            <form method="post" action="@Url.Action("GeneratePayouts", controllerName, new { area = areaName })" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="sellerId" value="@seller.SellerId" />
+                                                <input type="hidden" name="releaseNow" value="true" />
+                                                <button type="submit" class="btn btn-sm btn-primary rounded-pill">Chi trả</button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mt-3">
+                    <div class="small text-muted" id="sellerFinancePageInfo"></div>
+                    <div class="btn-group" role="group" aria-label="Phân trang shop">
+                        <button type="button" class="btn btn-outline-secondary rounded-pill" id="sellerFinancePrev">Trước</button>
+                        <button type="button" class="btn btn-outline-secondary rounded-pill" id="sellerFinanceNext">Sau</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (!isAdminFinance)
+    {
     <div class="card finance-filter-card mb-4">
         <div class="card-body">
             <form method="get" class="row g-3 align-items-end">
@@ -270,47 +453,47 @@
                     </select>
                 </div>
                 <div class="col-md-4 col-lg-3">
-                    <label class="form-label fw-semibold">Nhóm theo dõi</label>
+                    <label class="form-label fw-semibold">Trạng thái xử lý</label>
                     <select class="form-select" name="followUpBucket">
                         @if (Model.FollowUpBucket == "all")
                         {
-                            <option value="all" selected>Tất cả mốc theo dõi</option>
+                            <option value="all" selected>Tất cả trạng thái xử lý</option>
                         }
                         else
                         {
-                            <option value="all">Tất cả mốc theo dõi</option>
+                            <option value="all">Tất cả trạng thái xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "overdue")
                         {
-                            <option value="overdue" selected>Quá hạn</option>
+                            <option value="overdue" selected>Cần xử lý quá hạn</option>
                         }
                         else
                         {
-                            <option value="overdue">Quá hạn</option>
+                            <option value="overdue">Cần xử lý quá hạn</option>
                         }
                         @if (Model.FollowUpBucket == "due-soon")
                         {
-                            <option value="due-soon" selected>Sắp đến hạn 48h</option>
+                            <option value="due-soon" selected>Sắp đến hạn xử lý</option>
                         }
                         else
                         {
-                            <option value="due-soon">Sắp đến hạn 48h</option>
+                            <option value="due-soon">Sắp đến hạn xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "no-follow-up")
                         {
-                            <option value="no-follow-up" selected>Chưa đặt mốc theo dõi</option>
+                            <option value="no-follow-up" selected>Chưa đặt lịch xử lý</option>
                         }
                         else
                         {
-                            <option value="no-follow-up">Chưa đặt mốc theo dõi</option>
+                            <option value="no-follow-up">Chưa đặt lịch xử lý</option>
                         }
                         @if (Model.FollowUpBucket == "scheduled")
                         {
-                            <option value="scheduled" selected>Đã có lịch theo dõi</option>
+                            <option value="scheduled" selected>Đã có lịch xử lý</option>
                         }
                         else
                         {
-                            <option value="scheduled">Đã có lịch theo dõi</option>
+                            <option value="scheduled">Đã có lịch xử lý</option>
                         }
                     </select>
                 </div>
@@ -354,79 +537,7 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.Section == "payouts" ? "active" : string.Empty)" href="@BuildSectionLink("payouts")">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">Chi trả</div>
-                        <div class="display-6 fw-bold">@Model.SectionCounts.Payouts</div>
-                        <div class="text-muted">Các đợt đối soát hoặc chi trả người bán đang được theo dõi</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.Section == "refunds" ? "active" : string.Empty)" href="@BuildSectionLink("refunds")">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">Hoàn tiền</div>
-                        <div class="display-6 fw-bold">@Model.SectionCounts.Refunds</div>
-                        <div class="text-muted">Các giao dịch hoàn tiền cần đối chiếu với đơn hàng và thanh toán</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.Section == "returns" ? "active" : string.Empty)" href="@BuildSectionLink("returns")">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">Đổi trả</div>
-                        <div class="display-6 fw-bold">@Model.SectionCounts.Returns</div>
-                        <div class="text-muted">Các yêu cầu đổi trả liên quan tới hoàn tiền và hậu mãi</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.FollowUpBucket == "overdue" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "overdue", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">Quá hạn</div>
-                        <div class="display-6 fw-bold text-danger">@Model.Stats.OverdueFollowUps</div>
-                        <div class="text-muted">Các bản ghi đã quá mốc theo dõi, nên ưu tiên xử lý ngay.</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.FollowUpBucket == "due-soon" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "due-soon", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">48h tới</div>
-                        <div class="display-6 fw-bold text-warning">@Model.Stats.DueSoonFollowUps</div>
-                        <div class="text-muted">Các trường hợp sắp tới hạn theo dõi, phù hợp để chủ động chốt đối soát.</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-md-4">
-            <a class="finance-section-link @(Model.FollowUpBucket == "no-follow-up" ? "active" : string.Empty)" href="@Url.Action("Index", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = "no-follow-up", sellerId = Model.ShowSellerFilter ? Model.SellerId : null })">
-                <div class="card finance-section-card h-100">
-                    <div class="card-body">
-                        <div class="finance-pill mb-3">Chưa đặt mốc</div>
-                        <div class="display-6 fw-bold">@Model.Stats.NoFollowUpCount</div>
-                        <div class="text-muted">Các bản ghi chưa có mốc theo dõi để phụ trách viên lên lịch đối soát tiếp theo.</div>
-                    </div>
-                </div>
-            </a>
-        </div>
-    </div>
-
-    @if (areaName == "Admin" && Model.OwnerSummary.Count > 0)
+    @if (isAdminFinance && Model.OwnerSummary.Count > 0)
     {
         <div class="card finance-card mb-4">
             <div class="card-body">
@@ -435,7 +546,7 @@
                         <div class="finance-stat-label">Bảng theo dõi phụ trách</div>
                         <div class="h5 mb-0">Phân bổ hàng chờ theo người phụ trách trong phạm vi lọc hiện tại</div>
                     </div>
-                    <div class="small text-muted">Top 6 người phụ trách theo mức độ quá hạn</div>
+                    <div class="small text-muted">Top 6 người phụ trách theo mức độ trễ xử lý</div>
                 </div>
                 <div class="row g-3">
                     @foreach (var owner in Model.OwnerSummary)
@@ -448,9 +559,9 @@
                                         <span class="finance-pill">@owner.ItemCount việc</span>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2">
-                                        <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>@owner.OverdueCount quá hạn</span>
-                                        <span class="finance-ops-chip text-warning"><i class="bi bi-hourglass-split"></i>@owner.DueSoonCount 48h tới</span>
-                                        <span class="finance-ops-chip"><i class="bi bi-calendar-x"></i>@owner.NoFollowUpCount chưa đặt mốc</span>
+                                        <span class="finance-ops-chip text-danger"><i class="bi bi-exclamation-triangle"></i>@owner.OverdueCount quá hạn xử lý</span>
+                                        <span class="finance-ops-chip text-warning"><i class="bi bi-hourglass-split"></i>@owner.DueSoonCount sắp đến hạn</span>
+                                        <span class="finance-ops-chip"><i class="bi bi-calendar-x"></i>@owner.NoFollowUpCount chưa đặt lịch</span>
                                     </div>
                                 </div>
                             </div>
@@ -468,31 +579,45 @@
                     <h5 class="mb-1">
                         @if (Model.Section == "refunds")
                         {
-                            <span>Danh sách hoàn tiền</span>
+                            <span>Danh sách hoàn tiền cho khách</span>
                         }
                         else if (Model.Section == "returns")
                         {
-                            <span>Danh sách đổi trả</span>
+                            <span>Danh sách đổi trả ảnh hưởng đối soát</span>
                         }
                         else
                         {
-                            <span>Danh sách chi trả</span>
+                            <span>Danh sách chi trả cho người bán</span>
                         }
                     </h5>
                     <div class="text-muted small">Hiển thị @Model.Rows.Count / @Model.Total bản ghi theo phạm vi hiện tại</div>
                 </div>
-                @if (areaName == "Admin")
+                @if (isAdminFinance)
                 {
                     <div class="d-flex flex-wrap gap-2 align-items-center">
+                        @if (Model.Section == "payouts")
+                        {
+                            <form method="post" action="@Url.Action("GeneratePayouts", controllerName, new { area = areaName })" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="q" value="@Model.Query" />
+                                <input type="hidden" name="status" value="@Model.Status" />
+                                <input type="hidden" name="followUpBucket" value="@Model.FollowUpBucket" />
+                                <input type="hidden" name="sellerId" value="@Model.SellerId" />
+                                <input type="hidden" name="page" value="@Model.Page" />
+                                <button type="submit" class="btn btn-primary rounded-pill px-3">
+                                    <i class="bi bi-plus-circle me-2"></i>Tạo lệnh chi trả chờ xử lý
+                                </button>
+                            </form>
+                        }
                         <a class="btn btn-outline-primary rounded-pill px-3" href="@Url.Action("Export", controllerName, new { area = areaName, section = Model.Section, q = Model.Query, status = Model.Status, followUpBucket = Model.FollowUpBucket, sellerId = Model.SellerId })">
                             <i class="bi bi-download me-2"></i>Xuất CSV
                         </a>
-                        <div class="small text-muted">Quản trị viên có thể thao tác trực tiếp trên chi trả, hoàn tiền và đổi trả ngay tại đây.</div>
+                        <div class="small text-muted">Quản trị viên có thể xử lý chi trả cho người bán, hoàn tiền cho khách và đổi trả ảnh hưởng đối soát ngay tại đây.</div>
                     </div>
                 }
             </div>
 
-            @if (areaName == "Admin" && Model.Rows.Count > 0)
+            @if (isAdminFinance && Model.Rows.Count > 0)
             {
                 <form id="bulk-finance-form" method="post" action="@Url.Action("TakeBulkAction", "Finance", new { area = areaName })" class="card border-0 bg-light mb-3">
                     <div class="card-body">
@@ -557,7 +682,7 @@
                 <table class="table align-middle">
                     <thead>
                         <tr>
-                            @if (areaName == "Admin")
+                            @if (isAdminFinance)
                             {
                                 <th>
                                     <input class="form-check-input" type="checkbox" id="finance-select-all" />
@@ -594,7 +719,7 @@
                             <th>Đối soát</th>
                             <th>Vận hành</th>
                             <th>Trạng thái</th>
-                            @if (areaName == "Admin")
+                            @if (isAdminFinance)
                             {
                                 <th>Thao tác</th>
                             }
@@ -618,9 +743,10 @@
                                         ? "done"
                                         : "pending";
                                 var isFollowUpOverdue = IsOverdue(row.FollowUpAt);
+                                var canReleasePayout = CanReleasePayout(row);
 
                                 <tr>
-                                    @if (areaName == "Admin")
+                                    @if (isAdminFinance)
                                     {
                                         <td>
                                             <input class="form-check-input finance-row-checkbox" type="checkbox" name="recordIds" value="@row.RecordId" />
@@ -750,7 +876,7 @@
                                         </div>
                                     </td>
                                     <td><span class="finance-status @statusClass">@row.Status</span></td>
-                                    @if (areaName == "Admin")
+                                    @if (isAdminFinance)
                                     {
                                         <td>
                                             <form method="post" action="@Url.Action("TakeAction", "Finance", new { area = areaName })" class="d-grid gap-2">
@@ -773,7 +899,14 @@
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="send-reminder">Nhắc phụ trách</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary rounded-pill" name="actionName" value="mark-exported">Xuất</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-primary rounded-pill" name="actionName" value="acknowledge">Nhận</button>
-                                                        <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
+                                                        @if (canReleasePayout)
+                                                        {
+                                                            <button type="submit" class="btn btn-sm btn-success rounded-pill" name="actionName" value="release">Chi trả</button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button type="button" class="btn btn-sm btn-outline-success rounded-pill" disabled title="Chỉ chi trả payout đang chờ xử lý và có AmountNet > 0">Chi trả</button>
+                                                        }
                                                         <button type="submit" class="btn btn-sm btn-outline-warning rounded-pill" name="actionName" value="hold">Giữ</button>
                                                         <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" name="actionName" value="reject">Lỗi</button>
                                                     }
@@ -831,9 +964,102 @@
             }
         </div>
     </div>
+    }
 </main>
 
-@if (areaName == "Admin" && Model.Rows.Count > 0)
+@if (isAdminFinance && Model.SellerBreakdown.Count > 0)
+{
+    <script>
+        (() => {
+            const pageSize = 20;
+            let currentPage = 1;
+            const rows = Array.from(document.querySelectorAll('.seller-finance-row'));
+            const searchInput = document.getElementById('sellerFinanceSearch');
+            const minInput = document.getElementById('sellerFinanceMin');
+            const maxInput = document.getElementById('sellerFinanceMax');
+            const paymentFilter = document.getElementById('sellerFinancePaymentFilter');
+            const resetButton = document.getElementById('sellerFinanceReset');
+            const prevButton = document.getElementById('sellerFinancePrev');
+            const nextButton = document.getElementById('sellerFinanceNext');
+            const pageInfo = document.getElementById('sellerFinancePageInfo');
+
+            const getFilteredRows = () => {
+                const term = (searchInput?.value || '').trim().toLowerCase();
+                const min = Number(minInput?.value || 0);
+                const max = Number(maxInput?.value || 0);
+                const payState = paymentFilter?.value || 'all';
+
+                return rows.filter((row) => {
+                    const sellerText = `${row.dataset.sellerLabel || ''} ${row.dataset.sellerId || ''}`;
+                    const net = Number(row.dataset.net || 0);
+                    const unpaid = Number(row.dataset.unpaid || 0);
+                    const matchesShop = !term || sellerText.includes(term);
+                    const matchesMin = !min || net >= min;
+                    const matchesMax = !max || net <= max;
+                    const matchesPayState = payState === 'all'
+                        || (payState === 'unpaid' && unpaid > 0)
+                        || (payState === 'paid' && unpaid <= 0);
+                    return matchesShop && matchesMin && matchesMax && matchesPayState;
+                });
+            };
+
+            const render = () => {
+                const filtered = getFilteredRows();
+                const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+                currentPage = Math.min(Math.max(1, currentPage), totalPages);
+                const start = (currentPage - 1) * pageSize;
+                const visible = new Set(filtered.slice(start, start + pageSize));
+
+                rows.forEach((row) => {
+                    row.hidden = !visible.has(row);
+                });
+
+                if (pageInfo) {
+                    const from = filtered.length === 0 ? 0 : start + 1;
+                    const to = Math.min(start + pageSize, filtered.length);
+                    pageInfo.textContent = `Hiển thị ${from}-${to} / ${filtered.length} shop`;
+                }
+                if (prevButton) {
+                    prevButton.disabled = currentPage <= 1;
+                }
+                if (nextButton) {
+                    nextButton.disabled = currentPage >= totalPages;
+                }
+            };
+
+            [searchInput, minInput, maxInput, paymentFilter].forEach((control) => {
+                control?.addEventListener('input', () => {
+                    currentPage = 1;
+                    render();
+                });
+                control?.addEventListener('change', () => {
+                    currentPage = 1;
+                    render();
+                });
+            });
+            resetButton?.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                if (minInput) minInput.value = '';
+                if (maxInput) maxInput.value = '';
+                if (paymentFilter) paymentFilter.value = 'all';
+                currentPage = 1;
+                render();
+            });
+            prevButton?.addEventListener('click', () => {
+                currentPage -= 1;
+                render();
+            });
+            nextButton?.addEventListener('click', () => {
+                currentPage += 1;
+                render();
+            });
+
+            render();
+        })();
+    </script>
+}
+
+@if (isAdminFinance && Model.Rows.Count > 0)
 {
     <script>
         (() => {

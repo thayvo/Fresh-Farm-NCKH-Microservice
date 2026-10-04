@@ -16,6 +16,7 @@ public sealed class AdminUserViewModel
     public int AdminID { get; set; }
 
     [Required]
+    [RegularExpression(@"^[a-zA-Z0-9._-]+$", ErrorMessage = "Tên đăng nhập chỉ được chứa chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang")]
     public string UserName { get; set; } = string.Empty;
 
     [Required]
@@ -29,11 +30,29 @@ public sealed class AdminUserViewModel
 
     public string? Avatar { get; set; }
 
+    public string AvatarUrl { get; set; } = "/uploads/avatar/no-avatar.jpg";
+
     public int RoleID { get; set; }
 
     public AdminRoleViewModel? Role { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public bool EmailConfirmed { get; set; }
+
+    public DateTime? EmailConfirmedAt { get; set; }
+
+    public string ApprovalStatus { get; set; } = "Pending";
+
+    public long ApprovalVersion { get; set; }
+
+    public DateTime? ApprovedAt { get; set; }
+
+    public int? ApprovedByUserId { get; set; }
+
+    public string? ApprovalNote { get; set; }
+
+    public DateTime? ApprovalStatusChangedAt { get; set; }
 
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
@@ -50,6 +69,8 @@ public sealed class AdminUserManagementPageViewModel
 
     public bool? IsActive { get; set; }
 
+    public string ApprovalStatus { get; set; } = "all";
+
     public DateTime? CreatedFrom { get; set; }
 
     public DateTime? CreatedTo { get; set; }
@@ -57,4 +78,38 @@ public sealed class AdminUserManagementPageViewModel
     public List<AdminRoleViewModel> Roles { get; set; } = new();
 
     public List<AdminUserViewModel> Users { get; set; } = new();
+
+    public int Page { get; set; } = 1;
+
+    public int PageSize { get; set; } = 15;
+
+    public int TotalUsers { get; set; }
+
+    public int ActiveUsers { get; set; }
+
+    public int InactiveUsers => Math.Max(0, TotalUsers - ActiveUsers);
+
+    public int AdminUsers { get; set; }
+
+    public int SellerUsers { get; set; }
+
+    public int BuyerUsers { get; set; }
+
+    public int PendingUsers { get; set; }
+
+    public int ApprovedUsers { get; set; }
+
+    public int RejectedUsers { get; set; }
+
+    public int SuspendedUsers { get; set; }
+
+    public int TotalPages => Math.Max(1, (int)Math.Ceiling(TotalUsers / (double)Math.Max(1, PageSize)));
+
+    public int FirstItemNumber => TotalUsers == 0 ? 0 : ((Math.Max(1, Page) - 1) * Math.Max(1, PageSize)) + 1;
+
+    public int LastItemNumber => TotalUsers == 0 ? 0 : Math.Min(TotalUsers, Math.Max(1, Page) * Math.Max(1, PageSize));
+
+    public bool HasPreviousPage => Page > 1;
+
+    public bool HasNextPage => Page < TotalPages;
 }

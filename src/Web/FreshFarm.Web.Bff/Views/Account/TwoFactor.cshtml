@@ -1,0 +1,128 @@
+@model FreshFarm.Web.Bff.Dtos.AccountTwoFactorViewModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xác thực 2 bước - FreshFarm</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --freshfarm-primary: #008a4f;
+            --freshfarm-primary-dark: #006a3d;
+        }
+
+        body {
+            font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(0, 138, 79, 0.14), transparent 30%),
+                linear-gradient(180deg, #f7fbf8 0%, #eef7f1 100%);
+        }
+
+        .twofactor-card {
+            border: 0;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
+        }
+
+        .twofactor-hero {
+            background: linear-gradient(135deg, var(--freshfarm-primary) 0%, #1da76a 100%);
+            color: #fff;
+        }
+
+        .btn-freshfarm {
+            background: var(--freshfarm-primary);
+            border-color: var(--freshfarm-primary);
+            color: #fff;
+        }
+
+        .btn-freshfarm:hover {
+            background: var(--freshfarm-primary-dark);
+            border-color: var(--freshfarm-primary-dark);
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-light d-flex align-items-center" style="min-height:100vh">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-sm-11 col-md-8 col-lg-5">
+                <div class="card twofactor-card">
+                    <div class="twofactor-hero p-4 p-md-5">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <span class="bg-white bg-opacity-25 rounded-circle d-inline-flex align-items-center justify-content-center" style="width:56px;height:56px;">
+                                <i class="bi bi-shield-lock fs-4"></i>
+                            </span>
+                            <div>
+                                <div class="text-uppercase small fw-semibold opacity-75">FreshFarm Account</div>
+                                <h1 class="h4 mb-0 fw-bold">Xác thực 2 bước</h1>
+                            </div>
+                        </div>
+                        <p class="mb-0 opacity-75">
+                            @if (Model.RequiresSetup)
+                            {
+                                <text>Thiết lập ứng dụng xác thực cho tài khoản của bạn trước khi tiếp tục.</text>
+                            }
+                            else
+                            {
+                                <text>Nhập mã 6 số từ ứng dụng xác thực để hoàn tất đăng nhập.</text>
+                            }
+                        </p>
+                    </div>
+
+                    <div class="card-body p-4 p-md-5">
+                        <div class="alert alert-info">
+                            @(string.IsNullOrWhiteSpace(Model.ChallengeMessage)
+                                ? "Nhập mã 6 số đang hiển thị trong ứng dụng xác thực."
+                                : Model.ChallengeMessage)
+                        </div>
+
+                        @if (Model.RequiresSetup)
+                        {
+                            <div class="border rounded-4 p-3 bg-light mb-4">
+                                @if (!string.IsNullOrWhiteSpace(Model.QrCodeImageDataUri))
+                                {
+                                    <div class="d-flex justify-content-center mb-3">
+                                        <img src="@Model.QrCodeImageDataUri" alt="Mã QR ứng dụng xác thực" width="180" height="180" class="rounded bg-white p-2 border" />
+                                    </div>
+                                }
+                                <div class="fw-semibold mb-2">Khóa thiết lập thủ công</div>
+                                <div class="fs-5 fw-bold">@Model.ManualEntryKey</div>
+                                <div class="text-muted small mt-2">
+                                    Tài khoản: <strong>@Model.AuthenticatorAccountName</strong><br />
+                                    Nhà phát hành: <strong>@Model.AuthenticatorIssuer</strong>
+                                </div>
+                            </div>
+                        }
+
+                        @using (Html.BeginForm("TwoFactor", "Account", routeValues: null, method: FormMethod.Post, antiforgery: null, htmlAttributes: new { @class = "needs-validation", novalidate = "novalidate" }))
+                        {
+                            @Html.AntiForgeryToken()
+                            @Html.ValidationSummary(true, "", new { @class = "text-danger mb-2" })
+
+                            <div class="mb-3">
+                                @Html.LabelFor(m => m.Code, new { @class = "form-label" })
+                                @Html.TextBoxFor(m => m.Code, new { @class = "form-control", placeholder = "123456", inputmode = "numeric", autocomplete = "one-time-code", maxlength = "6" })
+                                @Html.ValidationMessageFor(m => m.Code, "", new { @class = "text-danger" })
+                            </div>
+
+                            <button type="submit" class="btn btn-freshfarm w-100 mb-3">Xác nhận và tiếp tục</button>
+                            <a class="btn btn-outline-secondary w-100" href="@Url.Action("SignIn", "Account")">Quay lại đăng nhập</a>
+                        }
+                    </div>
+                </div>
+                <p class="text-center text-muted mt-3 mb-0">&copy; FreshFarm</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

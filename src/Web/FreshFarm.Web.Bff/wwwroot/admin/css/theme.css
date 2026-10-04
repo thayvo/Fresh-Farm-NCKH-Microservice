@@ -22,6 +22,18 @@ body.admin-theme {
     color: var(--ff-ink);
 }
 
+body.admin-theme #sidebar {
+    background: linear-gradient(180deg, #151a20 0%, #1f2831 100%);
+}
+
+body.admin-theme #sidebar .submenu {
+    margin-left: 2rem;
+}
+
+body.admin-theme #sidebar .submenu .nav-link {
+    font-size: .96rem;
+}
+
 .ff-admin-shell {
     min-height: 100vh;
     padding: 1.5rem;

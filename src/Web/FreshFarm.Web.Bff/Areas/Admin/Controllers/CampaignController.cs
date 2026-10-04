@@ -44,8 +44,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             var client = CreateOrderingClient();
             var overviewTask = client.GetAsync("/api/orders/admin/campaigns/overview");
             var listTask = client.GetAsync(BuildListEndpoint(model));
-            var adsOverviewTask = client.GetAsync($"/api/orders/admin/campaigns/ads/overview?status=all&q={Uri.EscapeDataString(model.AdsTopupEditor.SellerId > 0 ? model.AdsTopupEditor.SellerId.ToString() : string.Empty)}");
-            await Task.WhenAll(overviewTask, listTask, adsOverviewTask);
+            await Task.WhenAll(overviewTask, listTask);
 
             var overviewResponse = await overviewTask;
             if (overviewResponse.IsSuccessStatusCode)
@@ -74,23 +73,12 @@ public sealed class CampaignController : LegacySellerControllerBase
                 model.Query = payload.Filters?.Q ?? model.Query;
                 model.Status = payload.Filters?.Status ?? model.Status;
                 model.Type = payload.Filters?.Type ?? model.Type;
-                model.StatusOptions = payload.StatusOptions?.Select(MapOption).ToList() ?? new List<CampaignOptionViewModel>();
-                model.TypeOptions = payload.TypeOptions?.Select(MapOption).ToList() ?? new List<CampaignOptionViewModel>();
-                model.Campaigns = payload.Rows?.Select(MapCampaignListItem).ToList() ?? new List<CampaignListItemViewModel>();
-            }
-
-            var adsOverviewResponse = await adsOverviewTask;
-            if (adsOverviewResponse.IsSuccessStatusCode)
-            {
-                var adsPayload = await adsOverviewResponse.Content.ReadFromJsonAsync<AdsOverviewApiResponse>(JsonOptions);
-                if (adsPayload is not null)
-                {
-                    MapAdsOverview(model, adsPayload);
-                }
-            }
-            else
-            {
-                ViewBag.AdsError = await ReadApiErrorAsync(adsOverviewResponse, "Khong the tai ads wallet overview.");
+                model.StatusOptions = DeduplicateOptions(payload.StatusOptions).Select(MapOption).ToList();
+                model.TypeOptions = DeduplicateOptions(payload.TypeOptions)
+                    .Where(option => !string.Equals(option.Value, "livestream", StringComparison.OrdinalIgnoreCase))
+                    .Select(MapOption)
+                    .ToList();
+                model.Campaigns = DeduplicateCampaignRows(payload.Rows).Select(MapCampaignListItem).ToList();
             }
 
             if (campaignId.HasValue)
@@ -108,7 +96,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> TopupAdsWallet(AdsTopupInputModel input)
+    public async Task<IActionResult> TopupAdsWallet([Bind(Prefix = "AdsTopupEditor")] AdsTopupInputModel input)
     {
         try
         {
@@ -128,7 +116,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SpendAdsWallet(AdsSpendInputModel input)
+    public async Task<IActionResult> SpendAdsWallet([Bind(Prefix = "AdsSpendEditor")] AdsSpendInputModel input)
     {
         try
         {
@@ -148,7 +136,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateAdsCampaign(AdsCampaignInputModel input)
+    public async Task<IActionResult> CreateAdsCampaign([Bind(Prefix = "AdsCampaignEditor")] AdsCampaignInputModel input)
     {
         try
         {
@@ -168,7 +156,7 @@ public sealed class CampaignController : LegacySellerControllerBase
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(CampaignUpsertInputModel input)
+    public async Task<IActionResult> Save([Bind(Prefix = "Editor")] CampaignUpsertInputModel input)
     {
         if (!ModelState.IsValid)
         {
@@ -196,13 +184,34 @@ public sealed class CampaignController : LegacySellerControllerBase
             }
 
             TempData["Success"] = input.CampaignId.HasValue ? "Cap nhat campaign thanh cong." : "Tao campaign thanh cong.";
-            return RedirectToAction(nameof(Index), new { campaignId = input.CampaignId });
+            var savedCampaignId = input.CampaignId ?? await TryReadCampaignIdAsync(response);
+            return RedirectToAction(nameof(Index), new { campaignId = savedCampaignId });
         }
         catch (Exception ex)
         {
             TempData["Error"] = "Loi khi luu campaign: " + ex.Message;
             return RedirectToAction(nameof(Index), new { campaignId = input.CampaignId });
         }
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Delete(int id)
+    {
+        try
+        {
+            var client = CreateOrderingClient();
+            var response = await client.DeleteAsync($"/api/orders/admin/campaigns/{id}");
+            TempData[response.IsSuccessStatusCode ? "Success" : "Error"] = response.IsSuccessStatusCode
+                ? "Xoa campaign thanh cong."
+                : await ReadApiErrorAsync(response, "Khong the xoa campaign.");
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = "Loi khi xoa campaign: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
@@ -258,7 +267,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             CreatedAt = payload.CreatedAt,
             UpdatedAt = payload.UpdatedAt,
             ApprovedAt = payload.ApprovedAt,
-            Participations = payload.Participations?.Select(x => new CampaignParticipationViewModel
+            Participations = DeduplicateParticipations(payload.Participations).Select(x => new CampaignParticipationViewModel
             {
                 ParticipationId = x.ParticipationId,
                 SellerId = x.SellerId,
@@ -270,8 +279,8 @@ public sealed class CampaignController : LegacySellerControllerBase
                 RequestedAt = x.RequestedAt,
                 ReviewedAt = x.ReviewedAt,
                 ReviewedBy = x.ReviewedBy
-            }).ToList() ?? new List<CampaignParticipationViewModel>(),
-            Slots = payload.Slots?.Select(x => new CampaignSlotViewModel
+            }).ToList(),
+            Slots = DeduplicateSlots(payload.Slots).Select(x => new CampaignSlotViewModel
             {
                 SlotId = x.SlotId,
                 ParticipationId = x.ParticipationId,
@@ -282,7 +291,7 @@ public sealed class CampaignController : LegacySellerControllerBase
                 InventoryLimit = x.InventoryLimit,
                 CreatedAt = x.CreatedAt,
                 ApprovedAt = x.ApprovedAt
-            }).ToList() ?? new List<CampaignSlotViewModel>()
+            }).ToList()
         };
 
         model.Editor = new CampaignUpsertInputModel
@@ -351,7 +360,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             ApprovedSlots = payload.ApprovedSlots,
             LiveSlots = payload.LiveSlots,
             TotalBudget = payload.TotalBudget,
-            Upcoming = payload.Upcoming?.Select(x => new CampaignUpcomingViewModel
+            Upcoming = DeduplicateUpcoming(payload.Upcoming).Select(x => new CampaignUpcomingViewModel
             {
                 CampaignId = x.CampaignId,
                 Name = x.Name ?? string.Empty,
@@ -360,7 +369,7 @@ public sealed class CampaignController : LegacySellerControllerBase
                 StartAt = x.StartAt,
                 EndAt = x.EndAt,
                 RegistrationEndAt = x.RegistrationEndAt
-            }).ToList() ?? new List<CampaignUpcomingViewModel>()
+            }).ToList()
         };
 
     private static CampaignOptionViewModel MapOption(CampaignOptionApiModel option)
@@ -433,8 +442,7 @@ public sealed class CampaignController : LegacySellerControllerBase
             new CampaignOptionViewModel { Value = "all", Text = "Tất cả" },
             new CampaignOptionViewModel { Value = "flash_sale", Text = "Flash sale" },
             new CampaignOptionViewModel { Value = "voucher_boost", Text = "Đẩy voucher" },
-            new CampaignOptionViewModel { Value = "seasonal", Text = "Theo mùa" },
-            new CampaignOptionViewModel { Value = "livestream", Text = "Livestream" }
+            new CampaignOptionViewModel { Value = "seasonal", Text = "Theo mùa" }
         ];
 
         model.WalletStatusOptions =
@@ -460,8 +468,8 @@ public sealed class CampaignController : LegacySellerControllerBase
             TotalSpend = payload.Stats?.TotalSpend ?? 0m
         };
 
-        model.WalletStatusOptions = payload.Filters?.StatusOptions?.Select(MapOption).ToList() ?? new List<CampaignOptionViewModel>();
-        model.AdsWallets = payload.Wallets?.Select(x => new AdsWalletRowViewModel
+        model.WalletStatusOptions = DeduplicateOptions(payload.Filters?.StatusOptions).Select(MapOption).ToList();
+        model.AdsWallets = DeduplicateAdsWallets(payload.Wallets).Select(x => new AdsWalletRowViewModel
         {
             WalletId = x.WalletId,
             SellerId = x.SellerId,
@@ -473,8 +481,8 @@ public sealed class CampaignController : LegacySellerControllerBase
             Status = x.Status ?? string.Empty,
             CreatedAt = x.CreatedAt,
             UpdatedAt = x.UpdatedAt
-        }).ToList() ?? new List<AdsWalletRowViewModel>();
-        model.AdsCampaigns = payload.AdsCampaigns?.Select(x => new AdsCampaignRowViewModel
+        }).ToList();
+        model.AdsCampaigns = DeduplicateAdsCampaigns(payload.AdsCampaigns).Select(x => new AdsCampaignRowViewModel
         {
             AdsCampaignId = x.AdsCampaignId,
             WalletId = x.WalletId,
@@ -489,8 +497,8 @@ public sealed class CampaignController : LegacySellerControllerBase
             StartAt = x.StartAt,
             EndAt = x.EndAt,
             CreatedAt = x.CreatedAt
-        }).ToList() ?? new List<AdsCampaignRowViewModel>();
-        model.RecentTopups = payload.RecentTopups?.Select(x => new AdsTopupHistoryItemViewModel
+        }).ToList();
+        model.RecentTopups = DeduplicateTopups(payload.RecentTopups).Select(x => new AdsTopupHistoryItemViewModel
         {
             TopupId = x.TopupId,
             WalletId = x.WalletId,
@@ -500,7 +508,251 @@ public sealed class CampaignController : LegacySellerControllerBase
             PaymentMethod = x.PaymentMethod,
             ReferenceCode = x.ReferenceCode,
             CreatedAt = x.CreatedAt
-        }).ToList() ?? new List<AdsTopupHistoryItemViewModel>();
+        }).ToList();
+    }
+
+    private static List<CampaignUpcomingApiModel> DeduplicateUpcoming(IEnumerable<CampaignUpcomingApiModel>? items)
+    {
+        return items?
+            .Where(item => item.CampaignId > 0)
+            .GroupBy(item => item.CampaignId)
+            .Select(group => group
+                .OrderByDescending(CalculateUpcomingScore)
+                .ThenByDescending(CalculateUpcomingSignalLength)
+                .ThenByDescending(item => item.RegistrationEndAt)
+                .First())
+            .ToList() ?? new List<CampaignUpcomingApiModel>();
+    }
+
+    private static List<CampaignOptionApiModel> DeduplicateOptions(IEnumerable<CampaignOptionApiModel>? options)
+    {
+        return options?
+            .Where(option => HasMeaningfulValue(option.Value))
+            .GroupBy(option => option.Value!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(option => HasMeaningfulValue(option.Text))
+                .ThenByDescending(CalculateOptionSignalLength)
+                .First())
+            .ToList() ?? new List<CampaignOptionApiModel>();
+    }
+
+    private static List<CampaignListItemApiModel> DeduplicateCampaignRows(IEnumerable<CampaignListItemApiModel>? rows)
+    {
+        return rows?
+            .Where(row => row.CampaignId > 0)
+            .GroupBy(row => row.CampaignId)
+            .Select(group => group
+                .OrderByDescending(CalculateCampaignRowScore)
+                .ThenByDescending(CalculateCampaignRowSignalLength)
+                .ThenByDescending(row => row.UpdatedAt ?? row.CreatedAt)
+                .First())
+            .ToList() ?? new List<CampaignListItemApiModel>();
+    }
+
+    private static List<CampaignParticipationApiModel> DeduplicateParticipations(IEnumerable<CampaignParticipationApiModel>? items)
+    {
+        return items?
+            .Where(item => item.ParticipationId > 0)
+            .GroupBy(item => item.ParticipationId)
+            .Select(group => group
+                .OrderByDescending(CalculateParticipationScore)
+                .ThenByDescending(CalculateParticipationSignalLength)
+                .ThenByDescending(item => item.ReviewedAt ?? item.RequestedAt)
+                .First())
+            .ToList() ?? new List<CampaignParticipationApiModel>();
+    }
+
+    private static List<CampaignSlotApiModel> DeduplicateSlots(IEnumerable<CampaignSlotApiModel>? items)
+    {
+        return items?
+            .Where(item => item.SlotId > 0)
+            .GroupBy(item => item.SlotId)
+            .Select(group => group
+                .OrderByDescending(CalculateSlotScore)
+                .ThenByDescending(CalculateSlotSignalLength)
+                .ThenByDescending(item => item.ApprovedAt ?? item.CreatedAt)
+                .First())
+            .ToList() ?? new List<CampaignSlotApiModel>();
+    }
+
+    private static List<AdsWalletApiModel> DeduplicateAdsWallets(IEnumerable<AdsWalletApiModel>? wallets)
+    {
+        return wallets?
+            .Where(wallet => wallet.WalletId > 0)
+            .GroupBy(wallet => wallet.WalletId)
+            .Select(group => group
+                .OrderByDescending(CalculateAdsWalletScore)
+                .ThenByDescending(CalculateAdsWalletSignalLength)
+                .ThenByDescending(wallet => wallet.UpdatedAt ?? wallet.CreatedAt)
+                .First())
+            .ToList() ?? new List<AdsWalletApiModel>();
+    }
+
+    private static List<AdsCampaignApiModel> DeduplicateAdsCampaigns(IEnumerable<AdsCampaignApiModel>? campaigns)
+    {
+        return campaigns?
+            .Where(campaign => campaign.AdsCampaignId > 0)
+            .GroupBy(campaign => campaign.AdsCampaignId)
+            .Select(group => group
+                .OrderByDescending(CalculateAdsCampaignScore)
+                .ThenByDescending(CalculateAdsCampaignSignalLength)
+                .ThenByDescending(campaign => campaign.CreatedAt)
+                .First())
+            .ToList() ?? new List<AdsCampaignApiModel>();
+    }
+
+    private static List<AdsTopupHistoryApiModel> DeduplicateTopups(IEnumerable<AdsTopupHistoryApiModel>? items)
+    {
+        return items?
+            .Where(item => item.TopupId > 0)
+            .GroupBy(item => item.TopupId)
+            .Select(group => group
+                .OrderByDescending(CalculateTopupScore)
+                .ThenByDescending(CalculateTopupSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList() ?? new List<AdsTopupHistoryApiModel>();
+    }
+
+    private static int CalculateUpcomingScore(CampaignUpcomingApiModel item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.Name) ? 2 : 0;
+        score += HasMeaningfulValue(item.CampaignType) ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateUpcomingSignalLength(CampaignUpcomingApiModel item)
+        => (item.Name?.Length ?? 0) + (item.CampaignType?.Length ?? 0) + (item.Status?.Length ?? 0);
+
+    private static int CalculateOptionSignalLength(CampaignOptionApiModel option)
+        => (option.Text?.Length ?? 0) + (option.Value?.Length ?? 0);
+
+    private static int CalculateCampaignRowScore(CampaignListItemApiModel row)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(row.Name) ? 2 : 0;
+        score += HasMeaningfulValue(row.CampaignType) ? 1 : 0;
+        score += HasMeaningfulValue(row.Description) ? 1 : 0;
+        score += HasMeaningfulValue(row.Status) ? 1 : 0;
+        score += row.BudgetAmount.HasValue ? 1 : 0;
+        score += row.VoucherCouponId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(row.VoucherCode) ? 1 : 0;
+        score += row.ParticipationCount > 0 ? 1 : 0;
+        score += row.ApprovedParticipationCount > 0 ? 1 : 0;
+        score += row.ProductSlotCount > 0 ? 1 : 0;
+        score += row.ApprovedSlotCount > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateCampaignRowSignalLength(CampaignListItemApiModel row)
+        => (row.Name?.Length ?? 0)
+        + (row.CampaignType?.Length ?? 0)
+        + (row.Description?.Length ?? 0)
+        + (row.Status?.Length ?? 0)
+        + (row.VoucherCode?.Length ?? 0);
+
+    private static int CalculateParticipationScore(CampaignParticipationApiModel item)
+    {
+        var score = 0;
+        score += item.SellerId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 2 : 0;
+        score += HasMeaningfulValue(item.Notes) ? 1 : 0;
+        score += item.DiscountPercent.HasValue ? 1 : 0;
+        score += item.RequestedSlots.HasValue ? 1 : 0;
+        score += item.ApprovedSlots.HasValue ? 1 : 0;
+        score += item.ReviewedBy.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateParticipationSignalLength(CampaignParticipationApiModel item)
+        => (item.Status?.Length ?? 0) + (item.Notes?.Length ?? 0);
+
+    private static int CalculateSlotScore(CampaignSlotApiModel item)
+    {
+        var score = 0;
+        score += item.ParticipationId.HasValue ? 1 : 0;
+        score += item.SellerId > 0 ? 1 : 0;
+        score += item.ProductId > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 2 : 0;
+        score += item.FlashSalePrice.HasValue ? 1 : 0;
+        score += item.InventoryLimit.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateSlotSignalLength(CampaignSlotApiModel item)
+        => (item.Status?.Length ?? 0);
+
+    private static int CalculateAdsWalletScore(AdsWalletApiModel wallet)
+    {
+        var score = 0;
+        score += wallet.SellerId > 0 ? 1 : 0;
+        score += wallet.Balance != 0m ? 1 : 0;
+        score += wallet.ReservedBalance != 0m ? 1 : 0;
+        score += wallet.AvailableBalance != 0m ? 1 : 0;
+        score += wallet.TotalTopup != 0m ? 1 : 0;
+        score += wallet.TotalSpend != 0m ? 1 : 0;
+        score += HasMeaningfulValue(wallet.Status) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateAdsWalletSignalLength(AdsWalletApiModel wallet)
+        => (wallet.Status?.Length ?? 0);
+
+    private static int CalculateAdsCampaignScore(AdsCampaignApiModel campaign)
+    {
+        var score = 0;
+        score += campaign.WalletId > 0 ? 1 : 0;
+        score += campaign.SellerId > 0 ? 1 : 0;
+        score += campaign.CampaignId.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(campaign.Name) ? 2 : 0;
+        score += HasMeaningfulValue(campaign.Channel) ? 1 : 0;
+        score += HasMeaningfulValue(campaign.Status) ? 1 : 0;
+        score += campaign.DailyBudget != 0m ? 1 : 0;
+        score += campaign.TotalBudget != 0m ? 1 : 0;
+        score += campaign.SpendToDate != 0m ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateAdsCampaignSignalLength(AdsCampaignApiModel campaign)
+        => (campaign.Name?.Length ?? 0) + (campaign.Channel?.Length ?? 0) + (campaign.Status?.Length ?? 0);
+
+    private static int CalculateTopupScore(AdsTopupHistoryApiModel item)
+    {
+        var score = 0;
+        score += item.WalletId > 0 ? 1 : 0;
+        score += item.SellerId > 0 ? 1 : 0;
+        score += item.Amount != 0m ? 1 : 0;
+        score += HasMeaningfulValue(item.Status) ? 1 : 0;
+        score += HasMeaningfulValue(item.PaymentMethod) ? 1 : 0;
+        score += HasMeaningfulValue(item.ReferenceCode) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateTopupSignalLength(AdsTopupHistoryApiModel item)
+        => (item.Status?.Length ?? 0) + (item.PaymentMethod?.Length ?? 0) + (item.ReferenceCode?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
+
+    private static async Task<int?> TryReadCampaignIdAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var doc = await JsonDocument.ParseAsync(stream);
+            if (doc.RootElement.TryGetProperty("campaignId", out var campaignIdElement) &&
+                campaignIdElement.TryGetInt32(out var campaignId) &&
+                campaignId > 0)
+            {
+                return campaignId;
+            }
+        }
+        catch
+        {
+        }
+
+        return null;
     }
 
     private static async Task<string> ReadApiErrorAsync(HttpResponseMessage response, string fallback)

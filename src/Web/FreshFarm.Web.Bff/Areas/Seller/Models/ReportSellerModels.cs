@@ -370,6 +370,8 @@ public sealed class ReviewRecentItemViewModel
 
     public string CustomerName { get; set; } = string.Empty;
 
+    public string? AvatarUrl { get; set; }
+
     public string ProductName { get; set; } = string.Empty;
 
     public string? ProductImageFileName { get; set; }

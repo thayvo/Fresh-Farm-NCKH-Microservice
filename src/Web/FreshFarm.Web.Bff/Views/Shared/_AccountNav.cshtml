@@ -2,6 +2,14 @@
     var currentAction = (ViewContext.RouteData.Values["action"]?.ToString() ?? string.Empty).ToLowerInvariant();
     var isOrderMenuActive = currentAction is "orderhistory" or "orderdetail";
     var isProfileMenuActive = currentAction is "profile" or "accountprofile" or "profileupdate";
+    var isSellerApplicationActive = currentAction is "becomeseller";
+    var isNotificationsMenuActive = currentAction is "notifications";
+    var sellerApplication = ViewData["SellerApplicationSummary"] as FreshFarm.Web.Bff.Dtos.SellerApplicationSummaryDto;
+    var accountNotificationSummary = ViewData["AccountNotificationSummary"] as FreshFarm.Web.Bff.Dtos.AccountNotificationNavSummaryDto;
+    var hasSellerAlert = sellerApplication?.HasSellerReviewAlert ?? false;
+    var sellerAlertTone = sellerApplication?.SellerReviewAlertTone ?? "secondary";
+    var sellerAlertLabel = sellerApplication?.ReviewStatusLabel ?? "Cập nhật";
+    var notificationCount = accountNotificationSummary?.UnreadCount ?? 0;
 }
 <div class="col-lg-3">
     <div class="card border-0 shadow-sm account-nav">
@@ -14,6 +22,27 @@
                 <a href="/account/orders"
                    class="list-group-item list-group-item-action @(isOrderMenuActive ? "active" : string.Empty)">
                     <i class="bi bi-receipt me-2"></i>Lịch sử đơn hàng
+                </a>
+                <a href="@(accountNotificationSummary?.NotificationsUrl ?? "/account/notifications")"
+                   class="list-group-item list-group-item-action d-flex align-items-center justify-content-between @(isNotificationsMenuActive ? "active" : string.Empty)">
+                    <span class="d-inline-flex align-items-center gap-2">
+                        <span class="position-relative d-inline-flex">
+                            <i class="bi bi-bell"></i>
+                            @if (notificationCount > 0)
+                            {
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">@notificationCount</span>
+                            }
+                        </span>
+                        <span>Thông báo tài khoản</span>
+                    </span>
+                </a>
+                <a href="/account/become-seller"
+                   class="list-group-item list-group-item-action @(isSellerApplicationActive ? "active" : string.Empty)">
+                    <i class="bi bi-shop-window me-2"></i>Đăng ký người bán
+                    @if (hasSellerAlert)
+                    {
+                        <span class="badge text-bg-@sellerAlertTone ms-2">@sellerAlertLabel</span>
+                    }
                 </a>
                 <a href="/"
                    class="list-group-item list-group-item-action">

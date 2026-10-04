@@ -328,6 +328,45 @@ public sealed class CampaignsAdminController : ControllerBase
         return Ok(new { success = true, message = "Cap nhat campaign thanh cong." });
     }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var campaign = await _db.Campaigns.FirstOrDefaultAsync(x => x.CampaignId == id, cancellationToken);
+        if (campaign is null)
+        {
+            return NotFound(new { message = "Khong tim thay campaign." });
+        }
+
+        var hasParticipations = await _db.CampaignSellerParticipations.AnyAsync(x => x.CampaignId == id, cancellationToken);
+        var hasSlots = await _db.CampaignProductSlots.AnyAsync(x => x.CampaignId == id, cancellationToken);
+        var hasAdsCampaigns = await _db.AdsCampaigns.AnyAsync(x => x.CampaignId == id, cancellationToken);
+        if (hasParticipations || hasSlots || hasAdsCampaigns)
+        {
+            return BadRequest(new { message = "Campaign da co nha ban, suat san pham hoac ads campaign lien ket nen khong the xoa." });
+        }
+
+        var actorUserId = TryGetActorUserId();
+        AdminAuditLogger.AddAction(
+            _db,
+            "campaign_center",
+            "delete_campaign",
+            "campaign",
+            campaign.CampaignId,
+            $"Xoa campaign {campaign.Name}",
+            actorUserId,
+            new
+            {
+                campaign.CampaignType,
+                campaign.Status,
+                campaign.BudgetAmount,
+                campaign.VoucherCouponId
+            });
+        _db.Campaigns.Remove(campaign);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { success = true, message = "Xoa campaign thanh cong." });
+    }
+
     [HttpPost("{id:int}/toggle-registration")]
     public async Task<IActionResult> ToggleRegistration([FromRoute] int id, CancellationToken cancellationToken)
     {

@@ -68,7 +68,9 @@
         <img src="@imageUrl"
              class="product-image"
              alt="@safeProductName"
-             onerror="this.onerror=null;this.src='@ProductImagePaths.FallbackImageRequestPath';" />
+             loading="lazy"
+             decoding="async"
+             data-fallback-src="@ProductImagePaths.FallbackImageRequestPath" />
     </div>
 
     <div class="product-overlay">

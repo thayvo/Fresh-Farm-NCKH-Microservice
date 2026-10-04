@@ -1,0 +1,165 @@
+@model FreshFarm.Web.Bff.Areas.Seller.Models.FreshOpsSellerPageViewModel
+@{
+    ViewBag.Title = "Lô hàng tươi";
+    Layout = "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
+}
+
+<section class="seller-fresh-ops">
+    <div class="fresh-header mb-4">
+        <div>
+            <p class="fresh-kicker mb-2">Vận hành hàng tươi</p>
+            <h1 class="fw-bold mb-2">Tạo lô hàng tươi</h1>
+            <p class="mb-0 text-muted">Nhập lô có hạn sử dụng, mã truy xuất và tồn kho để hệ thống theo dõi FEFO đúng theo gian hàng của bạn.</p>
+        </div>
+        <a class="btn btn-outline-primary" asp-area="Seller" asp-controller="Warehouse" asp-action="Index">
+            <i class="bi bi-box-seam"></i> Về kho hàng
+        </a>
+    </div>
+
+    @if (TempData["SuccessMessage"] is string successMessage && !string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success">@successMessage</div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMessage && !string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="fresh-panel">
+        <form method="post" asp-action="CreateLot" asp-controller="FreshOps" asp-area="Seller" class="row g-3">
+            @Html.AntiForgeryToken()
+            <div class="col-12">
+                <label asp-for="NewLot.ProductId" class="form-label">Sản phẩm</label>
+                <select asp-for="NewLot.ProductId" asp-items="Model.ProductOptions" class="form-select" required>
+                    <option value="">Chọn sản phẩm của bạn</option>
+                </select>
+                <span asp-validation-for="NewLot.ProductId" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="NewLot.LotCode" class="form-label">Mã lô</label>
+                <input asp-for="NewLot.LotCode" class="form-control" required />
+                <span asp-validation-for="NewLot.LotCode" class="text-danger small"></span>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="NewLot.TraceCode" class="form-label">Mã truy xuất</label>
+                <input asp-for="NewLot.TraceCode" class="form-control" />
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="NewLot.FarmName" class="form-label">Nông trại</label>
+                <input asp-for="NewLot.FarmName" class="form-control" />
+            </div>
+            <div class="col-md-6">
+                <label asp-for="NewLot.OriginRegion" class="form-label">Xuất xứ</label>
+                <input asp-for="NewLot.OriginRegion" class="form-control" />
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="NewLot.HarvestedAt" class="form-label">Ngày thu hoạch</label>
+                <input asp-for="NewLot.HarvestedAt" class="form-control" type="datetime-local" />
+            </div>
+            <div class="col-md-6">
+                <label asp-for="NewLot.PackedAt" class="form-label">Ngày đóng gói</label>
+                <input asp-for="NewLot.PackedAt" class="form-control" type="datetime-local" />
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="NewLot.ReceivedAt" class="form-label">Ngày nhập kho</label>
+                <input asp-for="NewLot.ReceivedAt" class="form-control" type="datetime-local" />
+            </div>
+            <div class="col-md-6">
+                <label asp-for="NewLot.ExpiresAt" class="form-label">Hạn sử dụng</label>
+                <input asp-for="NewLot.ExpiresAt" class="form-control" type="datetime-local" />
+            </div>
+
+            <div class="col-md-4">
+                <label asp-for="NewLot.InitialQuantity" class="form-label">Số lượng đầu kỳ</label>
+                <input asp-for="NewLot.InitialQuantity" class="form-control" min="1" required />
+                <span asp-validation-for="NewLot.InitialQuantity" class="text-danger small"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="NewLot.RemainingQuantity" class="form-label">Số lượng còn lại</label>
+                <input asp-for="NewLot.RemainingQuantity" class="form-control" min="0" />
+                <span asp-validation-for="NewLot.RemainingQuantity" class="text-danger small"></span>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="NewLot.UnitCost" class="form-label">Giá vốn đơn vị</label>
+                <input asp-for="NewLot.UnitCost" class="form-control" min="0" step="0.01" />
+                <span asp-validation-for="NewLot.UnitCost" class="text-danger small"></span>
+            </div>
+
+            <div class="col-md-6">
+                <label asp-for="NewLot.Status" class="form-label">Trạng thái</label>
+                <select asp-for="NewLot.Status" class="form-select">
+                    <option value="active">Đang hoạt động</option>
+                    <option value="held">Đang giữ</option>
+                    <option value="expired">Hết hạn</option>
+                    <option value="depleted">Đã hết hàng</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="NewLot.QualityStatus" class="form-label">Tình trạng chất lượng</label>
+                <select asp-for="NewLot.QualityStatus" class="form-select">
+                    <option value="ok">Ổn</option>
+                    <option value="watch">Cần theo dõi</option>
+                    <option value="blocked">Đang chặn</option>
+                </select>
+            </div>
+
+            <div class="col-12">
+                <label asp-for="NewLot.Notes" class="form-label">Ghi chú</label>
+                <textarea asp-for="NewLot.Notes" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="col-12 d-flex gap-2 justify-content-end">
+                <a class="btn btn-light" asp-area="Seller" asp-controller="Warehouse" asp-action="Index">Hủy</a>
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-plus-circle"></i> Tạo lô hàng
+                </button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<style>
+    .seller-fresh-ops {
+        max-width: 1120px;
+        margin: 0 auto;
+    }
+
+    .seller-fresh-ops .fresh-header,
+    .seller-fresh-ops .fresh-panel {
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, .08);
+        border-radius: 18px;
+        box-shadow: 0 18px 42px rgba(15, 23, 42, .08);
+    }
+
+    .seller-fresh-ops .fresh-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1.5rem;
+    }
+
+    .seller-fresh-ops .fresh-kicker {
+        color: #0f766e;
+        font-size: .8rem;
+        font-weight: 800;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+    }
+
+    .seller-fresh-ops .fresh-panel {
+        padding: 1.5rem;
+    }
+
+    @@media (max-width: 767.98px) {
+        .seller-fresh-ops .fresh-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+</style>

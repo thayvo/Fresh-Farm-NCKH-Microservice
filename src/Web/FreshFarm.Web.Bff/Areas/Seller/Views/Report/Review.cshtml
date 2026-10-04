@@ -3,7 +3,8 @@
     ViewBag.Title = "Quản Lý Đánh Giá";
     var currentArea = (string?)ViewData["AreaName"] ?? "Seller";
     Layout = (string?)ViewData["LayoutPath"] ?? "~/Areas/Seller/Views/Shared/_LayoutAdmin.cshtml";
-Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
+    Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
+    var defaultAvatarUrl = Url.Content("~/uploads/avatar/no-avatar.jpg");
 }
 
 <main class="container-fluid py-4 min-vh-100">
@@ -249,11 +250,14 @@ Func<string?, string> imgUrl = f => ProductImagePaths.ResolveRequestPath(f);
                         foreach (var review in Model.RecentReviews)
                         {
                             var img = imgUrl(review.ProductImageFileName);
+                            var avatarUrl = string.IsNullOrWhiteSpace(review.AvatarUrl)
+                                ? defaultAvatarUrl
+                                : review.AvatarUrl;
                             <tr id="review-row-@review.ReviewID">
                                 <td class="px-4">
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="avatar-wrapper">
-                                            <img src="@Url.Action("AvatarById","Account", new { area = "", id = (review.UserID ?? 0) })"
+                                            <img src="@avatarUrl"
                                                  alt="avatar" class="rounded-circle"
                                                  style="width:40px;height:40px;object-fit:cover" />
                                         </div>

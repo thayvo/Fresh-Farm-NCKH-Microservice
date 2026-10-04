@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Text;
 using FreshFarm.Identity.Api.Models;
 using FreshFarm.Identity.Api.Options;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 namespace FreshFarm.Identity.Api.Services;
@@ -36,7 +38,8 @@ public sealed class PasswordResetTokenService : IPasswordResetTokenService
             BuildSecurityVersion(user, userAuth));
 
         var lifetimeMinutes = _options.TokenLifetimeMinutes <= 0 ? 30 : _options.TokenLifetimeMinutes;
-        return _protector.Protect(payload, TimeSpan.FromMinutes(lifetimeMinutes));
+        var protectedPayload = _protector.Protect(payload, TimeSpan.FromMinutes(lifetimeMinutes));
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(protectedPayload));
     }
 
     public bool TryValidateToken(string token, User user, UserAuth? userAuth, out string? errorMessage)
@@ -51,7 +54,7 @@ public sealed class PasswordResetTokenService : IPasswordResetTokenService
 
         try
         {
-            var payload = _protector.Unprotect(token);
+            var payload = _protector.Unprotect(DecodeToken(token));
             var parts = payload.Split('|', StringSplitOptions.None);
             if (parts.Length != 3)
             {
@@ -88,15 +91,28 @@ public sealed class PasswordResetTokenService : IPasswordResetTokenService
 
     private static string BuildSecurityVersion(User user, UserAuth? userAuth)
     {
-        var versionMoment = userAuth?.UpdatedAt
-            ?? user.UpdatedAt
-            ?? user.CreatedAt;
-
-        return versionMoment.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture);
+        var nonce = userAuth?.PasswordResetNonce;
+        return string.IsNullOrWhiteSpace(nonce) ? "missing" : nonce;
     }
 
     private static string NormalizeEmail(string? email)
     {
         return (email ?? string.Empty).Trim().ToUpperInvariant();
+    }
+
+    private static string DecodeToken(string token)
+    {
+        try
+        {
+            return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(token));
+        }
+        catch (FormatException)
+        {
+            return token;
+        }
+        catch (ArgumentException)
+        {
+            return token;
+        }
     }
 }

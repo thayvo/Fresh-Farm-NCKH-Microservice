@@ -281,11 +281,29 @@ public sealed class GhnSandboxOrderTrackingResult
 
     public string ServiceName { get; set; } = string.Empty;
 
+    public string FromName { get; set; } = string.Empty;
+
+    public string FromPhone { get; set; } = string.Empty;
+
+    public string FromAddress { get; set; } = string.Empty;
+
     public string ToName { get; set; } = string.Empty;
 
     public string ToPhone { get; set; } = string.Empty;
 
     public string ToAddress { get; set; } = string.Empty;
+
+    public int? CurrentWarehouseId { get; set; }
+
+    public string CurrentWarehouseName { get; set; } = string.Empty;
+
+    public int? Weight { get; set; }
+
+    public int? Length { get; set; }
+
+    public int? Width { get; set; }
+
+    public int? Height { get; set; }
 
     public int? CodAmount { get; set; }
 
@@ -307,4 +325,8 @@ public sealed class GhnSandboxOrderTrackingLogItem
     public string StatusLabel { get; set; } = string.Empty;
 
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    public int? WarehouseId { get; set; }
+
+    public string WarehouseName { get; set; } = string.Empty;
 }

@@ -17,6 +17,7 @@
     };
 
     var items = (summary.Items ?? new List<CartItemDto>()).ToList();
+    var recommendations = (summary.Recommendations ?? new List<CartRecommendationDto>()).ToList();
     var totalQty = items.Sum(x => x.Quantity);
     var checkoutError = TempData["CheckoutError"] as string;
 
@@ -88,6 +89,88 @@
             pointer-events: none;
             opacity: .6;
         }
+
+        .cart-recommendation-section {
+            margin-top: 2rem;
+        }
+
+        .cart-recommendation-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .cart-recommendation-card {
+            background: #fff;
+            border: 1px solid #e5eee8;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 .45rem 1.25rem rgba(15, 23, 42, .06);
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .cart-recommendation-image {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            background: #eef7f0;
+        }
+
+        .cart-recommendation-body {
+            padding: .9rem;
+            display: flex;
+            flex-direction: column;
+            gap: .55rem;
+            flex: 1;
+        }
+
+        .cart-recommendation-label {
+            align-self: flex-start;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            max-width: 100%;
+            border-radius: 999px;
+            background: #eaf7ef;
+            color: #0b7a3b;
+            font-size: .76rem;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: .32rem .62rem;
+        }
+
+        .cart-recommendation-name {
+            font-size: .96rem;
+            line-height: 1.35;
+            min-height: 2.6em;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .cart-recommendation-meta {
+            color: #6b7280;
+            font-size: .84rem;
+        }
+
+        .cart-recommendation-action {
+            margin-top: auto;
+        }
+
+        @@media (max-width: 991.98px) {
+            .cart-recommendation-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .cart-recommendation-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -157,7 +240,9 @@
                                         <img src="@imageUrl"
                                              class="cart-item-img rounded"
                                              alt="@safeName"
-                                             onerror="this.onerror=null;this.src='@ProductImagePaths.FallbackImageRequestPath';" />
+                                             loading="lazy"
+                                             decoding="async"
+                                             data-fallback-src="@ProductImagePaths.FallbackImageRequestPath" />
                                         <div class="ms-3">
                                             <h6 class="mb-1">@safeName</h6>
                                             <small class="text-muted">Đơn vị: @safeUnit</small>
@@ -258,196 +343,78 @@
                     </form>
                 </aside>
             </div>
+
+            @if (recommendations.Any())
+            {
+                <section class="cart-recommendation-section" aria-labelledby="cart-recommendation-title">
+                    <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap mb-3">
+                        <div>
+                            <h2 id="cart-recommendation-title" class="h4 fw-bold mb-1">Có thể bạn cũng thích</h2>
+                            <p class="text-muted mb-0">Gợi ý từ các sản phẩm thường được mua cùng những món trong giỏ.</p>
+                        </div>
+                    </div>
+
+                    <div class="cart-recommendation-grid">
+                        @foreach (var recommendation in recommendations)
+                        {
+                            var safeName = string.IsNullOrWhiteSpace(recommendation.ProductName)
+                                ? $"Sản phẩm #{recommendation.ProductId}"
+                                : recommendation.ProductName;
+                            var safeSellerName = string.IsNullOrWhiteSpace(recommendation.SellerName)
+                                ? $"Shop #{recommendation.SellerId}"
+                                : recommendation.SellerName;
+                            var safeUnit = string.IsNullOrWhiteSpace(recommendation.UnitSymbol)
+                                ? "đơn vị"
+                                : recommendation.UnitSymbol;
+                            var imageUrl = ProductImagePaths.ResolveRequestPath(recommendation.ImageFileName);
+
+                            <article class="cart-recommendation-card">
+                                <img src="@imageUrl"
+                                     class="cart-recommendation-image"
+                                     alt="@safeName"
+                                     loading="lazy"
+                                     decoding="async"
+                                     data-fallback-src="@ProductImagePaths.FallbackImageRequestPath" />
+                                <div class="cart-recommendation-body">
+                                    <span class="cart-recommendation-label">
+                                        <i class="bi bi-bag-heart"></i>
+                                        @recommendation.Label
+                                    </span>
+                                    <h3 class="cart-recommendation-name fw-semibold mb-0" title="@safeName">@safeName</h3>
+                                    <div>
+                                        <div class="fw-bold checkout-total">@Vnd(recommendation.UnitPrice)</div>
+                                        <div class="cart-recommendation-meta">@safeUnit · @safeSellerName</div>
+                                    </div>
+                                    @if (recommendation.CoPurchaseOrderCount > 0)
+                                    {
+                                        <div class="cart-recommendation-meta">
+                                            Từng được mua cùng @recommendation.CoPurchaseOrderCount đơn
+                                        </div>
+                                    }
+                                    <form asp-controller="Cart" asp-action="Add" method="post" class="cart-recommendation-action">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="ProductId" value="@recommendation.ProductId" />
+                                        <input type="hidden" name="SellerId" value="@recommendation.SellerId" />
+                                        <input type="hidden" name="SellerName" value="@safeSellerName" />
+                                        <input type="hidden" name="ProductName" value="@safeName" />
+                                        <input type="hidden" name="ImageFileName" value="@recommendation.ImageFileName" />
+                                        <input type="hidden" name="UnitPrice" value="@recommendation.UnitPrice.ToString(CultureInfo.InvariantCulture)" />
+                                        <input type="hidden" name="UnitSymbol" value="@safeUnit" />
+                                        <input type="hidden" name="Quantity" value="1" />
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="bi bi-cart-plus me-1"></i>Thêm vào giỏ
+                                        </button>
+                                    </form>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            }
         }
     </main>
 
-    <script>
-        (() => {
-            const cartView = document.getElementById("cart-view");
-            if (!cartView) return;
-
-            const selectionStorageKey = "freshfarm-cart-selected-keys";
-            const summaryData = document.getElementById("cart-summary-data");
-            const selectAll = document.getElementById("cart-select-all");
-            const itemChecks = Array.from(document.querySelectorAll(".cart-item-check"));
-            const itemRows = Array.from(document.querySelectorAll(".cart-item-row"));
-            const qtyForms = Array.from(document.querySelectorAll(".cart-qty-form"));
-            const selectedInline = document.getElementById("cart-selected-inline");
-            const selectedItemCount = document.getElementById("selected-item-count");
-            const selectedSubTotal = document.getElementById("selected-sub-total");
-            const selectedInputsWrap = document.getElementById("selected-product-inputs");
-            const checkoutBtn = document.getElementById("checkout-btn");
-
-            const totalItems = Number(summaryData?.getAttribute("data-total-items") || itemChecks.length || 0);
-
-            const vnd = (value) => {
-                const safe = Number.isFinite(value) ? value : 0;
-                return safe.toLocaleString("vi-VN") + " ₫";
-            };
-
-            const getRowMeta = (row) => {
-                const lineTotal = Number(row.getAttribute("data-line-total") || 0);
-                return {
-                    lineTotal: Number.isFinite(lineTotal) ? lineTotal : 0
-                };
-            };
-
-            const loadStoredSelection = () => {
-                try {
-                    const raw = window.localStorage.getItem(selectionStorageKey);
-                    if (!raw) return [];
-                    const parsed = JSON.parse(raw);
-                    return Array.isArray(parsed) ? parsed.map((x) => String(x || "").trim()).filter(Boolean) : [];
-                } catch {
-                    return [];
-                }
-            };
-
-            const saveStoredSelection = (keys) => {
-                try {
-                    window.localStorage.setItem(selectionStorageKey, JSON.stringify(keys));
-                } catch {
-                    // Ignore storage errors in private mode or blocked storage.
-                }
-            };
-
-            const setCheckoutDisabled = (disabled) => {
-                if (!(checkoutBtn instanceof HTMLButtonElement)) return;
-                checkoutBtn.classList.toggle("disabled", disabled);
-                checkoutBtn.disabled = disabled;
-            };
-
-            const updateSummaryBySelection = () => {
-                let checkedCount = 0;
-                let subTotal = 0;
-
-                itemRows.forEach((row) => {
-                    const checkbox = row.querySelector(".cart-item-check");
-                    if (!(checkbox instanceof HTMLInputElement)) return;
-
-                    const isChecked = checkbox.checked;
-                    row.classList.toggle("is-unchecked", !isChecked);
-
-                    if (isChecked) {
-                        checkedCount += 1;
-                        subTotal += getRowMeta(row).lineTotal;
-                    }
-                });
-
-                if (selectedInline) {
-                    selectedInline.textContent = `Đã chọn ${checkedCount}/${totalItems} sản phẩm`;
-                }
-                if (selectedItemCount) {
-                    selectedItemCount.textContent = `${checkedCount} sản phẩm`;
-                }
-                if (selectedSubTotal) {
-                    selectedSubTotal.textContent = vnd(subTotal);
-                }
-
-                if (selectedInputsWrap) {
-                    selectedInputsWrap.innerHTML = "";
-                    const selectedKeys = [];
-                    itemRows.forEach((row) => {
-                        const checkbox = row.querySelector(".cart-item-check");
-                        if (!(checkbox instanceof HTMLInputElement) || !checkbox.checked) {
-                            return;
-                        }
-
-                        const productId = Number(checkbox.getAttribute("data-product-id") || 0);
-                        if (!Number.isFinite(productId) || productId <= 0) {
-                            return;
-                        }
-
-                        const input = document.createElement("input");
-                        input.type = "hidden";
-                        input.name = "selectedCartItemKeys";
-                        input.value = checkbox.getAttribute("data-cart-item-key") || "";
-                        selectedInputsWrap.appendChild(input);
-                        selectedKeys.push(input.value);
-                    });
-                    saveStoredSelection(selectedKeys);
-                }
-
-                if (selectAll instanceof HTMLInputElement) {
-                    selectAll.checked = checkedCount > 0 && checkedCount === itemChecks.length;
-                    selectAll.indeterminate = checkedCount > 0 && checkedCount < itemChecks.length;
-                }
-
-                setCheckoutDisabled(checkedCount === 0);
-            };
-
-            if (selectAll instanceof HTMLInputElement) {
-                selectAll.addEventListener("change", () => {
-                    itemChecks.forEach((check) => {
-                        if (check instanceof HTMLInputElement) {
-                            check.checked = selectAll.checked;
-                        }
-                    });
-                    updateSummaryBySelection();
-                });
-            }
-
-            itemChecks.forEach((check) => {
-                if (!(check instanceof HTMLInputElement)) return;
-                check.addEventListener("change", updateSummaryBySelection);
-            });
-
-            qtyForms.forEach((form) => {
-                if (!(form instanceof HTMLFormElement)) return;
-                const visibleInput = form.querySelector(".cart-qty-input");
-                const hiddenInput = form.querySelector(".cart-qty-hidden");
-                const buttons = Array.from(form.querySelectorAll(".cart-qty-btn"));
-
-                if (!(visibleInput instanceof HTMLInputElement) || !(hiddenInput instanceof HTMLInputElement)) {
-                    return;
-                }
-
-                const syncHidden = () => {
-                    const parsed = Number(visibleInput.value || hiddenInput.value || 1);
-                    const safe = Number.isFinite(parsed) ? Math.max(1, Math.round(parsed)) : 1;
-                    visibleInput.value = String(safe);
-                    hiddenInput.value = String(safe);
-                    return safe;
-                };
-
-                visibleInput.addEventListener("change", () => {
-                    syncHidden();
-                    form.submit();
-                });
-
-                visibleInput.addEventListener("keydown", (event) => {
-                    if (event.key === "Enter") {
-                        event.preventDefault();
-                        syncHidden();
-                        form.submit();
-                    }
-                });
-
-                buttons.forEach((button) => {
-                    if (!(button instanceof HTMLButtonElement)) return;
-                    button.addEventListener("click", () => {
-                        const delta = Number(button.getAttribute("data-delta") || 0);
-                        const current = syncHidden();
-                        const next = Math.max(1, current + (Number.isFinite(delta) ? delta : 0));
-                        visibleInput.value = String(next);
-                        hiddenInput.value = String(next);
-                        form.submit();
-                    });
-                });
-            });
-
-            const storedSelection = loadStoredSelection();
-            if (storedSelection.length > 0) {
-                const storedSet = new Set(storedSelection);
-                itemChecks.forEach((check) => {
-                    if (!(check instanceof HTMLInputElement)) return;
-                    const key = (check.getAttribute("data-cart-item-key") || "").trim();
-                    check.checked = storedSet.has(key);
-                });
-            }
-
-            updateSummaryBySelection();
-        })();
-    </script>
+    <script src="~/js/cart-page.js" asp-append-version="true"></script>
+    <script src="~/js/csp-phase2.js" asp-append-version="true"></script>
 </body>
 </html>

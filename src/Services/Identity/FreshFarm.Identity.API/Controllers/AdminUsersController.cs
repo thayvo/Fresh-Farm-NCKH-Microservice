@@ -1,4 +1,5 @@
 using FreshFarm.Identity.Api.Models;
+using FreshFarm.Identity.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -13,13 +14,25 @@ namespace FreshFarm.Identity.Api.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "AdminOnly")]
 public sealed class AdminUsersController : ControllerBase
 {
+    private const string UserNamePattern = @"^[a-zA-Z0-9._-]+$";
     private readonly FreshFarmIdentityDBContext _db;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly ILoginDeviceSecurityService _loginDeviceSecurityService;
+    private readonly IAccountEmailSender _accountEmailSender;
+    private readonly ILogger<AdminUsersController> _logger;
 
-    public AdminUsersController(FreshFarmIdentityDBContext db, IPasswordHasher<User> passwordHasher)
+    public AdminUsersController(
+        FreshFarmIdentityDBContext db,
+        IPasswordHasher<User> passwordHasher,
+        ILoginDeviceSecurityService loginDeviceSecurityService,
+        IAccountEmailSender accountEmailSender,
+        ILogger<AdminUsersController> logger)
     {
         _db = db;
         _passwordHasher = passwordHasher;
+        _loginDeviceSecurityService = loginDeviceSecurityService;
+        _accountEmailSender = accountEmailSender;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -28,6 +41,7 @@ public sealed class AdminUsersController : ControllerBase
         [FromQuery] int take = 5000,
         [FromQuery] string? userType = "all",
         [FromQuery] bool? isActive = null,
+        [FromQuery] string? approvalStatus = null,
         [FromQuery] DateTime? createdFrom = null,
         [FromQuery] DateTime? createdTo = null)
     {
@@ -55,6 +69,17 @@ public sealed class AdminUsersController : ControllerBase
         if (isActive.HasValue)
         {
             query = query.Where(u => u.IsActive == isActive.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(approvalStatus))
+        {
+            var normalizedApprovalStatus = NormalizeApprovalStatus(approvalStatus);
+            if (normalizedApprovalStatus is null)
+            {
+                return BadRequest(new { message = "Trang thai phe duyet khong hop le." });
+            }
+
+            query = query.Where(u => u.ApprovalStatus == normalizedApprovalStatus);
         }
 
         if (createdFrom.HasValue)
@@ -90,6 +115,12 @@ public sealed class AdminUsersController : ControllerBase
                 phone = u.Phone,
                 avatar = u.Avatar,
                 isActive = u.IsActive,
+                emailConfirmed = u.EmailConfirmed,
+                approvalStatus = u.ApprovalStatus,
+                approvalVersion = u.ApprovalVersion,
+                approvedAt = u.ApprovedAt,
+                approvedByUserId = u.ApprovedByUserId,
+                approvalNote = u.ApprovalNote,
                 created = u.CreatedAt,
                 updated = u.UpdatedAt,
                 lastLogin = u.UserSessions
@@ -120,6 +151,12 @@ public sealed class AdminUsersController : ControllerBase
             roleId = row.role?.roleId ?? 0,
             role = row.role,
             row.isActive,
+            row.emailConfirmed,
+            row.approvalStatus,
+            row.approvalVersion,
+            row.approvedAt,
+            row.approvedByUserId,
+            row.approvalNote,
             row.lastLogin,
             row.created,
             row.updated
@@ -157,6 +194,23 @@ public sealed class AdminUsersController : ControllerBase
         return normalized is "admin" or "seller" or "buyer" ? normalized : "all";
     }
 
+    private static string? NormalizeApprovalStatus(string? approvalStatus)
+    {
+        if (string.IsNullOrWhiteSpace(approvalStatus))
+        {
+            return null;
+        }
+
+        return approvalStatus.Trim().ToLowerInvariant() switch
+        {
+            "pending" => AccountApprovalStatus.Pending,
+            "approved" => AccountApprovalStatus.Approved,
+            "rejected" => AccountApprovalStatus.Rejected,
+            "suspended" => AccountApprovalStatus.Suspended,
+            _ => null
+        };
+    }
+
     [HttpGet("metrics")]
     public async Task<IActionResult> GetMetrics(CancellationToken cancellationToken = default)
     {
@@ -168,46 +222,40 @@ public sealed class AdminUsersController : ControllerBase
 
         try
         {
-            var sellerRoleIdTask = _db.Roles
+            var sellerRoleId = await _db.Roles
                 .AsNoTracking()
                 .Where(r => r.RoleName == "Seller")
                 .Select(r => (int?)r.RoleId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var buyerRoleIdTask = _db.Roles
+            var buyerRoleId = await _db.Roles
                 .AsNoTracking()
                 .Where(r => r.RoleName == "Customer")
                 .Select(r => (int?)r.RoleId)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var totalUsersTask = _db.Users
+            var totalUsers = await _db.Users
                 .AsNoTracking()
                 .CountAsync(cancellationToken);
 
-            var newUsersTodayTask = _db.Users
+            var newUsersToday = await _db.Users
                 .AsNoTracking()
                 .CountAsync(u => u.CreatedAt >= todayStart && u.CreatedAt < nextDay, cancellationToken);
 
-            var newUsersSevenDaysTask = _db.Users
+            var newUsersSevenDays = await _db.Users
                 .AsNoTracking()
                 .CountAsync(u => u.CreatedAt >= sevenDaysStart && u.CreatedAt < nextDay, cancellationToken);
 
-            await Task.WhenAll(
-                sellerRoleIdTask,
-                buyerRoleIdTask,
-                totalUsersTask,
-                newUsersTodayTask,
-                newUsersSevenDaysTask);
+            var totalSellers = sellerRoleId.HasValue
+                ? await _db.UserRoles.AsNoTracking()
+                    .Where(ur => ur.RoleId == sellerRoleId.Value)
+                    .Select(ur => ur.UserId)
+                    .Distinct()
+                    .CountAsync(cancellationToken)
+                : 0;
 
-            var sellerRoleId = sellerRoleIdTask.Result;
-            var buyerRoleId = buyerRoleIdTask.Result;
-
-            var totalSellersTask = sellerRoleId.HasValue
-                ? _db.UserRoles.AsNoTracking().CountAsync(ur => ur.RoleId == sellerRoleId.Value, cancellationToken)
-                : Task.FromResult(0);
-
-            var newSellersSevenDaysTask = sellerRoleId.HasValue
-                ? _db.UserRoles
+            var newSellersSevenDays = sellerRoleId.HasValue
+                ? await _db.UserRoles
                     .AsNoTracking()
                     .Where(ur => ur.RoleId == sellerRoleId.Value)
                     .Join(
@@ -217,14 +265,18 @@ public sealed class AdminUsersController : ControllerBase
                         (ur, u) => ur.UserId)
                     .Distinct()
                     .CountAsync(cancellationToken)
-                : Task.FromResult(0);
+                : 0;
 
-            var totalBuyersTask = buyerRoleId.HasValue
-                ? _db.UserRoles.AsNoTracking().CountAsync(ur => ur.RoleId == buyerRoleId.Value, cancellationToken)
-                : Task.FromResult(0);
+            var totalBuyers = buyerRoleId.HasValue
+                ? await _db.UserRoles.AsNoTracking()
+                    .Where(ur => ur.RoleId == buyerRoleId.Value)
+                    .Select(ur => ur.UserId)
+                    .Distinct()
+                    .CountAsync(cancellationToken)
+                : 0;
 
-            var newBuyersSevenDaysTask = buyerRoleId.HasValue
-                ? _db.UserRoles
+            var newBuyersSevenDays = buyerRoleId.HasValue
+                ? await _db.UserRoles
                     .AsNoTracking()
                     .Where(ur => ur.RoleId == buyerRoleId.Value)
                     .Join(
@@ -234,47 +286,35 @@ public sealed class AdminUsersController : ControllerBase
                         (ur, u) => ur.UserId)
                     .Distinct()
                     .CountAsync(cancellationToken)
-                : Task.FromResult(0);
+                : 0;
 
             var trafficToday = 0;
             var activeSessions = 0;
 
             try
             {
-                var trafficTodayTask = _db.UserSessions
+                trafficToday = await _db.UserSessions
                     .AsNoTracking()
                     .CountAsync(s => s.CreatedAt >= todayStart && s.CreatedAt < nextDay, cancellationToken);
 
-                var activeSessionsTask = _db.UserSessions
+                activeSessions = await _db.UserSessions
                     .AsNoTracking()
                     .CountAsync(s => s.RevokedAt == null && s.ExpiresAt > now, cancellationToken);
-
-                await Task.WhenAll(
-                    totalSellersTask,
-                    newSellersSevenDaysTask,
-                    totalBuyersTask,
-                    newBuyersSevenDaysTask,
-                    trafficTodayTask,
-                    activeSessionsTask);
-
-                trafficToday = trafficTodayTask.Result;
-                activeSessions = activeSessionsTask.Result;
             }
             catch (Exception ex)
             {
                 warnings.Add($"UserSessions fallback: {ex.GetType().Name}");
-                await Task.WhenAll(totalSellersTask, newSellersSevenDaysTask, totalBuyersTask, newBuyersSevenDaysTask);
             }
 
             return Ok(new
             {
-                totalUsers = totalUsersTask.Result,
-                newUsersToday = newUsersTodayTask.Result,
-                newUsers7Days = newUsersSevenDaysTask.Result,
-                totalSellers = totalSellersTask.Result,
-                newSellers7Days = newSellersSevenDaysTask.Result,
-                totalBuyers = totalBuyersTask.Result,
-                newBuyers7Days = newBuyersSevenDaysTask.Result,
+                totalUsers,
+                newUsersToday,
+                newUsers7Days = newUsersSevenDays,
+                totalSellers,
+                newSellers7Days = newSellersSevenDays,
+                totalBuyers,
+                newBuyers7Days = newBuyersSevenDays,
                 trafficToday,
                 activeSessions,
                 warnings
@@ -314,6 +354,14 @@ public sealed class AdminUsersController : ControllerBase
                 phone = u.Phone,
                 avatar = u.Avatar,
                 isActive = u.IsActive,
+                emailConfirmed = u.EmailConfirmed,
+                emailConfirmedAt = u.EmailConfirmedAt,
+                approvalStatus = u.ApprovalStatus,
+                approvalVersion = u.ApprovalVersion,
+                approvedAt = u.ApprovedAt,
+                approvedByUserId = u.ApprovedByUserId,
+                approvalNote = u.ApprovalNote,
+                approvalStatusChangedAt = u.ApprovalStatusChangedAt,
                 created = u.CreatedAt,
                 updated = u.UpdatedAt,
                 lastLogin = u.UserSessions
@@ -348,6 +396,14 @@ public sealed class AdminUsersController : ControllerBase
             roleId = row.role?.roleId ?? 0,
             role = row.role,
             row.isActive,
+            row.emailConfirmed,
+            row.emailConfirmedAt,
+            row.approvalStatus,
+            row.approvalVersion,
+            row.approvedAt,
+            row.approvedByUserId,
+            row.approvalNote,
+            row.approvalStatusChangedAt,
             row.lastLogin,
             row.created,
             row.updated
@@ -397,6 +453,11 @@ public sealed class AdminUsersController : ControllerBase
             }
         }
 
+        if (!TryGetCurrentUserId(out var currentAdminUserId))
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc quan tri vien dang tao tai khoan." });
+        }
+
         var now = DateTime.UtcNow;
         var user = new User
         {
@@ -405,6 +466,12 @@ public sealed class AdminUsersController : ControllerBase
             Email = normalized.email,
             Phone = normalized.phone,
             Avatar = normalized.avatar,
+            EmailConfirmed = true,
+            EmailConfirmedAt = now,
+            ApprovalStatus = AccountApprovalStatus.Approved,
+            ApprovedAt = now,
+            ApprovedByUserId = currentAdminUserId,
+            ApprovalStatusChangedAt = now,
             IsActive = normalized.isActive,
             CreatedAt = now,
             UpdatedAt = now
@@ -428,6 +495,16 @@ public sealed class AdminUsersController : ControllerBase
             LockedUntil = null,
             Mfasecret = string.Empty,
             UpdatedAt = now
+        });
+
+        _db.AccountApprovalEvents.Add(new AccountApprovalEvent
+        {
+            UserId = user.UserId,
+            ActorUserId = currentAdminUserId,
+            FromStatus = AccountApprovalStatus.Pending,
+            ToStatus = AccountApprovalStatus.Approved,
+            Note = "Tài khoản được tạo trực tiếp bởi quản trị viên.",
+            OccurredAt = now
         });
 
         await _db.SaveChangesAsync();
@@ -535,9 +612,219 @@ public sealed class AdminUsersController : ControllerBase
             user.UserAuth.UpdatedAt = now;
         }
 
+        if (user.UserAuth is not null)
+        {
+            user.UserAuth.TokenVersion += 1;
+            user.UserAuth.UpdatedAt = now;
+        }
+
         await _db.SaveChangesAsync();
 
         return Ok(new { success = true, message = "Cap nhat ho so thanh cong." });
+    }
+
+    [HttpPost("{id:int}/approval")]
+    public async Task<IActionResult> ChangeApproval(
+        [FromRoute] int id,
+        [FromBody] AdminChangeApprovalRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetCurrentUserId(out var currentAdminUserId))
+        {
+            return Unauthorized(new { message = "Khong xac dinh duoc quan tri vien dang thao tac." });
+        }
+
+        var expectedApprovalVersion = request?.ExpectedApprovalVersion;
+        if (expectedApprovalVersion is null
+            || expectedApprovalVersion < 0
+            || expectedApprovalVersion == long.MaxValue)
+        {
+            return BadRequest(new
+            {
+                code = "approval_version_required",
+                message = "Thieu phien ban phe duyet. Vui long tai lai danh sach va thu lai."
+            });
+        }
+
+        var normalizedStatus = NormalizeApprovalStatus(request?.Status);
+        if (normalizedStatus is null)
+        {
+            return BadRequest(new { message = "Trang thai phe duyet khong hop le." });
+        }
+
+        var note = string.IsNullOrWhiteSpace(request?.Note)
+            ? null
+            : request.Note.Trim()[..Math.Min(request.Note.Trim().Length, 500)];
+        if ((normalizedStatus == AccountApprovalStatus.Rejected || normalizedStatus == AccountApprovalStatus.Suspended)
+            && string.IsNullOrWhiteSpace(note))
+        {
+            return BadRequest(new { message = "Vui long nhap ly do tu choi hoac dinh chi tai khoan." });
+        }
+
+        if (id == currentAdminUserId && normalizedStatus != AccountApprovalStatus.Approved)
+        {
+            return BadRequest(new { message = "Khong the tu tu choi hoac dinh chi tai khoan quan tri vien dang dang nhap." });
+        }
+
+        var user = await _db.Users
+            .Include(u => u.UserAuth)
+            .Include(u => u.UserSessions)
+            .FirstOrDefaultAsync(u => u.UserId == id, cancellationToken);
+        if (user is null)
+        {
+            return NotFound(new { message = "Khong tim thay nguoi dung." });
+        }
+
+        if (user.ApprovalVersion != expectedApprovalVersion.Value)
+        {
+            return Conflict(new
+            {
+                code = "approval_conflict",
+                message = "Tai khoan da duoc quan tri vien khac cap nhat. Vui long tai lai danh sach truoc khi quyet dinh.",
+                approvalStatus = user.ApprovalStatus,
+                approvalVersion = user.ApprovalVersion
+            });
+        }
+
+        var previousStatus = string.IsNullOrWhiteSpace(user.ApprovalStatus)
+            ? AccountApprovalStatus.Pending
+            : user.ApprovalStatus;
+        var now = DateTime.UtcNow;
+
+        user.ApprovalStatus = normalizedStatus;
+        user.ApprovalNote = note;
+        user.ApprovalStatusChangedAt = now;
+        user.ApprovalVersion = expectedApprovalVersion.Value + 1;
+        user.UpdatedAt = now;
+        if (user.UserAuth is not null)
+        {
+            user.UserAuth.TokenVersion += 1;
+            user.UserAuth.UpdatedAt = now;
+        }
+
+        if (normalizedStatus == AccountApprovalStatus.Approved)
+        {
+            user.ApprovedAt = now;
+            user.ApprovedByUserId = currentAdminUserId;
+        }
+        else
+        {
+            user.ApprovedAt = null;
+            user.ApprovedByUserId = null;
+            if (user.UserSessions.Count > 0)
+            {
+                _db.UserSessions.RemoveRange(user.UserSessions);
+            }
+        }
+
+        await using var transaction = _db.Database.IsRelational()
+            ? await _db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _db.AccountApprovalEvents.Add(new AccountApprovalEvent
+            {
+                UserId = user.UserId,
+                ActorUserId = currentAdminUserId,
+                FromStatus = previousStatus,
+                ToStatus = normalizedStatus,
+                Note = note,
+                OccurredAt = now
+            });
+            await _db.SaveChangesAsync(cancellationToken);
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Xung dot phe duyet userId {UserId}; admin userId {AdminUserId} da gui phien ban {ApprovalVersion}.",
+                id,
+                currentAdminUserId,
+                expectedApprovalVersion.Value);
+
+            return Conflict(new
+            {
+                code = "approval_conflict",
+                message = "Tai khoan da duoc quan tri vien khac cap nhat. Vui long tai lai danh sach truoc khi quyet dinh."
+            });
+        }
+
+        var emailSent = false;
+        if (_accountEmailSender.IsConfigured && user.EmailConfirmed
+            && (normalizedStatus == AccountApprovalStatus.Approved || normalizedStatus == AccountApprovalStatus.Rejected))
+        {
+            try
+            {
+                await _accountEmailSender.SendAccountApprovalResultAsync(
+                    user.Email,
+                    user.FullName,
+                    normalizedStatus == AccountApprovalStatus.Approved,
+                    note,
+                    cancellationToken);
+                emailSent = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Da cap nhat phe duyet userId {UserId} nhung gui email that bai.", user.UserId);
+            }
+        }
+
+        return Ok(new
+        {
+            success = true,
+            message = normalizedStatus == AccountApprovalStatus.Approved
+                ? "Da phe duyet tai khoan."
+                : normalizedStatus == AccountApprovalStatus.Pending
+                    ? "Da chuyen tai khoan ve trang thai cho phe duyet."
+                    : normalizedStatus == AccountApprovalStatus.Suspended
+                        ? "Da dinh chi tai khoan."
+                        : "Da tu choi tai khoan.",
+            approvalStatus = normalizedStatus,
+            approvalVersion = user.ApprovalVersion,
+            emailSent
+        });
+    }
+
+    [HttpPost("{id:int}/unlock-login")]
+    public async Task<IActionResult> UnlockLogin([FromRoute] int id, CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users
+            .Include(u => u.UserAuth)
+            .FirstOrDefaultAsync(u => u.UserId == id, cancellationToken);
+        if (user is null)
+        {
+            return NotFound(new { message = "Khong tim thay nguoi dung." });
+        }
+
+        if (user.UserAuth is not null)
+        {
+            user.UserAuth.FailedCount = 0;
+            user.UserAuth.LockoutLevel = 0;
+            user.UserAuth.LockedUntil = null;
+            user.UserAuth.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        var unlockedDeviceCount = await _loginDeviceSecurityService.UnlockForUserAsync(id, cancellationToken);
+        _logger.LogInformation(
+            "Admin userId {AdminUserId} da mo khoa login cho userId {UserId}; deviceStates={DeviceCount}.",
+            TryGetCurrentUserId(out var actorUserId) ? actorUserId : (int?)null,
+            id,
+            unlockedDeviceCount);
+
+        return Ok(new
+        {
+            success = true,
+            message = "Da mo khoa dang nhap cho tai khoan va cac thiet bi lien quan.",
+            unlockedDeviceCount
+        });
     }
 
     [HttpDelete("{id:int}")]
@@ -554,6 +841,7 @@ public sealed class AdminUsersController : ControllerBase
         }
 
         var user = await _db.Users
+            .Include(u => u.UserAuth)
             .Include(u => u.UserRoles)
             .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.UserId == id);
@@ -565,6 +853,11 @@ public sealed class AdminUsersController : ControllerBase
 
         user.IsActive = false;
         user.UpdatedAt = DateTime.UtcNow;
+        if (user.UserAuth is not null)
+        {
+            user.UserAuth.TokenVersion += 1;
+            user.UserAuth.UpdatedAt = DateTime.UtcNow;
+        }
 
         var sessions = await _db.UserSessions.Where(s => s.UserId == id).ToListAsync();
         if (sessions.Count > 0)
@@ -594,6 +887,11 @@ public sealed class AdminUsersController : ControllerBase
         if (string.IsNullOrWhiteSpace(userName))
         {
             return (false, "Ten dang nhap khong duoc de trong.", string.Empty, string.Empty, string.Empty, string.Empty, null, null, true, 0);
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", string.Empty, string.Empty, string.Empty, string.Empty, null, null, true, 0);
         }
 
         if (string.IsNullOrWhiteSpace(fullName))
@@ -634,6 +932,11 @@ public sealed class AdminUsersController : ControllerBase
             return (false, "Ten dang nhap khong duoc de trong.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
         }
 
+        if (!System.Text.RegularExpressions.Regex.IsMatch(userName, UserNamePattern))
+        {
+            return (false, "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
+        }
+
         if (string.IsNullOrWhiteSpace(fullName))
         {
             return (false, "Ho ten khong duoc de trong.", string.Empty, string.Empty, string.Empty, null, null, null, true, 0);
@@ -665,6 +968,7 @@ public sealed class AdminUsersController : ControllerBase
     public sealed class AdminCreateUserRequest
     {
         [Required]
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         [Required]
@@ -689,6 +993,7 @@ public sealed class AdminUsersController : ControllerBase
     public sealed class AdminUpdateUserRequest
     {
         [Required]
+        [RegularExpression(UserNamePattern, ErrorMessage = "Ten dang nhap chi duoc chua chu cai, so, dau cham, gach duoi hoac gach ngang.")]
         public string UserName { get; set; } = string.Empty;
 
         [Required]
@@ -707,5 +1012,19 @@ public sealed class AdminUsersController : ControllerBase
         public bool? IsActive { get; set; }
 
         public int? RoleId { get; set; }
+    }
+
+    public sealed class AdminChangeApprovalRequest
+    {
+        [Required]
+        [StringLength(20)]
+        public string Status { get; set; } = string.Empty;
+
+        [StringLength(500)]
+        public string? Note { get; set; }
+
+        [Required]
+        [Range(typeof(long), "0", "9223372036854775806")]
+        public long? ExpectedApprovalVersion { get; set; }
     }
 }

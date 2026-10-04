@@ -6,15 +6,47 @@
     }
   },
   "AllowedHosts": "*",
+  "DataProtection": {
+    "CertificateThumbprint": ""
+  },
   "Services": {
     "Identity": {
-      "BaseUrl": "https://localhost:7140"
+      "BaseUrl": "https://localhost:7140",
+      "InternalServiceKey": ""
     },
     "Catalog": {
       "BaseUrl": "https://localhost:7245"
     },
     "Ordering": {
       "BaseUrl": "https://localhost:7018"
+    }
+  },
+  "Storage": {
+    "SellerKyc": {
+      "RootPath": "App_Data/SellerKyc"
+    }
+  },
+  "Security": {
+    "BotChallenge": {
+      "Provider": "LocalSvg",
+      "SignUpAction": "signup",
+      "ForgotPasswordAction": "forgot_password",
+      "AllowLocalSvgInDevelopment": true
+    },
+    "CloudflareTurnstile": {
+      "SiteKey": "",
+      "SecretKey": "",
+      "VerificationEndpoint": "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      "AllowedHostnames": []
+    },
+    "GoogleRecaptcha": {
+      "SiteKey": "",
+      "SecretKey": "",
+      "VerificationEndpoint": "https://www.google.com/recaptcha/api/siteverify",
+      "AllowedHostnames": [
+        "localhost"
+      ],
+      "MinimumScore": 0.5
     }
   }
 }

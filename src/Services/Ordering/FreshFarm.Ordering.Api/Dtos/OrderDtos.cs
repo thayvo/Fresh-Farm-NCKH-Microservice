@@ -84,6 +84,27 @@ public sealed class CreateSellerShippingRequest
 
     [MaxLength(255)]
     public string? ShippingOriginLabel { get; init; }
+
+    [Range(1, 30000, ErrorMessage = "PackageWeight phai trong khoang 1..30000 gram.")]
+    public int? PackageWeight { get; init; }
+
+    [Range(1, 200, ErrorMessage = "PackageLength phai trong khoang 1..200 cm.")]
+    public int? PackageLength { get; init; }
+
+    [Range(1, 200, ErrorMessage = "PackageWidth phai trong khoang 1..200 cm.")]
+    public int? PackageWidth { get; init; }
+
+    [Range(1, 200, ErrorMessage = "PackageHeight phai trong khoang 1..200 cm.")]
+    public int? PackageHeight { get; init; }
+
+    [Range(0, int.MaxValue, ErrorMessage = "PackageInsuranceValue phai >= 0.")]
+    public int? PackageInsuranceValue { get; init; }
+
+    [MaxLength(255)]
+    public string? PackageItemName { get; init; }
+
+    [Range(1, 10000, ErrorMessage = "PackageItemQuantity phai trong khoang 1..10000.")]
+    public int? PackageItemQuantity { get; init; }
 }
 
 

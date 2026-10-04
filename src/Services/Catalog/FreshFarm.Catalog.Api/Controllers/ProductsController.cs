@@ -1,5 +1,6 @@
 using FreshFarm.Catalog.Api.Dtos;
 using FreshFarm.Catalog.Api.Models;
+using Microsoft.Data.SqlClient;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -23,19 +24,156 @@ public sealed class ProductsController : ControllerBase
     public async Task<IActionResult> Get(
         [FromQuery] string? name,
         [FromQuery] int? sellerId = null,
+        [FromQuery] int[]? productIds = null,
         [FromQuery] int[]? categoryIds = null,
         [FromQuery] string[]? origins = null,
         [FromQuery] string[]? standards = null,
-        [FromQuery] string[]? units = null)
+        [FromQuery] string[]? units = null,
+        [FromQuery] int? limit = null)
     {
         var currentSellerId = TryGetCurrentSellerId();
+        try
+        {
+            var result = await BuildPublicProductListQuery(
+                    currentSellerId,
+                    name,
+                    sellerId,
+                    productIds,
+                    categoryIds,
+                    origins,
+                    standards,
+                    units,
+                    limit,
+                    includeAttributes: true)
+                .ToListAsync();
+            return Ok(result);
+        }
+        catch (SqlException ex) when (IsMissingProductAttributeValueTable(ex))
+        {
+            var fallbackResult = await BuildPublicProductListQuery(
+                    currentSellerId,
+                    name,
+                    sellerId,
+                    productIds,
+                    categoryIds,
+                    origins,
+                    standards,
+                    units,
+                    limit,
+                    includeAttributes: false)
+                .ToListAsync();
+            return Ok(fallbackResult);
+        }
+    }
 
+    [HttpGet("seasonality")]
+    public async Task<IActionResult> GetSeasonality([FromQuery] int[]? productIds, CancellationToken cancellationToken)
+    {
+        var normalizedProductIds = (productIds ?? Array.Empty<int>())
+            .Where(idValue => idValue > 0)
+            .Distinct()
+            .Take(200)
+            .ToArray();
+
+        if (normalizedProductIds.Length == 0)
+        {
+            return Ok(Array.Empty<ProductSeasonalityPublicDto>());
+        }
+
+        var rows = await _db.ProductSeasonalities
+            .AsNoTracking()
+            .Where(row => normalizedProductIds.Contains(row.ProductId))
+            .OrderBy(row => row.ProductId)
+            .ThenBy(row => row.StartMonth)
+            .ThenBy(row => row.EndMonth)
+            .ThenBy(row => row.ProductSeasonalityId)
+            .Select(row => new ProductSeasonalityPublicDto
+            {
+                ProductId = row.ProductId,
+                Country = row.Country,
+                ProvinceRegion = row.ProvinceRegion,
+                AreaDetail = row.AreaDetail,
+                SeasonType = row.SeasonType,
+                SeasonLabel = row.SeasonLabel,
+                StartMonth = row.StartMonth,
+                EndMonth = row.EndMonth,
+                PeakMonths = row.PeakMonths,
+                IsYearRound = row.IsYearRound,
+                HasPeakSeason = row.HasPeakSeason,
+                IsControlledCultivation = row.IsControlledCultivation,
+                IsImportedSeason = row.IsImportedSeason,
+                IsOffSeason = row.IsOffSeason,
+                IsPostHarvestAvailability = row.IsPostHarvestAvailability,
+                SeasonScoreWeight = row.SeasonScoreWeight,
+                ConfidenceLevel = row.ConfidenceLevel
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(rows);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById([FromRoute] int id)
+    {
+        var sellerId = TryGetCurrentSellerId();
+        if (sellerId.HasValue)
+        {
+            var owned = await _db.SellerProducts
+                .AsNoTracking()
+                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
+
+            if (!owned)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+        }
+
+        try
+        {
+            var product = await BuildPublicProductDetailQuery(id, includeAttributes: true).SingleOrDefaultAsync();
+            if (product is null)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+
+            return Ok(product);
+        }
+        catch (SqlException ex) when (IsMissingProductAttributeValueTable(ex))
+        {
+            var fallbackProduct = await BuildPublicProductDetailQuery(id, includeAttributes: false).SingleOrDefaultAsync();
+            if (fallbackProduct is null)
+            {
+                return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            }
+
+            return Ok(fallbackProduct);
+        }
+    }
+
+    private IQueryable<ProductPublicListDto> BuildPublicProductListQuery(
+        int? currentSellerId,
+        string? name,
+        int? sellerId,
+        int[]? productIds,
+        int[]? categoryIds,
+        string[]? origins,
+        string[]? standards,
+        string[]? units,
+        int? limit,
+        bool includeAttributes)
+    {
         var query = _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Unit)
             .Include(p => p.ProductInfos)
             .AsQueryable();
+
+        if (includeAttributes)
+        {
+            query = query.Include(p => p.ProductAttributeValues)
+                .ThenInclude(value => value.CategoryAttribute);
+        }
 
         if (currentSellerId.HasValue)
         {
@@ -72,8 +210,19 @@ public sealed class ProductsController : ControllerBase
                     (info.Standard != null && info.Standard.Contains(keyword))));
         }
 
+        var normalizedProductIds = (productIds ?? Array.Empty<int>())
+            .Where(idValue => idValue > 0)
+            .Distinct()
+            .Take(200)
+            .ToArray();
+
+        if (normalizedProductIds.Length > 0)
+        {
+            query = query.Where(p => normalizedProductIds.Contains(p.ProductId));
+        }
+
         var normalizedCategoryIds = (categoryIds ?? Array.Empty<int>())
-            .Where(id => id > 0)
+            .Where(idValue => idValue > 0)
             .Distinct()
             .ToArray();
 
@@ -117,119 +266,202 @@ public sealed class ProductsController : ControllerBase
             query = query.Where(p => normalizedUnits.Contains(p.Unit.UnitName.ToLower()));
         }
 
-        var result = await query
-            .OrderByDescending(p => p.CreatedDate)
-            .Select(p => new
+        IQueryable<Product> orderedQuery = query.OrderByDescending(p => p.CreatedDate);
+        if (limit.HasValue)
+        {
+            orderedQuery = orderedQuery.Take(Math.Clamp(limit.Value, 1, 200));
+        }
+
+        return orderedQuery
+            .Select(p => new ProductPublicListDto
             {
-                p.ProductId,
-                p.ProductName,
-                p.Sku,
-                p.Price,
-                p.Status,
-                p.StockQuantity,
-                p.ReservedStock,
+                ProductId = p.ProductId,
+                ProductName = p.ProductName,
+                Sku = p.Sku,
+                Price = p.Price,
+                Status = p.Status,
+                StockQuantity = p.StockQuantity,
+                ReservedStock = p.ReservedStock,
                 AvailableStock = Math.Max(0, p.StockQuantity - p.ReservedStock),
                 OnHandStock = p.StockQuantity,
-                p.ImageFileName,
-                p.CreatedDate,
-                p.ShortDescription,
-                p.LongDescription,
-                p.IsManuallyDisabled,
-                p.CategoryId,
+                ImageFileName = p.ImageFileName,
+                CreatedDate = p.CreatedDate,
+                ShortDescription = p.ShortDescription,
+                LongDescription = p.LongDescription,
+                IsManuallyDisabled = p.IsManuallyDisabled,
+                CategoryId = p.CategoryId,
                 CategoryName = p.Category.CategoryName,
                 UnitId = p.UnitId,
                 UnitName = p.Unit.UnitName,
                 UnitSymbol = p.Unit.Symbol,
-                Origin = p.ProductInfos
-                    .OrderBy(info => info.InfoId)
-                    .Select(info => info.Origin)
-                    .FirstOrDefault(),
-                Standard = p.ProductInfos
-                    .OrderBy(info => info.InfoId)
-                    .Select(info => info.Standard)
-                    .FirstOrDefault(),
-                Preservation = p.ProductInfos
-                    .OrderBy(info => info.InfoId)
-                    .Select(info => info.Preservation)
-                    .FirstOrDefault(),
-                Weight = p.ProductInfos
-                    .OrderBy(info => info.InfoId)
-                    .Select(info => info.Weight)
-                    .FirstOrDefault(),
+                Origin = p.ProductInfos.OrderBy(info => info.InfoId).Select(info => info.Origin).FirstOrDefault(),
+                Standard = p.ProductInfos.OrderBy(info => info.InfoId).Select(info => info.Standard).FirstOrDefault(),
+                Preservation = p.ProductInfos.OrderBy(info => info.InfoId).Select(info => info.Preservation).FirstOrDefault(),
+                Weight = p.ProductInfos.OrderBy(info => info.InfoId).Select(info => info.Weight).FirstOrDefault(),
+                ProductAttributes = includeAttributes
+                    ? p.ProductAttributeValues
+                        .Where(value => value.CategoryAttribute.IsActive)
+                        .OrderBy(value => value.CategoryAttribute.SortOrder)
+                        .ThenBy(value => value.ProductAttributeValueId)
+                        .Select(value => new ProductAttributePublicDto
+                        {
+                            CategoryAttributeId = value.CategoryAttributeId,
+                            AttributeKey = value.CategoryAttribute.AttributeKey,
+                            DisplayName = value.CategoryAttribute.DisplayName,
+                            ValueText = value.ValueText,
+                            NormalizedValue = value.NormalizedValue
+                        })
+                        .ToList()
+                    : new List<ProductAttributePublicDto>(),
                 PrimarySellerId = _db.SellerProducts
                     .Where(sp => sp.ProductId == p.ProductId && sp.IsActive)
                     .OrderBy(sp => sp.CreatedAt)
                     .Select(sp => (int?)sp.SellerId)
                     .FirstOrDefault()
-            })
-            .ToListAsync();
-
-        return Ok(result);
+            });
     }
 
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById([FromRoute] int id)
+    private IQueryable<ProductPublicDetailDto> BuildPublicProductDetailQuery(int id, bool includeAttributes)
     {
-        var sellerId = TryGetCurrentSellerId();
-        if (sellerId.HasValue)
-        {
-            var owned = await _db.SellerProducts
-                .AsNoTracking()
-                .AnyAsync(sp => sp.ProductId == id && sp.SellerId == sellerId.Value && sp.IsActive);
-
-            if (!owned)
-            {
-                return NotFound(new { message = "Không tìm thấy sản phẩm." });
-            }
-        }
-
-        var product = await _db.Products
+        var query = _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
             .Include(p => p.Unit)
             .Include(p => p.ProductInfos)
-            .FirstOrDefaultAsync(p => p.ProductId == id);
+            .Where(p => p.ProductId == id)
+            .AsQueryable();
 
-        if (product is null || (!sellerId.HasValue && (!product.Status || product.IsManuallyDisabled)))
+        if (includeAttributes)
         {
-            return NotFound(new { message = "Không tìm thấy sản phẩm." });
+            query = query.Include(p => p.ProductAttributeValues)
+                .ThenInclude(value => value.CategoryAttribute);
         }
 
-        return Ok(new
+        return query.Select(product => new ProductPublicDetailDto
         {
-            product.ProductId,
-            product.ProductName,
-            product.Sku,
-            product.Price,
-            product.Status,
-            product.StockQuantity,
-            product.ReservedStock,
+            ProductId = product.ProductId,
+            ProductName = product.ProductName,
+            Sku = product.Sku,
+            Price = product.Price,
+            Status = product.Status,
+            StockQuantity = product.StockQuantity,
+            ReservedStock = product.ReservedStock,
             AvailableStock = Math.Max(0, product.StockQuantity - product.ReservedStock),
             OnHandStock = product.StockQuantity,
-            product.ImageFileName,
-            product.CreatedDate,
-            product.ShortDescription,
-            product.LongDescription,
-            product.IsManuallyDisabled,
-            product.CategoryId,
+            ImageFileName = product.ImageFileName,
+            CreatedDate = product.CreatedDate,
+            ShortDescription = product.ShortDescription,
+            LongDescription = product.LongDescription,
+            IsManuallyDisabled = product.IsManuallyDisabled,
+            CategoryId = product.CategoryId,
             CategoryName = product.Category.CategoryName,
             UnitId = product.UnitId,
             UnitName = product.Unit.UnitName,
             UnitSymbol = product.Unit.Symbol,
-            PrimarySellerId = await _db.SellerProducts
+            PrimarySellerId = _db.SellerProducts
                 .AsNoTracking()
                 .Where(sp => sp.ProductId == product.ProductId && sp.IsActive)
                 .OrderBy(sp => sp.CreatedAt)
                 .Select(sp => (int?)sp.SellerId)
-                .FirstOrDefaultAsync(),
-            ProductInfos = product.ProductInfos.Select(info => new
+                .FirstOrDefault(),
+            ProductInfos = product.ProductInfos.Select(info => new ProductInfoPublicDto
             {
-                info.Weight,
-                info.Origin,
-                info.Standard,
-                info.Preservation
-            })
+                Weight = info.Weight,
+                Origin = info.Origin,
+                Standard = info.Standard,
+                Preservation = info.Preservation
+            }).ToList(),
+            ProductAttributes = includeAttributes
+                ? product.ProductAttributeValues
+                    .Where(value => value.CategoryAttribute.IsActive)
+                    .OrderBy(value => value.CategoryAttribute.SortOrder)
+                    .ThenBy(value => value.ProductAttributeValueId)
+                    .Select(value => new ProductAttributePublicDto
+                    {
+                        CategoryAttributeId = value.CategoryAttributeId,
+                        AttributeKey = value.CategoryAttribute.AttributeKey,
+                        DisplayName = value.CategoryAttribute.DisplayName,
+                        ValueText = value.ValueText,
+                        NormalizedValue = value.NormalizedValue
+                    })
+                    .ToList()
+                : new List<ProductAttributePublicDto>()
         });
+    }
+
+    private static bool IsMissingProductAttributeValueTable(SqlException ex)
+        => ex.Number == 208 && ex.Message.Contains("ProductAttributeValue", StringComparison.OrdinalIgnoreCase);
+
+    private class ProductPublicListDto
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public bool Status { get; set; }
+        public int StockQuantity { get; set; }
+        public int ReservedStock { get; set; }
+        public int AvailableStock { get; set; }
+        public int OnHandStock { get; set; }
+        public string? ImageFileName { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public string? ShortDescription { get; set; }
+        public string? LongDescription { get; set; }
+        public bool IsManuallyDisabled { get; set; }
+        public int CategoryId { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        public int UnitId { get; set; }
+        public string UnitName { get; set; } = string.Empty;
+        public string? UnitSymbol { get; set; }
+        public string? Origin { get; set; }
+        public string? Standard { get; set; }
+        public string? Preservation { get; set; }
+        public string? Weight { get; set; }
+        public List<ProductAttributePublicDto> ProductAttributes { get; set; } = new();
+        public int? PrimarySellerId { get; set; }
+    }
+
+    private sealed class ProductPublicDetailDto : ProductPublicListDto
+    {
+        public List<ProductInfoPublicDto> ProductInfos { get; set; } = new();
+    }
+
+    private sealed class ProductInfoPublicDto
+    {
+        public string? Weight { get; set; }
+        public string? Origin { get; set; }
+        public string? Standard { get; set; }
+        public string? Preservation { get; set; }
+    }
+
+    private sealed class ProductSeasonalityPublicDto
+    {
+        public int ProductId { get; set; }
+        public string? Country { get; set; }
+        public string? ProvinceRegion { get; set; }
+        public string? AreaDetail { get; set; }
+        public string SeasonType { get; set; } = string.Empty;
+        public string SeasonLabel { get; set; } = string.Empty;
+        public byte StartMonth { get; set; }
+        public byte EndMonth { get; set; }
+        public string? PeakMonths { get; set; }
+        public bool IsYearRound { get; set; }
+        public bool HasPeakSeason { get; set; }
+        public bool IsControlledCultivation { get; set; }
+        public bool IsImportedSeason { get; set; }
+        public bool IsOffSeason { get; set; }
+        public bool IsPostHarvestAvailability { get; set; }
+        public int SeasonScoreWeight { get; set; }
+        public string? ConfidenceLevel { get; set; }
+    }
+
+    private sealed class ProductAttributePublicDto
+    {
+        public int CategoryAttributeId { get; set; }
+        public string? AttributeKey { get; set; }
+        public string? DisplayName { get; set; }
+        public string? ValueText { get; set; }
+        public string? NormalizedValue { get; set; }
     }
 
     [HttpPost]

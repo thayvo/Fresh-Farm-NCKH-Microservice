@@ -18,7 +18,7 @@
             ViewBag.BreadcrumbParentUrl = Url.Action("ManageCustomers", "Customer", new { area = areaName });
             ViewBag.BreadcrumbCurrentTitle = "Chỉnh sửa";
         }
-        @Html.Partial("_Breadcrumb")
+        <partial name="_Breadcrumb" />
     </div>
 
     <div class="card shadow-sm border-0">

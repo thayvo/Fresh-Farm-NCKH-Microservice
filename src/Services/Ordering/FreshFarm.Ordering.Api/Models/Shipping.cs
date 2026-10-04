@@ -25,6 +25,22 @@ public partial class Shipping
 
     public int? CommuneId { get; set; }
 
+    public string GhnOrderCode { get; set; }
+
+    public string GhnClientOrderCode { get; set; }
+
+    public string GhnStatus { get; set; }
+
+    public string GhnStatusLabel { get; set; }
+
+    public decimal? GhnTotalFee { get; set; }
+
+    public DateTime? GhnCreatedAt { get; set; }
+
+    public DateTime? GhnExpectedDeliveryTime { get; set; }
+
+    public DateTime? GhnLastSyncedAt { get; set; }
+
     public bool IsStorePickup { get; set; }
 
     public string StoreAddress { get; set; }

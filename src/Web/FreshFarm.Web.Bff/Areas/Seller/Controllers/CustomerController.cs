@@ -1,5 +1,6 @@
 using FreshFarm.Web.Bff.Areas.Seller.Infrastructure;
 using FreshFarm.Web.Bff.Areas.Seller.Models;
+using FreshFarm.Web.Bff.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -44,7 +45,7 @@ public class CustomerController : LegacySellerControllerBase
             var sellerCustomerIds = await GetSellerCustomerIdsAsync();
             var customers = await GetCustomersAsync(keyword: null, take: 5000, sellerCustomerIds);
             var metrics = await GetCustomerMetricsAsync(customers.Select(c => c.userId).ToList());
-            var metricsByUserId = metrics.ToDictionary(m => m.userId, m => m);
+            var metricsByUserId = BuildCustomerMetricsLookup(metrics);
 
             var customerModels = customers.Select(c =>
             {
@@ -61,7 +62,7 @@ public class CustomerController : LegacySellerControllerBase
                     CreatedDate = c.createdAt,
                     TotalSpent = metric?.totalSpent ?? 0,
                     OrderCount = metric?.orderCount ?? 0,
-                    AvatarUrl = Url.Action("AvatarById", "Account", new { area = "", id = c.userId }) ?? string.Empty
+                    AvatarUrl = AvatarImagePaths.ResolveRequestPath(c.avatar) ?? AvatarImagePaths.FallbackImageRequestPath
                 };
             });
 
@@ -293,7 +294,7 @@ public class CustomerController : LegacySellerControllerBase
             var sellerCustomerIds = await GetSellerCustomerIdsAsync();
             var customers = await GetCustomersAsync(keyword, 200, sellerCustomerIds);
             var metrics = await GetCustomerMetricsAsync(customers.Select(c => c.userId).ToList());
-            var metricsByUserId = metrics.ToDictionary(m => m.userId, m => m);
+            var metricsByUserId = BuildCustomerMetricsLookup(metrics);
 
             var results = customers
                 .Select(c =>
@@ -308,7 +309,8 @@ public class CustomerController : LegacySellerControllerBase
                         Phone = c.phone,
                         CreatedDate = c.createdAt,
                         TotalSpent = metric?.totalSpent ?? 0,
-                        OrderCount = metric?.orderCount ?? 0
+                        OrderCount = metric?.orderCount ?? 0,
+                        AvatarUrl = AvatarImagePaths.ResolveRequestPath(c.avatar) ?? AvatarImagePaths.FallbackImageRequestPath
                     };
                 })
                 .OrderByDescending(x => x.CreatedDate)
@@ -466,6 +468,39 @@ public class CustomerController : LegacySellerControllerBase
         return fallback;
     }
 
+    private static IReadOnlyDictionary<int, CustomerMetricDto> BuildCustomerMetricsLookup(IEnumerable<CustomerMetricDto> metrics)
+    {
+        return metrics
+            .Where(metric => metric.userId > 0)
+            .GroupBy(metric => metric.userId)
+            .ToDictionary(group => group.Key, group => SelectPreferredCustomerMetric(group));
+    }
+
+    private static CustomerMetricDto SelectPreferredCustomerMetric(IEnumerable<CustomerMetricDto> metrics)
+    {
+        return metrics
+            .OrderByDescending(CalculateCustomerMetricScore)
+            .ThenByDescending(metric => metric.totalSpent)
+            .ThenByDescending(metric => metric.orderCount)
+            .First();
+    }
+
+    private static int CalculateCustomerMetricScore(CustomerMetricDto metric)
+    {
+        var score = 0;
+        if (metric.totalSpent > 0)
+        {
+            score += 2;
+        }
+
+        if (metric.orderCount > 0)
+        {
+            score += 1;
+        }
+
+        return score;
+    }
+
     private sealed class IdentityCustomerDto
     {
         public int userId { get; set; }
@@ -477,6 +512,8 @@ public class CustomerController : LegacySellerControllerBase
         public string? email { get; set; }
 
         public string? phone { get; set; }
+
+        public string? avatar { get; set; }
 
         public DateTime createdAt { get; set; }
 

@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace FreshFarm.Web.Bff.Areas.Admin.Controllers;
@@ -40,13 +42,14 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<CustomerReportViewModel>($"/api/orders/admin/reports/customers{query}");
+        NormalizeCustomerReport(model);
         model.RegisterFromDate = registerFromDate;
         model.RegisterToDate = registerToDate;
         model.CustomerSegment = string.IsNullOrWhiteSpace(model.CustomerSegment) ? "all" : model.CustomerSegment;
 
         foreach (var customer in model.TopCustomers)
         {
-            customer.AvatarUrl = Url.Action("AvatarById", "Account", new { area = "", id = customer.UserID }) ?? string.Empty;
+            customer.AvatarUrl = Url?.Action("AvatarById", "Account", new { area = "", id = customer.UserID }) ?? string.Empty;
         }
 
         return RenderReportView("~/Areas/Seller/Views/Report/Customer.cshtml", model);
@@ -63,6 +66,7 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<OrderReportViewModel>($"/api/orders/admin/reports/orders{query}");
+        NormalizeOrderReport(model);
         model.FromDate = fromDate;
         model.ToDate = toDate;
         model.OrderStatus = string.IsNullOrWhiteSpace(model.OrderStatus) ? "all" : model.OrderStatus;
@@ -80,6 +84,7 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<RevenueReportViewModel>($"/api/orders/admin/reports/revenue{query}");
+        NormalizeRevenueReport(model);
         model.FromDate = fromDate;
         model.ToDate = toDate;
         model.ViewBy = string.IsNullOrWhiteSpace(model.ViewBy) ? "day" : model.ViewBy;
@@ -98,6 +103,7 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<ProductReportViewModel>($"/api/orders/admin/reports/products{query}");
+        NormalizeProductReport(model);
         model.FromDate = fromDate;
         model.ToDate = toDate;
         model.ProductCategory = string.IsNullOrWhiteSpace(model.ProductCategory) ? "all" : model.ProductCategory;
@@ -130,6 +136,7 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<ShippingReportViewModel>($"/api/orders/admin/reports/shipping{query}");
+        NormalizeShippingReport(model);
         model.FromDate = fromDate;
         model.ToDate = toDate;
         model.SelectedStaffId = staffId;
@@ -160,6 +167,7 @@ public sealed class ReportController : LegacySellerControllerBase
         });
 
         var model = await GetFromOrderingAsync<ReviewReportViewModel>($"/api/orders/admin/reports/reviews{query}");
+        NormalizeReviewReport(model);
         model.FromDate = fromDate;
         model.ToDate = toDate;
         model.StarRating = string.IsNullOrWhiteSpace(model.StarRating) ? "all" : model.StarRating;
@@ -353,6 +361,286 @@ public sealed class ReportController : LegacySellerControllerBase
 
     private static string BuildQueryPath(string path, IDictionary<string, string?> parameters)
         => path + BuildQuery(parameters);
+
+    private static void NormalizeCustomerReport(CustomerReportViewModel model)
+    {
+        model.TopCustomers = model.TopCustomers
+            .Where(customer => customer.UserID > 0)
+            .GroupBy(customer => customer.UserID)
+            .Select(group => group
+                .OrderByDescending(CalculateTopCustomerScore)
+                .ThenByDescending(CalculateTopCustomerSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeOrderReport(OrderReportViewModel model)
+    {
+        model.RecentOrders = model.RecentOrders
+            .Where(order => order.OrderID > 0)
+            .GroupBy(order => order.OrderID)
+            .Select(group => group
+                .OrderByDescending(CalculateRecentOrderScore)
+                .ThenByDescending(CalculateRecentOrderSignalLength)
+                .ThenByDescending(order => order.OrderDate)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeRevenueReport(RevenueReportViewModel model)
+    {
+        model.TopProducts = model.TopProducts
+            .Where(product => HasMeaningfulValue(product.ProductName))
+            .GroupBy(product => product.ProductName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(product => product.TotalRevenue)
+                .ThenByDescending(product => product.ProductName.Length)
+                .First())
+            .ToList();
+
+        model.DailyRevenues = model.DailyRevenues
+            .GroupBy(day => day.Date.Date)
+            .Select(group => group
+                .OrderByDescending(CalculateDailyRevenueScore)
+                .ThenByDescending(CalculateDailyRevenueSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeProductReport(ProductReportViewModel model)
+    {
+        model.TopSellingProducts = model.TopSellingProducts
+            .Where(product => HasMeaningfulValue(product.ProductName))
+            .GroupBy(product => product.ProductName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(product => product.QuantitySold)
+                .ThenByDescending(product => product.ProductName.Length)
+                .First())
+            .ToList();
+
+        model.CategoryRevenues = model.CategoryRevenues
+            .Where(category => HasMeaningfulValue(category.CategoryName))
+            .GroupBy(category => category.CategoryName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(category => category.Revenue)
+                .ThenByDescending(category => category.CategoryName.Length)
+                .First())
+            .ToList();
+
+        model.ProductPerformances = model.ProductPerformances
+            .Where(product => HasMeaningfulValue(product.Sku) || HasMeaningfulValue(product.ProductName))
+            .GroupBy(product => HasMeaningfulValue(product.ProductName) ? product.ProductName : product.Sku, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateProductPerformanceScore)
+                .ThenByDescending(CalculateProductPerformanceSignalLength)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeShippingReport(ShippingReportViewModel model)
+    {
+        model.StaffPerformances = model.StaffPerformances
+            .Where(staff => HasMeaningfulValue(staff.StaffName))
+            .GroupBy(staff => staff.StaffName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateStaffPerformanceScore)
+                .ThenByDescending(CalculateStaffPerformanceSignalLength)
+                .First())
+            .ToList();
+
+        model.DeliveryTimeDistributions = model.DeliveryTimeDistributions
+            .Where(item => HasMeaningfulValue(item.TimeRange))
+            .GroupBy(item => item.TimeRange, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(item => item.OrderCount)
+                .ThenByDescending(item => item.TimeRange.Length)
+                .First())
+            .ToList();
+
+        model.RecentShippings = model.RecentShippings
+            .Where(item => HasMeaningfulValue(item.OrderCode))
+            .GroupBy(item => item.OrderCode, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(CalculateRecentShippingScore)
+                .ThenByDescending(CalculateRecentShippingSignalLength)
+                .First())
+            .ToList();
+
+        model.DeliveryStaffs = model.DeliveryStaffs
+            .Where(item => HasMeaningfulValue(item.Value))
+            .GroupBy(item => item.Value, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(item => HasMeaningfulValue(item.Text))
+                .ThenByDescending(item => item.Text?.Length ?? 0)
+                .First())
+            .ToList();
+    }
+
+    private static void NormalizeReviewReport(ReviewReportViewModel model)
+    {
+        model.StarDistributions = model.StarDistributions
+            .Where(item => HasMeaningfulValue(item.Label))
+            .GroupBy(item => item.Label, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(item => item.Count)
+                .ThenByDescending(item => item.Label.Length)
+                .First())
+            .ToList();
+
+        model.TopMentionedTopics = model.TopMentionedTopics
+            .Where(HasMeaningfulValue)
+            .GroupBy(NormalizeTopicKey, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(topic => topic.Trim().Length)
+                .First())
+            .ToList()!;
+
+        model.RecentReviews = model.RecentReviews
+            .Where(item => item.ReviewID > 0)
+            .GroupBy(item => item.ReviewID)
+            .Select(group => group
+                .OrderByDescending(CalculateRecentReviewScore)
+                .ThenByDescending(CalculateRecentReviewSignalLength)
+                .ThenByDescending(item => item.CreatedAt)
+                .First())
+            .ToList();
+    }
+
+    private static int CalculateTopCustomerScore(TopCustomerViewModel customer)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(customer.FullName) ? 2 : 0;
+        score += customer.TotalOrders > 0 ? 1 : 0;
+        score += customer.TotalSpent > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateTopCustomerSignalLength(TopCustomerViewModel customer)
+        => (customer.FullName?.Length ?? 0);
+
+    private static int CalculateRecentOrderScore(OrderRecentItemViewModel order)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(order.OrderCode) ? 1 : 0;
+        score += HasMeaningfulValue(order.CustomerName) ? 2 : 0;
+        score += order.TotalAmount > 0 ? 1 : 0;
+        score += HasMeaningfulValue(order.OrderDateFormatted) ? 1 : 0;
+        score += HasMeaningfulValue(order.StatusText) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRecentOrderSignalLength(OrderRecentItemViewModel order)
+        => (order.OrderCode?.Length ?? 0)
+        + (order.CustomerName?.Length ?? 0)
+        + (order.OrderDateFormatted?.Length ?? 0)
+        + (order.StatusText?.Length ?? 0);
+
+    private static int CalculateDailyRevenueScore(RevenueDailyViewModel item)
+        => (HasMeaningfulValue(item.DateFormatted) ? 1 : 0)
+        + (item.TotalOrders > 0 ? 1 : 0)
+        + (item.TotalProducts > 0 ? 1 : 0)
+        + (item.Revenue > 0 ? 1 : 0)
+        + (item.Profit > 0 ? 1 : 0);
+
+    private static int CalculateDailyRevenueSignalLength(RevenueDailyViewModel item)
+        => item.DateFormatted?.Length ?? 0;
+
+    private static int CalculateProductPerformanceScore(ProductPerformanceViewModel product)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(product.ImageFileName) ? 1 : 0;
+        score += HasMeaningfulValue(product.ProductName) ? 2 : 0;
+        score += HasMeaningfulValue(product.Sku) ? 2 : 0;
+        score += HasMeaningfulValue(product.CategoryName) ? 1 : 0;
+        score += product.QuantitySold > 0 ? 1 : 0;
+        score += HasMeaningfulValue(product.StockStatus) ? 1 : 0;
+        score += product.TotalRevenue > 0 ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateProductPerformanceSignalLength(ProductPerformanceViewModel product)
+        => (product.ImageFileName?.Length ?? 0)
+        + (product.ProductName?.Length ?? 0)
+        + (product.Sku?.Length ?? 0)
+        + (product.CategoryName?.Length ?? 0)
+        + (product.StockStatus?.Length ?? 0);
+
+    private static int CalculateStaffPerformanceScore(ShippingStaffPerformanceViewModel item)
+        => (HasMeaningfulValue(item.StaffName) ? 2 : 0)
+        + (item.TotalOrders > 0 ? 1 : 0)
+        + (item.SuccessRate > 0 ? 1 : 0);
+
+    private static int CalculateStaffPerformanceSignalLength(ShippingStaffPerformanceViewModel item)
+        => item.StaffName?.Length ?? 0;
+
+    private static int CalculateRecentShippingScore(ShippingRecentItemViewModel item)
+    {
+        var score = 0;
+        score += HasMeaningfulValue(item.OrderCode) ? 1 : 0;
+        score += HasMeaningfulValue(item.CustomerName) ? 2 : 0;
+        score += HasMeaningfulValue(item.CustomerPhone) ? 1 : 0;
+        score += HasMeaningfulValue(item.DeliveryStaffName) ? 1 : 0;
+        score += HasMeaningfulValue(item.DeliveryAddress) ? 1 : 0;
+        score += HasMeaningfulValue(item.ShippingDateFormatted) ? 1 : 0;
+        score += HasMeaningfulValue(item.ExpectedDeliveryDateFormatted) ? 1 : 0;
+        score += HasMeaningfulValue(item.StatusText) ? 1 : 0;
+        score += item.ActualDeliveryDays.HasValue ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRecentShippingSignalLength(ShippingRecentItemViewModel item)
+        => (item.OrderCode?.Length ?? 0)
+        + (item.CustomerName?.Length ?? 0)
+        + (item.CustomerPhone?.Length ?? 0)
+        + (item.DeliveryStaffName?.Length ?? 0)
+        + (item.DeliveryAddress?.Length ?? 0)
+        + (item.ShippingDateFormatted?.Length ?? 0)
+        + (item.ExpectedDeliveryDateFormatted?.Length ?? 0)
+        + (item.StatusText?.Length ?? 0);
+
+    private static int CalculateRecentReviewScore(ReviewRecentItemViewModel item)
+    {
+        var score = 0;
+        score += item.UserID.HasValue ? 1 : 0;
+        score += HasMeaningfulValue(item.CustomerName) ? 1 : 0;
+        score += HasMeaningfulValue(item.ProductName) ? 2 : 0;
+        score += HasMeaningfulValue(item.ProductImageFileName) ? 1 : 0;
+        score += item.Rating > 0 ? 1 : 0;
+        score += HasMeaningfulValue(item.StarDisplay) ? 1 : 0;
+        score += HasMeaningfulValue(item.Comment) ? 1 : 0;
+        score += HasMeaningfulValue(item.CreatedAtFormatted) ? 1 : 0;
+        return score;
+    }
+
+    private static int CalculateRecentReviewSignalLength(ReviewRecentItemViewModel item)
+        => (item.CustomerName?.Length ?? 0)
+        + (item.ProductName?.Length ?? 0)
+        + (item.ProductImageFileName?.Length ?? 0)
+        + (item.StarDisplay?.Length ?? 0)
+        + (item.Comment?.Length ?? 0)
+        + (item.CreatedAtFormatted?.Length ?? 0);
+
+    private static bool HasMeaningfulValue(string? value) => !string.IsNullOrWhiteSpace(value);
+
+    private static string NormalizeTopicKey(string topic)
+    {
+        var normalized = topic.Trim().Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(ch) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(ch);
+            }
+        }
+
+        return builder
+            .ToString()
+            .Normalize(NormalizationForm.FormC)
+            .Replace('đ', 'd')
+            .Replace('Đ', 'D')
+            .ToLowerInvariant();
+    }
 
     private static string BuildQuery(IDictionary<string, string?> parameters)
     {

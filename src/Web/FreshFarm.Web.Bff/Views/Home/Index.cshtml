@@ -1,6 +1,7 @@
 ﻿@{
     Layout = null;
 }
+@using FreshFarm.Web.Bff.Services
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -130,6 +131,68 @@
             overflow: hidden;
         }
 
+        .product-card .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .recommendation-meta {
+            display: grid;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(22, 163, 74, .08) 0%, rgba(250, 204, 21, .14) 100%);
+            border: 1px solid rgba(22, 163, 74, .12);
+        }
+
+        .recommendation-badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .recommendation-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #166534;
+            background: rgba(240, 253, 244, .92);
+            border: 1px solid rgba(34, 197, 94, .2);
+            white-space: nowrap;
+        }
+
+        .recommendation-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: .7;
+        }
+
+        .seasonality-badge-row {
+            justify-content: center;
+            margin-top: 6px;
+        }
+
+        .recommendation-badge.seasonality-badge {
+            color: #047857;
+            background: rgba(236, 253, 245, .96);
+            border-color: rgba(16, 185, 129, .28);
+        }
+
+        .recommendation-reason {
+            font-size: .79rem;
+            line-height: 1.45;
+            color: #4b5563;
+        }
+
         .product-image-wrapper {
             position: relative;
             width: 100%;
@@ -157,6 +220,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 2;
             background-color: rgba(0, 0, 0, .5);
             color: #fff;
             display: flex;
@@ -167,16 +231,19 @@
             padding: 1rem;
             opacity: 0;
             visibility: hidden;
+            pointer-events: none;
             transition: opacity .4s ease, visibility .4s ease;
         }
 
         .product-card:hover .product-overlay {
             opacity: 1;
             visibility: visible;
+            pointer-events: auto;
         }
 
         .product-card:hover .card-body {
             opacity: 0;
+            pointer-events: none;
             transition: opacity .3s ease;
         }
 
@@ -211,6 +278,92 @@
             gap: 16px;
         }
 
+        .recommendation-section-stack {
+            display: grid;
+            gap: 24px;
+        }
+
+        .recommendation-section-card {
+            background: #fff;
+            border: 1px solid rgba(22, 163, 74, .08);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 14px 36px rgba(15, 23, 42, .06);
+        }
+
+        .recommendation-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .recommendation-section-title {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .recommendation-section-subtitle {
+            margin: 6px 0 0;
+            color: #64748b;
+            line-height: 1.6;
+            font-size: .94rem;
+        }
+
+        .recommendation-section-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 700;
+            color: #166534;
+            background: rgba(240, 253, 244, .9);
+            border: 1px solid rgba(34, 197, 94, .18);
+            white-space: nowrap;
+        }
+
+        .recommendation-section-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .recommendation-card-hidden {
+            display: none !important;
+        }
+
+        .recommendation-section-actions {
+            display: flex;
+            justify-content: center;
+            margin-top: 22px;
+        }
+
+        .recommendation-load-more {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border: 1px solid rgba(22, 163, 74, .18);
+            border-radius: 999px;
+            background: rgba(240, 253, 244, .92);
+            color: #166534;
+            font-size: .92rem;
+            font-weight: 700;
+            transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+        }
+
+        .recommendation-load-more:hover {
+            background: #dcfce7;
+            box-shadow: 0 12px 28px rgba(22, 163, 74, .12);
+            transform: translateY(-1px);
+        }
+
         .empty-state {
             border: 1px dashed #ced4da;
             border-radius: 14px;
@@ -218,6 +371,106 @@
             color: #6c757d;
             padding: 2rem;
             text-align: center;
+        }
+
+        .product-skeleton-card {
+            pointer-events: none;
+        }
+
+        .product-skeleton-card:hover .card-body {
+            opacity: 1;
+        }
+
+        .skeleton-box,
+        .skeleton-line,
+        .skeleton-chip,
+        .skeleton-pill,
+        .category-skeleton {
+            position: relative;
+            overflow: hidden;
+            background: #e5e7eb;
+        }
+
+        .skeleton-box::after,
+        .skeleton-line::after,
+        .skeleton-chip::after,
+        .skeleton-pill::after,
+        .category-skeleton::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-100%);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .7), transparent);
+            animation: skeletonShimmer 1.35s ease-in-out infinite;
+        }
+
+        @@keyframes skeletonShimmer {
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .skeleton-line {
+            height: 12px;
+            border-radius: 999px;
+        }
+
+        .skeleton-title {
+            width: 76%;
+        }
+
+        .skeleton-price {
+            width: 44%;
+        }
+
+        .skeleton-chip-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .skeleton-chip {
+            width: 64px;
+            height: 22px;
+            border-radius: 999px;
+        }
+
+        .category-skeleton {
+            display: flex;
+            align-items: flex-end;
+            padding: 18px;
+        }
+
+        .category-skeleton-title {
+            width: 70%;
+            background: rgba(255, 255, 255, .62);
+        }
+
+        .recommendation-skeleton-card {
+            pointer-events: none;
+        }
+
+        .recommendation-skeleton-heading {
+            display: grid;
+            gap: 10px;
+            width: min(460px, 70vw);
+        }
+
+        .skeleton-heading {
+            width: 54%;
+            height: 20px;
+        }
+
+        .skeleton-subheading {
+            width: 100%;
+        }
+
+        .skeleton-pill {
+            display: inline-flex;
+            width: 118px;
+            height: 34px;
+            border-radius: 999px;
         }
 
         .popup-overlay {
@@ -544,6 +797,10 @@
         }
 
         @@media (max-width: 991.98px) {
+            .recommendation-section-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
             .header-main-wrap {
                 align-items: flex-start;
             }
@@ -565,6 +822,10 @@
         }
 
         @@media (max-width: 767.98px) {
+            .recommendation-section-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
             .header-cart-link span {
                 display: none !important;
             }
@@ -588,6 +849,14 @@
         }
 
         @@media (max-width: 576px) {
+            .recommendation-section-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .recommendation-meta {
+                padding: 9px 10px;
+            }
+
             .popup-container {
                 width: 95%;
                 margin: 10px;
@@ -606,6 +875,174 @@
                 padding: 6px 12px;
             }
         }
+
+        .broadcast-home-popup {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(15, 23, 42, .55);
+            backdrop-filter: blur(2px);
+        }
+
+        .broadcast-home-popup.show {
+            display: flex;
+            animation: fadeIn .2s ease-out forwards;
+        }
+
+        .broadcast-home-popup__dialog {
+            position: relative;
+            width: min(520px, 92vw);
+            max-height: 86vh;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 28px 90px rgba(15, 23, 42, .35);
+            overflow: visible;
+            transform: translateY(10px) scale(.98);
+            animation: popupEnter .24s ease-out forwards;
+        }
+
+        .broadcast-home-popup__close {
+            position: absolute;
+            top: -18px;
+            right: -18px;
+            width: 38px;
+            height: 38px;
+            border: 0;
+            border-radius: 50%;
+            background: #fff;
+            color: #334155;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .22);
+            z-index: 2;
+        }
+
+        .broadcast-home-popup__image {
+            display: block;
+            width: 100%;
+            max-height: 78vh;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .broadcast-home-popup__text {
+            padding: 32px;
+            text-align: center;
+            background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%);
+            border-radius: 10px;
+        }
+
+        .broadcast-home-popup__label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #15803d;
+            font-weight: 700;
+            padding: 6px 12px;
+            margin-bottom: 14px;
+        }
+
+        .broadcast-home-popup__title {
+            font-size: 28px;
+            font-weight: 800;
+            color: #102a43;
+            margin: 0 0 12px;
+        }
+
+        .broadcast-home-popup__message {
+            color: #475569;
+            font-size: 17px;
+            line-height: 1.6;
+            margin: 0 0 24px;
+            white-space: pre-line;
+        }
+
+        .broadcast-home-popup__link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            background: #16a34a;
+            color: #fff;
+            font-weight: 700;
+            padding: 12px 20px;
+            text-decoration: none;
+        }
+
+        .broadcast-home-popup__link:hover {
+            color: #fff;
+            background: #15803d;
+        }
+
+        .back-to-top-btn {
+            position: fixed;
+            right: 28px;
+            bottom: 112px;
+            width: 46px;
+            height: 46px;
+            border: 0;
+            border-radius: 50%;
+            background: #16a34a;
+            color: #fff;
+            box-shadow: 0 14px 32px rgba(22, 163, 74, .28);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: opacity .2s ease, transform .2s ease, visibility .2s ease, background-color .2s ease;
+            z-index: 1040;
+        }
+
+        .back-to-top-btn.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .back-to-top-btn:hover {
+            background: #15803d;
+        }
+
+        .back-to-top-btn:focus-visible {
+            outline: 3px solid rgba(34, 197, 94, .34);
+            outline-offset: 3px;
+        }
+
+        @@media (max-width: 576px) {
+            .broadcast-home-popup {
+                padding: 18px;
+            }
+
+            .broadcast-home-popup__close {
+                top: -14px;
+                right: -10px;
+            }
+
+            .broadcast-home-popup__text {
+                padding: 26px 20px;
+            }
+
+            .broadcast-home-popup__title {
+                font-size: 23px;
+            }
+
+            .back-to-top-btn {
+                right: 18px;
+                bottom: 96px;
+                width: 42px;
+                height: 42px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -620,9 +1057,9 @@
             <button type="button" data-bs-target="#bannerCarousel" data-bs-slide-to="2"></button>
         </div>
         <div class="carousel-inner">
-            <div class="carousel-item active"><img src="https://images.pexels.com/photos/2252584/pexels-photo-2252584.jpeg" class="d-block w-100" alt="Banner 1" /></div>
-            <div class="carousel-item"><img src="https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg" class="d-block w-100" alt="Banner 2" /></div>
-            <div class="carousel-item"><img src="https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg" class="d-block w-100" alt="Banner 3" /></div>
+            <div class="carousel-item active"><img src="https://images.pexels.com/photos/2252584/pexels-photo-2252584.jpeg" class="d-block w-100" alt="Banner 1" decoding="async" /></div>
+            <div class="carousel-item"><img src="https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg" class="d-block w-100" alt="Banner 2" loading="lazy" decoding="async" /></div>
+            <div class="carousel-item"><img src="https://images.pexels.com/photos/1656663/pexels-photo-1656663.jpeg" class="d-block w-100" alt="Banner 3" loading="lazy" decoding="async" /></div>
         </div>
         <button class="carousel-control-prev" type="button" data-bs-target="#bannerCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
         <button class="carousel-control-next" type="button" data-bs-target="#bannerCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
@@ -640,29 +1077,47 @@
     </section>
 
     <section id="section-suggest" class="container my-5">
-        <h2 class="text-center fw-bold mb-4">Gợi Ý Hôm Nay</h2>
-        <div class="swiper mySwiper-suggest">
-            <div id="suggestionWrapper" class="swiper-wrapper"></div>
-            <div class="swiper-button-prev"></div>
-            <div class="swiper-button-next"></div>
+        <div class="text-center mb-4">
+            <h2 class="fw-bold mb-2">Gợi ý cho bạn hôm nay</h2>
         </div>
+        <div id="homeRecommendationSections" class="recommendation-section-stack"></div>
         <div id="suggestionEmpty" class="empty-state d-none mt-3">Chưa có sản phẩm gợi ý.</div>
     </section>
 
     <section id="section-featured" class="container my-5">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-            <h2 class="fw-bold mb-0">Sản phẩm nổi bật</h2>
+            <h2 class="fw-bold mb-0">Sản phẩm xu hướng</h2>
             <a href="#section-featured" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
         </div>
 
         <div id="featuredGrid" class="row g-4"></div>
-        <div id="featuredEmpty" class="empty-state d-none">Không có sản phẩm để hiển thị.</div>
+        <div id="featuredEmpty" class="empty-state d-none">Chưa có sản phẩm thịnh hành để hiển thị.</div>
+    </section>
+
+    <section id="section-new-arrivals" class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0">Hàng mới về</h2>
+            <a href="#section-new-arrivals" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
+        </div>
+
+        <div id="newArrivalsGrid" class="row g-4"></div>
+        <div id="newArrivalsEmpty" class="empty-state d-none">Chưa có sản phẩm mới để hiển thị.</div>
+    </section>
+
+    <section id="section-best-sellers" class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <h2 class="fw-bold mb-0">Sản phẩm bán chạy</h2>
+            <a href="#section-best-sellers" class="btn btn-outline-success fw-semibold">Xem thêm <i class="bi bi-arrow-right"></i></a>
+        </div>
+
+        <div id="bestSellersGrid" class="row g-4"></div>
+        <div id="bestSellersEmpty" class="empty-state d-none">Chưa có sản phẩm bán chạy để hiển thị.</div>
     </section>
 
     <div class="popup-overlay" id="welcomePopup">
         <div class="popup-container">
             <div class="popup-header">
-                <button class="btn-close-popup" onclick="closeWelcomePopup()"><i class="bi bi-x-lg"></i></button>
+                <button class="btn-close-popup" type="button" data-popup-close="welcome"><i class="bi bi-x-lg"></i></button>
                 <div class="welcome-icon">🎉</div>
                 <h2 class="popup-title">Chào mừng bạn trở lại!</h2>
                 <p class="popup-subtitle">Bạn có 2 ưu đãi đặc biệt đang chờ</p>
@@ -719,7 +1174,27 @@
                 </div>
             </div>
             <div class="popup-footer">
-                <button class="btn-continue" onclick="closeWelcomePopup()"><i class="bi bi-bag-heart me-2"></i>Bắt đầu mua sắm</button>
+                <button class="btn-continue" type="button" data-popup-close="welcome"><i class="bi bi-bag-heart me-2"></i>Bắt đầu mua sắm</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="broadcast-home-popup" id="broadcastHomePopup" aria-hidden="true">
+        <div class="broadcast-home-popup__dialog" role="dialog" aria-modal="true" aria-labelledby="broadcastPopupTitle">
+            <button class="broadcast-home-popup__close" type="button" data-broadcast-popup-close aria-label="Đóng popup">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <div class="broadcast-home-popup__image-wrap d-none" data-broadcast-popup-image-wrap>
+                <img class="broadcast-home-popup__image" data-broadcast-popup-image alt="" />
+            </div>
+            <div class="broadcast-home-popup__text d-none" data-broadcast-popup-text-wrap>
+                <div class="broadcast-home-popup__label" data-broadcast-popup-type>Thông báo mới</div>
+                <h2 class="broadcast-home-popup__title" id="broadcastPopupTitle" data-broadcast-popup-title></h2>
+                <p class="broadcast-home-popup__message" data-broadcast-popup-message></p>
+                <a class="broadcast-home-popup__link" href="/account/notifications">
+                    Xem thông báo
+                    <i class="bi bi-arrow-right"></i>
+                </a>
             </div>
         </div>
     </div>
@@ -729,535 +1204,22 @@
     <form id="homeAntiForgeryForm" class="d-none" method="post">
         @Html.AntiForgeryToken()
     </form>
+    <div id="homePageConfig"
+         class="d-none"
+         data-fallback-image="@ProductImagePaths.FallbackImageRequestPath"
+         data-upload-folder="@ProductImagePaths.UploadFolderRequestPath"></div>
+
+    <button class="back-to-top-btn" type="button" data-back-to-top aria-label="Trở về đầu trang">
+        <i class="bi bi-arrow-up"></i>
+    </button>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-    <script>
-        (() => {
-            const categoryWrapper = document.getElementById("categoryWrapper");
-            const suggestionWrapper = document.getElementById("suggestionWrapper");
-            const featuredGrid = document.getElementById("featuredGrid");
-            const suggestionEmpty = document.getElementById("suggestionEmpty");
-            const featuredEmpty = document.getElementById("featuredEmpty");
-            const searchForm = document.getElementById("headerSearchForm");
-            const searchInput = document.getElementById("headerSearchInput");
-            const btnPrev = document.getElementById("btnPrev");
-            const btnNext = document.getElementById("btnNext");
-            const antiForgeryToken = document.querySelector("#homeAntiForgeryForm input[name='__RequestVerificationToken']")?.value ?? "";
-
-            let swiperInstance = null;
-
-            const endpointBase = "/bff/products";
-            const categoryImages = [
-                "https://images.pexels.com/photos/1435904/pexels-photo-1435904.jpeg",
-                "https://images.pexels.com/photos/1656666/pexels-photo-1656666.jpeg",
-                "https://images.pexels.com/photos/1327838/pexels-photo-1327838.jpeg",
-                "https://images.pexels.com/photos/4198019/pexels-photo-4198019.jpeg",
-                "https://images.pexels.com/photos/2090902/pexels-photo-2090902.jpeg"
-            ];
-            let cartToastTimer = 0;
-
-            const escapeHtml = (value) => {
-                const text = value ?? "";
-                return text
-                    .replaceAll("&", "&amp;")
-                    .replaceAll("<", "&lt;")
-                    .replaceAll(">", "&gt;")
-                    .replaceAll('"', "&quot;")
-                    .replaceAll("'", "&#39;");
-            };
-
-            const toNumber = (value, fallback = 0) => {
-                const n = Number(value);
-                return Number.isFinite(n) ? n : fallback;
-            };
-
-            const toVnd = (value) => toNumber(value, 0).toLocaleString("vi-VN") + " ₫";
-
-            const resolveProductImage = (value) => {
-                const raw = (value ?? "").toString().trim();
-                if (!raw || raw.toLowerCase() === "no-image.png") {
-                    return "@ProductImagePaths.FallbackImageRequestPath";
-                }
-
-                if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("/")) {
-                    return raw;
-                }
-
-                return `@ProductImagePaths.UploadFolderRequestPath${raw}`;
-            };
-
-            const normalizeProduct = (raw) => {
-                const productId = raw.productID ?? raw.productId ?? raw.ProductID ?? raw.ProductId ?? 0;
-                const productName = raw.productName ?? raw.ProductName ?? "Không rõ tên";
-                const categoryName = raw.categoryName ?? raw.CategoryName ?? "Chưa phân loại";
-                const unitName = raw.unitName ?? raw.UnitName ?? "đơn vị";
-                const price = raw.price ?? raw.Price ?? 0;
-                const sellerId = raw.sellerId ?? raw.SellerId ?? raw.primarySellerId ?? raw.PrimarySellerId ?? 0;
-                const sellerName = raw.sellerName ?? raw.SellerName ?? raw.shopName ?? raw.ShopName ?? "";
-                const imageFileName = raw.imageFileName ?? raw.ImageFileName ?? raw.imageUrl ?? raw.ImageUrl ?? "";
-                return { productId, productName, categoryName, unitName, price, sellerId, sellerName, imageFileName };
-            };
-
-            const buildCheckoutUrl = (product, qty = 1) => {
-                const query = new URLSearchParams({
-                    productId: String(product.productId),
-                    productName: product.productName,
-                    unitPrice: String(product.price),
-                    unitSymbol: product.unitName,
-                    quantity: String(qty)
-                });
-
-                const sellerId = toNumber(product.sellerId, 0);
-                if (sellerId > 0) {
-                    query.set("sellerId", String(sellerId));
-                }
-
-                const sellerName = (product.sellerName ?? "").toString().trim();
-                if (sellerName) {
-                    query.set("sellerName", sellerName);
-                }
-
-                return "/checkout?" + query.toString();
-            };
-
-            const buildProductUrl = (product) => {
-                const productId = toNumber(product.productId, 0);
-                return productId > 0 ? `/products/${productId}` : "/search";
-            };
-
-            const showCartToast = (message, tone = "success") => {
-                let toast = document.getElementById("homeCartToast");
-                if (!(toast instanceof HTMLElement)) {
-                    toast = document.createElement("div");
-                    toast.id = "homeCartToast";
-                    toast.style.position = "fixed";
-                    toast.style.right = "20px";
-                    toast.style.bottom = "20px";
-                    toast.style.zIndex = "1085";
-                    toast.style.maxWidth = "320px";
-                    toast.style.padding = "12px 14px";
-                    toast.style.borderRadius = "14px";
-                    toast.style.color = "#fff";
-                    toast.style.fontWeight = "700";
-                    toast.style.lineHeight = "1.55";
-                    toast.style.boxShadow = "0 16px 40px rgba(15, 23, 42, .18)";
-                    toast.style.opacity = "0";
-                    toast.style.pointerEvents = "none";
-                    toast.style.transition = "opacity .2s ease, transform .2s ease";
-                    toast.style.transform = "translateY(12px)";
-                    document.body.appendChild(toast);
-                }
-
-                toast.textContent = message;
-                toast.style.background = tone === "error" ? "#b91c1c" : "#166534";
-                toast.style.opacity = "1";
-                toast.style.transform = "translateY(0)";
-
-                window.clearTimeout(cartToastTimer);
-                cartToastTimer = window.setTimeout(() => {
-                    toast.style.opacity = "0";
-                    toast.style.transform = "translateY(12px)";
-                }, 2200);
-            };
-
-            const submitAddToCart = async (product, qty = 1, triggerButton = null) => {
-                if (!antiForgeryToken || toNumber(product.productId, 0) <= 0) {
-                    return null;
-                }
-
-                const targetButton = triggerButton instanceof HTMLButtonElement ? triggerButton : null;
-                const originalLabel = targetButton?.innerHTML ?? "";
-                if (targetButton) {
-                    targetButton.disabled = true;
-                    targetButton.textContent = "Đang thêm...";
-                }
-
-                try {
-                    const body = new URLSearchParams();
-                    body.set("__RequestVerificationToken", antiForgeryToken);
-                    body.set("ProductId", String(product.productId));
-                    body.set("SellerId", String(Math.max(0, toNumber(product.sellerId, 0))));
-                    body.set("SellerName", (product.sellerName ?? "").toString());
-                    body.set("ProductName", (product.productName ?? "").toString());
-                    body.set("ImageFileName", (product.imageFileName ?? "").toString());
-                    body.set("UnitPrice", String(product.price ?? 0));
-                    body.set("UnitSymbol", (product.unitName ?? "").toString());
-                    body.set("Quantity", String(Math.max(1, toNumber(qty, 1))));
-
-                    const response = await fetch("/cart/add", {
-                        method: "POST",
-                        credentials: "same-origin",
-                        headers: {
-                            "Accept": "application/json",
-                            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                            "X-Requested-With": "XMLHttpRequest"
-                        },
-                        body: body.toString()
-                    });
-
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                        return null;
-                    }
-
-                    const text = await response.text();
-                    let payload = null;
-
-                    try {
-                        payload = text ? JSON.parse(text) : null;
-                    } catch {
-                        payload = null;
-                    }
-
-                    if (!response.ok) {
-                        throw new Error(payload?.message || `HTTP ${response.status}`);
-                    }
-
-                    showCartToast(payload?.message || "Đã thêm sản phẩm vào giỏ hàng.");
-                    return payload;
-                } catch (error) {
-                    showCartToast(error?.message || "Không thể thêm sản phẩm vào giỏ hàng lúc này.", "error");
-                    return null;
-                } finally {
-                    if (targetButton) {
-                        targetButton.disabled = false;
-                        targetButton.innerHTML = originalLabel;
-                    }
-                }
-            };
-
-            const buildCard = (product, sizeClass = "col-6 col-md-4 col-lg-3") => {
-                return `
-                    <div class="${sizeClass}">
-                        <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
-                            <div class="product-image-wrapper">
-                                <img src="${resolveProductImage(product.imageFileName)}" class="product-image" alt="${escapeHtml(product.productName)}" />
-                            </div>
-
-                            <div class="product-overlay">
-                                <h5 class="h6 mb-2">${escapeHtml(product.productName)}</h5>
-                                <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-                                    <span class="fw-bold fs-5">${toVnd(product.price)}</span>
-                                </div>
-                                <a href="${buildProductUrl(product)}" class="view-details mb-3">
-                                    <i class="bi bi-eye me-1"></i> Xem chi tiết
-                                </a>
-                                <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                    <button type="button"
-                                            class="btn btn-outline-light btn-sm"
-                                            data-action="add-cart"
-                                            data-product-id="${product.productId}"
-                                            data-seller-id="${toNumber(product.sellerId, 0)}"
-                                            data-seller-name="${escapeHtml(product.sellerName)}"
-                                            data-product-name="${escapeHtml(product.productName)}"
-                                            data-unit-price="${toNumber(product.price, 0)}"
-                                            data-unit-symbol="${escapeHtml(product.unitName)}">
-                                        <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
-                                    </button>
-                                    <a href="${buildCheckoutUrl(product)}" class="btn btn-success btn-sm">
-                                        <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
-                                    </a>
-                                </div>
-                            </div>
-
-                            <div class="card-body text-center">
-                                <h5 class="card-title h6 mb-1">${escapeHtml(product.productName)}</h5>
-                                <span class="fw-bold" style="color: var(--primary-green)">${toVnd(product.price)}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            };
-
-            const renderCategories = (products) => {
-                const categories = [];
-                const seen = new Set();
-
-                products.forEach((p) => {
-                    const key = (p.categoryName || "Chưa phân loại").trim();
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        categories.push(key);
-                    }
-                });
-
-                if (categories.length === 0) {
-                    categoryWrapper.innerHTML = "<div class='empty-state w-100'>Chưa có dữ liệu danh mục.</div>";
-                    return;
-                }
-
-                categoryWrapper.innerHTML = categories
-                    .map((name, index) => {
-                        const image = categoryImages[index % categoryImages.length];
-                        const keyword = encodeURIComponent(name);
-                        return `
-                            <a href="#"
-                               class="category-item d-flex align-items-end p-3 text-white text-decoration-none position-relative overflow-hidden rounded-4 shadow-sm"
-                               data-category="${escapeHtml(name)}"
-                               data-keyword="${keyword}">
-                                <img class="position-absolute top-0 start-0 w-100 h-100" src="${image}" alt="${escapeHtml(name)}" />
-                                <div class="category-name position-relative fw-semibold z-2">${escapeHtml(name)}</div>
-                            </a>
-                        `;
-                    })
-                    .join("");
-
-                categoryWrapper.querySelectorAll(".category-item").forEach((item) => {
-                    item.addEventListener("click", (event) => {
-                        event.preventDefault();
-                        const keyword = item.getAttribute("data-category") || "";
-                        const url = keyword
-                            ? `/search?q=${encodeURIComponent(keyword)}`
-                            : "/search";
-                        window.location.href = url;
-                    });
-                });
-            };
-
-            const renderSuggestions = (products) => {
-                const suggestions = products.slice(0, 12);
-                const swiperHost = document.querySelector(".mySwiper-suggest");
-                const hasSwiperRuntime = typeof window.Swiper === "function";
-
-                if (suggestions.length === 0) {
-                    suggestionWrapper.innerHTML = "";
-                    suggestionEmpty.classList.remove("d-none");
-                    if (swiperHost instanceof HTMLElement) {
-                        swiperHost.classList.remove("suggestion-fallback-grid");
-                    }
-                    if (swiperInstance) {
-                        swiperInstance.destroy(true, true);
-                        swiperInstance = null;
-                    }
-                    return;
-                }
-
-                suggestionEmpty.classList.add("d-none");
-                if (swiperHost instanceof HTMLElement) {
-                    swiperHost.classList.toggle("suggestion-fallback-grid", !hasSwiperRuntime);
-                }
-
-                suggestionWrapper.innerHTML = suggestions
-                    .map((p) => {
-                        const cardMarkup = `
-                            <div class="card product-card h-100 shadow-sm border-0 rounded-3 position-relative">
-                                <div class="product-image-wrapper">
-                                    <img src="${resolveProductImage(p.imageFileName)}" class="product-image" alt="${escapeHtml(p.productName)}" />
-                                </div>
-
-                                <div class="product-overlay">
-                                    <h5 class="h6 mb-2">${escapeHtml(p.productName)}</h5>
-                                    <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
-                                        <span class="fw-bold fs-5">${toVnd(p.price)}</span>
-                                    </div>
-                                    <a href="${buildProductUrl(p)}" class="view-details mb-3">
-                                        <i class="bi bi-eye me-1"></i> Xem chi tiết
-                                    </a>
-                                    <div class="d-flex flex-wrap gap-2 justify-content-center">
-                                        <button type="button"
-                                                class="btn btn-outline-light btn-sm"
-                                                data-action="add-cart"
-                                                data-product-id="${p.productId}"
-                                                data-seller-id="${toNumber(p.sellerId, 0)}"
-                                                data-seller-name="${escapeHtml(p.sellerName)}"
-                                                data-product-name="${escapeHtml(p.productName)}"
-                                                data-unit-price="${toNumber(p.price, 0)}"
-                                                data-unit-symbol="${escapeHtml(p.unitName)}">
-                                            <i class="bi bi-cart-plus me-1"></i> Thêm vào giỏ
-                                        </button>
-                                        <a href="${buildCheckoutUrl(p)}" class="btn btn-success btn-sm">
-                                            <i class="bi bi-lightning-charge-fill me-1"></i> Mua ngay
-                                        </a>
-                                    </div>
-                                </div>
-
-                                <div class="card-body text-center">
-                                    <h5 class="card-title h6 mb-1">${escapeHtml(p.productName)}</h5>
-                                    <span class="fw-bold" style="color: var(--primary-green)">${toVnd(p.price)}</span>
-                                </div>
-                            </div>
-                        `;
-
-                        return hasSwiperRuntime
-                            ? `<div class="swiper-slide">${cardMarkup}</div>`
-                            : `<div>${cardMarkup}</div>`;
-                    })
-                    .join("");
-
-                if (swiperInstance) {
-                    swiperInstance.destroy(true, true);
-                    swiperInstance = null;
-                }
-
-                if (!hasSwiperRuntime) {
-                    console.warn("Swiper runtime unavailable. Rendering suggestions in static grid mode.");
-                    return;
-                }
-
-                swiperInstance = new Swiper(".mySwiper-suggest", {
-                    slidesPerView: 2,
-                    spaceBetween: 16,
-                    breakpoints: {
-                        576: { slidesPerView: 2 },
-                        768: { slidesPerView: 3 },
-                        992: { slidesPerView: 4 },
-                        1200: { slidesPerView: 5 }
-                    },
-                    loop: suggestions.length > 5,
-                    autoplay: {
-                        delay: 3500,
-                        disableOnInteraction: false
-                    },
-                    navigation: {
-                        nextEl: ".swiper-button-next",
-                        prevEl: ".swiper-button-prev"
-                    }
-                });
-
-                const swiperEl = document.querySelector(".mySwiper-suggest");
-                if (swiperEl && swiperInstance?.autoplay) {
-                    swiperEl.addEventListener("mouseenter", () => swiperInstance.autoplay.stop());
-                    swiperEl.addEventListener("mouseleave", () => swiperInstance.autoplay.start());
-                }
-            };
-
-            const renderFeatured = (products) => {
-                const featured = products.slice(0, 12);
-                if (featured.length === 0) {
-                    featuredGrid.innerHTML = "";
-                    featuredEmpty.classList.remove("d-none");
-                    return;
-                }
-
-                featuredEmpty.classList.add("d-none");
-                featuredGrid.innerHTML = featured.map((p) => buildCard(p)).join("");
-            };
-
-            document.addEventListener("click", (event) => {
-                const target = event.target;
-                if (!(target instanceof HTMLElement)) {
-                    return;
-                }
-
-                const addCartButton = target.closest("button[data-action='add-cart']");
-                if (!(addCartButton instanceof HTMLButtonElement)) {
-                    return;
-                }
-
-                event.preventDefault();
-
-                const product = {
-                    productId: toNumber(addCartButton.getAttribute("data-product-id"), 0),
-                    sellerId: toNumber(addCartButton.getAttribute("data-seller-id"), 0),
-                    sellerName: addCartButton.getAttribute("data-seller-name") ?? "",
-                    productName: addCartButton.getAttribute("data-product-name") ?? "",
-                    price: toNumber(addCartButton.getAttribute("data-unit-price"), 0),
-                    unitName: addCartButton.getAttribute("data-unit-symbol") ?? "đơn vị"
-                };
-
-                void submitAddToCart(product, 1, addCartButton);
-            });
-
-            const loadHomeProducts = async (keyword = "") => {
-                try {
-                    const url = keyword
-                        ? `${endpointBase}?name=${encodeURIComponent(keyword)}`
-                        : endpointBase;
-
-                    const response = await fetch(url, {
-                        method: "GET",
-                        headers: { Accept: "application/json" }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Không tải được sản phẩm: ${response.status}`);
-                    }
-
-                    const payload = await response.json();
-                    const products = Array.isArray(payload)
-                        ? payload.map(normalizeProduct)
-                        : [];
-
-                    renderCategories(products);
-                    renderSuggestions(products);
-                    renderFeatured(products);
-                } catch (error) {
-                    categoryWrapper.innerHTML = "<div class='empty-state w-100'>Không tải được danh mục.</div>";
-                    suggestionWrapper.innerHTML = "";
-                    featuredGrid.innerHTML = "";
-                    suggestionEmpty.classList.remove("d-none");
-                    featuredEmpty.classList.remove("d-none");
-                    console.error(error);
-                }
-            };
-
-            searchForm.addEventListener("submit", (event) => {
-                event.preventDefault();
-                const keyword = searchInput.value.trim();
-                const url = keyword ? `/search?q=${encodeURIComponent(keyword)}` : "/search";
-                window.location.href = url;
-            });
-
-            document.querySelectorAll("[data-header-keyword]").forEach((link) => {
-                link.addEventListener("click", (event) => {
-                    event.preventDefault();
-                    const keyword = (link.getAttribute("data-header-keyword") || "").trim();
-                    if (searchInput instanceof HTMLInputElement) {
-                        searchInput.value = keyword;
-                    }
-                    const url = keyword ? `/search?q=${encodeURIComponent(keyword)}` : "/search";
-                    window.location.href = url;
-                });
-            });
-
-            const step = 260;
-            btnPrev.addEventListener("click", () => categoryWrapper.scrollBy({ left: -step, behavior: "smooth" }));
-            btnNext.addEventListener("click", () => categoryWrapper.scrollBy({ left: step, behavior: "smooth" }));
-
-            loadHomeProducts();
-        })();
-
-        function closeWelcomePopup() {
-            const popup = document.getElementById("welcomePopup");
-            if (!popup) return;
-            popup.classList.remove("show");
-            popup.style.display = "none";
-            sessionStorage.setItem("hideWelcomePopup", "1");
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const popup = document.getElementById("welcomePopup");
-            if (!popup) return;
-
-            popup.addEventListener("click", function (event) {
-                if (event.target === this) {
-                    closeWelcomePopup();
-                }
-            });
-
-            try {
-                const params = new URLSearchParams(window.location.search);
-                const from = params.get("from");
-                const ref = document.referrer || "";
-                const isHidden = sessionStorage.getItem("hideWelcomePopup") === "1";
-                const shouldHide = from === "thankyou"
-                    || ref.includes("/checkout/success")
-                    || ref.includes("/Checkout/Success")
-                    || isHidden;
-                const shouldShow = params.get("showCoupon") === "1" && !shouldHide;
-
-                if (shouldShow) {
-                    popup.classList.add("show");
-                } else {
-                    popup.classList.remove("show");
-                    popup.style.display = "none";
-                }
-            } catch {
-                popup.classList.remove("show");
-                popup.style.display = "none";
-            }
-        });
-    </script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/home-page.js" asp-append-version="true"></script>
+    <script src="~/js/home-welcome-popup.js" asp-append-version="true"></script>
+    <script src="~/js/home-broadcast-popup.js" asp-append-version="true"></script>
+    <script src="~/js/home-back-to-top.js" asp-append-version="true"></script>
+    <script src="~/js/csp-phase2.js" asp-append-version="true"></script>
 </body>
 </html>

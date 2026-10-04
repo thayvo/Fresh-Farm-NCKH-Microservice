@@ -23,7 +23,6 @@ public sealed class ProductReviewsController : ControllerBase
     }
 
     [HttpGet("products/{productId:int}")]
-    [AllowAnonymous]
     public async Task<IActionResult> GetByProduct([FromRoute] int productId, CancellationToken cancellationToken = default)
     {
         if (productId <= 0)

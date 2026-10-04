@@ -16,3 +16,19 @@ public sealed class AdminLoginViewModel
     [Display(Name = "Ghi nhớ tôi")]
     public bool RememberMe { get; set; }
 }
+
+public sealed class AdminTwoFactorViewModel
+{
+    [Required(ErrorMessage = "Vui lòng nhập mã xác thực 6 số.")]
+    [Display(Name = "Mã xác thực 6 số")]
+    public string Code { get; set; } = string.Empty;
+
+    public bool RequiresSetup { get; set; }
+    public bool RememberMe { get; set; }
+    public string? ManualEntryKey { get; set; }
+    public string? OtpAuthUri { get; set; }
+    public string? QrCodeImageDataUri { get; set; }
+    public string? AuthenticatorIssuer { get; set; }
+    public string? AuthenticatorAccountName { get; set; }
+    public string? ChallengeMessage { get; set; }
+}

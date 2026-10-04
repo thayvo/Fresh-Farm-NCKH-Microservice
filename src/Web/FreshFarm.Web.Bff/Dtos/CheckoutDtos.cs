@@ -11,6 +11,8 @@ public sealed class CheckoutItemInputDto // 1 dong item user dat.
     public int Quantity { get; set; } // So luong mua.
     public decimal UnitPrice { get; set; } // Don gia tai thoi diem dat.
     public string? UnitSymbol { get; set; } // Don vi tinh (kg, hop...).
+    public int? RecommendationPosition { get; set; } // Vi tri recommendation neu item den tu goi y.
+    public int? Position { get; set; } // Alias vi tri recommendation cho payload don gian.
 }
 
 public sealed class CheckoutSubmitRequestDto // Payload gui qua BFF -> Ordering POST /api/orders.
@@ -31,6 +33,13 @@ public sealed class CheckoutSellerShippingInputDto
     public decimal ShippingFee { get; set; }
     public string? ServiceName { get; set; }
     public string? ShippingOriginLabel { get; set; }
+    public int? PackageWeight { get; set; }
+    public int? PackageLength { get; set; }
+    public int? PackageWidth { get; set; }
+    public int? PackageHeight { get; set; }
+    public int? PackageInsuranceValue { get; set; }
+    public string? PackageItemName { get; set; }
+    public int? PackageItemQuantity { get; set; }
 }
 
 public sealed class CheckoutShippingFeePreviewRequestDto
@@ -60,6 +69,13 @@ public sealed class CheckoutSellerShippingFeeBreakdownDto
     public decimal ShippingFee { get; set; }
     public string ServiceName { get; set; } = string.Empty;
     public string ShippingOriginLabel { get; set; } = string.Empty;
+    public int PackageWeight { get; set; }
+    public int PackageLength { get; set; }
+    public int PackageWidth { get; set; }
+    public int PackageHeight { get; set; }
+    public int PackageInsuranceValue { get; set; }
+    public string PackageItemName { get; set; } = string.Empty;
+    public int PackageItemQuantity { get; set; }
 }
 
 public sealed class CheckoutShippingInputDto
